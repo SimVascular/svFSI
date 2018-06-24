@@ -1,0 +1,107 @@
+checkgraph.c:            if (adjwgt != NULL && adjwgt[l] != adjwgt[j]) {
+debug.c:  if (graph->adjwgt == NULL) {
+graph.c:  graph->vwgt = NULL;
+graph.c:  graph->adjwgt = NULL;
+kwayfm.c:          if (myrinfo->edegrees == NULL) {
+kwayfm.c:        if (myrinfo->edegrees == NULL) {
+kwayfm.c:        if (myrinfo->edegrees == NULL) {
+kwayrefine.c:    if (graph->vwgt == NULL) {
+kwayrefine.c:  if (ctrl->wspace.edegrees != NULL)
+kwayrefine.c:    myrinfo->edegrees = NULL;
+kwayrefine.c:    myrinfo->edegrees = NULL;
+kwayrefine.c:        myrinfo->edegrees = NULL;
+kwayrefine.c:  graph->coarser = NULL;
+kwayvolfm.c:    if (myrinfo->edegrees == NULL) {
+kwayvolfm.c:  vsize = (graph->vsize == NULL ? graph->vwgt : graph->vsize);
+kwayvolrefine.c:    MALLOC_CHECK(NULL);
+kwayvolrefine.c:    myrinfo->edegrees = NULL;
+kwayvolrefine.c:    myrinfo->edegrees = NULL;
+kwayvolrefine.c:        myrinfo->edegrees = NULL;
+kwayvolrefine.c:  graph->coarser = NULL;
+memory.c:  ctrl->wspace.pmat = NULL;
+memory.c:    ctrl->wspace.vedegrees = NULL;
+memory.c:    ctrl->wspace.edegrees = NULL;
+memory.c:    ctrl->wspace.vedegrees = NULL;
+memory.c:  graph->gdata = graph->rdata = NULL;
+memory.c:  graph->xadj = graph->vwgt = graph->adjncy = graph->adjwgt = NULL;
+memory.c:  graph->adjwgtsum = NULL;
+memory.c:  graph->label = NULL;
+memory.c:  graph->cmap = NULL;
+memory.c:  graph->where = graph->pwgts = NULL;
+memory.c:  graph->id = graph->ed = NULL;
+memory.c:  graph->bndptr = graph->bndind = NULL;
+memory.c:  graph->rinfo = NULL;
+memory.c:  graph->vrinfo = NULL;
+memory.c:  graph->nrinfo = NULL;
+memory.c:  graph->nvwgt = NULL;
+memory.c:  graph->npwgts = NULL;
+memory.c:  graph->vsize = NULL;
+memory.c:  graph->coarser = graph->finer = NULL;
+meshpart.c:  METIS_PartGraphKway(nn, xadj, adjncy, NULL, NULL, &wgtflag, &pnumflag, nparts, options, edgecut, npart);
+meshpart.c:  METIS_PartGraphKway(ne, xadj, adjncy, NULL, NULL, &wgtflag, &pnumflag, nparts, options, edgecut, epart);
+mkwayfmh.c:          if (myrinfo->edegrees == NULL) {
+mkwayfmh.c:        if (myrinfo->edegrees == NULL) {
+mkwayrefine.c:    myrinfo->edegrees = NULL;
+mkwayrefine.c:    myrinfo->edegrees = NULL;
+mkwayrefine.c:        myrinfo->edegrees = NULL;
+mkwayrefine.c:  graph->coarser = NULL;
+mpmetis.c:  lubvec = rubvec = NULL;
+mrefine.c:  graph->coarser = NULL;
+ometis.c:  SetUpGraph(&graph, OP_OEMETIS, *nvtxs, 1, xadj, adjncy, NULL, NULL, 0);
+ometis.c:    SetUpGraph(&graph, OP_ONMETIS, *nvtxs, 1, xadj, adjncy, NULL, NULL, 0);
+ometis.c:  SetUpGraph(&graph, OP_ONMETIS, *nvtxs, 1, xadj, adjncy, vwgt, NULL, 2);
+ometis.c:    if (sgraphs[i].adjwgt == NULL) {
+ometis.c:  ASSERT(bndptr != NULL);
+ometis.c:  ASSERT(bndptr != NULL);
+ometis.c:      sgraphs[iii].adjwgt = NULL;  /* A marker to call MMD on the driver */
+parmetis.c:    SetUpGraph(&graph, OP_ONMETIS, nvtxs, 1, xadj, adjncy, NULL, NULL, 0);
+parmetis.c:  graph.npwgts = NULL;
+pmetis.c:  ASSERT(bndptr != NULL);
+pqueue.c:  queue->buckets = NULL;
+pqueue.c:  queue->nodes = NULL;
+pqueue.c:  queue->heap = NULL;
+pqueue.c:  queue->locator = NULL;
+pqueue.c:      queue->buckets[i] = NULL;
+pqueue.c:      queue->buckets[i] = NULL;
+pqueue.c:    newnode->prev = NULL;
+pqueue.c:    if (newnode->next != NULL)
+pqueue.c:    if (newnode->prev != NULL)
+pqueue.c:    if (newnode->next != NULL)
+pqueue.c:    if (buckets[gain] == NULL && gain == queue->maxgain) {
+pqueue.c:        for (; buckets[queue->maxgain]==NULL; queue->maxgain--);
+pqueue.c:    if (newnode->prev != NULL)
+pqueue.c:    if (newnode->next != NULL)
+pqueue.c:    newnode->prev = NULL;
+pqueue.c:    if (newnode->next != NULL)
+pqueue.c:    if (tptr->next != NULL) {
+pqueue.c:      tptr->next->prev = NULL;
+pqueue.c:        for (; queue->buckets[queue->maxgain]==NULL; queue->maxgain--);
+refine.c:  graph->coarser = NULL;
+srefine.c:  graph->coarser = NULL;
+stat.c:  if (vwgt == NULL) {
+stat.c:  if (adjwgt == NULL) {
+stat.c:    IsConnectedSubdomain(NULL, graph, i, 1);
+stat.c:    graph->vwgt = NULL;
+stat.c:    graph->adjwgt = NULL;
+stat.c:  if (vwgt == NULL) {
+stat.c:  if (adjwgt == NULL) {
+stat.c:    graph->vwgt = NULL;
+stat.c:    graph->adjwgt = NULL;
+stat.c:  if (vwgt == NULL && ncon == 1) {
+subdomains.c:          if (myrinfo->edegrees == NULL) {
+subdomains.c:        if (myrinfo->edegrees == NULL) {
+subdomains.c:    if (myrinfo->edegrees == NULL) {
+subdomains.c:      if (myrinfo->edegrees == NULL) {
+subdomains.c:    if (myrinfo->edegrees == NULL) {
+subdomains.c:      if (myrinfo->edegrees == NULL) {
+util.c:    return NULL;
+util.c:    return NULL;
+util.c:    return NULL;
+util.c:    return NULL;
+util.c:    return NULL;
+util.c:    return NULL;
+util.c:  if (ptr == NULL) 
+util.c:  if (*ptr1 != NULL)
+util.c:  *ptr1 = NULL;
+util.c:    if (*ptr != NULL)
+util.c:    *ptr = NULL;

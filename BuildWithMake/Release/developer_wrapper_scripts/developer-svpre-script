@@ -1,0 +1,11 @@
+
+# run the executable
+case "$*" in
+"")
+$SV_HOME/BuildWithMake/Bin/svpre.exe
+;;
+*)
+$SV_HOME/BuildWithMake/Bin/svpre.exe $*
+;;
+esac
+

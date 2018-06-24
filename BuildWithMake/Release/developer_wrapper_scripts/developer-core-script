@@ -1,0 +1,66 @@
+#!/bin/bash -f
+
+# simvascular specific additions
+
+export SV_OS=REPLACEME_SV_OS
+export SOFTWARE_PLATFORM=REPLACEME_SOFTWARE_PLATFORM
+export CXX_COMPILER_VERSION=REPLACEME_CXX_COMPILER_VERSION
+export FORTRAN_COMPILER_VERSION=REPLACEME_FORTRAN_COMPILER_VERSION
+export LIB_BUILD_DIR=REPLACEME_LIB_BUILD_DIR
+export SV_VERSION=REPLACEME_SV_VERSION
+
+# must specify paths in unix style
+export OPEN_SOFTWARE_BINARIES_TOPLEVEL=REPLACEME_OPEN_SOFTWARE_BINARIES_TOPLEVEL
+export LICENSED_SOFTWARE_TOPLEVEL=REPLACEME_LICENSED_SOFTWARE_TOPLEVEL
+export SV_HOME=REPLACEME_SV_HOME
+
+#export SV_STATIC_BUILD=REPLACEME_SV_STATIC_BUILD
+
+################################################################
+# YOU PROBABLY DON'T NEED TO CHANGE ANYTHING BELOW THIS LINE.  #
+################################################################
+
+# simvascular addition
+export LD_LIBRARY_PATH=$SV_HOME/BuildWithMake/Lib/$LIB_BUILD_DIR:$LD_LIBRARY_PATH
+
+# Tcl/Tk additions
+export TCL_LIBRARY=REPLACEME_TCL_LIBRARY
+export TK_LIBRARY=REPLACEME_TK_LIBRARY
+export LD_LIBRARY_PATH=REPLACEME_TCLTK_SO_PATH:$LD_LIBRARY_PATH
+
+# vtk additions
+case "$SV_OS" in
+"windows" )
+export LD_LIBRARY_PATH=REPLACEME_VTK_SO_PATH:$LD_LIBRARY_PATH
+# leave VTK_RENDERER blank for win32
+;;
+"linux" )
+export LD_LIBRARY_PATH=REPLACEME_VTK_SO_PATH:$LD_LIBRARY_PATH
+export VTK_RENDERER=OpenGL
+;;
+* )
+export LD_LIBRARY_PATH=REPLACEME_VTK_SO_PATH:$LD_LIBRARY_PATH
+;;
+esac
+# Vtk Tcl path additions
+export TCLLIBPATH=REPLACEME_VTK_TCL_LIB_PATH
+# Vtk Python additions (included above with python site-packages)
+
+# MPICH2 additions
+export LD_LIBRARY_PATH=REPLACEME_MPICH_SO_PATH:$LD_LIBRARY_PATH
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:REPLACEME_INTEL_COMPILER_SO_PATH
+
+# needed for macosx
+export DYLD_LIBRARY_PATH=$LD_LIBRARY_PATH
+
+# need to convert to dos style paths on windows
+case "$SV_OS" in
+ "windows" )
+export OPEN_SOFTWARE_BINARIES_TOPLEVEL=`cygpath --windows -t mixed $OPEN_SOFTWARE_BINARIES_TOPLEVEL`
+export SV_HOME=`cygpath --windows -t mixed $SV_HOME`
+export TCL_LIBRARY=`cygpath --windows -t mixed $TCL_LIBRARY`
+export TK_LIBRARY=`cygpath --windows -t mixed $TK_LIBRARY`
+export PATH=$LD_LIBRARY_PATH:$PATH
+;;
+esac

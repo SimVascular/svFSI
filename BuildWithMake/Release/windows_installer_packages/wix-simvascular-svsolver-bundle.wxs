@@ -1,0 +1,33 @@
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi"
+     xmlns:bal="http://schemas.microsoft.com/wix/BalExtension"
+     xmlns:util="http://schemas.microsoft.com/wix/UtilExtension">
+
+  <Bundle Name="SimVascular svSolver Complete Windows Installer (64-bit)" Version="REPLACE_SV_FULL_VER_NO" Manufacturer="simvascular.org" UpgradeCode="E278326B-9FAA-4D85-8B3E-F105C1CE824A" Copyright="2016" IconSourceFile="windows_msi_helpers/simvascular.ico" AboutUrl="http://www.simvascular.org">
+
+     <BootstrapperApplicationRef Id="WixStandardBootstrapperApplication.RtfLicense">
+        <bal:WixStandardBootstrapperApplication LicenseFile="License.rtf" LogoFile="windows_installer_packages/msi-logo.png" />
+     </BootstrapperApplicationRef>
+
+      <util:RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\MPI" Value="Version" Variable="MSMPI_EXISTS" Result="exists" Win64="yes" />
+      <util:RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\MPI" Value="Version" Variable="MSMPI_VERSION" Result="value" Win64="yes" />
+
+      <util:RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\DevDiv\vc\Servicing\14.0\RuntimeMinimum" Value="Version" Variable="MSVC_EXISTS" Result="exists" Win64="yes"/>
+      <util:RegistrySearch Root="HKLM" Key="SOFTWARE\Microsoft\DevDiv\vc\Servicing\14.0\RuntimeMinimum" Value="Version" Variable="MSVC_VERSION" Result="value" Win64="yes"/>
+
+     <Chain>
+
+     <ExePackage Id="Dependency1" DisplayName="MSVC 2013 C++ Runtime Libraries" SourceFile="windows_installer_packages/vcredist_x64-MSVC-2013-update-4.exe" Vital="no"
+         DetectCondition="(MSVC_EXISTS)" Permanent="yes"
+     />
+     <MsiPackage Id="Dependency2" DisplayName="Intel Fortran Runtime Libraries" SourceFile="windows_installer_packages/w_fcompxe_redist_intel64_2013_sp1.5.239.msi" Vital="no" DisplayInternalUI="yes" Permanent="yes" />
+     <ExePackage Id="Dependency3" DisplayName="Microsoft MPI" SourceFile="windows_installer_packages/MSMpiSetup.exe" Vital="no"
+         DetectCondition="(MSMPI_EXISTS)" Permanent="yes"
+     />
+
+     <MsiPackage Id="MainPackage" SourceFile="simvascular-svsolver.msi" Vital="yes" DisplayInternalUI="yes"/>
+      
+    </Chain>
+
+  </Bundle>
+
+</Wix>

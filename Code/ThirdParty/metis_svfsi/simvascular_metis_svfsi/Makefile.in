@@ -1,0 +1,36 @@
+# Which compiler to use
+# This is included from ../../Makefile.in
+#CC = mpicc
+
+
+# What optimization level to use
+#OPTFLAGS = -g
+OPTFLAGS = -O3 
+
+# Include directories for the compiler
+INCDIR = 
+
+# What options to be used by the compiler
+#COPTIONS = -g 
+COPTIONS = -DNDEBUG
+
+# Which loader to use
+LD = $(CC)
+
+# In which directories to look for any additional libraries
+LIBDIR = 
+
+# What additional libraries to link the programs with (eg., -lmpi)
+#XTRALIBS = -lefence
+#XTRALIBS = -ldmalloc
+
+# What archiving to use
+# This is included from ../../Makefile.in
+#AR = ar rv
+
+# What to use for indexing the archive
+# This is included from ../../Makefile.in
+#RANLIB = ranlib
+#RANLIB = ar -ts
+
+VERNUM = 3.2.0

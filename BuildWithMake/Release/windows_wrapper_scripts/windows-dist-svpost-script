@@ -1,0 +1,10 @@
+
+# run the executable
+case "$*" in
+"")
+"$SV_HOME/svpost-bin.exe"
+;;
+*)
+"$SV_HOME/svpost-bin.exe" $*
+;;
+esac

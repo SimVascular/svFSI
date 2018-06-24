@@ -1,0 +1,28 @@
+cmake_minimum_required(VERSION 2.8.8)
+project(METIS_SVFSI)
+if (NOT METIS_SVFSI_LIBRARY_NAME)
+  set(METIS_SVFSI_LIBRARY_NAME metis_svfsi)
+endif()
+
+if (NOT PARMETIS_SVFSI_LIBRARY_NAME)
+  set(PARMETIS_SVFSI_LIBRARY_NAME parmetis_svfsi)
+endif()
+
+#set default build type to relwithdebinfo, also sets flags O2 on linux
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'RelWithDebInfo' as none was specified.")
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build." FORCE)
+  mark_as_advanced(CMAKE_BUILD_TYPE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
+      "MinSizeRel" "RelWithDebInfo")
+endif()
+
+if(WIN32)
+  add_definitions("/Zi")
+  add_definitions("-DWINDOWS")
+endif()
+
+add_subdirectory(METISLib)
+
+# add_subdirectory(ParMETISLib)

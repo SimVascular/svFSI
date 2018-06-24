@@ -1,0 +1,36 @@
+cmake_minimum_required(VERSION 2.8.8)
+
+Project(NSPCG Fortran)
+if (NOT NSPCG_LIBRARY_NAME)
+  set(NSPCG_LIBRARY_NAME nspcg)
+endif()
+#set default build type to relwithdebinfo, also sets flags O2 on linux
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to 'RelWithDebInfo' as none was specified.")
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Choose the type of build." FORCE)
+  mark_as_advanced(CMAKE_BUILD_TYPE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
+    "MinSizeRel" "RelWithDebInfo")
+endif()
+
+if(WIN32)
+  add_definitions("/Zi /Ox /MD")
+endif()
+
+add_definitions("-w")
+
+set(FSRCS nspcg1.f nspcg2.f nspcg3.f nspcg4.f nspcg5.f)
+if(SV_USE_THIRDPARTY_SHARED_LIBRARIES)
+  add_library(${NSPCG_LIBRARY_NAME} SHARED ${FSRCS})
+else()
+  add_library(${NSPCG_LIBRARY_NAME} STATIC ${FSRCS})
+endif()
+
+if(SV_INSTALL_LIBS)
+  install(TARGETS ${NSPCG_LIBRARY_NAME}
+    RUNTIME DESTINATION ${SV_INSTALL_RUNTIME_DIR} COMPONENT ThirdPartyExecutables
+    LIBRARY DESTINATION ${SV_INSTALL_LIBRARY_DIR} COMPONENT ThirdPartyLibraries
+    ARCHIVE DESTINATION ${SV_INSTALL_ARCHIVE_DIR} COMPONENT ThirdPartyLibraries
+    )
+endif()
