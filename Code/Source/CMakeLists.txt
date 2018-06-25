@@ -27,8 +27,35 @@
  # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  #
  #=========================================================================#
-set(INDENTS "${INDENTS}    ")
-message(STATUS "FlowSolvers")
-message(STATUS "${INDENTS}ThreeDSolver")
 
-add_subdirectory(ThreeDSolver)
+set(INDENTS "${INDENTS}    ")
+
+#-----------------------------------------------------------------------------
+# svFSI
+#-----------------------------------------------------------------------------
+if(SV_USE_DUMMY_MPI)
+    message(FATAL_ERROR "svFSI requires MPI (not dummyMPI) and SV_USE_DUMMY_MPI \
+            is set to true.")
+endif()
+
+set(FLOWSOLVER_SUBDIRS ${FLOWSOLVER_SUBDIRS} svFSILS)
+set(FLOWSOLVER_SUBDIRS ${FLOWSOLVER_SUBDIRS} svFSI)
+
+#-----------------------------------------------------------------------------
+# Optional header path
+#-----------------------------------------------------------------------------
+set(FLOWSOLVER_OPTIONS_HEADER_PATH ${CMAKE_CURRENT_BINARY_DIR} CACHE INTERNAL "" FORCE)
+dev_message("Flowsolver Header Path:  ${FLOWSOLVER_OPTIONS_HEADER_PATH}" )
+
+#-----------------------------------------------------------------------------
+# Include and add subdirs
+#-----------------------------------------------------------------------------
+foreach(dir ${FLOWSOLVER_SUBDIRS})
+  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/${dir})
+endforeach()
+
+message(STATUS "${INDENTS}ThreeDSolver Components")
+foreach(dir ${FLOWSOLVER_SUBDIRS})
+  message(STATUS "${INDENTS}    ${dir}")
+  add_subdirectory(${dir})
+endforeach()

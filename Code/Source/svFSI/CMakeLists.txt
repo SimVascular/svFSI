@@ -32,15 +32,11 @@
 include_directories(${SV_SOURCE_DIR}/ThirdParty/parmetis_svfsi/simvascular_parmetis_svfsi/ParMETISLib)
 include_directories(${SV_SOURCE_DIR}/ThirdParty/tetgen/simvascular_tetgen)
 
-if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-  set(CMAKE_Fortran_FLAGS "-cpp -pthread")
-else()
-  # nothing for now
-  # may need to set for intel compiler or others
-endif()
 
 # Find Trilinos package if requested
 if(SV_USE_TRILINOS)
+
+  # source: https://github.com/trilinos/Trilinos_tutorial/wiki/CMakeFindPackageTrilinosExample
 
   # It may be required to add a path for Trilinos 
   # This can be accomplished by adding the Trilinos 
@@ -174,11 +170,14 @@ target_link_libraries(${SV_SVFSI_EXE}
   ${METIS_SVFSI_LIBRARY_NAME}
   ${PARMETIS_SVFSI_LIBRARY_NAME}
   ${TETGEN_LIBRARY_NAME}
-  ${SV_MPI_EXTRA_LIBRARY}
   ${SV_MPI_Fortran_LIBRARIES}
   ${SV_LIB_SVFSILS_NAME}${SV_MPI_NAME_EXT}
   )
 
+# extra MPI libraries only if there are not set to NOT_FOUND or other null 
+if(SV_MPI_EXTRA_LIBRARY)
+  target_link_libraries(${SV_SVFSI_EXE} ${SV_MPI_EXTRA_LIBRARY})
+endif()
 
 if(WITH_TRILINOS)
   target_link_libraries(${SV_SVFSI_EXE} ${Trilinos_LIBRARIES} ${Trilinos_TPL_LIBRARIES})

@@ -35,7 +35,6 @@ option(SV_SUPPRESS_WARNINGS "Option to suppress all compiler warnings while comp
 # General Options
 option(SV_USE_MPI "Use MSMPI" ON)
 option(SV_USE_MSMPI "Use MSMPI" OFF)
-option(SV_BUILD_ADDITIONAL_NOMPI_VERSION "Distribute an additional nompi version of svsolver" ON)
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
@@ -77,26 +76,10 @@ option(SV_EXTERNALS_USE_TOPLEVEL_DIR "If ON, SV_EXTERNALS_TOPLEVEL_DIR will be u
 
 
 #-----------------------------------------------------------------------------
-
+# SVFSILS linear solver is always on 
 #-----------------------------------------------------------------------------
-# Linear Solver Options: SVLS
-option(SV_USE_SVLS "Use svLS as linear solver" ON )
-if(SV_USE_SVLS)
-  set(USE_SVLS 1)
-endif()
-set(SVLS_BUILD_TYPE "Source")
-
-option(SV_USE_SVFSILS "Use svFSILS as an additional linear solver" ON )
-if(SV_USE_SVFSILS)
-  set(USE_SVFSILS 1)
-endif()
+set(USE_SVFSILS 1)
 set(SVFSILS_BUILD_TYPE "Source")
-
-option(SV_USE_LESLIB "Use leslib as linear solver" OFF )
-if(SV_USE_LESLIB)
-  set(SV_USE_LESLIB 1)
-endif()
-#-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
 # WIN32
@@ -111,7 +94,7 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   # svsolver requires -ffixed-line-length-132 but
   # svFSI does not compile with this flag
   # reset flags for svFSILS and svFSI in their local CMakeLists
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -ffixed-line-length-132 -cpp")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp")
 else()
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -132 -fpp")
 endif()
