@@ -34,7 +34,6 @@ option(SV_SUPPRESS_WARNINGS "Option to suppress all compiler warnings while comp
 #-----------------------------------------------------------------------------
 # General Options
 option(SV_USE_MPI "Use MSMPI" ON)
-option(SV_USE_DUMMY_MPI "Use Dummy MPI" OFF)
 option(SV_USE_MSMPI "Use MSMPI" OFF)
 option(SV_BUILD_ADDITIONAL_NOMPI_VERSION "Distribute an additional nompi version of svsolver" ON)
 #-----------------------------------------------------------------------------
@@ -58,17 +57,6 @@ option(SV_USE_NOTIMER "Use notimer" ON)
 
 #-----------------------------------------------------------------------------
 # Solver Build Options (Modules)
-option(SV_USE_SOLVERIO "Option to build solverIO module (requires Fortran)" ON)
-option(SV_USE_SVPRE "Option to build Pre-solver module (requires Fortran)" ON)
-option(SV_USE_SVPOST "Option to build post-solver module" ON)
-option(SV_SOLVERIO_REDIRECT "Option to redirect solver IO" OFF)
-option(SV_USE_CORONARY "" ON)
-option(SV_USE_CLOSEDLOOP "" ON)
-option(SV_USE_VARWALL "" ON)
-option(SV_USE_SPARSE "Use sparse Library" ON)
-option(SV_USE_METIS "Use metis Library" ON)
-option(SV_USE_NSPCG "Use nspcg Library" ON)
-# Additional metis, parmetis options necessary for svfsi
 option(SV_USE_METIS_SVFSI "Use metis_svfsi Library" ON)
 option(SV_USE_PARMETIS_SVFSI "Use parmetis_svfsi Library" ON)
 option(SV_USE_TETGEN "Use tetgen Library" ON)
@@ -86,9 +74,8 @@ set(SV_EXTERNALS_BIN_DIR "${SV_EXTERNALS_TOPLEVEL_DIR}/bin/${SV_COMPILER_DIR}/${
 set(SV_EXTERNALS_INSTALL_PREFIX "sv_externals" CACHE PATH "Externals toplevel directory")
 
 option(SV_EXTERNALS_USE_TOPLEVEL_DIR "If ON, SV_EXTERNALS_TOPLEVEL_DIR will be used as location for external packages" OFF)
-# VTK
 
-simvascular_add_new_external(VTK 6.2.0 ON OFF vtk)
+
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

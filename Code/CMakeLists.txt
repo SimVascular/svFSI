@@ -92,9 +92,6 @@ include(SimVascularInstallSetup)
 
 #-----------------------------------------------------------------------------
 # Set EXE names for the executables
-set(SV_PRESOLVER_EXE "svpre")
-set(SV_FLOWSOLVER_EXE "svsolver")
-set(SV_POSTSOLVER_EXE "svpost")
 set(SV_SVFSI_EXE "svFSI")
 #-----------------------------------------------------------------------------
 
