@@ -23,35 +23,6 @@ else()
     unset(INTELRUNTIME_LIBRARIES CACHE)
 endif()
 
-#-----------------------------------------------------------------------------
-# VTK
-if (SV_USE_VTK)
-  # If using toplevel dir, foce VTK_DIR to be the SV_VTK_DIR set by the
-  if(SV_EXTERNALS_USE_TOPLEVEL_DIR)
-    set(VTK_DIR ${SV_VTK_DIR}/lib/cmake/vtk-${VTK_MAJOR_VERSION}.${VTK_MINOR_VERSION} CACHE PATH "Force VTK dir to externals" FORCE)
-  endif()
-
-  # Find VTK, specific components
-  simvascular_external(VTK COMPONENTS
-    vtkFiltersFlowPaths vtkCommonDataModel vtkFiltersModeling
-    vtkCommonCore vtkChartsCore vtkCommonExecutionModel
-    vtkFiltersCore vtkIOLegacy vtkIOXML)
-
-  # Include cmake file provided by VTK to define libs and include dirs
-  include(${VTK_USE_FILE})
-
-  # Shared
-  if(SV_USE_VTK_SHARED)
-    set(SV_INSTALL_EXTERNALS ON)
-    set(SV_EXTERNAL_SHARED_LIBS ${SV_EXTERNAL_SHARED_LIBS} VTK)
-    set(GLOBAL_DEFINES "${GLOBAL_DEFINES} -DSV_USE_VTK_SHARED")
-  endif()
-
-  # Intel
-  if(${VTK_DIR} MATCHES "intel")
-    set(VTK_LIBRARIES ${VTK_LIBRARIES} ${INTELRUNTIME_LIBRARIES})
-  endif()
-endif()
 
 #-----------------------------------------------------------------------------
 # tkcximage (Legacy)
@@ -66,24 +37,6 @@ if(WIN32)
   endif()
 endif()
 
-#-----------------------------------------------------------------------------
-#  SVLS
-# svLS depends on the THREEDSOLVER build state so it must be here.
-if(SV_USE_SVLS)
-  set(SVLS_BUILD_TYPE "Source")
-  #simvascular_external(svls SVEXTERN_DEFAULT)
-  set(SV_USE_MPI ON)
-endif()
-
-# svFSILS
-if(SV_USE_SVFSILS)
-  set(SVFSILS_BUILD_TYPE "Source")
-  set(SV_USE_MPI ON)
-endif()
-
-if(SV_USE_LESLIB)
-  find_package(LESLIB REQUIRED)
-endif()
 
 #-----------------------------------------------------------------------------
 # Enable MPI

@@ -59,9 +59,3 @@ set(SV_EXTERNALS_GIT_URL "http://github.com/SimVascular" CACHE STRING "Git URL f
 mark_as_advanced(SV_EXTERNALS_GIT_URL)
 #-----------------------------------------------------------------------------
 
-# Add externals with default values of version, build_with, shared, dirname,
-# and optional install dirname. Order matters; put independent packages first
-#-----------------------------------------------------------------------------
-# VTK
-sv_externals_add_new_external(VTK 6.2.0 ON OFF vtk vtk)
-#-----------------------------------------------------------------------------

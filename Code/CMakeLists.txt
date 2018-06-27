@@ -92,9 +92,6 @@ include(SimVascularInstallSetup)
 
 #-----------------------------------------------------------------------------
 # Set EXE names for the executables
-set(SV_PRESOLVER_EXE "svpre")
-set(SV_FLOWSOLVER_EXE "svsolver")
-set(SV_POSTSOLVER_EXE "svpost")
 set(SV_SVFSI_EXE "svFSI")
 #-----------------------------------------------------------------------------
 
@@ -135,7 +132,7 @@ set(INDENTS "")
 # set
 set(SV_INCLUDE_DIRS "")
 set(SV_INCLUDE_DIRS ${SV_INCLUDE_DIRS}
-  "FlowSolvers/Include"
+  "Source/Include"
   )
 
 foreach(dir ${SV_INCLUDE_DIRS})
@@ -147,7 +144,7 @@ endforeach()
 #-----------------------------------------------------------------------------
 # Add directories
 # Modules
-add_subdirectory(FlowSolvers)
+add_subdirectory(Source)
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------

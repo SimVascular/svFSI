@@ -24,5 +24,3 @@ if(WIN32)
 endif()
 
 add_subdirectory(METISLib)
-
-# add_subdirectory(ParMETISLib)

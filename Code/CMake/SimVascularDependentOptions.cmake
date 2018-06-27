@@ -96,18 +96,3 @@ else()
   set(GLOBAL_DEFINES "${GLOBAL_DEFINES} -DSV_STATIC_LINK -DSV_STATIC_BUILD")
   set(SV_STATIC_BUILD "1")
 endif()
-
-#-----------------------------------------------------------------------------
-# Flowsolver
-#-----------------------------------------------------------------------------
-if(SV_SOLVERIO_REDIRECT)
-  set(GLOBAL_DEFINES "${GLOBAL_DEFINES} -DBUILD_WITH_FLOWSOLVER_STDOUT_STDERR_REDIRECT")
-endif()
-
-#-----------------------------------------------------------------------------
-# Postsolver
-#-----------------------------------------------------------------------------
-if (NOT SV_USE_VTK)
-  set(SV_USE_SVPOST "OFF" CACHE BOOL "Cannot build svpost without vtk" FORCE)
-  set(SV_USE_SVPRE "OFF" CACHE BOOL "Cannot build svpre without vtk" FORCE)
-endif()
