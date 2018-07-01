@@ -1,4 +1,11 @@
 
+if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+  set(CMAKE_Fortran_FLAGS "-cpp -pthread")
+else()
+  # nothing for now
+  # may need to reset for intel compiler or others
+endif()
+
 set(lib ${SV_LIB_SVFSILS_NAME}${SV_MPI_NAME_EXT})
 
 set(FSRCS ADDBCMUL.f

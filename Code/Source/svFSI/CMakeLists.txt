@@ -32,6 +32,12 @@
 include_directories(${SV_SOURCE_DIR}/ThirdParty/parmetis_svfsi/simvascular_parmetis_svfsi/ParMETISLib)
 include_directories(${SV_SOURCE_DIR}/ThirdParty/tetgen/simvascular_tetgen)
 
+if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+  set(CMAKE_Fortran_FLAGS "-cpp -pthread")
+else()
+  # nothing for now
+  # may need to set for intel compiler or others
+endif()
 
 # Find Trilinos package if requested
 if(SV_USE_TRILINOS)
