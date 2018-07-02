@@ -19,7 +19,7 @@ endif()
 #-----------------------------------------------------------------------------
 # Platform independent options
 #-----------------------------------------------------------------------------
-set(CPACK_PACKAGE_NAME "svSolver")
+set(CPACK_PACKAGE_NAME "svFSI")
 set(CPACK_PACKAGE_VENDOR "SimVascular.org")
 set(CPACK_PACKAGE_CONTACT "SimVascular<sv@simvascular.org>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "SimVascular Solvers")
@@ -35,7 +35,7 @@ string(REPLACE "." "-" SV_INSTALL_VERSION_DIR ${SV_FULL_VERSION})
 #-----------------------------------------------------------------------------
 if(WIN32)
   # Package name
-   set(CPACK_PACKAGE_FILE_NAME "svsolver-windows-win-x64-${SV_FULL_VERSION}${INSTALL_TYPE_STR}")
+   set(CPACK_PACKAGE_FILE_NAME "svFSI-windows-win-x64-${SV_FULL_VERSION}${INSTALL_TYPE_STR}")
 
   # MPI dlls
   find_path(INTEL_REDIST_DIR names fmpich2.dll PATHS $ENV{PATH})
@@ -65,10 +65,10 @@ if(WIN32)
       set(CPACK_WIX_PROGRAM_MENU_FOLDER "SimVascular")
       set(CPACK_WIX_PRODUCT_GUID "39068F8A-D4E9-405F-B22B-9B417849AEE6")
       set(CPACK_WIX_UPGRADE_GUID "2359EF69-C03F-401C-9BC3-C19B10297E3B")
-      set(PACKAGE_NAME "svsolver")
+      set(PACKAGE_NAME "svFSI")
     elseif(SV_RELEASE_TYPE MATCHES "Beta")
       set(CPACK_WIX_PROGRAM_MENU_FOLDER "SimVascular-Beta")
-      set(PACKAGE_NAME "svsolver-beta")
+      set(PACKAGE_NAME "svFSI-beta")
       set(CPACK_PACKAGE_INSTALL_DIRECTORY "SimVascular/${TIMESTAMP}")
       set(CPACK_WIX_PRODUCT_GUID "9453BB7E-CD7E-46ED-AA9E-5514B56FC901")
       set(CPACK_WIX_UPGRADE_GUID "39C845FF-68E1-4AA7-B329-3407B47B3361")
@@ -85,11 +85,11 @@ endif()
 #-----------------------------------------------------------------------------
 if(LINUX)
   # Package name
-  set(CPACK_PACKAGE_FILE_NAME "svsolver-linux-x64-${SV_FULL_VERSION}${INSTALL_TYPE_STR}")
+  set(CPACK_PACKAGE_FILE_NAME "svFSI-linux-x64-${SV_FULL_VERSION}${INSTALL_TYPE_STR}")
 
     if(SV_INSTALLER_TYPE STREQUAL DEB)
         set(CPACK_GENERATOR "DEB")
-        set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local/sv/svsolver/${SV_INSTALL_VERSION_DIR}")
+        set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local/sv/svFSI/${SV_INSTALL_VERSION_DIR}")
     elseif(SV_INSTALLER_TYPE STREQUAL TGZ)
       set(CPACK_GENERATOR "TGZ")
       set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY ON)
@@ -101,7 +101,7 @@ endif()
 #-----------------------------------------------------------------------------
 if(APPLE)
   # Package name
-  set(CPACK_PACKAGE_FILE_NAME "svsolver-darwin-x64-${SV_FULL_VERSION}${INSTALL_TYPE_STR}")
+  set(CPACK_PACKAGE_FILE_NAME "svFSI-darwin-x64-${SV_FULL_VERSION}${INSTALL_TYPE_STR}")
 
   # Components
   set(CPACK_COMPONENTS_ALL CoreExecutables CoreLibraries CoreHeaders
@@ -114,7 +114,7 @@ if(APPLE)
   #  ${CMAKE_CURRENT_BINARY_DIR}/OSX/Info.plist @ONLY)
 
   # Install location
-  set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local/sv/svsolver/${SV_INSTALL_VERSION_DIR}")
+  set(CPACK_PACKAGING_INSTALL_PREFIX "/usr/local/sv/svFSI/${SV_INSTALL_VERSION_DIR}")
 endif()
 
 if(CPACK_PACKAGE_FILENAME_TAG)
