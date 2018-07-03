@@ -1,4 +1,5 @@
 include_directories(./)
+include_directories(${MPI_C_INCLUDE_PATH})
 
 set(CSRCS coarsen.c fm.c initpart.c match.c ccgraph.c 
        pmetis.c pqueue.c refine.c util.c timing.c debug.c 

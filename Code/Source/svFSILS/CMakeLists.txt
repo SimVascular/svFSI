@@ -1,3 +1,4 @@
+include_directories(${MPI_C_INCLUDE_PATH})
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   set(CMAKE_Fortran_FLAGS "-cpp -pthread")

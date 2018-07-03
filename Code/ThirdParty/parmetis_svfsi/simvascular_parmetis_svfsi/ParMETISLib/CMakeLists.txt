@@ -1,4 +1,5 @@
 include_directories(./)
+include_directories(${MPI_C_INCLUDE_PATH})
 
 set(CSRCS comm.c util.c debug.c setup.c grsetup.c timer.c
        node_refine.c initmsection.c
