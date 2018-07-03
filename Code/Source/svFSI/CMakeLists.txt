@@ -31,6 +31,7 @@
 # add include path for headers on third party libraries 
 include_directories(${SV_SOURCE_DIR}/ThirdParty/parmetis_svfsi/simvascular_parmetis_svfsi/ParMETISLib)
 include_directories(${SV_SOURCE_DIR}/ThirdParty/tetgen/simvascular_tetgen)
+include_directories(${MPI_C_INCLUDE_PATH})
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   set(CMAKE_Fortran_FLAGS "-cpp -pthread")
