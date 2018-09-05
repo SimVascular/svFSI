@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,25 +31,25 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 !
-!-------------------------------------------------------------------- 
-!     This subroutine solve a linear system of equations AX=B using 
+!--------------------------------------------------------------------
+!     This subroutine solve a linear system of equations AX=B using
 !     Gauss elimination and replaces the B with X
 !--------------------------------------------------------------------
-      
+
       FUNCTION GE (nV, N, A, B)
-      
+
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: nV, N
@@ -67,7 +67,7 @@
       DO i=1, N
          IF (ABS(A(i,i)) .LT. TINY(A(1,1))) THEN
             B  = 0D0
-            GE = .FALSE. 
+            GE = .FALSE.
             RETURN
          END IF
          W(i) = 1D0/SQRT(ABS(A(i,i)))
@@ -83,7 +83,7 @@
 
       GE = .TRUE.
       IF (N .LE. 0) THEN
-         GE = .FALSE. 
+         GE = .FALSE.
          RETURN
       ELSE IF (N .EQ. 1) THEN
          B(1) = C(1,2)/C(1,1)
@@ -92,7 +92,7 @@
       ELSE IF (N .EQ. 2) THEN
          pivot = C(1,1)*C(2,2) - C(2,1)*C(1,2)
          IF (ABS(pivot) .LT. EPSILON(pivot)) THEN
-!     Singular matrix            
+!     Singular matrix
             B  = 0D0
             GE = .FALSE.
             RETURN
@@ -114,7 +114,7 @@
             END IF
          END DO
          IF (ABS(pivot) .LT. EPSILON(pivot)) THEN
-!     Singular matrix            
+!     Singular matrix
             B  = 0D0
             GE = .FALSE.
             RETURN

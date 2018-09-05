@@ -35,6 +35,46 @@
 !     retype it upon request
 !
 !--------------------------------------------------------------------
+
+!     Read mesh vtu/vtp files in SimVascular format
+      SUBROUTINE READSV(list, lM)
+
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+
+      IMPLICIT NONE
+
+      TYPE(listType), INTENT(INOUT) :: list
+      TYPE(mshType), INTENT(INOUT) :: lM
+
+      INTEGER :: iFa
+      TYPE(listType), POINTER :: lPtr, lPBC
+      TYPE(fileType) :: ftmp
+
+      lPtr => list%get(ftmp,"Mesh file path (vtu)")
+      IF (.NOT.ASSOCIATED(lPtr)) RETURN
+      CALL READVTU(lM, ftmp%fname)
+
+      CALL SELECTELE(lM)
+      IF (ichckIEN) CALL CHECKIEN(lM, .FALSE.)
+
+      lM%nFa = list%srch("Add face")
+      std = " Number of available faces: "//lM%nFa
+
+      ALLOCATE(lM%fa(lM%nFa))
+      DO iFa=1, lM%nFa
+         lPBC => list%get(lM%fa(iFa)%name,"Add face",iFa)
+         lPtr => lPBC%get(ftmp,"Face file path (vtp)")
+         IF (.NOT.ASSOCIATED(lPtr)) err = "Face file (vtp) not provided"
+         CALL READVTP(lM%fa(iFa), ftmp%fname)
+         IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
+         CALL SELECTELEB(lM, lM%fa(iFa))
+      END DO
+
+      RETURN
+      END SUBROUTINE READSV
+!####################################################################
 !     This reads coordinate, connectivity, and ebc/vtk files
       SUBROUTINE READCCNE(list, lM)
 
@@ -92,9 +132,9 @@
  111  REWIND(fid)
 
 !     allocating the required space for solver
-      ALLOCATE (x(nsd,lM%gnNo))
+      ALLOCATE (lM%x(nsd,lM%gnNo))
       DO Ac=1, lM%gnNo
-         READ (fid,*) i, x(:,Ac)
+         READ (fid,*) i, lM%x(:,Ac)
       END DO
       CLOSE (fid)
 
@@ -135,18 +175,18 @@
             CLOSE (fid)
             CALL CALCNBC(lM, lM%fa(iFa))
          END IF
-         
+
          lM%fa(iFa)%gnEl = lM%fa(iFa)%nEl
          ALLOCATE(lM%fa(iFa)%gebc(1+lM%fa(iFa)%eNoN,lM%fa(iFa)%gnEl))
          lM%fa(iFa)%gebc(1,:) = lM%fa(iFa)%gE(:)
          lM%fa(iFa)%gebc(2:1+lM%fa(iFa)%eNoN,:) = lM%fa(iFa)%IEN(:,:)
       END DO
-      
+
       RETURN
       END SUBROUTINE READCCNE
 
 !####################################################################
-!     This reads msh file produced by Gambit
+!     This reads msh file produced by Gambit. Works for quad mesh only
       SUBROUTINE READGAMBIT(list, lM)
 
       USE COMMOD
@@ -189,7 +229,7 @@
       lPtr => list%get(ftmp,"Gambit mesh file path")
       IF (.NOT.ASSOCIATED(lPtr)) RETURN
 !     If that is not the case, we continue with this format of mesh
-      dbg = " Reading a Gambit formate mesh"
+      dbg = " Reading a Gambit format mesh"
       fid = ftmp%open()
 
       nonL     = .FALSE.
@@ -238,10 +278,10 @@
       END DO
       lM%gnNo = INT(tmp)
 !     allocating the required space for solver
-      ALLOCATE (x(nsd,lM%gnNo))
+      ALLOCATE (lM%x(nsd,lM%gnNo))
       DO A=1, lM%gnNo
          cntr = cntr + 1
-         READ (fid,*) x(:,A)
+         READ (fid,*) lM%x(:,A)
       END DO
 
 !     Now reading data block by block
@@ -452,9 +492,9 @@
 !     Upper estimation for gnNo
          ALLOCATE (Xtmp(nsd,lM%eNoN*lM%gnEl))
          DO a=1, lM%gnNo
-            Xtmp(:,a) = x(:,a)
+            Xtmp(:,a) = lM%x(:,a)
          END DO
-         DEALLOCATE (x)
+         DEALLOCATE (lM%x)
          IF (lM%eType .EQ. eType_BIQ) THEN
 !     We will start adding intermediate nodes from faces. Here I assume
 !     there is no overlapping between faces
@@ -494,9 +534,9 @@
                j = lM%gIEN(3,e)
                Xtmp(:,lM%gnNo) = (Xtmp(:,i) + Xtmp(:,j))/2D0
             END DO
-            ALLOCATE (x(nsd,lM%gnNo))
+            ALLOCATE (lM%x(nsd,lM%gnNo))
             DO a=1, lM%gnNo
-               x(:,a) = Xtmp(:,a)
+               lM%x(:,a) = Xtmp(:,a)
             END DO
             DEALLOCATE (Xtmp)
          ELSE
@@ -507,7 +547,7 @@
       DO iFa=1, lM%nFa
          CALL CALCNBC(lM, lM%fa(iFa))
          CALL SELECTELEB(lM, lM%fa(iFa))
-         
+
          lM%fa(iFa)%gnEl = lM%fa(iFa)%nEl
          ALLOCATE(lM%fa(iFa)%gebc(1+lM%fa(iFa)%eNoN,lM%fa(iFa)%gnEl))
          lM%fa(iFa)%gebc(1,:) = lM%fa(iFa)%gE(:)

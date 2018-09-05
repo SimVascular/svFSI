@@ -38,6 +38,7 @@
       MODULE COMMOD
       USE CMMOD
       USE CHNLMOD
+      USE CEPMOD
 
       INCLUDE "FSILS.h"
       INCLUDE "cplBC.h"
@@ -76,13 +77,14 @@
 !     Density of fluid, viscosity of fluid, density of solid, elsticity
 !     modulus, Poisson's ratio, conductivity, internal force(X,Y,Z),
 !     particles diameter, particle density, stabilization coefficient
-!     for backflow divergence
+!     for backflow divergence, shell thickness
       INTEGER, PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   viscosity = 2, solid_density = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
      4   particle_diameter = 10, particle_density = 11,
      5   permeability = 12, backflow_stab = 13, source_term = 14,
-     6   damping = 15
+     6   damping = 15, shell_thickness = 16,
+     7   initialization_pressure = 17
 
 !     Types of accepted elements
 !     Linear (1D), triangle (2D), tetrahedral (3D), bilinear (2D), quad
@@ -96,16 +98,14 @@
 !     Fluid equation (Navier-Stokes), structure (non-linear), heat
 !     equation, linear elasticity, heat in a fluid
 !     (advection-diffusion), fluid-structure-interaction, elector
-!     magnetic, mesh motion, and Basset-Boussinesq Oseen equation
+!     magnetic, mesh motion, Basset-Boussinesq Oseen equation,
+!     Electro-Physiology, Unified-structure (velocity-based)
       INTEGER, PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_elcMag = 207,
-     4   phys_mesh = 208, phys_BBO = 209
-
-!     Saving formats
-!     Don't save, VTK ASCII format, VTK binary format
-      INTEGER, PARAMETER :: saveF_NA = 300, saveF_none = 301,
-     2   saveF_VTK = 302, saveF_VTKB = 303
+     4   phys_mesh = 208, phys_BBO = 209, phys_preSt = 210,
+     5   phys_shell = 211, phys_CEP = 212, phys_ustruct = 213,
+     6   phys_CMM = 214
 
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit
@@ -126,12 +126,15 @@
 !     parabolic profile, user defined profile, zero out perimeter,
 !     impose flux instead of value, L2 projection, backflow
 !     stabilization, impose BC on the integral of state variable or D
-!     (instead of Y), diplacement dependent
+!     (instead of Y), diplacement dependent,
+!     fixed (shells), hinged (shells), free (shells), symmetric (shells)
       INTEGER, PARAMETER :: bType_Dir = 0, bType_Neu = 1,
      2   bType_per = 2, bType_std = 3, bType_ustd = 4, bType_cpl = 5,
      3   bType_gen = 6, bType_res = 7, bType_flx = 8, bType_flat = 9,
      4   bType_para = 10, bType_ud = 11, bType_zp = 12, bType_bfs = 13,
-     5   bType_impD = 14, bType_ddep = 15
+     5   bType_impD = 14, bType_ddep = 15, bType_trac = 16,
+     6   bType_fix = 17, bType_hing = 18, bType_free = 19,
+     7   bType_symm = 20, bType_CMM = 21
 
 !     Possible senarios for the output, followed by the possible outputs
 !     Undefined output, extract it from A, extract it from Y, extract it
@@ -140,19 +143,32 @@
       INTEGER, PARAMETER :: outGrp_NA = 500, outGrp_A = 501,
      2   outGrp_Y = 502, outGrp_D = 503, outGrp_WSS = 504,
      3   outGrp_vort = 505, outGrp_eFlx = 506, outGrp_hFlx = 507,
-     4   outGrp_absV = 508, outGrp_stInv = 509, outGrp_vortex = 510
+     4   outGrp_absV = 508, outGrp_stInv = 509, outGrp_vortex = 510,
+     5   outGrp_trac = 511, outGrp_stress = 512, outGrp_fN = 513
 
       INTEGER, PARAMETER :: out_velocity = 599, out_pressure = 598,
      2   out_acceleration = 597, out_temperature = 596, out_WSS = 595,
      3   out_vorticity = 594, out_displacement = 593,
      4   out_energyFlux = 592, out_heatFlux = 591,
-     5   out_absVelocity = 590, out_strainInv = 589, out_vortex = 588
+     5   out_absVelocity = 590, out_strainInv = 589, out_vortex = 588,
+     6   out_traction = 587, out_stress = 586, out_fibDir = 585,
+     7   out_actionPotential = 584
+
+!     Mesher choice for remeshing for moving wall problems
       INTEGER, PARAMETER :: RMSH_TETGEN = 1, RMSH_MESHSIM = 2
 
-!     Type of constitutive model for structure equation
-      INTEGER, PARAMETER :: cModel_NA = 600, cModel_stVK = 601,
-     2   cModel_mStVK = 602, cModel_nHook = 603, cModel_Guccione = 604,
-     3   cModel_reducedHolzapfel = 605
+!     Type of constitutive model (isochoric) for structure equation:
+!     St.Venant-Kirchhoff, modified St.Venant-Kirchhoff, NeoHookean,
+!     Mooney-Rivlin, Yeoh, Arruda & Boyce, Holzapfel orthotropic,
+!     modified Holzapfel-Gasser-Ogden with dispersion
+      INTEGER, PARAMETER :: stIso_NA = 600, stIso_StVK = 601,
+     2   stIso_mStVK = 602, stIso_nHook = 603, stIso_MR = 604,
+     4   stIso_HGO = 605
+
+!     Type of constitutive model (volumetric) for structure eqn:
+!     Quadratic, Simo-Taylor91, Miehe94
+      INTEGER, PARAMETER :: stVol_NA = 650, stVol_Quad = 651,
+     2   stVol_ST91 = 652, stVol_M94 = 653
 
 !     Preconditioner definitions
       INTEGER, PARAMETER :: PREC_NONE = 700, PREC_FSILS = 701,
@@ -167,6 +183,13 @@
      4   lSolver_MINRES = 794, lSolver_MUMPS = 793,
      5   lSolver_UMFPACK = 792, lSolver_PASTIX = 791,
      6   lSolver_SUPERLU = 790
+
+!     Contact model
+      INTEGER, PARAMETER :: cntctM_NA = 800, cntctM_penalty = 801
+
+!     IB treatment
+      INTEGER, PARAMETER :: ibMthd_NA = 850, ibMthd_SSM = 851,
+     2   ibMthd_Penalty = 852, ibMthd_Nitsche = 853, ibMthd_IFEM = 854
 
 !--------------------------------------------------------------------
 !     Here comes subTypes definitions later used in other derived types
@@ -188,20 +211,125 @@
          REAL(KIND=8), ALLOCATABLE :: xi(:)
       END TYPE bsType
 
+      TYPE stModelType
+!        Incompressible solid
+         LOGICAL :: iFlag = .FALSE.
+!        If fiber reinforcement needed, requires fN to be provided
+         LOGICAL :: fFlag = .FALSE.
+!        Type of constitutive model (volumetric) for struct/FSI
+         INTEGER :: volType = stVol_NA
+!        Penalty parameter
+         REAL(KIND=8) :: Kpen = 0D0
+!        Type of constitutive model (isochoric) for struct/FSI
+         INTEGER :: isoType = stIso_NA
+!        Parameters specific to the constitutive model (isochoric)
+!        NeoHookean model (C10 = mu/2)
+         REAL(KIND=8) :: C10 = 0D0
+!        Mooney-Rivlin model (C10, C01)
+         REAL(KIND=8) :: C01 = 0D0
+!        Yeoh model (C10, C20, C30)
+         REAL(KIND=8) :: C20 = 0D0
+         REAL(KIND=8) :: C30 = 0D0
+!        Arruda & Boycce model (n, C10=mu)
+         INTEGER :: n = 0
+!        Holzapfel model(a, b, aff, bff, ass, bss, afs, bfs, kap)
+         REAL(KIND=8) :: a   = 0D0
+         REAL(KIND=8) :: b   = 0D0
+         REAL(KIND=8) :: aff = 0D0
+         REAL(KIND=8) :: bff = 0D0
+         REAL(KIND=8) :: ass = 0D0
+         REAL(KIND=8) :: bss = 0D0
+         REAL(KIND=8) :: afs = 0D0
+         REAL(KIND=8) :: bfs = 0D0
+!        Collagen fiber dispersion parameter (Holzapfel model)
+         REAL(KIND=8) :: kap = 0D0
+      END TYPE stModelType
+
+!     Fourier coefficients that are used to specify unsteady BCs
+      TYPE fcType
+!        Number of Fourier coefficient
+         INTEGER :: n = 0
+!        Initial value
+         REAL(KIND=8) qi
+!        Time derivative of linear part
+         REAL(KIND=8) qs
+!        Period
+         REAL(KIND=8) T
+!        Initial time
+         REAL(KIND=8) ti
+!        Imaginary part of coefficint
+         REAL(KIND=8), ALLOCATABLE :: i(:)
+!        Real part of coefficint
+         REAL(KIND=8), ALLOCATABLE :: r(:)
+      END TYPE fcType
+
+!     Follower pressure load data type for shells. This force acts along
+!     the shell director (or normal)
+      TYPE shlFpType
+         INTEGER :: bType = 0
+!        Defined steady value
+         REAL(KIND=8) :: p = 0D0
+!        Time depandant body force
+         TYPE(fcType), ALLOCATABLE :: pt
+      END TYPE shlFpType
+
+!     Contact model type
+      TYPE cntctModelType
+!        Contact model
+         INTEGER :: cType = cntctM_NA
+!        Penalty parameter
+         REAL(KIND=8) k
+!        Min depth of penetration
+         REAL(KIND=8) h
+!        Max depth of penetration
+         REAL(KIND=8) c
+!        Min norm of face normals in contact
+         REAL(KIND=8) al
+!        Tolerance
+         REAL(KIND=8) :: tol = 1E-6
+      END TYPE cntctModelType
+
 !     Domain type is to keep track with element belong to which domain
 !     and also different hysical quantities
       TYPE dmnType
 !        The domain ID. Default includes entire domain
          INTEGER :: Id = -1
-!        which physics must be solved in this domain
+!        Which physics must be solved in this domain
          INTEGER :: phys
-!        Type of constitutive model (only for struct/FSI)
-         INTEGER :: cModel = cModel_NA
 !        The volume of this domain
          REAL(KIND=8) :: v = 0D0
-!        physical properties, such as viscosity, density, ...
+!        General physical properties, such as viscosity, density, ...
          REAL(KIND=8) :: prop(maxNProp) = 0D0
+!        Electrophysiology model
+         TYPE(cepModelType) :: cep
+!        Structure material model
+         TYPE(stModelType) :: stM
+!        Follower pressure loads for shells
+         TYPE(shlFpType), ALLOCATABLE :: shlFp
       END TYPE dmnType
+
+!     Mesh adjacency (neighboring element for each element)
+      TYPE adjType
+!        No of non-zeros
+         INTEGER :: nnz = 0
+!        Column pointer
+         INTEGER, ALLOCATABLE :: pcol(:)
+!        Row pointer
+         INTEGER, ALLOCATABLE :: prow(:)
+      END TYPE adjType
+
+!     Tracer type used for immersed boundaries. Identifies traces of
+!     nodes on background/foreground mesh elements
+      TYPE traceType
+!        No. of non-zero traces
+         INTEGER :: n = 0
+!        Pointer of each trace to the global element# and the
+!        integration point#
+         INTEGER, ALLOCATABLE :: gE(:,:)
+!        Trace pointer array stores two values for each trace. First is
+!        the element to which the trace points to. Second is the mesh no
+         INTEGER, ALLOCATABLE :: ptr(:,:)
+      END TYPE traceType
 
 !     The face type containing mesh at boundary
       TYPE faceType
@@ -225,6 +353,8 @@
          INTEGER, ALLOCATABLE :: gE(:)
 !        Global node Ids
          INTEGER, ALLOCATABLE :: gN(:)
+!        Global to local maping tnNo --> nNo
+         INTEGER, ALLOCATABLE :: lN(:)
 !        Connectivity array
          INTEGER, ALLOCATABLE :: IEN(:,:)
 !        EBC array (gE + gIEN)
@@ -235,14 +365,24 @@
          REAL(KIND=8), ALLOCATABLE :: w(:)
 !        Position coordinates
          REAL(KIND=8), ALLOCATABLE :: x(:,:)
+!        Gauss points in parametric space
+         REAL(KIND=8), ALLOCATABLE :: xi(:,:)
 !        Shape functions at Gauss points
          REAL(KIND=8), ALLOCATABLE :: N(:,:)
 !        Normal vector to each nodal point
          REAL(KIND=8), ALLOCATABLE :: nV(:,:)
 !        Shape functions derivative at Gauss points
          REAL(KIND=8), ALLOCATABLE :: Nx(:,:,:)
+!        Second derivatives of shape functions - for shells & IGA
+         REAL(KIND=8), ALLOCATABLE :: Nxx(:,:,:)
 !        Face name for flux files
          CHARACTER(LEN=stdL) name
+!        Face nodal adjacency
+         TYPE(adjType) :: nAdj
+!        Face element adjacency
+         TYPE(adjType) :: eAdj
+!        IB: tracers
+         TYPE(traceType) :: trc
       END TYPE faceType
 
 !     Declared type for outputed variables
@@ -273,26 +413,12 @@
          REAL(KIND=8), ALLOCATABLE :: d(:,:,:)
       END TYPE MBType
 
-!     Fourier coefficients that are used to specify unsteady BCs
-      TYPE fcType
-!        Number of Fourier coefficient
-         INTEGER :: n = 0
-!        Initial value
-         REAL(KIND=8) qi
-!        Time derivative of linear part
-         REAL(KIND=8) qs
-!        Period
-         REAL(KIND=8) T
-!        Initial time
-         REAL(KIND=8) ti
-!        Imaginary part of coefficint
-         REAL(KIND=8), ALLOCATABLE :: i(:)
-!        Real part of coefficint
-         REAL(KIND=8), ALLOCATABLE :: r(:)
-      END TYPE fcType
-
 !     Boundary condition data type
       TYPE bcType
+!        Strong/Weak application of Dirichlet BC
+         LOGICAL :: weakDir
+!        Whether feedback force is along normal direction only
+         LOGICAL :: fbN = .FALSE.
 !        Pre/Res/Flat/Para... boundary types
          INTEGER :: bType = 0
 !        Pointer to coupledBC%face
@@ -307,6 +433,10 @@
          REAL(KIND=8) :: g = 0D0
 !        Neu: defined resistance
          REAL(KIND=8) :: r = 0D0
+!        Penalty parameters for weakly applied Dir BC / immersed bodies
+         REAL(KIND=8) :: tauB(2) = 0D0
+!        IB: Feedback force constant
+         REAL(KIND=8) :: tauF = 0D0
 !        Direction vector for imposing the BC
          INTEGER, ALLOCATABLE :: eDrn(:)
 !        Spatial depanadant BC (profile data)
@@ -388,6 +518,8 @@
       TYPE mshType
 !        Whether the shape function is linear
          LOGICAL lShpF
+!        Whether the mesh is shell
+         LOGICAL :: lShl = .FALSE.
 !        Element type
          INTEGER :: eType = eType_NA
 !        Number of nodes (control points) in a single element
@@ -408,8 +540,10 @@
          INTEGER :: nNo = 0
 !        Number of elements sample points to be outputs (NURBS)
          INTEGER nSl
-!        the element type recognized by VTK format
+!        The element type recognized by VTK format
          INTEGER vtkType
+!        IB: Mesh size parameter
+         REAL(KIND=8) dx
 !        Element distribution between processors
          INTEGER, ALLOCATABLE :: eDist(:)
 !        Element domain ID number
@@ -429,22 +563,40 @@
          INTEGER, ALLOCATABLE :: INN(:,:)
 !        Global to local maping tnNo --> nNo
          INTEGER, ALLOCATABLE :: lN(:)
+!        Shells: extended IEN array with neighboring nodes
+         INTEGER, ALLOCATABLE :: eIEN(:,:)
+!        Shells: boundary condition variable
+         INTEGER, ALLOCATABLE :: sbc(:,:)
+!        IB: Whether a cell is a ghost cell or not
+         INTEGER, ALLOCATABLE :: iGC(:)
 !        Control points weights (NURBS)
          REAL(KIND=8), ALLOCATABLE :: nW(:)
 !        Gauss weights
          REAL(KIND=8), ALLOCATABLE :: w(:)
+!        Gauss integration points in parametric space
+         REAL(KIND=8), ALLOCATABLE :: xi(:,:)
 !        Position coordinates
          REAL(KIND=8), ALLOCATABLE :: x(:,:)
 !        Parent shape function
          REAL(KIND=8), ALLOCATABLE :: N(:,:)
+!        Normal vector to each nodal point (for Shells)
+         REAL(KIND=8), ALLOCATABLE :: nV(:,:)
 !        Parent shape functions gradient
          REAL(KIND=8), ALLOCATABLE :: Nx(:,:,:)
+!        Second derivatives of shape functions - used for shells & IGA
+         REAL(KIND=8), ALLOCATABLE :: Nxx(:,:,:)
 !        Mesh Name
          CHARACTER(LEN=stdL) :: name
+!        Mesh nodal adjacency
+         TYPE(adjType) :: nAdj
+!        Mesh element adjacency
+         TYPE(adjType) :: eAdj
 !        BSpline in different directions (NURBS)
          TYPE(bsType), ALLOCATABLE :: bs(:)
 !        Faces are stored in this variable
          TYPE(faceType), ALLOCATABLE :: fa(:)
+!        IB: tracers
+         TYPE(traceType) :: trc
       END TYPE mshType
 
 !     Equation type
@@ -465,10 +617,16 @@
          INTEGER :: minItr = 1
 !        Number of possible outputs
          INTEGER :: nOutput = 0
+!        IB: Number of possible outputs
+         INTEGER :: nOutIB = 0
 !        Number of domains
          INTEGER :: nDmn = 0
+!        IB: Number of immersed domains
+         INTEGER :: nDmnIB = 0
 !        Number of BCs
          INTEGER :: nBc = 0
+!        IB: Number of BCs on immersed surfaces
+         INTEGER :: nBcIB = 0
 !        Type of equation fluid/heatF/heatS/lElas/FSI
          INTEGER phys
 !        Pointer to start of unknown Yo(:,s:e)
@@ -497,12 +655,20 @@
          TYPE(lsType) ls
 !        FSILS type of linear solver
          TYPE(FSILS_lsType) FSILS
+!        IB: FSILS type of linear solver
+         TYPE(FSILS_lsType) lsIB
 !        BCs associated with this equation
          TYPE(bcType), ALLOCATABLE :: bc(:)
+!        IB: BCs associated with this equation on immersed surfaces
+         TYPE(bcType), ALLOCATABLE :: bcIB(:)
 !        domains that this equation must be solved
          TYPE(dmnType), ALLOCATABLE :: dmn(:)
+!        IB: immersed domains that this equation must be solved
+         TYPE(dmnType), ALLOCATABLE :: dmnIB(:)
 !        Outputs
          TYPE(outputType), ALLOCATABLE :: output(:)
+!        IB: Outputs
+         TYPE(outputType), ALLOCATABLE :: outIB(:)
       END TYPE eqType
 
 !     This type will be used to write data in the VTK files.
@@ -553,13 +719,100 @@
          REAL(KIND=8), ALLOCATABLE :: A0(:,:)
          REAL(KIND=8), ALLOCATABLE :: Y0(:,:)
          REAL(KIND=8), ALLOCATABLE :: D0(:,:)
-!     Solution variables used for averaging
-         REAL(KIND=8), ALLOCATABLE :: Aav(:,:)
-         REAL(KIND=8), ALLOCATABLE :: Yav(:,:)
-         REAL(KIND=8), ALLOCATABLE :: Dav(:,:)
 !     Flag is set if remeshing is required for each mesh
          LOGICAL, ALLOCATABLE :: flag(:)
       END TYPE rmshType
+
+      TYPE ibCommType
+!        Num nodes local to each process
+         INTEGER, ALLOCATABLE :: n(:)
+!        Pointer to global node num stacked contiguously
+         INTEGER, ALLOCATABLE :: gE(:)
+      END TYPE ibCommType
+
+!     Immersed Boundary (IB) data type
+      TYPE ibType
+!        Whether any file being saved
+         LOGICAL :: savedOnce = .FALSE.
+!        Whether to use finite cell integration
+         LOGICAL :: fcFlag = .FALSE.
+!        Whether to apply a feedback spring force
+         LOGICAL :: fbFlag = .FALSE.
+!        IB formulation
+         INTEGER :: mthd = ibMthd_NA
+!        Current IB domain ID
+         INTEGER :: cDmn
+!        Current equation
+         INTEGER :: cEq = 0
+!        Total number of IB nodes
+         INTEGER :: tnNo
+!        Number of IB meshes
+         INTEGER :: nMsh
+!        Number of fiber directions
+         INTEGER :: nFn
+!        Number of IB faces in LHS passed to FSILS
+         INTEGER :: nFacesLS
+!        IB call duration
+         REAL(KIND=8) :: callD
+!        IB Domain ID
+         INTEGER, ALLOCATABLE :: dmnID(:)
+!        Row pointer (for sparse LHS matrix storage)
+         INTEGER, ALLOCATABLE :: rowPtr(:)
+!        Column pointer (for sparse LHS matrix storage)
+         INTEGER, ALLOCATABLE :: colPtr(:)
+!        IB position coordinates
+         REAL(KIND=8), ALLOCATABLE :: x(:,:)
+!        Fiber direction (for electrophysiology / structure mechanics)
+         REAL(KIND=8), ALLOCATABLE :: fN(:,:)
+!        Acceleration (new)
+         REAL(KIND=8), ALLOCATABLE :: An(:,:)
+!        Acceleration (old)
+         REAL(KIND=8), ALLOCATABLE :: Ao(:,:)
+!        Velocity (new)
+         REAL(KIND=8), ALLOCATABLE :: Yn(:,:)
+!        Velocity (old)
+         REAL(KIND=8), ALLOCATABLE :: Yo(:,:)
+!        Displacement (new)
+         REAL(KIND=8), ALLOCATABLE :: Un(:,:)
+!        Displacement (old)
+         REAL(KIND=8), ALLOCATABLE :: Uo(:,:)
+!        Feedback forcing
+         REAL(KIND=8), ALLOCATABLE :: Rfb(:,:)
+!        FSI force
+         REAL(KIND=8), ALLOCATABLE :: f(:,:)
+
+!        DERIVED TYPE VARIABLES
+!        IB meshes
+         TYPE(mshType), ALLOCATABLE :: msh(:)
+!        FSILS data structure to produce LHS sparse matrix
+         TYPE(FSILS_lhsType) lhs
+      END TYPE ibType
+
+!     Finite cell type
+      TYPE fCellType
+!        Element type
+         INTEGER :: eType = eType_NA
+!        Number of nodes (control points) in a single element
+         INTEGER :: eNoN
+!        Number of Gauss points for integration
+         INTEGER :: nG
+!        Level of the finite subcell
+         INTEGER :: ilev = 0
+!        No of subcell divisions
+         INTEGER :: nSub = 0
+!        Whether Gauss point is included for integration or not
+         LOGICAL, ALLOCATABLE :: incG(:)
+!        Gauss weights
+         REAL(KIND=8), ALLOCATABLE :: w(:)
+!        Position coordinates
+         REAL(KIND=8), ALLOCATABLE :: x(:,:)
+!        Position coordinates in parametric space
+         REAL(KIND=8), ALLOCATABLE :: xi(:,:)
+!        Gauss points in parameteric space
+         REAL(KIND=8), ALLOCATABLE :: xiGP(:,:)
+!        Subcell (recursion is used for subdivision)
+         TYPE(fCellType), POINTER :: sub(:)
+      END TYPE fCellType
 
 !--------------------------------------------------------------------
 !     All the types are defined, time to use them
@@ -579,14 +832,20 @@
       LOGICAL stFileFlag
 !     Whether to overwrite restart file or not
       LOGICAL stFileRepl
-!     Use Legacy mesh input format
-      LOGICAL legacyFmt
 !     Restart simulation after remeshing
       LOGICAL resetSim
 !     Check IEN array for initial mesh
       LOGICAL ichckIEN
 !     Reset averaging variables from zero
       LOGICAL zeroAve
+!     Whether PRESTRESS equation is solved
+      LOGICAL pstEq
+!     Whether CMM equation is solved
+      LOGICAL cmmEq
+!     Whether to detect and apply any contact model
+      LOGICAL iCntct
+!     Whether any Immersed Boundary (IB) treatment is required
+      LOGICAL :: ibFlag
 !     Use C++ Trilinos framework for the linear solvers
       LOGICAL useTrilinosLS
 !     Use C++ Trilinos framework for assembly and for linear solvers
@@ -619,8 +878,6 @@
       INTEGER recLn
 !     Start saving after this number of time step
       INTEGER saveATS
-!     Format of output file
-      INTEGER saveFormat
 !     Increment in saving solutions
       INTEGER saveIncr
 !     Stamp ID to make sure simulation is compatible with stFiles
@@ -633,6 +890,12 @@
       INTEGER tnNo
 !     Restart Time Step
       INTEGER rsTS
+!     Number of fiber directions
+      INTEGER nFn
+!     Number of stress values to be stored
+      INTEGER nstd
+!     FSILS pointer for immersed boundaries
+      INTEGER ibLSptr
 
 !     REAL VARIABLES
 !     Time step size
@@ -659,6 +922,10 @@
       INTEGER, ALLOCATABLE :: ltg(:)
 !     Row pointer (for sparse LHS matrix structure)
       INTEGER, ALLOCATABLE :: rowPtr(:)
+!     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid)
+      INTEGER, ALLOCATABLE :: iblank(:)
+!     IB: Solid nodes with iblank=1, and are part of ghost cells
+      INTEGER, ALLOCATABLE :: ighost(:)
 
 !     Old time derivative of variables (acceleration)
       REAL(KIND=8), ALLOCATABLE :: Ao(:,:)
@@ -681,6 +948,30 @@
 !     Fiber direction (for electrophysiology / structure mechanics)
       REAL(KIND=8), ALLOCATABLE :: fN(:,:)
 
+!     Additional arrays for velocity-based formulation of nonlinear
+!     solid mechanics
+!     Old time derivative of displacement
+      REAL(KIND=8), ALLOCATABLE :: ADo(:,:)
+!     New time derivative of displacement
+      REAL(KIND=8), ALLOCATABLE :: ADn(:,:)
+!     Residue of the displacement equation
+      REAL(KIND=8), ALLOCATABLE :: Rd(:,:)
+!     LHS matrix
+      REAL(KIND=8), ALLOCATABLE :: Kd(:,:)
+
+!     Variables for prestress calculations
+      REAL(KIND=8), ALLOCATABLE :: pS0(:,:)
+      REAL(KIND=8), ALLOCATABLE :: pSn(:,:)
+      REAL(KIND=8), ALLOCATABLE :: pSa(:)
+
+!     Temporary storage for initializing state variables
+      REAL(KIND=8), ALLOCATABLE :: Pinit(:)
+      REAL(KIND=8), ALLOCATABLE :: Vinit(:,:)
+      REAL(KIND=8), ALLOCATABLE :: Dinit(:,:)
+
+!     FSI force on fluid due to IB (for IFEM method)
+      REAL(KIND=8), ALLOCATABLE :: fIB(:,:)
+
 !     DERIVED TYPE VARIABLES
 !     Coupled BCs structures used for multidomain simulations
       TYPE(cplBCType), SAVE :: cplBC
@@ -697,6 +988,10 @@
 !     The general communicator
       TYPE(cmType) cm
 !     Remesher type
-      TYPE(rmshType) :: rmsh
+      TYPE(rmshType) rmsh
+!     Contact model type
+      TYPE(cntctModelType) cntctM
+!     IB: Immersed boundary data structure
+      TYPE(ibType), ALLOCATABLE :: ib
 
       END MODULE COMMOD

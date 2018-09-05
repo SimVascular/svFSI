@@ -37,11 +37,9 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE READFILES
-
       USE COMMOD
       USE ALLFUN
       USE LISTMOD
-
       IMPLICIT NONE
 
       LOGICAL :: ltmp
@@ -80,7 +78,6 @@
          stFileRepl   = .FALSE.
          saveAve      = .FALSE.
          sepOutput    = .FALSE.
-         legacyFmt    = .FALSE.
          saveATS      = 1
          saveIncr     = 10
          nITs         = 0
@@ -91,7 +88,7 @@
          rmsh%isReqd  = .FALSE.
          ichckIEN     = .TRUE.
          zeroAve      = .FALSE.
-
+         ibFlag       = .FALSE.
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
 
@@ -146,9 +143,6 @@
      2      "-"//date(1:4)
          std = "                                               "
 
-         IF (tArray(1).GE.expDate(1) .AND. tArray(2).GE.expDate(2)
-     2      .AND. tArray(3).GE.expDate(3)) err = "License is expired"
-
          IF (cm%seq() .AND. cm%nT().EQ.1) THEN
             std = " Running sequentially"
          ELSE
@@ -158,14 +152,14 @@
      2         cm%nT()//" proccesors"
          END IF
 
-         IF (.NOT.stFileFlag) THEN
-            lPtr => list%get(fTmp,"Simulation initialization file path")
-            IF (ASSOCIATED(lPtr))
-     2         iniFilePath = fTmp%fname
-         END IF
+         lPtr => list%get(fTmp,"Simulation initialization file path")
+         IF (ASSOCIATED(lPtr)) iniFilePath = fTmp%fname
 
          lPtr => list%get(nsd,"Number of spatial dimensions",
      2      1,ll=2,ul=3)
+         nstd = 6
+         IF (nsd .EQ. 2) nstd = 3
+
          lPtr => list%get(nTs,"Number of time steps",1,ll=1)
          lPtr => list%get(dt,"Time step size",1,lb=0D0)
          lPtr => list%get(nITs,"Number of initialization time steps",
@@ -177,25 +171,6 @@
      2      "Searched file name to trigger stop")
          stopTrigName = TRIM(appPath)//stopTrigName
          lPtr => list%get(ichckIEN, "Check IEN order")
-
-         lPtr => list%get(legacyFmt,"Use legacy file format")
-
-         IF (legacyFmt) THEN
-            wrn = "Legacy file format is NOT fully supported. "//
-     2         " May lead to errors"
-            ctmp = 'VTKB'
-            lPtr => list%get(ctmp,"Format of saved files")
-            SELECT CASE (TRIM(ctmp))
-            CASE('none')
-               saveFormat = saveF_none
-            CASE('VTK')
-               saveFormat = saveF_VTK
-            CASE('VTKB')
-               saveFormat = saveF_VTKB
-            CASE DEFAULT
-               saveFormat = saveF_VTKB
-            END SELECT
-         END IF
 
          lPtr => list%get(saveIncr,"Increment in saving files",ll=1)
          lPtr => list%get(saveATS,"Start saving after time step",
@@ -213,12 +188,20 @@
          lPtr => list%get(stFileIncr,
      2      "Increment in saving restart files",ll=0)
          lPtr => list%get(rmsh%isReqd, "Simulation requires remeshing")
-
       END IF ! resetSim
 
 !--------------------------------------------------------------------
 !     Reading the mesh
       CALL READMSH(list)
+
+!     Reading immersed boundary mesh data
+      i = list%srch("Add IB")
+      IF (i .GT. 0) THEN
+         ibFlag = .TRUE.
+         ALLOCATE(ib)
+         CALL IB_READMSH(list)
+         CALL IB_READOPTS(list)
+      END IF
 
 !--------------------------------------------------------------------
 !     Reading equations
@@ -230,9 +213,18 @@
 !     This is pointing to an equation list
          lPtr => list%get(ctmp,"Add equation",iEq)
          CALL READEQ(eq(iEq), lPtr, ctmp)
+         IF (ibFlag) THEN
+            IF (eq(iEq)%phys .EQ. phys_fluid .OR.
+     2          eq(iEq)%phys .EQ. phys_FSI) THEN
+               CALL IB_READEQ(eq(iEq), lPtr, ctmp)
+            END IF
+         END IF
 
          IF (eq(iEq)%phys .EQ. phys_fluid) THEN
             IF (iEq .NE. 1) err = "fluid equation must come first"
+         END IF
+         IF (eq(iEq)%phys .EQ. phys_CMM) THEN
+            IF (iEq .NE. 1) err = "CMM equation must come first"
          END IF
          IF (eq(iEq)%phys .EQ. phys_FSI) THEN
             IF (iEq .NE. 1) err = "FSI equation must come first"
@@ -242,6 +234,12 @@
          END IF
          IF (rmsh%isReqd .AND. eq(1)%phys .NE. phys_FSI) THEN
             err = "Remeshing is applicable only for FSI equation"
+         END IF
+         IF (iCntct) THEN
+            IF (eq(iEq)%phys .NE. phys_shell) err =
+     2         "Contact model is applicable for shell problems only"
+            IF (nMsh .EQ. 1) err =
+     2         "More than one mesh is needed to apply contact model"
          END IF
          lPtr => list%get(ctmp,"Add equation",1)
          IF ((eq(iEq)%phys .EQ. phys_BBO) .OR.
@@ -273,7 +271,6 @@
 
       RETURN
       END SUBROUTINE READFILES
-
 !####################################################################
 !     This routine reads a Eq
       SUBROUTINE READEQ(lEq, list, eqName)
@@ -281,11 +278,12 @@
       USE ALLFUN
       USE LISTMOD
       IMPLICIT NONE
+
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 10
+      INTEGER, PARAMETER :: maxOutput = 11
       INTEGER fid, iBc, phys(2), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
@@ -357,7 +355,7 @@
          IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/8,2,3,0/)
+         nDOP = (/9,2,3,0/)
          outPuts(1) = out_velocity
          outPuts(2) = out_pressure
          outPuts(3) = out_energyFlux
@@ -366,6 +364,7 @@
          outPuts(6) = out_vorticity
          outPuts(7) = out_strainInv
          outPuts(8) = out_vortex
+         outPuts(9) = out_traction
 
          CALL READLS(lSolver_NS, lEq, list)
 !     HEAT FLUID advection diffusion solver -------------------------
@@ -417,21 +416,93 @@
          lEq%phys = phys_struct
 
          propL(1,1) = solid_density
-         propL(2,1) = elasticity_modulus
-         propL(3,1) = poisson_ratio
-         propL(4,1) = f_x
-         propL(5,1) = f_y
-         IF (nsd .EQ. 3) propL(6,1) = f_z
+         propL(2,1) = damping
+         propL(3,1) = elasticity_modulus
+         propL(4,1) = poisson_ratio
+         propL(5,1) = f_x
+         propL(6,1) = f_y
+         IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/4,2,0,0/)
+         nDOP = (/5,1,0,0/)
          outPuts(1) = out_displacement
-         outputs(2) = out_strainInv
-         outPuts(3) = out_velocity
-         outPuts(4) = out_acceleration
+         outPuts(2) = out_fibDir
+         outputs(3) = out_strainInv
+         outPuts(4) = out_velocity
+         outPuts(5) = out_acceleration
 
          CALL READLS(lSolver_CG, lEq, list)
-!     FLUID STRUCTUR INTERACTION equation solver---------------------
+!     PRESTRESS equation solver---------------------
+      CASE ('prestress')
+         lEq%phys = phys_preSt
+         propL(1,1) = solid_density
+         propL(2,1) = damping
+         propL(3,1) = elasticity_modulus
+         propL(4,1) = poisson_ratio
+         propL(5,1) = f_x
+         propL(6,1) = f_y
+         IF (nsd .EQ. 3) propL(7,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/2,2,0,0/)
+         outPuts(1) = out_displacement
+         outPuts(2) = out_stress
+
+         CALL READLS(lSolver_CG, lEq, list)
+      CASE ('shell')
+         IF (nsd .NE. 3) err = "Shell mechanics can be solved only"//
+     2      " in 3-dimensions"
+         lEq%phys = phys_shell
+
+         propL(1,1) = solid_density
+         propL(2,1) = damping
+         propL(3,1) = elasticity_modulus
+         propL(4,1) = poisson_ratio
+         propL(5,1) = shell_thickness
+         propL(6,1) = f_x
+         propL(7,1) = f_y
+         propL(8,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/2,1,0,0/)
+         outPuts(1) = out_displacement
+         outPuts(2) = out_velocity
+
+         CALL READLS(lSolver_CG, lEq, list)
+
+!     COUPLED MOMENTUM FLUID STRUCTURE INTERACTION equation solver---
+      CASE ('CMM')
+         lEq%phys = phys_CMM
+
+         propL(1,1) = fluid_density
+         propL(2,1) = viscosity
+         propL(3,1) = permeability
+         propL(4,1) = backflow_stab
+         propL(5,1) = solid_density
+         propL(6,1) = elasticity_modulus
+         propL(7,1) = poisson_ratio
+         propL(8,1) = damping
+         propL(9,1) = shell_thickness
+         propL(10,1) = initialization_pressure
+         propL(11,1) = f_x
+         propL(12,1) = f_y
+         IF (nsd .EQ. 3) propL(13,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/9,2,4,0/)
+         outPuts(1) = out_velocity
+         outPuts(2) = out_pressure
+         outPuts(3) = out_energyFlux
+         outPuts(4) = out_absVelocity
+         outPuts(5) = out_acceleration
+         outPuts(6) = out_WSS
+         outPuts(7) = out_vorticity
+         outPuts(8) = out_displacement
+         outPuts(9) = out_strainInv
+
+         CALL READLS(lSolver_GMRES, lEq, list)
+
+!     FLUID STRUCTURE INTERACTION equation solver---------------------
       CASE ('FSI')
          mvMsh = .TRUE.
          lEq%phys = phys_FSI
@@ -454,7 +525,7 @@
          phys(2) = phys_struct
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/10,2,4,0/)
+         nDOP = (/11,2,4,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_energyFlux
@@ -465,6 +536,7 @@
          outPuts(8)  = out_vortex
          outPuts(9)  = out_displacement
          outPuts(10) = out_strainInv
+         outPuts(11) = out_traction
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -507,6 +579,39 @@
          outPuts(2) = out_acceleration
 
          CALL READLS(lSolver_GMRES, lEq, list)
+
+!     Cardiac Electro-Physiology equation----------------------------
+      CASE ('CEP')
+         lEq%phys = phys_CEP
+
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/1,1,0,0/)
+         outPuts(1) = out_actionPotential
+
+         CALL READLS(lSolver_GMRES, lEq, list)
+
+!     STRUCTURAL with nonlinear velocity-based equation solver---------
+      CASE ('ustruct')
+         lEq%phys = phys_ustruct
+
+         propL(1,1) = solid_density
+         propL(2,1) = elasticity_modulus
+         propL(3,1) = poisson_ratio
+         propL(4,1) = f_x
+         propL(5,1) = f_y
+         IF (nsd .EQ. 3) propL(6,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/5,1,0,0/)
+         outPuts(1) = out_displacement
+         outPuts(2) = out_velocity
+         outPuts(3) = out_pressure
+         outPuts(4) = out_fibDir
+         outputs(5) = out_strainInv
+
+         CALL READLS(lSolver_CG, lEq, list)
+
       CASE DEFAULT
          err = "Equation type "//TRIM(eqName)//" is not defined"
       END SELECT
@@ -532,6 +637,7 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
+
       TYPE(eqType), INTENT(INOUT) :: lEq
       INTEGER, INTENT(IN) :: propList(maxNProp,10)
       TYPE (listType), TARGET, INTENT(INOUT) :: list
@@ -541,7 +647,7 @@
       INTEGER i, iDmn, iPhys, iProp, prop, nPhys
       REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr, lPD
+      TYPE(listType), POINTER :: lPtr, lPD, lSFp
       INTEGER, ALLOCATABLE :: phys(:)
 
       IF (PRESENT(physI)) THEN
@@ -594,9 +700,11 @@
                lEq%dmn(iDmn)%phys = phys_struct
             CASE("lElas")
                lEq%dmn(iDmn)%phys = phys_lElas
+            CASE("CMM")
+               lEq%dmn(iDmn)%phys = phys_CMM
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/lElas"
+     2            "Equation must be fluid/struct/lElas/CMM"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys
@@ -606,35 +714,32 @@
          END DO
          IF (iPhys .GT. nPhys) err = "Undefined phys is used"
 
-         lEq%dmn(iDmn)%cModel = cModel_NA
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_struct) THEN
-            lPtr => lPD%get(ctmp,"Constitutive model")
-            SELECT CASE (TRIM(ctmp))
-            CASE ("stVK","stVenantKirchhoff")
-               lEq%dmn(iDmn)%cModel = cModel_stVK
-            CASE ("stVK85","stVenantKirchhoffSimo85")
-               lEq%dmn(iDmn)%cModel = cModel_mStVK
-            CASE ("nHK","nHK91","neoHookean","neoHookeanSimo91")
-               lEq%dmn(iDmn)%cModel = cModel_nHook
-            CASE DEFAULT
-               err = "Undefined constitutive model used"
-            END SELECT
-         END IF
-
          DO iProp=1, maxNProp
             rtmp = 0D0
             prop = propList(iProp,iPhys)
             SELECT CASE (prop)
             CASE (prop_NA)
                EXIT
-            CASE (fluid_density,solid_density)
-               lPtr => lPD%get(rtmp,"Density",1,lb=0D0)
+            CASE (fluid_density)
+               IF(lEq%phys .EQ. phys_CMM) THEN
+                  lPtr => lPD%get(rtmp,"Fluid Density",1,lb=0D0)
+               ELSE
+                  lPtr => lPD%get(rtmp,"Density",1,lb=0D0)
+               END IF
+            CASE (solid_density)
+               IF(lEq%phys .EQ. phys_CMM) THEN
+                  lPtr => lPD%get(rtmp,"Solid Density",1,lb=0D0)
+               ELSE
+                  lPtr => lPD%get(rtmp,"Density",1,lb=0D0)
+               END IF
             CASE (viscosity)
                lPtr => lPD%get(rtmp,"Viscosity",1,lb=0D0)
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
             CASE (poisson_ratio)
                lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ub=5D-1)
+            CASE (initialization_pressure)
+               lPtr => lPD%get(rtmp,"Initialization Pressure",1,lb=0D0)
             CASE (conductivity)
                lPtr => lPD%get(rtmp,"Conductivity",1,ll=0D0)
             CASE (f_x)
@@ -657,26 +762,97 @@
             CASE (source_term)
                lPtr => lPD%get(rtmp,"Source term")
             CASE (damping)
-               lPtr => lPD%get(rtmp,"Damping")
+               lPtr => lPD%get(rtmp,"Mass damping")
+            CASE (shell_thickness)
+               lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0D0)
             CASE DEFAULT
                err = "Undefined properties"
             END SELECT
             lEq%dmn(iDmn)%prop(prop) = rtmp
          END DO
+
+         IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP) THEN
+            CALL READCEP(lEq%dmn(iDmn), lPD)
+         END IF
+
+         IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
+     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct) THEN
+            CALL READMATMODEL(lEq%dmn(iDmn), lPD)
+         END IF
+
+         IF (lEq%dmn(iDmn)%phys .EQ. phys_shell) THEN
+            lSFp => lPD%get(ctmp,"Follower pressure load")
+            IF (ASSOCIATED(lSFp)) THEN
+               ALLOCATE(lEq%dmn(iDmn)%shlFp)
+               CALL READShlFp(lSFp, lEq%dmn(iDmn)%shlFp, ctmp)
+            END IF
+         END IF
       END DO
 
       RETURN
       END SUBROUTINE READDOMAIN
 !--------------------------------------------------------------------
+      SUBROUTINE READShlFp(list, lFp, ctmp)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(listType), INTENT(INOUT) :: list
+      TYPE(shlFpType), INTENT(INOUT) :: lFp
+      CHARACTER(LEN=stdL), INTENT(IN) :: ctmp
+
+      INTEGER i, j
+      TYPE(fileType) fTmp
+
+      SELECT CASE (TRIM(ctmp))
+      CASE ("steady")
+         lFp%bType = IBSET(lFp%bType, bType_std)
+         lPtr => list%get(lFp%p,"Value",1)
+      CASE ("unsteady")
+         lFp%bType = IBSET(lFp%bType, bType_ustd)
+         ALLOCATE(lFp%pt)
+         lPtr => list%get(ftmp, "Temporal values file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            fid = fTmp%open()
+            READ(fid,*) i, j
+            IF (i .LT. 2) THEN
+               std = "Enter nPnts nFCoef; nPts*(t Q)"
+               err = "Wrong format in: "//fTmp%fname
+            END IF
+            lFp%pt%n = j
+            ALLOCATE(lFp%pt%r(j))
+            ALLOCATE(lFp%pt%i(j))
+            CALL FFT(fid, i, lFp%pt)
+            CLOSE(fid)
+         ELSE
+            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
+            fid = fTmp%open()
+            READ (fid,*) lFp%pt%ti
+            READ (fid,*) lFp%pt%T
+            READ (fid,*) lFp%pt%qi
+            READ (fid,*) lFp%pt%qs
+            READ (fid,*) j
+            lFp%pt%n = j
+            ALLOCATE(lFp%pt%r(j))
+            ALLOCATE(lFp%pt%i(j))
+            DO i=1, j
+               READ (fid,*) lFp%pt%r(i), lFp%pt%i(i)
+            END DO
+            CLOSE(fid)
+         END IF
+      CASE DEFAULT
+         err = "Undefined follower load type"
+      END SELECT
+
+      RETURN
+      END SUBROUTINE READShlFp
+!--------------------------------------------------------------------
       END SUBROUTINE READEQ
-!####################################################################
+!--------------------------------------------------------------------
 !     This routine reads a BC
       SUBROUTINE READBC(lBc, list, phys)
-
       USE COMMOD
       USE ALLFUN
       USE LISTMOD
-
       IMPLICIT NONE
 
       TYPE(bcType), INTENT(INOUT) :: lBc
@@ -701,6 +877,37 @@
          lBc%bType = IBSET(lBc%bType,bType_Neu)
          IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
      2      lBc%bType = IBSET(lBc%bType,bType_bfs)
+      CASE ("Traction","Trac")
+         lBc%bType = IBSET(lBc%bType,bType_trac)
+         lBc%bType = IBSET(lBc%bType,bType_gen)
+         lBc%bType = IBSET(lBc%bType,bType_impD)
+         lBc%bType = IBSET(lBc%bType,bType_flat)
+         iM  = lBc%iM
+         iFa = lBc%iFa
+
+         IF (phys .NE. phys_preSt) err = " Traction type BC " //
+     2      "can be used for prestress calculations only"
+         lPtr => list%get(fTmp, "Traction values file path (vtp)",1)
+         lPtr => list%get(rtmp, "Traction multiplier",1)
+         IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
+         i = nsd
+         j = 2
+         a = msh(iM)%fa(iFa)%nNo
+         ALLOCATE(lBc%gm)
+         lBc%gm%nTP = j
+         lBc%gm%dof = i
+         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
+         lBc%gm%t(1) = 0D0
+         lBc%gm%t(2) = HUGE(rtmp)
+
+         CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
+         lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
+
+         ALLOCATE(lBc%eDrn(nsd))
+         lBc%eDrn = 0
+         RETURN
+      CASE ("Coupled Momentum","CMM")
+         lBc%bType = IBSET(lBc%bType,bType_CMM)
       CASE ("Periodic","Per")
          lBc%bType = IBSET(lBc%bType,bType_per)
          err = "Periodic BC hasn't been implemented yet"
@@ -708,9 +915,55 @@
          err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
       END SELECT
 
+!     Weak Dirichlet BC for fluid/FSI equations
+      lBc%weakDir = .FALSE.
+      IF (BTEST(lBc%bType,bType_Dir)) THEN
+         IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
+     2      lPtr => list%get(lBc%weakDir, "Weakly applied")
+      END IF
+
+!     Read penalty values for weakly applied Dir BC
+      IF (lBc%weakDir) THEN
+         lPtr => list%get(rtmp, "Penalty value")
+         IF (ASSOCIATED(lPtr)) lBc%tauB = rtmp
+         lPtr => list%get(rtmp, "Penalty value (tangential)")
+         IF (ASSOCIATED(lPtr)) lBc%tauB(1) = rtmp
+         lPtr => list%get(rtmp, "Penalty value (normal)")
+         IF (ASSOCIATED(lPtr)) lBc%tauB(2) = rtmp
+      END IF
+
+!     Read BCs for shells with triangular elements. Not necessary for
+!     NURBS elements
+      lPtr => list%get(ctmp,"Shell BC type")
+      IF (ASSOCIATED(lPtr)) THEN
+         SELECT CASE (ctmp)
+         CASE ("Fixed", "fixed", "Clamped", "clamped")
+            lBc%bType = IBSET(lBc%bType,bType_fix)
+            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Fixed BC "//
+     2         "can be applied for Dirichlet boundaries only"
+         CASE ("Hinged", "hinged")
+            lBc%bType = IBSET(lBc%bType,bType_hing)
+            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Hinged BC "//
+     2         "can be applied for Dirichlet boundaries only"
+         CASE ("Free", "free")
+            lBc%bType = IBSET(lBc%bType,bType_free)
+            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Free BC "//
+     2         "can be applied for Neumann boundaries only"
+!        Symm BC needs to be verified
+c         CASE ("Symm", "symm", "Symmetric", "symmetric")
+c            lBc%bType = IBSET(lBc%bType,bType_symm)
+c            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Symm BC "//
+c     2         "can be applied for Neumann boundaries only"
+         CASE DEFAULT
+            err = TRIM(list%ping("Shell BC type",lPtr))//
+     2         " Unexpected Shell BC type"
+         END SELECT
+      END IF
+
       ALLOCATE(lBc%eDrn(nsd))
       lBc%eDrn = 0
       lPtr => list%get(lBc%eDrn,"Effective direction")
+
       ctmp = "Steady"
       lPtr => list%get(ctmp,"Time dependence")
       SELECT CASE (ctmp)
@@ -761,8 +1014,11 @@
          lBc%bType = IBSET(lBc%bType,bType_res)
          IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Resistance"//
      2      " is only defined for Neu BC"
-         IF (phys.NE.phys_fluid .AND. phys.NE.phys_FSI) err =
-     2      "Resistance is only defined for fluid/FSI equations"
+         IF (phys.NE.phys_fluid .AND.
+     2       phys.NE.phys_FSI   .AND.
+     3       phys.NE.phys_CMM) THEN
+            err = "Resistance is only defined for fluid/FSI equations"
+         END IF
 
          lPtr => list%get(lBc%r,"Value",1)
       CASE ('General')
@@ -774,10 +1030,10 @@
          iFa = lBc%iFa
          IF (a .NE. msh(iM)%fa(iFa)%nNo) THEN
             err = "Number of nodes does not match between "//
-     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//TRIM(fTmp%fname)
+     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//fTmp%fname
          END IF
          IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
-     2      " is violated in "//TRIM(fTmp%fname)
+     2      " is violated in "//fTmp%fname
 
          ALLOCATE(lBc%gm)
          ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(msh(iM)%gnNo))
@@ -789,6 +1045,11 @@
 !     Preparing the pointer array
          DO a=1, msh(iM)%fa(iFa)%nNo
             Ac = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%lN(Ac)
+            IF (Ac .EQ. 0) err = "Incorrect global node number "//
+     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
+     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
+     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
             ptr(Ac) = a
          END DO
          DO i=1, j
@@ -796,25 +1057,22 @@
             lBc%gm%t(i) = rtmp
             IF (i .EQ. 1) THEN
                IF (.NOT.ISZERO(rtmp)) err = "First time step"//
-     2            " should be zero in <"//TRIM(ftmp%fname)//">"
+     2            " should be zero in <"//TRIM(ctmp)//">"
             ELSE
                rtmp = rtmp - lBc%gm%t(i-1)
-               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-"//
-     2            "increasing time trend is found in <"//
-     3            TRIM(ftmp%fname)//">"
+               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-in"//
+     2            "creasing time trend is found in <"//TRIM(ctmp)//">"
             END IF
          END DO
          lBc%gm%period = lBc%gm%t(j)
          DO b=1, msh(iM)%fa(iFa)%nNo
             READ (fid,*) Ac
             IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
-               err = "Entry "//Ac//" "//b//" is out of bound in "//
-     2            TRIM(ftmp%fname)
+               err = "Entry "//b//" is out of bound in "//ctmp
             END IF
             a = ptr(Ac)
             IF (a .EQ. 0) THEN
-               err = "Entry "//Ac//" "//b//" not found in face "//
-     2            TRIM(ftmp%fname)
+               err = "Entry "//b//" not found in face "//ctmp
             END IF
             DO i=1, j
                READ (fid,*) lBc%gm%d(:,a,i)
@@ -830,17 +1088,19 @@
       lPtr => list%get(ltmp,"Impose flux")
       IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_flx)
 
-!     To zero-out perimeter or not. Default is .true. for Dir
+!     To zero-out perimeter or not. Default is .true. for Dir/CMM
       ltmp = .FALSE.
-      IF (BTEST(lBc%bType,bType_Dir)) ltmp = .TRUE.
-      lPtr => list%get(ltmp,"Zero out perimeter")
+      IF (BTEST(lBc%bType,bType_Dir) .OR.
+     2    BTEST(lBc%bType,bType_CMM)) ltmp = .TRUE.
+      lPtr => list%get(ltmp, "Zero out perimeter")
       lBc%bType = IBCLR(lBc%bType,bType_zp)
-      IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_zp)
+      IF (ltmp .OR. BTEST(lBc%bType,bType_CMM))
+     2   lBc%bType = IBSET(lBc%bType,bType_zp)
 
 !     Impose BC on the state variable or its integral
       ltmp = .FALSE.
       IF (phys.EQ.phys_lElas .OR. phys.EQ.phys_mesh .OR.
-     2    phys.EQ.phys_struct) ltmp = .TRUE.
+     2    phys.EQ.phys_struct .OR. phys.EQ.phys_shell) ltmp = .TRUE.
       lPtr => list%get(ltmp,"Impose on state variable integral")
       lBc%bType = IBCLR(lBc%bType,bType_impD)
       IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_impD)
@@ -868,18 +1128,21 @@
          DO a=1, msh(iM)%fa(iFa)%nNo
             lBc%gx(a) = 0D0
             Ac        = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%lN(Ac)
+            IF (Ac .EQ. 0) err = "Incorrect global node number "//
+     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
+     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
+     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
             ptr(Ac)   = a
          END DO
          DO b=1, msh(iM)%fa(iFa)%nNo
             READ (fid,*) Ac, rtmp
             IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
-               err = "Entry "//b//" is out of bound in "//
-     2            TRIM(fTmp%fname)
+               err = "Entry "//b//" is out of bound in "//fTmp%fname
             END IF
             a = ptr(Ac)
             IF (a .EQ. 0) THEN
-               err = "Entry <"//b//" not found in face "//
-     2            TRIM(fTmp%fname)
+               err = "Entry <"//b//" not found in face "//fTmp%fname
             END IF
             lBc%gx(a) = rtmp
          END DO
@@ -890,7 +1153,7 @@
 
       RETURN
       END SUBROUTINE READBC
-!####################################################################
+!--------------------------------------------------------------------
 !     This subroutine is to read inputs of VTK files or boundaries.
 !     nDOP(1) is the total number of outputs, nDOP(2) is the default
 !     number of outputs for VTK files, nDOP(3) is for boundaries, and
@@ -900,6 +1163,7 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
+
       TYPE(eqType), INTENT(INOUT) :: lEq
       INTEGER, INTENT(IN) :: nDOP(4), outputs(nDOP(1))
       TYPE(listType), INTENT(INOUT) :: list
@@ -943,6 +1207,16 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = maxnsd
             lEq%output(iOut)%name = "WSS"
+         CASE (out_traction)
+            lEq%output(iOut)%grp  = outGrp_trac
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Traction"
+         CASE (out_stress)
+            lEq%output(iOut)%grp  = outGrp_stress
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%name = "Prestress"
          CASE (out_vorticity)
             lEq%output(iOut)%grp  = outGrp_vort
             lEq%output(iOut)%o    = 0
@@ -973,6 +1247,16 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Vortex"
+         CASE (out_actionPotential)
+            lEq%output(iOut)%grp  = outGrp_Y
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Action_potential"
+         CASE (out_fibDir)
+            lEq%output(iOut)%grp  = outGrp_fN
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Fiber"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT
@@ -1010,13 +1294,14 @@
 
       RETURN
       END SUBROUTINE READOUTPUTS
-!####################################################################
+!--------------------------------------------------------------------
 !     This subroutine reads LS type, tolerance, ...
       SUBROUTINE READLS(ilsType, lEq, list)
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
+
       INTEGER, INTENT(IN) :: ilsType
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(listType), INTENT(INOUT) :: list
@@ -1050,7 +1335,7 @@
       END IF
 
       lEq%ls%LS_Type = lSolverType
-         CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
+      CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
 
 !     Default Preconditioners
       IF (useTrilinosLS) THEN
@@ -1091,7 +1376,7 @@
      2          //" Undefined type"
                lEq%ls%PREC_Type = PREC_NONE
             END SELECT
-            print *, "Using Preconditioner: ", TRIM(ctmp)
+            std = "Using Preconditioner: "//TRIM(ctmp)
          END IF
 
 !        Set solver options file
@@ -1159,6 +1444,7 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
+
       TYPE(listType), INTENT(INOUT) :: list
 
       CHARACTER(LEN=stdL) ctmp
@@ -1205,4 +1491,464 @@
 
       RETURN
       END SUBROUTINE READRMSH
+!#######################################################################
+!     Reads properties of cardiac-electrophysiology model
+      SUBROUTINE READCEP(lDmn, lPD)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(dmnType), INTENT(INOUT) :: lDmn
+      TYPE(listType), INTENT(INOUT) :: lPD
+
+      TYPE(listType), POINTER :: lPtr, list
+      CHARACTER(LEN=stdL) ctmp
+      REAL(KIND=8) rtmp
+
+      lPtr => lPD%get(ctmp, "Electrophysiology model")
+      SELECT CASE(TRIM(ctmp))
+      CASE ("AP", "ap", "Aliev-Panfilov", "aliev-panfilov")
+         lDmn%cep%cepType = cepModel_AP
+      CASE ("FN", "fn", "Fitzhugh-Nagumo", "fitzhugh-nagumo")
+         lDmn%cep%cepType = cepModel_FN
+      CASE ("TTP", "tTP", "ttp", "tenTusscher-Panfilov")
+         lDmn%cep%cepType = cepModel_TTP
+      CASE DEFAULT
+         err = "Unknown electrophysiology model"
+      END SELECT
+
+      lPtr => lPD%get(lDmn%cep%nX,"State variables",ll=1)
+      lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
+      lPtr => lPD%get(lDmn%cep%Dani,"Conductivity (ani)",ll=0D0)
+
+      lDmn%cep%Istim%A  = 0.0d0
+      lDmn%cep%Istim%Ts = HUGE(rtmp)
+      lDmn%cep%Istim%Tp = HUGE(rtmp)
+      lDmn%cep%Istim%Td = 0.0d0
+
+      list => lPD%get(ctmp, "Stimulus")
+      IF (ASSOCIATED(list)) THEN
+         lPtr => list%get(lDmn%cep%Istim%A, "Amplitude")
+         IF (.NOT.ISZERO(lDmn%cep%Istim%A)) THEN
+            lPtr => list%get(lDmn%cep%Istim%Ts, "Start time")
+            lPtr => list%get(lDmn%cep%Istim%Td, "Duration")
+            lPtr => list%get(lDmn%cep%Istim%Tp, "Period")
+         END IF
+      END IF
+
+      lDmn%cep%odes%tIntType = tIntType_FE
+      lPtr => lPD%get(ctmp, "ODE solver")
+      IF (ASSOCIATED(lPtr)) THEN
+         SELECT CASE (ctmp)
+         CASE ("FE", "Euler", "Explicit")
+            lDmn%cep%odes%tIntType = tIntType_FE
+         CASE ("RK4", "Runge")
+            lDmn%cep%odes%tIntType = tIntType_RK4
+         CASE ("CN2", "Implicit")
+            lDmn%cep%odes%tIntType = tIntType_CN2
+         CASE DEFAULT
+            err = " Unknown ODE time integrator"
+         END SELECT
+      END IF
+
+      IF (lDmn%cep%odes%tIntType .EQ. tIntType_CN2) THEN
+         list => lPtr
+         lDmn%cep%odes%maxItr = 5
+         lDmn%cep%odes%absTol = 1D-8
+         lDmn%cep%odes%relTol = 1D-4
+         lPtr => list%get(lDmn%cep%odes%maxItr, "Maximum iterations")
+         lPtr => list%get(lDmn%cep%odes%absTol, "Absolute tolerance")
+         lPtr => list%get(lDmn%cep%odes%relTol, "Relative tolerance")
+      END IF
+
+      RETURN
+      END SUBROUTINE READCEP
+!####################################################################
+!     This subroutine reads properties of structure constitutive model
+      SUBROUTINE READMATMODEL(lDmn, lPD)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(dmnType), INTENT(INOUT) :: lDmn
+      TYPE(listType), INTENT(INOUT) :: lPD
+
+      TYPE(listType), POINTER :: lPtr, lSt
+      CHARACTER(LEN=stdL) ctmp
+      REAL(KIND=8) :: E, nu, lam, mu, kap, rtmp
+
+!     Domain properties: elasticity modulus, poisson ratio
+      E   = lDmn%prop(elasticity_modulus)
+      nu  = lDmn%prop(poisson_ratio)
+
+!     Shear modulus
+      mu  = E/(1D0+nu)/2D0
+
+!     Incompressible material
+      lPtr => lPD%get(lDmn%stM%iFlag, "Incompressible")
+
+!     Bulk modulus for compressible case
+      IF (.NOT.lDmn%stM%iFlag) THEN
+         kap = E/(1D0-2D0*nu)/3D0
+         lam = E*nu/(1D0+nu)/(1D0-2D0*nu)
+      END IF
+
+      lSt => lPD%get(ctmp, "Constitutive model")
+
+!     Default: St.Venant-Kirchhoff material model
+      IF (.NOT.ASSOCIATED(lSt)) THEN
+         IF (lDmn%stM%iFlag) err = "No constitutive model specified "//
+     2      "for incompressible solids"
+         lDmn%stM%isoType = stIso_stVK
+         lDmn%stM%C10 = lam
+         lDmn%stM%C01 = mu
+         RETURN
+      END IF
+
+      SELECT CASE (TRIM(ctmp))
+      CASE ("stVK", "stVenantKirchhoff")
+         IF (lDmn%stM%iFlag) err = "St.Venant-Kirchhoff material "//
+     2      "model cannot be applied for incompressible solids"
+         lDmn%stM%isoType = stIso_stVK
+         lDmn%stM%C10 = lam
+         lDmn%stM%C01 = mu
+
+      CASE ("m-stVK", "modified-stVK",  "modified-stVenantKirchhoff")
+         IF (lDmn%stM%iFlag) err = "St.Venant-Kirchhoff material "//
+     2      "model cannot be applied for incompressible solids"
+         lDmn%stM%isoType = stIso_mStVK
+         lDmn%stM%C10 = kap
+         lDmn%stM%C01 = mu
+
+      CASE ("nHK", "nHK91", "neoHookean", "neoHookeanSimo91")
+         lDmn%stM%isoType = stIso_nHook
+         lDmn%stM%C10 = mu/2D0
+         lPtr => lPD%get(lDmn%stM%fFlag, "Fiber reinforcement")
+         IF (lDmn%stM%fFlag .AND. .NOT.ALLOCATED(fN)) err =
+     2      " Fiber directions not yet provided"
+
+      CASE ("MR", "Mooney-Rivlin")
+         lDmn%stM%isoType = stIso_MR
+         lPtr => lSt%get(lDmn%stM%C10, "c1")
+         lPtr => lSt%get(lDmn%stM%C01, "c2")
+
+      CASE ("HGO")
+      ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
+         lDmn%stM%isoType = stIso_HGO
+         lDmn%stM%C10 = mu/2D0
+         lDmn%stM%fFlag = .TRUE.
+         lPtr => lSt%get(lDmn%stM%aff, "a4")
+         lPtr => lSt%get(lDmn%stM%bff, "b4")
+         lPtr => lSt%get(lDmn%stM%ass, "a6")
+         lPtr => lSt%get(lDmn%stM%bss, "b6")
+         lPtr => lSt%get(lDmn%stM%kap, "kappa")
+         IF (nFn .NE. 2) err = "Min fiber directions not defined for "//
+     2      "HGO material model (2)"
+
+      CASE ("Guccione")
+         err = "Guccione material model still under development.."
+c         lDmn%stM%isoType = stIso_Gucc
+c         lPtr => lSt%get(lDmn%stM%C10, "C")
+c         lPtr => lSt%get(lDmn%stM%bff, "bf")
+c         lPtr => lSt%get(lDmn%stM%bss, "bt")
+c         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
+
+      CASE DEFAULT
+         err = "Undefined constitutive model used"
+      END SELECT
+
+      IF (lDmn%stM%iFlag) RETURN
+
+      IF (lDmn%stM%isoType.EQ.stIso_stVK .OR.
+     2    lDmn%stM%isoType.EQ.stIso_mStVK) THEN
+         RETURN
+      END IF
+
+!     Look for dilational penalty model. HGO uses quadratic penalty model
+      lPtr => lPD%get(ctmp, "Dilational penalty model")
+      IF (.NOT.ASSOCIATED(lPtr)) wrn =
+     2   "Couldn't find any penalty model"
+      SELECT CASE(TRIM(ctmp))
+      CASE ("quad", "Quad", "quadratic", "Quadratic")
+         lDmn%stM%volType = stVol_Quad
+
+      CASE ("ST91", "Simo-Taylor91")
+         lDmn%stM%volType = stVol_ST91
+
+      CASE ("M94", "Miehe94")
+         lDmn%stM%volType = stVol_M94
+
+      CASE DEFAULT
+         err = "Undefined dilational penalty model"
+      END SELECT
+
+!     Default penalty parameter is equal to bulk modulus
+      lDmn%stM%Kpen = kap
+      lPtr => lPD%get(rtmp, "Penalty constant")
+      IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
+
+      RETURN
+      END SUBROUTINE READMATMODEL
+!####################################################################
+!     This subroutine reads traction data from a vtp file and stores
+!     in moving BC data structure
+      SUBROUTINE READTRACBCFF(lMB, lFa, fName)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(MBType), INTENT(INOUT) :: lMB
+      TYPE(faceType), INTENT(INOUT) :: lFa
+      CHARACTER(LEN=stdL) :: fName
+
+      TYPE(vtkXMLType) :: vtp
+      TYPE(faceType) :: gFa
+      INTEGER :: iStat, a, e, Ac
+
+      INTEGER, ALLOCATABLE :: ptr(:), lIEN(:,:)
+      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:)
+
+!     Read Traction data from VTP file
+      iStat = 0
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtp, fName, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (init)"
+
+      CALL getVTK_numPoints(vtp, gFa%nNo, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (num points)"
+
+      CALL getVTK_numElems(vtp, gFa%nEl, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (num cells)"
+
+      CALL getVTK_nodesPerElem(vtp, gFa%eNoN, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (nodes per cell)"
+
+      ALLOCATE(gFa%x(nsd,gFa%nNo), tmpX(maxNSD,gFa%nNo))
+      CALL getVTK_pointCoords(vtp, tmpX, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (coords)"
+      gFa%x(:,:) = tmpX(1:nsd,:)
+
+      ALLOCATE(gFa%IEN(gFa%eNoN,gFa%nEl))
+      CALL getVTK_elemIEN(vtp, gFa%IEN, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (ien)"
+      gFa%IEN = gFa%IEN + 1
+
+!     Use gFa%w as temporary array to load traction data
+      ALLOCATE(gFa%N(nsd,gFa%nNo))
+      CALL getVTK_pointData(vtp, "NS_Traction", tmpX, iStat)
+      gFa%N(:,:) = tmpX(1:nsd,:)
+      IF (iStat .LT. 0) err = "VTP file read error (point data)"
+
+      DEALLOCATE(tmpX)
+      CALL flushVTK(vtp)
+
+!     Project traction from gFa to lFa. First prepare lFa%x, lFa%IEN
+      ALLOCATE(ptr(gtnNo), lFa%x(nsd,lFa%nNo), lIEN(lFa%eNoN,lFa%nEl))
+
+      ptr = 0
+      DO a=1, lFa%nNo
+         Ac = lFa%gN(a)
+         ptr(Ac) = a
+         lFa%x(:,a) = x(:,Ac)
+      END DO
+
+      lIEN = lFa%IEN
+      DO e=1, lFa%nEl
+         DO a=1, lFa%eNoN
+            Ac = lFa%IEN(a,e)
+            lFa%IEN(a,e) = ptr(Ac)
+         END DO
+      END DO
+      DEALLOCATE(ptr)
+
+      ALLOCATE(ptr(lFa%nNo))
+      ptr = 0
+      CALL FACEMATCH(lFa, gFa, ptr)
+      lFa%IEN = lIEN
+
+!     Copy traction data to MB data structure
+      DO a=1, lFa%nNo
+         Ac = ptr(a)
+         lMB%d(:,a,1) = gFa%N(:,Ac)
+         lMB%d(:,a,2) = gFa%N(:,Ac)
+      END DO
+
+      CALL DESTROY(gFa)
+      DEALLOCATE(lFa%x, lIEN, ptr)
+
+      RETURN
+      END SUBROUTINE READTRACBCFF
+!--------------------------------------------------------------------
+      SUBROUTINE FACEMATCH(lFa, gFa, ptr)
+      USE COMMOD
+      USE ALLFUN
+      USE UTILMOD
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(IN) :: lFa, gFa
+      INTEGER, INTENT(INOUT) :: ptr(lFa%nNo)
+
+      INTEGER :: a, b, i
+      REAL(KIND=8) :: ds
+      TYPE(adjType) :: lAdj, gAdj
+      TYPE(queueType) :: lnQ, gnQ
+
+      INTEGER, ALLOCATABLE :: seed(:)
+      LOGICAL, ALLOCATABLE :: flag(:)
+
+      CALL SETNADJ(lFa, lAdj)
+
+      CALL SETNADJ(gFa, gAdj)
+
+      ALLOCATE(flag(lFa%nNo), seed(lFa%nNo))
+      flag = .FALSE.
+      seed = 0
+      DO a=1, lFa%nNo
+         DO b=1, gFa%nNo
+            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
+            IF (ds .LT. 1D3*eps) THEN
+               ptr(a)  = b
+               flag(a) = .TRUE.
+               seed(a) = b
+               DO i=lAdj%prow(a), lAdj%prow(a+1)-1
+                  CALL ENQUEUE(lnQ, lAdj%pcol(i))
+                  seed(lAdj%pcol(i)) = b
+               END DO
+               EXIT
+            END IF
+         END DO
+         IF (flag(a)) EXIT
+      END DO
+      IF (lnQ%n .EQ. 0) err = " Failed to find a matching node"
+
+      DO WHILE (DEQUEUE(lnQ, a))
+         IF (ALL(flag(:))) EXIT
+         IF (flag(a)) CYCLE
+
+         CALL DESTROY(gnQ)
+         b = seed(a)
+         DO i=gAdj%prow(b), gAdj%prow(b+1)-1
+            CALL ENQUEUE(gnQ, gAdj%pcol(i))
+         END DO
+
+         DO WHILE (DEQUEUE(gnQ, b))
+            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
+            IF (ds .LT. 1D3*eps) THEN
+               ptr(a)  = b
+               flag(a) = .TRUE.
+               IF (seed(a) .EQ. 0) seed(a) = b
+               DO i=lAdj%prow(a), lAdj%prow(a+1)-1
+                  CALL ENQUEUE(lnQ, lAdj%pcol(i))
+                  IF (seed(lAdj%pcol(i)) .EQ. 0) THEN
+                     seed(lAdj%pcol(i)) = b
+                  END IF
+               END DO
+               EXIT
+            END IF
+         END DO
+
+         IF (.NOT.flag(a)) THEN
+            DO b=1, gFa%nNo
+               ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
+               IF (ds .LT. 1D3*eps) THEN
+                  ptr(a)  = b
+                  flag(a) = .TRUE.
+                  seed(a) = b
+                  DO i=lAdj%prow(a), lAdj%prow(a+1)-1
+                     CALL ENQUEUE(lnQ, lAdj%pcol(i))
+                     seed(lAdj%pcol(i)) = b
+                  END DO
+                  EXIT
+               END IF
+            END DO
+            IF (.NOT.flag(a)) err = " Failed to map node "//STR(a)
+         END IF
+      END DO
+
+      DEALLOCATE(flag, seed, lAdj%prow, lAdj%pcol, gAdj%prow, gAdj%pcol)
+      RETURN
+      CONTAINS
+!--------------------------------------------------------------------
+         SUBROUTINE SETNADJ(pFa, pAdj)
+         USE COMMOD
+         IMPLICIT NONE
+
+         TYPE(faceType), INTENT(IN) :: pFa
+         TYPE(adjType), INTENT(INOUT) :: pAdj
+
+         INTEGER :: a, b, e, i, Ac, Bc, maxN
+         LOGICAL :: flag
+
+         INTEGER, ALLOCATABLE :: incNd(:), adjL(:,:)
+
+         ALLOCATE(incNd(pFa%nNo))
+         incNd = 0
+         DO e=1, pFa%nEl
+            DO a=1, pFa%eNoN
+               Ac = pFa%IEN(a,e)
+               DO b=1, pFa%eNoN
+                  IF (b .Eq. a) CYCLE
+                  Bc = pFa%IEN(b,e)
+                  incNd(Ac) = incNd(Ac) + 1
+               END DO
+            END DO
+         END DO
+         maxN = MAXVAL(incNd)
+
+         ALLOCATE(adjL(maxN, pFa%nNo))
+         adjL = 0
+         incNd = 0
+         DO e=1, pFa%nEl
+            DO a=1, pFa%eNoN
+               Ac = pFa%IEN(a,e)
+               DO b=1, pFa%eNoN
+                  IF (a .EQ. b) CYCLE
+                  Bc = pFa%IEN(b,e)
+                  flag = .TRUE.
+                  DO i=1, incNd(Ac)
+                     IF (adjL(i,Ac) .EQ. Bc) THEN
+                        flag = .FALSE.
+                        EXIT
+                     END IF
+                  END DO
+                  IF (flag) THEN
+                     incNd(Ac) = incNd(Ac) + 1
+                     adjL(incNd(Ac),Ac) = Bc
+                  END IF
+               END DO
+            END DO
+         END DO
+         maxN = MAXVAL(incNd)
+
+         pAdj%nnz = 0
+         DO a=1, pFa%nNo
+            DO i=1, maxN
+               Ac = adjL(i,a)
+               IF (Ac .EQ. 0) EXIT
+               pAdj%nnz = pAdj%nnz + 1
+            END DO
+         END DO
+
+         ALLOCATE(pAdj%prow(pFa%nNo+1), pAdj%pcol(pAdj%nnz))
+         b = 0
+         pAdj%prow(1) = 1
+         DO a=1, pFa%nNo
+            DO i=1, maxN
+               Ac = adjL(i,a)
+               IF (Ac .EQ. 0) EXIT
+               b = b + 1
+               pAdj%pcol(b) = Ac
+            END DO
+            pAdj%prow(a+1) = b + 1
+         END DO
+
+         DEALLOCATE(adjL, incNd)
+         RETURN
+         END SUBROUTINE SETNADJ
+!--------------------------------------------------------------------
+      END SUBROUTINE FACEMATCH
 !####################################################################

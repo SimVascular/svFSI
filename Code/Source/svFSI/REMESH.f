@@ -43,7 +43,7 @@
       USE ALLFUN
 
       IMPLICIT NONE
-      
+
       REAL(KIND=8), INTENT(IN) :: timeP(3)
 
       TYPE(mshType)  :: tMsh
@@ -52,7 +52,7 @@
       INTEGER :: iM, i, e, a, Ac, Ec, ierr, iEq, lDof
       REAL(KIND=8) :: t1, t2
       CHARACTER(LEN=stdL) :: sTmp, fTmp
-      
+
       REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: tempX,gX,gtX
       REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: tempD,gD,gnD,gtD
 
@@ -70,7 +70,7 @@
       END INTERFACE
 
       t1 = CPUT()
-      
+
       sTmp = TRIM(stFileName)//"_last.bin"
       fTmp = TRIM(stFileName)//"_"//STR(rmsh%rTS)//".bin"
       IF (cm%mas()) THEN
@@ -81,25 +81,18 @@
       CALL cm%bcast(rmsh%rTS)
       OPEN(fid, FILE=TRIM(fTmp), ACCESS='DIRECT', RECL=recLn)
       IF (dFlag) THEN
-         IF (rmsh%isReqd .AND. saveAve) THEN
-            WRITE(fid, REC=cm%tF()) stamp, rmsh%rTS, time,
-     2         CPUT()-timeP(1), eq%iNorm, cplBC%xn, rmsh%Y0, rmsh%A0,
-     3         rmsh%D0, rmsh%Aav, rmsh%Yav, rmsh%Dav
-         ELSE
-            WRITE(fid, REC=cm%tF()) stamp, rmsh%rTS, time,
-     2         CPUT()-timeP(1), eq%iNorm, cplBC%xn,
-     3         rmsh%Y0, rmsh%A0, rmsh%D0
-         END IF
+         WRITE(fid, REC=cm%tF()) stamp, rmsh%rTS, time,
+     2      CPUT()-timeP(1), eq%iNorm, cplBC%xn,
+     3      rmsh%Y0, rmsh%A0, rmsh%D0
       ELSE
          WRITE(fid, REC=cm%tF()) stamp, rmsh%rTS, rmsh%time,
      2      CPUT()-timeP(1), rmsh%iNorm, cplBC%xn, rmsh%Y0, rmsh%A0
       END IF
       CLOSE(fid)
       IF (cm%mas()) CALL SYSTEM("ln -f "//TRIM(fTmp)//" "//TRIM(sTmp))
-      
+
       gtnNo = 0
       lDof = 3*tDof
-      IF (saveAve) lDof = 6*tDof
       DO iM=1, nMsh
 
          IF (rmsh%flag(iM)) THEN
@@ -115,7 +108,7 @@
             ELSE
                err = "Unexpected behavior in Remesher"
             END IF
-            
+
             ALLOCATE(tempX(nsd,msh(iM)%nNo))
             ALLOCATE(gD(lDof,msh(iM)%nNo))
             DO a=1, msh(iM)%nNo
@@ -125,15 +118,7 @@
                gD(tDof+1:2*tDof,a) = rmsh%Y0(:,Ac)
                gD(2*tDof+1:3*tDof,a) = rmsh%D0(:,Ac)
             END DO
-            IF (saveAve) THEN
-               DO a=1, msh(iM)%nNo
-                  Ac = msh(iM)%gN(a)
-                  gD(3*tDof+1:4*tDof,a) = rmsh%Aav(:,Ac)
-                  gD(4*tDof+1:5*tDof,a) = rmsh%Yav(:,Ac)
-                  gD(5*tDof+1:6*tDof,a) = rmsh%Dav(:,Ac)
-               END DO
-            END IF
-            
+
             tMsh%nFa  = 1
             ALLOCATE(tMsh%fa(tMsh%nFa))
             IF (cm%mas()) THEN
@@ -148,7 +133,7 @@
             ALLOCATE(gX(nsd,tMsh%gnNo))
             gX = GLOBAL(msh(iM), tempX)
             DEALLOCATE(tempX)
-            
+
             IF (cm%mas()) THEN
                ALLOCATE(tMsh%gIEN(tMsh%eNoN,tMsh%gnEl))
                tMsh%gIEN = msh(iM)%gIEN
@@ -159,47 +144,47 @@
                   END DO
                END DO
             END IF
-            
+
             CALL INTMSHSRF(msh(iM), tMsh%fa(1))
-            
+
             IF (cm%mas()) THEN
                ALLOCATE(tMsh%fa(1)%x(nsd,tMsh%fa(1)%nNo))
                DO a=1, tMsh%fa(1)%nNo
                   Ac = tMsh%fa(1)%gN(a)
                   tMsh%fa(1)%x(:,a) = gX(:,Ac)
                END DO
-               
+
                IF (nsd .EQ. 2) THEN
                   err = "Remesher not yet developed for 2D objects"
                ELSE
                   CALL REMESHER_3D(iM, tMsh%fa(1), tMsh)
                END IF
-               
+
                ALLOCATE(gnD(lDof,tMsh%gnNo))
             ELSE
                ALLOCATE(tMsh%fa(1)%x(0,0), gnD(0,0))
             END IF
-            
+
             CALL cm%bcast(tMsh%gnNo)
             CALL cm%bcast(tMsh%eNoN)
             CALL cm%bcast(tMsh%gnEl)
-            
+
             IF (cm%slv()) THEN
                ALLOCATE(tMsh%x(nsd,tMsh%gnNo))
                ALLOCATE(tMsh%gIEN(tMsh%eNoN,tMsh%gnEl))
             END IF
-            
+
             CALL MPI_BCAST(tMsh%x, nsd*tMsh%gnNo, mpreal, master,
      2         cm%com(), ierr)
             CALL MPI_BCAST(tMsh%gIEN, tMsh%eNoN*tMsh%gnEl, mpint,
      2         master, cm%com(), ierr)
-            CALL MPI_BCAST(tMsh%fa(1)%IEN, tMsh%fa(1)%eNoN * 
+            CALL MPI_BCAST(tMsh%fa(1)%IEN, tMsh%fa(1)%eNoN *
      2         tMsh%fa(1)%nEl, mpint, master, cm%com(), ierr)
             CALL MPI_BCAST(tMsh%fa(1)%gN, tMsh%fa(1)%nNo, mpint,
      2         master, cm%com(), ierr)
-            
+
             CALL INTERP(lDof, iM, tMsh, gD, gnD)
-            
+
             IF (cm%mas()) THEN
                msh(iM)%gnNo = tMsh%gnNo
                a = gtnNo + msh(iM)%gnNo
@@ -223,17 +208,17 @@
                gtD(:,gtnNo+1:a) = gnD(:,:)
                msh(iM)%x(:,:) = gtX(:,gtnNo+1:a)
                gtnNo = a
-               
+
                CALL SETFACEEBC(tMsh%fa(1), tMsh)
-               
+
                msh(iM)%eNoN = tMsh%eNoN
                msh(iM)%gnEl = tMsh%gnEl
                IF (ALLOCATED(msh(iM)%gIEN)) DEALLOCATE(msh(iM)%gIEN)
                ALLOCATE(msh(iM)%gIEN(msh(iM)%eNoN,msh(iM)%gnEl))
                msh(iM)%gIEN(:,:) = tMsh%gIEN(:,:)
-               
+
                CALL DISTMSHSRF(tMsh%fa(1), msh(iM), 1)
-               
+
                sTmp = TRIM(appPath)//".remesh_tmp.dir"
                fTmp = TRIM(sTmp)//"/"//TRIM(msh(iM)%name)//
      2            "_"//STR(rmsh%rTS)//".vtu"
@@ -260,15 +245,7 @@
                tempD(tDof+1:2*tDof,a) = rmsh%Y0(:,Ac)
                tempD(2*tDof+1:3*tDof,a) = rmsh%D0(:,Ac)
             END DO
-            IF (saveAve) THEN
-               DO a=1, msh(iM)%nNo
-                  Ac = msh(iM)%gN(a)
-                  tempD(3*tDof+1:4*tDof,a) = rmsh%Aav(:,Ac)
-                  tempD(4*tDof+1:5*tDof,a) = rmsh%Yav(:,Ac)
-                  tempD(5*tDof+1:6*tDof,a) = rmsh%Dav(:,Ac)
-               END DO
-            END IF
-            
+
             IF (cm%mas()) THEN
                a = msh(iM)%gnNo
             ELSE
@@ -290,11 +267,11 @@
             DEALLOCATE(tempX, tempD)
             IF (ALLOCATED(msh(iM)%x)) DEALLOCATE(msh(iM)%x)
             ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            
+
             tMsh%nFa = 1
             ALLOCATE(tMsh%fa(tMsh%nFa))
             CALL INTMSHSRF(msh(iM), tMsh%fa(1))
-            
+
             IF (cm%mas()) THEN
                ALLOCATE(tMsh%fa(1)%x(nsd,tMsh%fa(1)%nNo))
                DO i=1, tMsh%fa(1)%nNo
@@ -302,9 +279,9 @@
                   tMsh%fa(1)%x(:,i) = gX(:,Ac)
                END DO
                msh(iM)%x = gX
-               
+
                CALL DISTMSHSRF(tMsh%fa(1), msh(iM), 2)
-               
+
                a = gtnNo + a
                IF (iM .GT. 1) THEN
                   ALLOCATE(tempX(nsd,gtnNo))
@@ -336,7 +313,6 @@
       END DO
       CALL cm%bcast(gtnNo)
       DEALLOCATE(x,rmsh%A0,rmsh%Y0,rmsh%D0)
-      IF (saveAve) DEALLOCATE(rmsh%Aav,rmsh%Yav,rmsh%Dav)
       IF (cm%mas()) THEN
          ALLOCATE(x(nsd,gtnNo))
          ALLOCATE(rmsh%A0(tDof,gtnNo))
@@ -348,20 +324,8 @@
             rmsh%Y0(:,a) = gtD(tDof+1:2*tDof,a)
             rmsh%D0(:,a) = gtD(2*tDof+1:3*tDof,a)
          END DO
-         IF (saveAve) THEN
-            ALLOCATE(rmsh%Aav(tDof,gtnNo))
-            ALLOCATE(rmsh%Yav(tDof,gtnNo))
-            ALLOCATE(rmsh%Dav(tDof,gtnNo))
-            DO a=1, gtnNo
-               rmsh%Aav(:,a) = gtD(3*tDof+1:4*tDof,a)
-               rmsh%Yav(:,a) = gtD(4*tDof+1:5*tDof,a)
-               rmsh%Dav(:,a) = gtD(5*tDof+1:6*tDof,a)
-            END DO
-         END IF
       ELSE
          ALLOCATE(rmsh%A0(0,0),rmsh%Y0(0,0),rmsh%D0(0,0))
-         IF (saveAve) 
-     2      ALLOCATE(rmsh%Aav(0,0),rmsh%Yav(0,0),rmsh%Dav(0,0))
       END IF
       DEALLOCATE(gtX, gtD)
 
@@ -407,7 +371,7 @@
       IF (ALLOCATED(Val)) DEALLOCATE(Val)
       IF (ALLOCATED(fN)) DEALLOCATE(fN)
       cplBC%nFa = 0
-      
+
       t2 = CPUT()
 
       std = " Time taken for remeshing: "//STR(t2-t1)//" (s)"
@@ -438,14 +402,14 @@
       lFa%nNo  = 0
       lFa%name = "old_mesh_surface"
       lFa%nEl = lFa%gnEl
-      
+
       ALLOCATE(lFa%IEN(lFa%eNoN,lFa%gnEl), lFa%gE(lFa%gnEl))
-      
+
       IF(eNoNb .NE. lM%fa(lM%nFa)%eNoN) THEN
          wrn = "    Remeshing not formulated for different face types"
          RETURN
       END IF
-      
+
       IF(cm%mas()) THEN
          DO iFa=1, lM%nFa
             eoff = 0
@@ -455,9 +419,9 @@
                lFa%IEN(:,e) = lM%fa(iFa)%gebc(2:1+eNoNb,e-eoff)
             END DO
          END DO
-      
+
          CALL CALCNBC(lM, lFa)
-      
+
          ALLOCATE(incNd(lM%gnNo))
          incNd = 0
          DO a=1, lFa%nNo
@@ -472,7 +436,7 @@
          END DO
          DEALLOCATE(incNd)
       END IF
-      
+
       CALL cm%bcast(lFa%nNo)
       IF (cm%slv()) ALLOCATE(lFa%gN(lFa%nNo))
 
@@ -491,9 +455,7 @@
       TYPE(mshType),  INTENT(INOUT) :: lM
 
       TYPE(fileType) :: fTmp
-      TYPE(faceType) :: gFa
-      INTEGER :: e, a, i, Ac, fid, iOK
-      INTEGER, ALLOCATABLE :: inclNd(:)
+      INTEGER :: e, i, Ac, fid, iOK
       REAL(KIND=8) :: rparams(3)
 
       rparams(1) = rmsh%maxRadRatio
@@ -504,11 +466,11 @@
          CALL remesh3d_tetgen(lFa%nNo, lFa%nEl, lFa%x, lFa%IEN,
      2      rparams, iOK)
          IF (iOK .LT. 0)
-     2      err = "Fatal! TetGen returned with error. Check log"      
+     2      err = "Fatal! TetGen returned with error. Check log"
       ELSE
          err = "Unknown remesher choice."
       END IF
-      
+
       dbg = " Reading new mesh data.."
       fTmp%fname  = "new-vol-mesh.ele"
       fid = fTmp%open()
@@ -520,7 +482,7 @@
  111  REWIND(fid)
       IF (rmsh%method .EQ. RMSH_TETGEN) lM%gnEl = lM%gnEl - 1
       std = "    Number of elements after remesh "//STR(lM%gnEl)
-      
+
       IF (ALLOCATED(lM%gIEN)) DEALLOCATE(lM%gIEN)
       ALLOCATE(lM%gIEN(lM%eNoN,lM%gnEl))
       IF (rmsh%method .EQ. RMSH_TETGEN) READ(fid,*)
@@ -539,7 +501,7 @@
  112  REWIND(fid)
       IF (rmsh%method .EQ. RMSH_TETGEN) lM%gnNo = lM%gnNo - 1
       std = "    Number of vertices after remesh "//STR(lM%gnNo)
-      
+
       IF (ALLOCATED(lM%x)) DEALLOCATE(lM%x)
       ALLOCATE(lM%x(nsd,lM%gnNo))
       IF (rmsh%method .EQ. RMSH_TETGEN) READ(fid,*)
@@ -547,73 +509,11 @@
          READ(fid,*) i, lM%x(:,Ac)
       END DO
       CLOSE(fid, STATUS='DELETE')
-      
+
       CALL SELECTELE(lM)
-            
+
       RETURN
       END SUBROUTINE REMESHER_3D
-!--------------------------------------------------------------------
-      SUBROUTINE REMAPFACE(oFa, nFa, nM)
-
-      USE COMMOD
-      USE UTILMOD
-      USE ALLFUN
-
-      IMPLICIT NONE
-
-      TYPE(faceType), INTENT(IN) :: oFa
-      TYPE(faceType), INTENT(INOUT) :: nFa
-      TYPE(mshType), INTENT(INOUT)  :: nM
-
-      INTEGER :: e, a, b, Ac_n, Ac_o
-      REAL(KIND=8) :: mag, mins
-
-      INTEGER, ALLOCATABLE :: ntoPtr(:), tempI(:,:)
-      REAL(KIND=8), ALLOCATABLE :: tempX(:,:)
-
-      std = "    Remapping surface mesh (L2 norm)"
-      ALLOCATE(ntoPtr(nM%gnNo))
-      ntoPtr = 0
-      
-      DO a=1, nFa%nNo
-         Ac_n = nFa%gN(a)
-         mins = HUGE(mins)
-         DO b=1, oFa%nNo
-            Ac_o = oFa%gN(b)
-            mag = SQRT( SUM( (nFa%x(:,a)-oFa%x(:,b))**2 ) )
-            IF (mins .GT. mag) THEN
-               mins = mag
-               ntoPtr(Ac_n) = b
-            END IF
-         END DO
-      END DO
-      
-      ALLOCATE(tempI(nM%eNoN,nM%gnEl)); tempI = nM%gIEN
-      ALLOCATE(tempX(nsd,nM%gnNo)); tempX = nM%x
-      DO a=1, nFa%nNo
-         Ac_n = nFa%gN(a)
-         b = ntoPtr(Ac_n)
-         Ac_o = oFa%gN(b)
-         IF (Ac_o .GT. nM%gnNo) err = "Global node pointer out of"//
-     2      " bounds. Cannot remap surface nodes."
-         nM%x(:,Ac_o) = oFa%x(:,b)
-      END DO
-      DO e=1, nM%gnEl
-         DO a=1, nM%eNoN
-            Ac_n = tempI(a,e)
-            IF (ntoPtr(Ac_n) .EQ. 0) CYCLE
-            Ac_o = oFa%gN(ntoPtr(Ac_n))
-            nM%gIEN(a,e) = Ac_o
-         END DO
-      END DO
-      
-      DEALLOCATE(ntoPtr,tempX,tempI)
-      nFa%x = oFa%x
-      nFa%IEN = oFa%IEN
-      nFa%gN = oFa%gN
-      
-      RETURN
-      END SUBROUTINE REMAPFACE
 !--------------------------------------------------------------------
       SUBROUTINE SETFACEEBC(lFa, lM)
 
@@ -709,7 +609,7 @@ c     Check mesh quality and reset IEN if necessary
       ELSE IF (sn .EQ. 0) THEN
          err = "Surface element "//STR(e)//" is distorted"
       END IF
-      
+
       DO e=1, lM%gnEl
          DO a=1, lM%eNoN
             Ac = lM%gIEN(a,e)
@@ -719,7 +619,7 @@ c     Check mesh quality and reset IEN if necessary
          IF (Jac .LT. 0) err = "Remeshing didn't improve mesh quality"
       END DO
       DEALLOCATE(xl,v)
-      
+
       RETURN
       END SUBROUTINE SETFACEEBC
 !--------------------------------------------------------------------
@@ -738,7 +638,7 @@ c     Check mesh quality and reset IEN if necessary
       CHARACTER(LEN=stdL) :: sTmp, fTmp
       INTEGER :: e, a, Ac, iFa, eoff
       LOGICAL :: flag
-      
+
       INTEGER, ALLOCATABLE :: incNd(:)
 
       dbg = " Distributing surface mesh"
@@ -747,7 +647,7 @@ c     Check mesh quality and reset IEN if necessary
       IF (.NOT. flag) THEN
          CALL SYSTEM("mkdir  -p  "//TRIM(sTmp))
       END IF
-      
+
       DO e=1, lFa%nEl
          DO a=1, lFa%eNoN
             Ac = lFa%IEN(a,e)
@@ -755,7 +655,7 @@ c     Check mesh quality and reset IEN if necessary
             lFa%IEN(a,e) = Ac
          END DO
       END DO
-      
+
       DO iFa=1, lM%nFa
          lM%fa(iFa)%nEl = lM%fa(iFa)%gnEl
          IF (ALLOCATED(lM%fa(iFa)%IEN)) DEALLOCATE(lM%fa(iFa)%IEN)
@@ -772,17 +672,17 @@ c     Check mesh quality and reset IEN if necessary
 
          IF (ALLOCATED(lM%fa(iFa)%gN)) DEALLOCATE(lM%fa(iFa)%gN)
          CALL CALCNBC(lM, lM%fa(iFa))
-         
+
          IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
          ALLOCATE(lM%fa(iFa)%x(nsd, lM%fa(iFa)%nNo))
          DO a=1, lM%fa(iFa)%nNo
             Ac = lM%fa(iFa)%gN(a)
             lM%fa(iFa)%x(:,a) = lM%x(:,Ac)
          END DO
-         
+
          lM%fa(iFa)%gebc(1,:) = lM%fa(iFa)%gE(:)
          lM%fa(iFa)%gebc(2:1+lM%fa(iFa)%eNoN,:) = lM%fa(iFa)%IEN(:,:)
-         
+
          IF (iOpt.EQ.1) THEN
             fTmp = TRIM(sTmp)//"/"//TRIM(lM%fa(iFa)%name)//"_"//
      2         STR(rmsh%rTS)//".vtp"
@@ -825,21 +725,21 @@ c     Check mesh quality and reset IEN if necessary
       INTEGER, INTENT(IN) :: lDof, iM
       REAL(KIND=8), DIMENSION(:,:), INTENT(IN)  :: sD
       REAL(KIND=8), DIMENSION(:,:), INTENT(OUT) :: tgD(:,:)
-      
+
       INTEGER :: a, e, b, i, iFa, ierr, Ac, Bc, Ec, nn, ne, try, nbnd
       INTEGER :: nNo, nEl, eNon, gnNo, gnEl, maxKNE, maxKNN, probe, bTag
       REAL(KIND=8) :: dS
       LOGICAL :: flag
-      
+
       TYPE(queueType) :: rootNdQ
-      INTEGER, ALLOCATABLE :: gN(:), gE(:), tagNd(:), masEList(:), 
+      INTEGER, ALLOCATABLE :: gN(:), gE(:), tagNd(:), masEList(:),
      2 srcAdjEl(:,:), tgtAdjNd(:,:), eList(:), rootEl(:), srfNds(:),
      3 sCount(:), disp(:), tmpL(:)
       REAL(KIND=8), ALLOCATABLE :: Xp(:), Nsf(:), gNsf(:,:)
       LOGICAL, ALLOCATABLE :: chckNp(:)
-      
+
       REAL(KIND=8), ALLOCATABLE :: Dg(:,:), tmpX(:,:), vec(:), gvec(:)
-      
+
       INTERFACE
          SUBROUTINE DISTRN(iM, lM, Dg, nNo, gN)
          USE COMMOD
@@ -853,7 +753,7 @@ c     Check mesh quality and reset IEN if necessary
          REAL(KIND=8), INTENT(IN) :: Dg(nsd,tnNo)
          END SUBROUTINE DISTRN
       END INTERFACE
-      
+
       INTERFACE
          SUBROUTINE DISTRE(lM, nEl, gE)
          USE COMMOD
@@ -865,7 +765,7 @@ c     Check mesh quality and reset IEN if necessary
          INTEGER, ALLOCATABLE :: gE(:)
          END SUBROUTINE DISTRE
       END INTERFACE
-      
+
       INTERFACE
          SUBROUTINE GETADJESRC(lM, kneList)
          USE COMMOD
@@ -876,7 +776,7 @@ c     Check mesh quality and reset IEN if necessary
          INTEGER, ALLOCATABLE :: kneList(:,:)
          END SUBROUTINE GETADJESRC
       END INTERFACE
-      
+
       INTERFACE
          SUBROUTINE GETADJNTGT(lM, nNo, nEl, gN, gE, knnList)
          USE COMMOD
@@ -888,7 +788,7 @@ c     Check mesh quality and reset IEN if necessary
          INTEGER, ALLOCATABLE :: knnList(:,:)
          END SUBROUTINE GETADJNTGT
       END INTERFACE
-            
+
       INTERFACE
          SUBROUTINE FINDN(xp, iM, Dg, eList, Ec, Nsf)
          USE COMMOD
@@ -901,40 +801,40 @@ c     Check mesh quality and reset IEN if necessary
          REAL(KIND=8), INTENT(OUT) :: Nsf(msh(iM)%eNoN)
          END SUBROUTINE FINDN
       END INTERFACE
-      
+
       std = " Interpolating.."
       IF (cm%seq()) wrn = "Interpolation not optimized for serial job"
-      
+
       IF (nsd+1 .NE. msh(iM)%eNoN) err = "Inconsistent element type "//
      2   "for interpolation. Can support 2D Tri or 3D Tet elements only"
-      
+
       gnNo = tMsh%gnNo
       eNoN = tMsh%eNoN
       gnEl = tMsh%gnEl
-      
+
 !     Distribute the new mesh nodes among all the processors
 !     Need to transfer mesh displacement
       ALLOCATE(Dg(nsd,tnNo))
       i = nsd+1
       Dg(:,:) = rmsh%D0(i+1:i+nsd,:)
       CALL DISTRN(iM, tMsh, Dg, nNo, gN)
-      
+
 !     Distribute elements of the new mesh to all processors
       CALL DISTRE(tMsh, nEl, gE)
-      
+
 !     Setup data structures for octree search
 !     Get adjacent cells for source (old) mesh
       CALL GETADJESRC(msh(iM), srcAdjEl)
       maxKNE = SIZE(srcAdjEl,1)
-      
+
 !     Get adjacent nodes for each node on the new mesh
       CALL GETADJNTGT(tMsh, nNo, nEl, gN, gE, tgtAdjNd)
       maxKNN = SIZE(tgtAdjNd,1)
       DEALLOCATE(gE)
-      
+
       ALLOCATE(Xp(nsd+1), Nsf(eNoN), gNsf(eNoN,nNo), tagNd(gnNo),
      2 gE(nNo), rootEl(nNo), chckNp(nNo), masEList(msh(iM)%nEl))
-      
+
       gNsf   = 0D0
       gE     = 0
       tagNd  = 0
@@ -943,9 +843,9 @@ c     Check mesh quality and reset IEN if necessary
       DO e=1, msh(iM)%nEl
          masEList(e) = e
       END DO
-      
+
 !     Determine boundary nodes on the new mesh, where interpolation is
-!     not needed, or boundary search is performed 
+!     not needed, or boundary search is performed
       ALLOCATE(tmpL(gnNo))
       tmpL = 0
       DO e=1, tMsh%fa(1)%nEl
@@ -954,7 +854,7 @@ c     Check mesh quality and reset IEN if necessary
             IF (tmpL(Ac) .EQ. 0) tmpL(Ac) = 1
          END DO
       END DO
-      
+
       ALLOCATE(srfNds(nNo))
       srfNds = 0
       DO a=1, nNo
@@ -962,8 +862,8 @@ c     Check mesh quality and reset IEN if necessary
         IF (tmpL(Ac) .GT. 0) srfNds(a) = 1
       END DO
       DEALLOCATE(tmpL)
-      
-      bTag = 2*cm%np() 
+
+      bTag = 2*cm%np()
       DO a=1, nNo
          Ac = gN(a)
          IF (srfNds(a) .GT. 0) THEN
@@ -973,7 +873,7 @@ c     Check mesh quality and reset IEN if necessary
             gNsf(:,a) = 0D0
          END IF
       END DO
-      
+
 !     Find a starting element through brute search and the starting node
 !     is used to initialize the queue (local numbering)
       DO a=1, nNo
@@ -1000,8 +900,8 @@ c     Check mesh quality and reset IEN if necessary
             IF (rootNdQ%n .GT. 1) EXIT
          END IF
       END DO
-      
-!     Node-Cell search begins here. Uses fastest grid-to-grid algorithm 
+
+!     Node-Cell search begins here. Uses fastest grid-to-grid algorithm
 !     based on advancing front in the nearest vicinity
       ALLOCATE(eList(maxKNE)); eList = 0
       DO WHILE (DEQUEUE(rootNdQ, probe))
@@ -1015,11 +915,11 @@ c     Check mesh quality and reset IEN if necessary
             Ec = srcAdjEl(e,rootEl(probe))
             IF (Ec .GT. 0) eList(e) = Ec
          END DO
-         
+
          DO try=1, 2
             CALL FINDN(Xp, iM, Dg, eList, Ec, Nsf)
 !      IF an element is found, the neighbors of the node are initialized
-!      with this element as root element and are added to the queue 
+!      with this element as root element and are added to the queue
 !      (front propagation)
             IF (Ec .GT. 0) THEN
               gE(probe) = Ec
@@ -1075,26 +975,26 @@ c     Check mesh quality and reset IEN if necessary
          chckNp(probe) = .TRUE.
       END DO
       CALL DESTROY(rootNdQ)
-      
+
       ALLOCATE(tmpL(gnNo))
       tmpL = 0
       CALL MPI_ALLREDUCE(tagNd, tmpL, gnNo, mpint, MPI_MAX, cm%com(),
      2   ierr)
-      
+
       nn   = 0
       nbnd = 0
       DO a=1, gnNo
          IF (tmpL(a) .GT. 0) nn = nn + 1
          IF (tmpL(a) .EQ. 2*cm%np()) nbnd = nbnd + 1
       END DO
-      
+
 !     Assign tag for nodes that were interpolated in other processors
       tagNd = 0
       DO a=1, nNo
          Ac = gN(a)
          tagNd(Ac) = tmpL(Ac)
       END DO
-         
+
 !     Now use brute force to find left over non-interpolated nodes
       DO a=1, nNo
          Ac = gN(a)
@@ -1109,7 +1009,7 @@ c     Check mesh quality and reset IEN if necessary
             END IF
          END IF
       END DO
-         
+
 !     Nodes belonging to other procs are reassigned 0
       DO a=1, nNo
          Ac = gN(a)
@@ -1120,7 +1020,7 @@ c     Check mesh quality and reset IEN if necessary
          END IF
       END DO
       DEALLOCATE(tmpL)
-      
+
 !     Now that all the elements have been found, data is interpolated
 !     from the source to the target mesh
       ALLOCATE(tmpX(lDof,nNo))
@@ -1137,7 +1037,7 @@ c     Check mesh quality and reset IEN if necessary
             END DO
          END IF
       END DO
-      
+
 !     Since there is no direct mapping for face data, we use L2 norm
 !     to find the nearest face node and copy its solution. This requires
 !     face node/IEN structure to NOT be changed during remeshing.
@@ -1167,9 +1067,8 @@ c     Check mesh quality and reset IEN if necessary
             END IF
          END IF
       END DO
-      CALL FLUSH(10000+cm%id())
       DEALLOCATE(tmpL)
-      
+
 !     Map the tagged nodes and solution to local vector within a proc,
 !     including boundary nodes. Since the boundary nodes can be overlapping
 !     across different procs, these are repeated. But this will not cause
@@ -1188,7 +1087,7 @@ c     Check mesh quality and reset IEN if necessary
             tmpL(nn) = a
          END IF
       END DO
-      
+
       DEALLOCATE(gNsf)
       ALLOCATE(gNsf(lDof,nn))
       DO i=1, nn
@@ -1198,17 +1097,17 @@ c     Check mesh quality and reset IEN if necessary
          tmpL(i) = Ac
       END DO
       DEALLOCATE(tmpX)
-      
+
       IF (cm%mas()) THEN
          ALLOCATE(disp(cm%np()))
          disp = 0
       ELSE
          ALLOCATE(disp(0))
       END IF
-      
-      CALL MPI_GATHER(nn, 1, mpint, disp, 1, mpint, master, 
+
+      CALL MPI_GATHER(nn, 1, mpint, disp, 1, mpint, master,
      2   cm%com(), ierr)
-      
+
       IF (cm%mas()) THEN
          i = SUM(disp(:))
          i = i*(1 + lDof)
@@ -1235,10 +1134,10 @@ c     Check mesh quality and reset IEN if necessary
          END DO
       END DO
       DEALLOCATE(gNsf)
-      
+
       CALL MPI_GATHERV(vec, (1+lDof)*nn, mpreal, gvec, sCount, disp,
      2   mpreal, master, cm%com(), ierr)
-      
+
       IF (cm%mas()) THEN
          tgD = 0D0
          nn = SUM(sCount(:))
@@ -1254,29 +1153,29 @@ c     Check mesh quality and reset IEN if necessary
          END DO
       END IF
       DEALLOCATE(vec, gvec, sCount, disp)
-      
+
       RETURN
       END SUBROUTINE INTERP
-!--------------------------------------------------------------------      
+!--------------------------------------------------------------------
 !     Distribute the new mesh nodes among all the processors
       SUBROUTINE DISTRN(iM, lM, Dg, nNo, gN)
-      
+
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-      
+
       IMPLICIT NONE
-      
+
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER, INTENT(IN) :: iM
       INTEGER, INTENT(OUT) :: nNo
       INTEGER, ALLOCATABLE :: gN(:)
       REAL(KIND=8), INTENT(IN) :: Dg(nsd,tnNo)
-      
+
       INTEGER :: i, a, b, Ac, gnNo, ierr
       REAL(KIND=8) :: f, tol, dS, minS
       INTEGER, ALLOCATABLE :: part(:), tmpI(:)
-      
+
       gnNo = lM%gnNo
       i = 0
       f = 2.5D-2
@@ -1300,15 +1199,15 @@ c     Check mesh quality and reset IEN if necessary
             part(a) = cm%tF()
          END IF
       END DO
-      
+
       CALL MPI_ALLREDUCE(part, tmpI, gnNo, mpint, MPI_MAX, cm%com(),
      2   ierr)
-      
+
       b = 0
       DO a=1, gnNo
          IF (tmpI(a) .GT. 0) b = b + 1
       END DO
-      
+
       IF (b .NE. gnNo) THEN
          wrn = "Found only "//STR(b)//" nodes in pass "//STR(i)//
      2      " out of "//STR(gnNo)//" nodes"
@@ -1316,7 +1215,7 @@ c     Check mesh quality and reset IEN if necessary
      2      STR(i)//" passes. Try changing tolerance."
          GOTO 003
       END IF
-      
+
       ALLOCATE(gN(nNo), lM%gpN(gnNo))
       nNo = 0
       DO a=1, gnNo
@@ -1328,29 +1227,29 @@ c     Check mesh quality and reset IEN if necessary
 !      WRITE(*,'(A)') "CPU "//STR(cm%tF())//" nNo = "//STR(nNo)
       lM%gpN = part
       DEALLOCATE(part, tmpI)
-      
+
       RETURN
       END SUBROUTINE DISTRN
 !--------------------------------------------------------------------
 !     Distribute the new mesh elements to all processors
       SUBROUTINE DISTRE(lM, nEl, gE)
-      
+
       USE COMMOD
       USE ALLFUN
       USE UTILMOD
-      
+
       IMPLICIT NONE
-      
+
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER, INTENT(OUT) :: nEl
       INTEGER, ALLOCATABLE :: gE(:)
-      
+
       INTEGER :: e, a, i, Ac, gnEl, eNoN
       INTEGER, ALLOCATABLE :: part(:)
-      
+
       gnEL = lM%gnEl
       eNoN = lM%eNoN
-      
+
       ALLOCATE(part(gnEl))
       part = 0
       nEl  = 0
@@ -1367,7 +1266,7 @@ c     Check mesh quality and reset IEN if necessary
       END DO
       DEALLOCATE(lM%gpN)
 !      WRITE(*,'(A)') "CPU "//STR(cm%tF())//" nEl = "//STR(nEl)
-      
+
       ALLOCATE(gE(nEl))
       nEl = 0
       DO e=1, gnEl
@@ -1377,27 +1276,27 @@ c     Check mesh quality and reset IEN if necessary
          END IF
       END DO
       DEALLOCATE(part)
-      
+
       RETURN
       END SUBROUTINE DISTRE
 !--------------------------------------------------------------------
 !     Create list of connected/adjacent elements for old/source mesh
       SUBROUTINE GETADJESRC(lM, kneList)
-      
+
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-      
+
       IMPLICIT NONE
-      
+
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER, ALLOCATABLE :: kneList(:,:)
-      
+
       INTEGER :: a, b, e, Ac, i, j, maxKNE
       LOGICAL :: flag
-      
+
       INTEGER, ALLOCATABLE :: nL(:), tmpList(:,:)
-      
+
 !     First get elements around all nodes
       ALLOCATE(nL(lM%nNo))
       nL = 0
@@ -1408,7 +1307,7 @@ c     Check mesh quality and reset IEN if necessary
             nL(Ac) = nL(Ac) + 1
          END DO
       END DO
-      
+
       maxKNE = MAX(MAXVAL(nL), 0)
       ALLOCATE(tmpList(maxKNE, lM%nNo))
       nL(:)  = 0
@@ -1422,7 +1321,7 @@ c     Check mesh quality and reset IEN if necessary
          END DO
       END DO
       b = 2*maxKNE
-      
+
 !     Now get elements around each element and avoid redundancy
  001  b = b + maxKNE
       DEALLOCATE(nL)
@@ -1458,7 +1357,7 @@ c     Check mesh quality and reset IEN if necessary
       DEALLOCATE(tmpList)
       maxKNE = MAX(MAXVAL(nL), 0)
 !      WRITE(*,'(A)') "CPU "//STR(cm%tF())//", maxKNE = "//STR(maxKNE)
-      
+
       ALLOCATE(tmpList(b,lM%nEl))
       tmpList = kneList
       DEALLOCATE(kneList)
@@ -1467,35 +1366,35 @@ c     Check mesh quality and reset IEN if necessary
          kneList(:, e) = tmpList(1:maxKNE, e)
       END DO
       DEALLOCATE(nL, tmpList)
-      
+
       RETURN
       END SUBROUTINE GETADJESRC
 !--------------------------------------------------------------------
 !     Create list of connected/adjacent nodes for new/target mesh
       SUBROUTINE GETADJNTGT(lM, nNo, nEl, gN, gE, knnList)
-      
+
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-      
+
       IMPLICIT NONE
-      
+
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER, INTENT(IN) :: nNo, nEl, gN(nNo), gE(nEl)
       INTEGER, ALLOCATABLE :: knnList(:,:)
-      
+
       INTEGER :: a, b, e, Ac, Bc, Ec, i, j, n, maxKNN
       LOGICAL :: flag
-      
+
       INTEGER, ALLOCATABLE :: lN(:), nL(:), tmpList(:,:)
-      
+
       ALLOCATE(lN(lM%gnNo))
       lN = 0
       DO a=1, nNo
          Ac = gN(a)
          lN(Ac) = a
       END DO
-      
+
       ALLOCATE(nL(nNo))
       nL = 0
       DO e=1, nEl
@@ -1511,7 +1410,7 @@ c     Check mesh quality and reset IEN if necessary
          END DO
       END DO
       maxKNN = MAX(MAXVAL(nL), 0)
-      
+
       ALLOCATE(tmpList(maxKNN, nNo))
       tmpList = 0
       nL = 0
@@ -1540,32 +1439,32 @@ c     Check mesh quality and reset IEN if necessary
       END DO
       maxKNN = MAX(MAXVAL(nL), 0)
 !      WRITE(*,'(A)') "CPU "//STR(cm%tF())//", maxKNN = "//STR(maxKNN)
-      
+
       ALLOCATE(knnList(maxKNN, nNo))
       DO a=1, nNo
          knnList(:,a) = tmpList(1:maxKNN,a)
       END DO
       DEALLOCATE(tmpList, nL, lN)
-      
+
       RETURN
       END SUBROUTINE GETADJNTGT
 !--------------------------------------------------------------------
 !     Find element in the old mesh for each node in the new mesh
       SUBROUTINE FINDN(xp, iM, Dg, eList, Ec, Nsf)
-      
+
       USE COMMOD
       USE MATFUN
-      
+
       IMPLICIT NONE
-      
+
       INTEGER, INTENT(IN) :: iM, eList(:)
       INTEGER, INTENT(OUT) :: Ec
       REAL(KIND=8), INTENT(IN) :: xp(nsd+1), Dg(nsd,tnNo)
       REAL(KIND=8), INTENT(OUT) :: Nsf(msh(iM)%eNoN)
-      
+
       INTEGER :: e, a, i, j, ne, Ac
       REAL(KIND=8), ALLOCATABLE :: Amat(:,:)
-      
+
       ne = size(eList)
       ALLOCATE(Amat(nsd+1,msh(iM)%eNoN))
       Nsf(:) = 0D0
@@ -1594,7 +1493,7 @@ c     Check mesh quality and reset IEN if necessary
       END DO
       Ec = 0
       Nsf(:) = 0D0
-      
+
       RETURN
       END SUBROUTINE FINDN
 !--------------------------------------------------------------------

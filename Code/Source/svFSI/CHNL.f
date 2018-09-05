@@ -224,7 +224,7 @@
       CHARACTER(LEN=*), INTENT(IN) :: isTmp
 
       LOGICAL flag
-      CHARACTER(LEN=stdL) sTmp, fName
+      CHARACTER(LEN=LEN(isTmp)) sTmp, fName
 
       IF (.NOT.chnl%oTS .AND. .NOT.chnl%oTF) RETURN
 
@@ -250,10 +250,10 @@
       IF (chnl%oTS) THEN
          IF (chnl%tag .NE. "") THEN
             IF (pClr) THEN
-               WRITE(*,"(A)") CLR(TRIM(chnl%tag)//" >>",4)//" "//
+               WRITE(*,"(A)") " "//CLR(TRIM(chnl%tag)//" >>",4)//" "//
      2            TRIM(isTmp)
             ELSE
-               WRITE(*,"(A)") TRIM(chnl%tag)//" >> "//TRIM(sTmp)
+               WRITE(*,"(A)") " "//TRIM(chnl%tag)//" >> "//TRIM(sTmp)
             END IF
          ELSE
             IF (pClr) THEN
@@ -299,9 +299,10 @@
 
       IF (chnl%oTS .OR. chnl%oTF) THEN
          IF (pClr) THEN
-            CALL CHNLOUTPUT(chnl,CLR(" WARNING:",4)//" "//ADJUSTL(sTmp))
+            CALL CHNLOUTPUT(chnl,CLR(" WARNING:",4)//" "//
+     2         ADJUSTL(sTmp))
          ELSE
-            CALL CHNLOUTPUT(chnl,"!!! WARNING: "//ADJUSTL(sTmp))
+            CALL CHNLOUTPUT(chnl," WARNING: "//ADJUSTL(sTmp))
          END IF
       END IF
 

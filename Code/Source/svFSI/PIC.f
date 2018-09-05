@@ -38,24 +38,49 @@
 
 !     This is the predictor
       SUBROUTINE PICP
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER iEq, s, e
       REAL(KIND=8) coef
 
-      Yn = Yo
+!     Prestress initialization
+      DO iEq=1, nEq
+         IF (eq(iEq)%phys .EQ. phys_preSt) THEN
+            pS0 = pS0 + pSn
+            eq(cEq)%iNorm = 0D0
+            eq(cEq)%pNorm = HUGE(coef)
+            Ao = 0D0
+            Yo = 0D0
+            Do = 0D0
+         END IF
+      END DO
+
       DO iEq=1, nEq
          s = eq(iEq)%s
          e = eq(iEq)%e
          coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
          An(s:e,:) = Ao(s:e,:)*coef
+
+!        electrophysiology
+         IF (eq(iEq)%phys .EQ. phys_CEP) THEN
+            CALL CEPION(iEq, e)
+         END IF
+
+         Yn(s:e,:) = Yo(s:e,:)
+
+!        struct, lElas, mesh
          IF (dFlag) THEN
             coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
      2         /(eq(iEq)%gam - 1D0)
             Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
+         END IF
+
+!        ustruct
+         IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
+            coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
+            ADn(1:nsd,:) = ADo(1:nsd,:)*coef
+            Dn(s:e,:)    = Do(s:e,:)
          END IF
       END DO
 
@@ -63,14 +88,12 @@
       END SUBROUTINE PICP
 !====================================================================
 !     This is the initiator
-      SUBROUTINE PICI(Ag, Yg, Dg)
-
+      SUBROUTINE PICI(Ag, Yg, Dg, ADg)
       USE COMMOD
-
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(INOUT) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo)
+     2   Dg(tDof,tnNo), ADg(nsd,tnNo)
 
       INTEGER s, e, i, a
       REAL(KIND=8) coef(4)
@@ -78,6 +101,7 @@
       dof         = eq(cEq)%dof
       eq(cEq)%itr = eq(cEq)%itr + 1
 
+      ADg = 0D0
       DO i=1, nEq
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, s, e, coef)
          s       = eq(i)%s
@@ -95,15 +119,28 @@
          END DO
 !$OMP END DO
 
-         IF(eq(i)%phys.EQ.phys_fluid .OR. eq(i)%phys.EQ.phys_FSI) THEN
+         IF (eq(i)%phys.EQ.phys_fluid .OR.
+     2       eq(i)%phys.EQ.phys_FSI   .OR.
+     3       eq(i)%phys.EQ.phys_CMM) THEN
 !$OMP DO SCHEDULE(GUIDED,mpBs)
             DO a=1, tnNo
                Yg(e,a) = Yn(e,a)
             END DO
 !$OMP END DO
          END IF
+
+         IF(eq(i)%phys .EQ. phys_ustruct) THEN
+!$OMP DO SCHEDULE(GUIDED,mpBs)
+            DO a=1, tnNo
+               ADg(:,a) = ADo(:,a)*coef(1) + ADn(:,a)*coef(2)
+            END DO
+!$OMP END DO
+         END IF
+
 !$OMP END PARALLEL
       END DO
+
+      IF (eq(cEq)%phys .EQ. phys_preSt) pSn = 0D0
 
       RETURN
       END SUBROUTINE PICI
@@ -111,30 +148,44 @@
 !     This is the corrector. Decision for next equation is also made
 !     here
       SUBROUTINE PICC
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
-      LOGICAL l1, l2, l3, l4
-      INTEGER s, e, a, Ac
-      REAL(KIND=8) coef(3), tmp
+      LOGICAL :: l1, l2, l3, l4
+      INTEGER :: s, e, a, Ac
+      REAL(KIND=8) :: coef(5), lRd(nsd), rtmp
+      CHARACTER(LEN=stdL) :: sCmd
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, s, e, coef)
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, s, e, coef, lRd, rtmp)
       s       = eq(cEq)%s
       e       = eq(cEq)%e
       coef(1) = eq(cEq)%gam*dt
       coef(2) = coef(1)*eq(cEq)%af
       coef(3) = eq(cEq)%beta*dt*dt
+      coef(4) = 1D0/eq(cEq)%am
+      coef(5) = coef(2)*coef(4)
+      lRd(:)  = 0D0
 
-      IF (eq(cEq)%phys.EQ.phys_fluid .OR. eq(cEq)%phys.EQ.phys_FSI) THEN
+      IF (eq(cEq)%phys.EQ.phys_fluid .OR.
+     2    eq(cEq)%phys.EQ.phys_FSI   .OR.
+     3    eq(cEq)%phys.EQ.phys_CMM) THEN
 !$OMP DO SCHEDULE(GUIDED,mpBs)
          DO a=1, tnNo
             An(s:e,a)   = An(s:e,a)   - R(:,a)
             Yn(s:e-1,a) = Yn(s:e-1,a) - R(1:dof-1,a)*coef(1)
             Yn(e,a)     = Yn(e,a)     - R(dof,a)*coef(2)
             Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
+         END DO
+!$OMP END DO
+      ELSE IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
+!$OMP DO SCHEDULE(GUIDED,mpBs)
+         DO a=1, tnNo
+            lRd(:)      = Rd(:,a)*coef(4) + R(1:nsd,a)*coef(5)
+            An(s:e,a)   = An(s:e,a)   - R(:,a)
+            Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
+            ADn(:,a)    = ADn(:,a)    - lRd(:)
+            Dn(s:e-1,a) = Dn(s:e-1,a) - lRd(:)*coef(1)
          END DO
 !$OMP END DO
       ELSE
@@ -162,18 +213,51 @@
       END IF
 !$OMP END PARALLEL
 
+!     Update prestress at the nodes and re-initialize
+      IF (eq(cEq)%phys .EQ. phys_preSt) THEN
+         CALL COMMU(pSn)
+         CALL COMMU(pSa)
+         DO a=1, tnNo
+            IF (.NOT.ISZERO(pSa(a))) THEN
+               pSn(:,a) = pSn(:,a) / pSa(a)
+            END IF
+         END DO
+         pSa = 0D0
+!     Stop the simulation if the norm of displacements is less than a
+!     given tolerance
+         s = eq(cEq)%s
+         e = eq(cEq)%e
+         rtmp = 0D0
+         DO a=1, tnNo
+            rtmp = rtmp + NORM(Dn(s:e,a))
+         END DO
+         rtmp = SQRT(cm%reduce(rtmp))
+         IF (cm%mas()) THEN
+            WRITE(1000,'(A)') STR(cTS)//" "//STR(eq(cEq)%itr)//" "//
+     2         STR(rtmp)
+            CALL FLUSH(1000)
+            IF(rtmp .LT. 1E-6) THEN
+               sCmd = "touch  "//TRIM(stopTrigName)
+               CALL SYSTEM(TRIM(sCmd))
+            END IF
+         END IF
+      END IF
+
+!     Filter out the non-wall displacements if solving the CMM equation
+      IF (eq(cEQ)%phys .EQ. phys_CMM) CALL CMM_DISPF(eq(cEq), Dn)
+
       IF (ISZERO(eq(cEq)%FSILS%RI%iNorm)) eq(cEq)%FSILS%RI%iNorm = eps
       IF (ISZERO(eq(cEq)%iNorm)) eq(cEq)%iNorm = eq(cEq)%FSILS%RI%iNorm
       IF (eq(cEq)%itr .EQ. 1) THEN
          eq(cEq)%pNorm = eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm
       END IF
-      tmp = 2D1*
+      rtmp = 2D1*
      2   LOG10(eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm/eq(cEq)%pNorm)
 
       l1 = eq(cEq)%itr .GE. eq(cEq)%maxItr
       l2 = eq(cEq)%FSILS%RI%iNorm .LE. eq(cEq)%tol*eq(cEq)%iNorm
       l3 = eq(cEq)%itr .GE. eq(cEq)%minItr
-      l4 = tmp .LE. eq(cEq)%dBr
+      l4 = rtmp .LE. eq(cEq)%dBr
       IF (l1 .OR. (l2.AND.l3.AND.l4)) eq(cEq)%ok = .TRUE.
       IF (ALL(eq%ok)) RETURN
 

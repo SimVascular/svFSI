@@ -37,9 +37,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE SETBCDIR(lA, lY, lD)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(INOUT) :: lA(tDof, tnNo), lY(tDof, tnNo),
@@ -52,7 +50,23 @@
 
       DO iEq=1, nEq
          DO iBc=1, eq(iEq)%nBc
+            IF(BTEST(eq(iEq)%bc(iBc)%bType,bType_CMM)) THEN
+               s = eq(iEq)%s
+               e = eq(iEq)%e
+               IF (eq(iEq)%dof .EQ. nsd+1) e = e - 1
+               iFa  = eq(iEq)%bc(iBc)%iFa
+               iM   = eq(iEq)%bc(iBc)%iM
+               DO a=1, msh(iM)%fa(iFa)%nNo
+                  IF (ISZERO(eq(iEq)%bc(iBc)%gx(a))) THEN
+                     Ac = msh(iM)%fa(iFa)%gN(a)
+                     lA(s:e,Ac) = 0D0
+                     lY(s:e,Ac) = 0D0
+                  END IF
+               END DO
+            END IF ! END bType_CMM
+
             IF (.NOT.BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) CYCLE
+            IF (eq(iEq)%bc(iBc)%weakDir) CYCLE
             s = eq(iEq)%s
             e = eq(iEq)%e
             IF (eq(iEq)%dof .EQ. nsd+1) e = e - 1
@@ -80,8 +94,8 @@
                         lDof = 0
                         IF (eDir(i)) THEN
                            lDof = lDof + 1
-                           lY(i,Ac) = tmpA(lDof,a)
-                           lD(i,Ac) = tmpY(lDof,a)
+                           lY(s+i-1,Ac) = tmpA(lDof,a)
+                           lD(s+i-1,Ac) = tmpY(lDof,a)
                         END IF
                      END DO
                   ELSE
@@ -89,8 +103,8 @@
                         lDof = 0
                         IF (eDir(i)) THEN
                            lDof = lDof + 1
-                           lA(i,Ac) = tmpA(lDof,a)
-                           lY(i,Ac) = tmpY(lDof,a)
+                           lA(s+i-1,Ac) = tmpA(lDof,a)
+                           lY(s+i-1,Ac) = tmpY(lDof,a)
                         END IF
                      END DO
                   END IF
@@ -108,15 +122,23 @@
                END DO
             END IF
          END DO
+
+         IF (ibFlag) THEN
+            CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
+            IF (ib%mthd .EQ. ibMthd_SSM) THEN
+               IF (eq(iEq)%phys .EQ. phys_fluid .OR.
+     2             eq(iEq)%phys .EQ. phys_FSI) THEN
+                  CALL IB_PRJCTU(lY, lD, ib%Yo)
+               END IF
+            END IF
+         END IF
       END DO
 
       RETURN
       END SUBROUTINE SETBCDIR
 !--------------------------------------------------------------------
       SUBROUTINE SETBCDIRL(lBc, lFa, lA, lY, lDof)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: lDof
@@ -154,13 +176,10 @@
 
       RETURN
       END SUBROUTINE SETBCDIRL
-
 !####################################################################
 !     Here for the outlets
       SUBROUTINE SETBCNEU(Yg, Dg)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
@@ -178,10 +197,8 @@
       END SUBROUTINE SETBCNEU
 !--------------------------------------------------------------------
       SUBROUTINE SETBCNEUL(lBc, lFa, Yg, Dg)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(bcType), INTENT(IN) :: lBc
@@ -192,8 +209,8 @@
       REAL(KIND=8) Q, h, tmp
 
       INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: hg(:), tmpA(:), yl(:,:), hl(:),
-     2   dl(:,:)
+      REAL(KIND=8), ALLOCATABLE :: hg(:), tmpA(:), yl(:,:), hl(:)
+
 !     Geting the contribution of Neu BC
       IF (BTEST(lBc%bType,bType_cpl)) THEN
          h = lBc%g
@@ -215,8 +232,7 @@
          END IF
       END IF
 
-      ALLOCATE(hg(tnNo), yl(tDof,lFa%eNoN), hl(lFa%eNoN), ptr(lFa%eNoN),
-     2   dl(tDof,msh(lFa%iM)%eNoN))
+      ALLOCATE(hg(tnNo), yl(tDof,lFa%eNoN), hl(lFa%eNoN), ptr(lFa%eNoN))
 !     Transforming it to a unified format
       IF (BTEST(lBc%bType,bType_gen)) THEN
          DO a=1, lFa%nNo
@@ -246,31 +262,316 @@
       END IF
 
 !     Constructing LHS/RHS contribution and assembiling them
-      DO e=1, lFa%nEl
-         DO a=1, lFa%eNoN
-            Ac      = lFa%IEN(a,e)
+      IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
+         CALL BUSTRUCTNEU(lFa, hg, Dg)
+      ELSE
+         DO e=1, lFa%nEl
+            DO a=1, lFa%eNoN
+               Ac      = lFa%IEN(a,e)
                ptr(a)  = Ac
-            yl(:,a) = Yg(:,Ac)
-            hl(a)   = hg(Ac)
-         END DO
-         DO a=1, msh(lFa%iM)%eNoN
-            Ac      = msh(lFa%iM)%IEN(a,lFa%gE(e))
-            dl(:,a) = Dg(:,Ac)
-         END DO
+               yl(:,a) = Yg(:,Ac)
+               hl(a)   = hg(Ac)
+            END DO
 !     Add Neumann BCs contribution to the LHS/RHS
-         CALL BCONSTRUCT(lFa, yl, dl, hl, ptr, e)
-      END DO
+            CALL BCONSTRUCT(lFa, yl, hl, ptr, e)
+         END DO
+      END IF
 
       RETURN
       END SUBROUTINE SETBCNEUL
-
 !####################################################################
-!     cplBC is set here
-      SUBROUTINE SETBCCPL
+!     Here traction vector is applied for the outlets
+      SUBROUTINE SETBCTRAC(Yg)
+
+      USE COMMOD
+
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
+
+      INTEGER iFa, iBc, iM
+
+      DO iBc=1, eq(cEq)%nBc
+         IF (.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) CYCLE
+         iFa = eq(cEq)%bc(iBc)%iFa
+         iM  = eq(cEq)%bc(iBc)%iM
+         IF (eq(cEq)%phys .NE. phys_preSt) err = "Traction BC is "//
+     2      "applied for prestress equation only"
+         CALL SETBCTRACL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg)
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCTRAC
+!--------------------------------------------------------------------
+      SUBROUTINE SETBCTRACL(lBc, lFa, Yg)
 
       USE COMMOD
       USE ALLFUN
 
+      IMPLICIT NONE
+
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(faceType), INTENT(IN) :: lFa
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
+
+      INTEGER :: a, Ac, e, g, iM, nNo, eNoN, cPhys
+      REAL(KIND=8) :: w, nV(nsd), y(tDof), Jac, h(nsd)
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: N(:), yl(:,:), hl(:,:),hg(:,:),
+     2   tmpA(:,:), lR(:,:), lK(:,:,:)
+
+      iM   = lFa%iM
+      nNo  = lFa%nNo
+      eNoN = lFa%eNoN
+
+      IF (.NOT.ALLOCATED(lBc%gm)) err = "Correction needed in SETBCTRAC"
+
+!     Geting the contribution of traction BC
+      ALLOCATE(tmpA(nsd,nNo), hg(nsd,nNo))
+      CALL IGBC(lBc%gm, tmpA, hg)
+      DEALLOCATE(hg)
+
+      ALLOCATE(hg(nsd,tnNo), hl(nsd,eNoN), yl(tDof,eNoN), ptr(eNoN),
+     2   N(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+
+!     Transforming it to a unified format
+      DO a=1, nNo
+         Ac       = lFa%gN(a)
+         hg(:,Ac) = tmpA(:,a)
+      END DO
+      DEALLOCATE(tmpA)
+
+!     Constructing LHS/RHS contribution and assembiling them
+      DO e=1, lFa%nEl
+         DO a=1, eNoN
+            Ac      = lFa%IEN(a,e)
+            ptr(a)  = Ac
+            yl(:,a) = Yg(:,Ac)
+            hl(:,a) = hg(:,Ac)
+         END DO
+
+!     Add Traction BCs contribution to the LHS/RHS
+         lK = 0D0
+         lR = 0D0
+         cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_preSt) CYCLE
+
+         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
+
+         DO g=1, lFa%nG
+            CALL GNNB(lFa, e, g, nV)
+            Jac = SQRT(NORM(nV))
+            nV  = nV/Jac
+            w   = lFa%w(g)*Jac
+            N   = lFa%N(:,g)
+
+            h = 0D0
+            y = 0D0
+            DO a=1, eNoN
+               h(:) = h(:) + N(a)*hl(:,a)
+               y(:) = y(:) + N(a)*yl(:,a)
+            END DO
+
+            DO a=1, eNoN
+               lR(:,a) = lR(:,a) - w*N(a)*h(:)
+            END DO
+         END DO
+
+#ifdef WITH_TRILINOS
+         IF (useTrilinosAssemAndLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCTRACL
+!####################################################################
+!     Weak treatment of Dirichlet boundary conditions
+      SUBROUTINE SETBCDIRW(Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
+
+      INTEGER :: iBc, iFa, iM
+
+      DO iBc=1, eq(cEq)%nBc
+         iM  = eq(cEq)%bc(iBc)%iM
+         iFa = eq(cEq)%bc(iBc)%iFa
+         IF (.NOT.eq(cEq)%bc(iBc)%weakDir) CYCLE
+         CALL SETBCDIRWL(eq(cEq)%bc(iBc), msh(iM), msh(iM)%fa(iFa), Yg,
+     2      Dg)
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCDIRW
+!--------------------------------------------------------------------
+      SUBROUTINE SETBCDIRWL(lBc, lM, lFa, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(mshType), INTENT(IN) :: lM
+      TYPE(faceType), INTENT(IN) :: lFa
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
+
+      LOGICAL :: flag, eDir(maxnsd)
+      INTEGER :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl, nG, eNoN,
+     2   eNoNb, cPhys
+      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
+     2   ub(nsd), tauB(2), Ks(nsd,nsd)
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
+     2   xl(:,:), xbl(:,:), yl(:,:), ubl(:,:), ubg(:,:), tmpA(:,:),
+     3   tmpY(:,:), lR(:,:), lK(:,:,:)
+
+      nNo   = lFa%nNo
+      nEl   = lFa%nEl
+      nG    = lFa%nG
+      eNoNb = lFa%eNoN
+      eNoN  = lM%eNoN
+
+      tauB  = lBc%tauB
+
+      ss    = eq(cEq)%s
+      ee    = eq(cEq)%e
+      IF (eq(cEq)%dof .EQ. nsd+1) ee = ee - 1
+      eDir  = .FALSE.
+      lDof  = 0
+      DO i=1, nsd
+         IF (lBc%eDrn(i) .NE. 0) THEN
+            eDir(i) = .TRUE.
+            lDof = lDof + 1
+         END IF
+      END DO
+      IF (lDof .EQ. 0) lDof = ee - ss + 1
+
+      ALLOCATE(tmpA(lDof,nNo), tmpY(lDof,nNo))
+      CALL SETBCDIRL(lBc, lFa, tmpA, tmpY, lDof)
+      IF (BTEST(lBc%bType,bType_impD)) tmpY(:,:) = tmpA(:,:)
+
+      ALLOCATE(ubg(nsd,tnNo))
+      ubg = 0D0
+      IF (ANY(eDir)) THEN
+         DO a=1, nNo
+            Ac = lFa%gN(a)
+            DO i=1, nsd
+               lDof = 0
+               IF (eDir(i)) THEN
+                  lDof = lDof + 1
+                  ubg(i,Ac) = tmpY(lDof,a)
+               END IF
+            END DO
+         END DO
+      ELSE
+         DO a=1, nNo
+            Ac = lFa%gN(a)
+            ubg(:,Ac) = tmpY(:,a)
+         END DO
+      END IF
+      DEALLOCATE(tmpA, tmpY)
+
+      ALLOCATE(Nb(eNoNb), xbl(nsd,eNoNb), ubl(nsd,eNoNb))
+
+      ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
+     2   yl(tDof,eNoN), ptr(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+
+      xi0 = 0D0
+      DO g=1, lM%nG
+         xi0 = xi0 + lM%xi(:,g)
+      END DO
+      xi0 = xi0 / REAL(lM%nG,KIND=8)
+
+      DO e=1, nEl
+         Ec = lFa%gE(e)
+         cDmn  = DOMAIN(lM, cEq, Ec)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+
+         IF (cPhys .NE. phys_fluid) err =
+     2      " Weak Dirichlet BC formulated for fluid phys only"
+
+         DO a=1, eNoN
+            Ac = lM%IEN(a,Ec)
+            ptr(a)  = Ac
+            xl(:,a) = x(:,Ac)
+            IF (mvMsh) xl(:,a) = xl(:,a) + Dg(nsd+2:2*nsd+1,Ac)
+            yl(:,a) = Yg(:,Ac)
+         END DO
+
+         DO a=1, eNoNb
+            Ac = lFa%IEN(a,e)
+            xbl(:,a) = x(:,Ac)
+            ubl(:,a) = ubg(:,Ac)
+            IF (mvMsh) xbl(:,a) = xbl(:,a) + Dg(nsd+2:2*nsd+1,Ac)
+         END DO
+
+         lK = 0D0
+         lR = 0D0
+         DO g=1, nG
+            CALL GNNB(lFa, e, g, nV)
+            Jac = SQRT(NORM(nV))
+            nV  = nV/Jac
+            w   = lFa%w(g) * Jac
+            Nb  = lFa%N(:,g)
+
+            xp = 0D0
+            ub = 0D0
+            DO a=1, eNoNb
+               xp = xp + xbl(:,a)*Nb(a)
+               ub = ub + ubl(:,a)*Nb(a)
+            END DO
+
+            xi = xi0
+            CALL GETXI(lM%eType, eNoN, xl, xp, xi, flag)
+            CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
+
+            i = 0
+            DO a=1, eNoN
+               IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
+            END DO
+            IF (.NOT.flag .OR. i.NE.eNoN) THEN
+               err = " Error in computing face shape function"
+            END IF
+
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF)
+     2         CALL GNN(eNoN, Nxi, xl, Nx, Jac, Ks)
+
+            IF (nsd .EQ. 3) THEN
+               CALL BWFLUID3D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
+            ELSE
+               CALL BWFLUID2D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
+            END IF
+         END DO
+
+!     Now doing the assembly part
+#ifdef WITH_TRILINOS
+         IF (useTrilinosAssemAndLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCDIRWL
+!####################################################################
+!     cplBC is set here
+      SUBROUTINE SETBCCPL
+      USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, PARAMETER :: iEq = 1
@@ -306,14 +607,11 @@
 
       RETURN
       END SUBROUTINE SETBCCPL
-
 !--------------------------------------------------------------------
 !     cplBC derivative is calculated here
       SUBROUTINE CALCDERCPLBC
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, PARAMETER :: iEq = 1
@@ -375,14 +673,11 @@
 
       RETURN
       END SUBROUTINE CALCDERCPLBC
-
 !--------------------------------------------------------------------
 !     Interface to call 0D code
       SUBROUTINE cplBC_Integ_X
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER fid, iFa, ios
@@ -431,4 +726,69 @@
 
       RETURN
       END SUBROUTINE cplBC_Integ_X
+!####################################################################
+! Below defines the SET_BC methods for the Coupled Momentum Method (CMM)
+      SUBROUTINE SETBCCMM(Ag, Yg, Dg)
+      USE COMMOD
+      IMPLICIT NONE
 
+      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER iFa, iBc, iM
+
+      DO iBc=1, eq(cEq)%nBc
+          IF(.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_CMM)) CYCLE
+          iFa = eq(cEq)%bc(iBc)%iFa
+          iM = eq(cEq)%bc(iBc)%iM
+          CALL SETBCCMML(msh(iM)%fa(iFa), Ag, Yg, Dg)
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCCMM
+!--------------------------------------------------------------------
+!     This defines the pseudo-structural equations to solve on the
+!     boundaries of the lateral surfaces for the CMM method. It
+!     borrows heavily from the current implementation of the 2D
+!     linear elasticity equations, modified for the CMM method
+!     It then will add the contributions to the LHS and RHS matrices
+      SUBROUTINE SETBCCMML(lFa, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(IN) :: lFa
+      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER a, Ac, e, eNoN
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: al(:,:), yl(:,:), dl(:,:), xl(:,:),
+     2  pS0l(:,:)
+
+      eNoN = lFa%eNoN
+      ALLOCATE(ptr(eNoN), al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN),
+     2   xl(nsd,eNoN), pS0l(nstd,eNoN))
+
+      pS0l = 0D0
+!     Constructing the CMM contributions to the LHS/RHS and
+!     assembling them
+      DO e=1, lFa%nEl
+          DO a=1, lFa%eNoN
+              Ac = lFa%IEN(a,e)
+              ptr(a)  = Ac
+              al(:,a) = Ag(:,Ac)
+              yl(:,a) = Yg(:,Ac)
+              dl(:,a) = Dg(:,Ac)
+              xl(:,a) = x(:,Ac)
+              IF(ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+          END DO
+
+!     Add CMM BCs contributions to the LHS/RHS
+          CALL CMM_CONSTRUCT(lFa, al, yl, dl, xl, pS0l, ptr, e)
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCCMML
+!####################################################################

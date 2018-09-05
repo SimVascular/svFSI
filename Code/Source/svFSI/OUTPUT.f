@@ -90,17 +90,14 @@ c      END DO
 !####################################################################
 !     Prepares the output of svFSI to the standard output.
       SUBROUTINE OUTRESULT(timeP, co, iEq)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: co, iEq
       REAL(KIND=8), INTENT(INOUT) :: timeP(3)
 
-      CHARACTER(LEN=*), PARAMETER :: sepLine = "---------------------"//
-     2   "-------------------------------------"
+      CHARACTER(LEN=stdL) :: sepLine
 
       INTEGER fid, i
       REAL(KIND=8) tmp, tmp2
@@ -112,19 +109,27 @@ c      END DO
       fid = 1
       tmp = CPUT()
 
+      sepLine = REPEAT("-", 58)
+      IF (ibFlag) sepLine = REPEAT("-", 68)
+
       IF (co .EQ. 1) THEN
          timeP(1) = tmp - timeP(1)
          timeP(2) = 0D0
          std = " "
-         std = sepLine
-         std = "Eq     N-i     T      dB   Ri/R0    R/Ri     lsIt  "//
-     2      "dB  %t"
-         IF (nEq .EQ. 1) std = sepLine
+         std = TRIM(sepLine)
+         IF (ibFlag) THEN
+            std = "Eq     N-i     T      dB   Ri/R0    "//
+     2         "R/Ri     lsIt  dB  %t   %t(IB)"
+         ELSE
+            std = "Eq     N-i     T      dB   Ri/R0    R/Ri     lsIt"//
+     2      "  dB  %t"
+         END IF
+         IF (nEq .EQ. 1) std = TRIM(sepLine)
          RETURN
       END IF
 
       IF (nEq.GT.1 .AND. iEq.EQ.1 .AND. eq(iEq)%itr.EQ.1) THEN
-         std = sepLine
+         std = TRIM(sepLine)
       END IF
 
       c1 = " "
@@ -138,8 +143,8 @@ c      END DO
          tmp2 = 1D0
          i    = 0
       ELSE
-         tmp  = eq(iEq)%FSILS%RI%iNorm/eq(iEq)%iNorm !||b|| / |initial at time 0
-         tmp2 = eq(iEq)%FSILS%RI%fNorm/eq(iEq)%FSILS%RI%iNorm !||rf|| / ||b||scaled residual
+         tmp  = eq(iEq)%FSILS%RI%iNorm/eq(iEq)%iNorm
+         tmp2 = eq(iEq)%FSILS%RI%fNorm/eq(iEq)%FSILS%RI%iNorm
          i    = INT(2D1*LOG10(tmp/eq(iEq)%pNorm))
       END IF
 
@@ -164,6 +169,11 @@ c      END DO
       sOut = TRIM(sOut)//"  "//c1//STR(eq(iEq)%FSILS%RI%itr,4)//" "//
      2   STR(NINT(eq(iEq)%FSILS%RI%dB),3)//" "//STR(NINT(tmp),3)//c2
 
+      IF (ibFlag) THEN
+         tmp  = tmp*ib%callD / eq(iEq)%FSILS%RI%callD
+         sOut = TRIM(sOut)//"   ("//STR(NINT(tmp),3)//")"
+      END IF
+
       IF (nEq .GT. 1) THEN
          std = CLR(sOut,iEq)
          IF (sepOutput .AND. iEq.NE.cEq) std = "--"
@@ -173,5 +183,5 @@ c      END DO
 
       RETURN
       END SUBROUTINE OUTRESULT
-
+!####################################################################
 

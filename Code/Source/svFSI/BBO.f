@@ -34,7 +34,7 @@
 !      This routine embodies formulation for solving
 !      Basset–Boussinesq–Oseen equation, which models the particle
 !      motion with gravity and inertial effects.
-!      
+!
 !--------------------------------------------------------------------
 
       PURE SUBROUTINE BBO3D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
@@ -48,12 +48,12 @@
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), ksix(nsd,nsd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-      
+
       REAL(KIND=8), PARAMETER :: ct(4) = (/4D0,1D0,1D0,4D0/)
 
       INTEGER a, b, i, j, k
-      REAL(KIND=8) wr, T1, T2, amd, wl, udNx(eNoN), res(nsd), tauM, kU, 
-     2   nu, tauB, up(nsd), updNx(eNoN), tmpV(nsd), NxdNx, rM(nsd,nsd), 
+      REAL(KIND=8) wr, T1, T2, amd, wl, udNx(eNoN), res(nsd), tauM, kU,
+     2   nu, tauB, up(nsd), updNx(eNoN), tmpV(nsd), NxdNx, rM(nsd,nsd),
      3   tauMs, wlnu, ud(nsd), u(nsd), ux(nsd,nsd), bf(nsd), s, px(nsd),
      4   rho, pRho, pDia
 
@@ -63,7 +63,7 @@
       nu    = eq(cEq)%dmn(cDmn)%prop(viscosity)
       bf(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       bf(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
-      bf(3) = eq(cEq)%dmn(cDmn)%prop(f_z) 
+      bf(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
       T1    = eq(cEq)%af*eq(cEq)%gam*dt
       amd   = eq(cEq)%am/T1
       i     = eq(cEq)%s
@@ -84,15 +84,15 @@
          up(1) = up(1) + N(a)*yl(i,a)
          up(2) = up(2) + N(a)*yl(j,a)
          up(3) = up(3) + N(a)*yl(k,a)
-               
+
          ud(1) = ud(1) + N(a)*al(1,a)
          ud(2) = ud(2) + N(a)*al(2,a)
          ud(3) = ud(3) + N(a)*al(3,a)
-               
+
          u(1)  = u(1)  + N(a)*yl(1,a)
          u(2)  = u(2)  + N(a)*yl(2,a)
          u(3)  = u(3)  + N(a)*yl(3,a)
-               
+
          px(1) = px(1) + Nx(1,a)*yl(3,a)
          px(2) = px(2) + Nx(2,a)*yl(3,a)
          px(3) = px(3) + Nx(3,a)*yl(3,a)
@@ -107,7 +107,7 @@
          ux(2,3) = ux(2,3) + Nx(2,a)*yl(3,a)
          ux(3,3) = ux(3,3) + Nx(3,a)*yl(3,a)
       END DO
- 
+
       bf(1) = s*u(1) + (-rho*px(1) + 5D-1*rho*(ud(1)
      2   + up(1)*ux(1,1) + up(2)*ux(2,1) + up(3)*ux(3,1))
      3   + (pRho - rho)*bf(1))/(pRho + 5D-1*rho)
@@ -117,7 +117,7 @@
       bf(3) = s*u(3) + (-rho*px(3) + 5D-1*rho*(ud(3)
      2   + up(1)*ux(1,3) + up(2)*ux(2,3) + up(3)*ux(3,3))
      3   + (pRho - rho)*bf(3))/(pRho + 5D-1*rho)
-       
+
       u  = up
       ud = 0D0
       ux = 0D0
@@ -137,31 +137,31 @@
          ux(3,3) = ux(3,3) + Nx(3,a)*yl(k,a)
       END DO
 
-      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1) 
-     2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2) 
-     3   + u(2)*u(2)*ksix(2,2) + u(3)*u(2)*ksix(3,2) 
-     4   + u(1)*u(3)*ksix(1,3) + u(2)*u(3)*ksix(2,3) 
+      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
+     2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2)
+     3   + u(2)*u(2)*ksix(2,2) + u(3)*u(2)*ksix(3,2)
+     4   + u(1)*u(3)*ksix(1,3) + u(2)*u(3)*ksix(2,3)
      5   + u(3)*u(3)*ksix(3,3)
 
       tauM = ct(3)/SQRT(ct(1)/dt/dt + ct(2)*kU + s*s)
       tauMs = ct(3)/SQRT(ct(2)*kU + s*s)
-      
+
       res(1) = ud(1) + u(1)*ux(1,1) + u(2)*ux(2,1) + u(3)*ux(3,1)
      2   + s*u(1) - bf(1)
-      res(2) = ud(2) + u(1)*ux(1,2) + u(2)*ux(2,2) + u(3)*ux(3,2) 
+      res(2) = ud(2) + u(1)*ux(1,2) + u(2)*ux(2,2) + u(3)*ux(3,2)
      2   + s*u(2) - bf(2)
-      res(3) = ud(3) + u(1)*ux(1,3) + u(2)*ux(2,3) + u(3)*ux(3,3) 
+      res(3) = ud(3) + u(1)*ux(1,3) + u(2)*ux(2,3) + u(3)*ux(3,3)
      2   + s*u(3) - bf(3)
 
 !     Discontinuity capturing nu (wx , ux)
       tmpV(1) = (u(1)*ux(1,1) + u(2)*ux(1,2) + u(3)*ux(1,3))
       tmpV(2) = (u(1)*ux(2,1) + u(2)*ux(2,2) + u(3)*ux(2,3))
       tmpV(2) = (u(1)*ux(3,1) + u(2)*ux(3,2) + u(3)*ux(3,3))
-      
-      nu = tmpV(1)*tmpV(1)*ksix(1,1) + tmpV(2)*tmpV(1)*ksix(2,1) 
-     2   + tmpV(3)*tmpV(1)*ksix(3,1) + tmpV(1)*tmpV(2)*ksix(1,2) 
-     3   + tmpV(2)*tmpV(2)*ksix(2,2) + tmpV(3)*tmpV(2)*ksix(3,2) 
-     4   + tmpV(1)*tmpV(3)*ksix(1,3) + tmpV(2)*tmpV(3)*ksix(2,3) 
+
+      nu = tmpV(1)*tmpV(1)*ksix(1,1) + tmpV(2)*tmpV(1)*ksix(2,1)
+     2   + tmpV(3)*tmpV(1)*ksix(3,1) + tmpV(1)*tmpV(2)*ksix(1,2)
+     3   + tmpV(2)*tmpV(2)*ksix(2,2) + tmpV(3)*tmpV(2)*ksix(3,2)
+     4   + tmpV(1)*tmpV(3)*ksix(1,3) + tmpV(2)*tmpV(3)*ksix(2,3)
      5   + tmpV(3)*tmpV(3)*ksix(3,3)
       IF (ISZERO(nu)) nu = eps
       nu = (u(1)*u(1) + u(2)*u(2) + u(3)*u(3))/nu
@@ -172,23 +172,23 @@
 
 !     tauB terms tauB (up.wx , up.ux)
       up = -tauM*res
-      tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1) 
-     2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2) 
-     3     + up(2)*up(2)*ksix(2,2) + up(3)*up(2)*ksix(3,2) 
-     4     + up(1)*up(3)*ksix(1,3) + up(2)*up(3)*ksix(2,3) 
+      tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
+     2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2)
+     3     + up(2)*up(2)*ksix(2,2) + up(3)*up(2)*ksix(3,2)
+     4     + up(1)*up(3)*ksix(1,3) + up(2)*up(3)*ksix(2,3)
      5     + up(3)*up(3)*ksix(3,3)
       IF (ISZERO(tauB)) tauB = eps
       tauB = ct(3)/SQRT(tauB)
-      
-      rM(1,1) = nu*(ux(1,1) + ux(1,1)) 
-      rM(2,1) = nu*(ux(2,1) + ux(1,2)) 
-      rM(3,1) = nu*(ux(3,1) + ux(1,3)) 
+
+      rM(1,1) = nu*(ux(1,1) + ux(1,1))
+      rM(2,1) = nu*(ux(2,1) + ux(1,2))
+      rM(3,1) = nu*(ux(3,1) + ux(1,3))
       rM(1,2) = nu*(ux(1,2) + ux(2,1))
-      rM(2,2) = nu*(ux(2,2) + ux(2,2)) 
-      rM(3,2) = nu*(ux(3,2) + ux(2,3)) 
+      rM(2,2) = nu*(ux(2,2) + ux(2,2))
+      rM(3,2) = nu*(ux(3,2) + ux(2,3))
       rM(1,3) = nu*(ux(1,3) + ux(3,1))
-      rM(2,3) = nu*(ux(2,3) + ux(3,2)) 
-      rM(3,3) = nu*(ux(3,3) + ux(3,3)) 
+      rM(2,3) = nu*(ux(2,3) + ux(3,2))
+      rM(3,3) = nu*(ux(3,3) + ux(3,3))
 
       tmpV(1) = tauB*(up(1)*ux(1,1) + up(2)*ux(2,1) + up(3)*ux(3,1))
       tmpV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2) + up(3)*ux(3,2))
@@ -198,7 +198,7 @@
          updNx(a) = up(1)*Nx(1,a) + up(2)*Nx(2,a) + up(3)*Nx(3,a)
          T1       = N(a) + udNx(a)*tauM
 
-         lR(1,a) = lR(1,a) + wr*(res(1)*T1 + updNx(a)*tmpV(1) 
+         lR(1,a) = lR(1,a) + wr*(res(1)*T1 + updNx(a)*tmpV(1)
      2           + rM(1,1)*Nx(1,a) + rM(1,2)*Nx(2,a) + rM(1,3)*Nx(3,a))
          lR(2,a) = lR(2,a) + wr*(res(2)*T1 + updNx(a)*tmpV(2)
      2           + rM(2,1)*Nx(1,a) + rM(2,2)*Nx(2,a) + rM(2,3)*Nx(3,a))
@@ -212,9 +212,9 @@
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
 
-            T2 = wl*(T1*(udNx(b) + (amd + s)*N(b)) 
+            T2 = wl*(T1*(udNx(b) + (amd + s)*N(b))
      2         + tauB*updNx(a)*updNx(b) + nu*NxdNx)
-             
+
             lK(1,a,b) = lK(1,a,b) + wlnu*Nx(1,a)*Nx(1,b) + T2
             lK(2,a,b) = lK(2,a,b) + wlnu*Nx(2,a)*Nx(1,b)
             lK(3,a,b) = lK(3,a,b) + wlnu*Nx(3,a)*Nx(1,b)
@@ -231,7 +231,7 @@
       END SUBROUTINE BBO3D
 
 !====================================================================
-      
+
       PURE SUBROUTINE BBO2D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
 
       USE COMMOD
@@ -240,14 +240,14 @@
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN), 
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), ksix(nsd,nsd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-      
+
       REAL(KIND=8), PARAMETER :: ct(4) = (/4D0,1D0,1D0,4D0/)
       INTEGER a, b, i, j
-      REAL(KIND=8) wr, T1, T2, amd, wl, udNx(eNoN), res(nsd), tauM, kU, 
-     2   nu, tauB, up(nsd), updNx(eNoN), tmpV(nsd), NxdNx, rM(nsd,nsd), 
+      REAL(KIND=8) wr, T1, T2, amd, wl, udNx(eNoN), res(nsd), tauM, kU,
+     2   nu, tauB, up(nsd), updNx(eNoN), tmpV(nsd), NxdNx, rM(nsd,nsd),
      3   tauMs, wlnu, ud(nsd), u(nsd), ux(nsd,nsd), bf(nsd), s, rho,
      4   pRho, pDia, px(nsd)
 
@@ -264,7 +264,7 @@
       wr    = w*(pRho + 5D-1*rho)
       wl    = wr*T1
       s     = 18D0*nu/pDia/pDia/(pRho + 5D-1*rho)
- 
+
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first
       ud = 0D0
@@ -275,13 +275,13 @@
       DO a=1, eNoN
          up(1) = up(1) + N(a)*yl(i,a)
          up(2) = up(2) + N(a)*yl(j,a)
-               
+
          ud(1) = ud(1) + N(a)*al(1,a)
          ud(2) = ud(2) + N(a)*al(2,a)
-               
+
          u(1)  = u(1)  + N(a)*yl(1,a)
          u(2)  = u(2)  + N(a)*yl(2,a)
-               
+
          px(1) = px(1) + Nx(1,a)*yl(3,a)
          px(2) = px(2) + Nx(2,a)*yl(3,a)
 
@@ -291,10 +291,10 @@
          ux(2,2) = ux(2,2) + Nx(2,a)*yl(2,a)
       END DO
 
-      bf(1) = s*u(1) + (-rho*px(1) + 5D-1*rho*(ud(1) 
+      bf(1) = s*u(1) + (-rho*px(1) + 5D-1*rho*(ud(1)
      2   + up(1)*ux(1,1) + up(2)*ux(2,1))
      3   + (pRho - rho)*bf(1))/(pRho + 5D-1*rho)
-      bf(2) = s*u(2) + (-rho*px(2) + 5D-1*rho*(ud(2) 
+      bf(2) = s*u(2) + (-rho*px(2) + 5D-1*rho*(ud(2)
      2   + up(1)*ux(1,2) + up(2)*ux(2,2))
      3   + (pRho - rho)*bf(2))/(pRho + 5D-1*rho)
 
@@ -311,19 +311,19 @@
          ux(2,2) = ux(2,2) + Nx(2,a)*yl(j,a)
       END DO
 
-      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1) 
+      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(1)*u(2)*ksix(1,2) + u(2)*u(2)*ksix(2,2)
 
       tauM = ct(3)/SQRT(ct(1)/dt/dt + ct(2)*kU + s*s)
       tauMs = ct(3)/SQRT(ct(2)*kU + s*s)
-      
+
       res(1) = ud(1) + u(1)*ux(1,1) + u(2)*ux(2,1) + s*u(1) - bf(1)
       res(2) = ud(2) + u(1)*ux(1,2) + u(2)*ux(2,2) + s*u(2) - bf(2)
 
 !     Discontinuity capturing nu (wx , ux)
       tmpV(1) = (u(1)*ux(1,1) + u(2)*ux(1,2))
       tmpV(2) = (u(1)*ux(2,1) + u(2)*ux(2,2))
-      nu = tmpV(1)*tmpV(1)*ksix(1,1) + tmpV(2)*tmpV(1)*ksix(2,1) 
+      nu = tmpV(1)*tmpV(1)*ksix(1,1) + tmpV(2)*tmpV(1)*ksix(2,1)
      2   + tmpV(1)*tmpV(2)*ksix(1,2) + tmpV(2)*tmpV(2)*ksix(2,2)
       IF (ISZERO(nu)) nu = eps
       nu = (u(1)*u(1) + u(2)*u(2))/nu
@@ -334,15 +334,15 @@
 
 !     tauB terms tauB (up.wx , up.ux)
       up = -tauM*res
-      tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1) 
+      tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(1)*up(2)*ksix(1,2) + up(2)*up(2)*ksix(2,2)
       IF (ISZERO(tauB)) tauB = eps
       tauB = ct(3)/SQRT(tauB)
-      
-      rM(1,1) = nu*(ux(1,1) + ux(1,1)) 
-      rM(2,1) = nu*(ux(2,1) + ux(1,2)) 
+
+      rM(1,1) = nu*(ux(1,1) + ux(1,1))
+      rM(2,1) = nu*(ux(2,1) + ux(1,2))
       rM(1,2) = nu*(ux(1,2) + ux(2,1))
-      rM(2,2) = nu*(ux(2,2) + ux(2,2)) 
+      rM(2,2) = nu*(ux(2,2) + ux(2,2))
 
       tmpV(1) = tauB*(up(1)*ux(1,1) + up(2)*ux(2,1))
       tmpV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2))
@@ -351,7 +351,7 @@
          updNx(a) = up(1)*Nx(1,a) + up(2)*Nx(2,a)
          T1       = N(a) + udNx(a)*tauM
 
-         lR(1,a) = lR(1,a) + wr*(res(1)*T1 + updNx(a)*tmpV(1) 
+         lR(1,a) = lR(1,a) + wr*(res(1)*T1 + updNx(a)*tmpV(1)
      2           + rM(1,1)*Nx(1,a) + rM(1,2)*Nx(2,a))
          lR(2,a) = lR(2,a) + wr*(res(2)*T1 + updNx(a)*tmpV(2)
      2           + rM(2,1)*Nx(1,a) + rM(2,2)*Nx(2,a))
@@ -363,9 +363,9 @@
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)
 
-            T2 = wl*(T1*(udNx(b) + (amd + s)*N(b)) 
+            T2 = wl*(T1*(udNx(b) + (amd + s)*N(b))
      2         + tauB*updNx(a)*updNx(b) + nu*NxdNx)
-             
+
             lK(1,a,b) = lK(1,a,b) + wlnu*Nx(1,a)*Nx(1,b) + T2
             lK(2,a,b) = lK(2,a,b) + wlnu*Nx(2,a)*Nx(1,b)
             lK(3,a,b) = lK(3,a,b) + wlnu*Nx(1,a)*Nx(2,b)

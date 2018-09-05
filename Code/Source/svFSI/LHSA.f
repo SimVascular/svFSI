@@ -30,26 +30,22 @@
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
 !--------------------------------------------------------------------
-!      
+!
 !     Creating the data structure and assembling LHS sparse matrix.
-!      
+!
 !--------------------------------------------------------------------
 
       SUBROUTINE LHSA(nnz)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, INTENT(OUT) :: nnz
 
-      LOGICAL flag
       INTEGER i, j, a, b, e, mnnzeic, rowN, colN, iM
 
       INTEGER, ALLOCATABLE :: uInd(:,:)
 
-      flag = .FALSE.
       mnnzeic = 10*MAXVAL(msh%eNoN)
  003  mnnzeic = mnnzeic + MAX(5,mnnzeic/5)
 
@@ -57,6 +53,8 @@
       ALLOCATE (uInd(mnnzeic,tnNo))
       uInd = 0
       DO iM=1, nMsh
+!        Treat shell with triangular elements separately
+         IF (msh(iM)%lShl .AND. msh(iM)%eType.EQ.eType_TRI) CYCLE
          DO e=1, msh(iM)%nEl
             DO a=1, msh(iM)%eNoN
                rowN = msh(iM)%IEN(a,e)
@@ -84,15 +82,50 @@
                      EXIT
                   END DO
 !     In the following case the list is too short.
-                  IF (i .GT. mnnzeic) THEN
-                     flag = .TRUE.
-                     GOTO 003
-                  END IF
+                  IF (i .GT. mnnzeic) GOTO 003
                END DO
             END DO
          END DO
       END DO
-      IF (flag) std = "max(nnz) is increased to: "//mnnzeic
+
+!     Treat shells with triangular elements here
+      DO iM=1, nMsh
+         IF (.NOT.msh(iM)%lShl) CYCLE
+         IF (msh(iM)%eType .EQ. eType_NRB) CYCLE
+         DO e=1, msh(iM)%nEl
+            DO a=1, 2*msh(iM)%eNoN
+               IF (a .LE. msh(iM)%eNoN) THEN
+                  rowN = msh(iM)%IEN(a,e)
+               ELSE
+                  rowN = msh(iM)%eIEN(a-msh(iM)%eNoN,e)
+               END IF
+               IF (rowN .EQ. 0) CYCLE
+               DO b=1, 2*msh(iM)%eNoN
+                  IF (b .LE. msh(iM)%eNoN) THEN
+                     colN = msh(iM)%IEN(b,e)
+                  ELSE
+                     colN = msh(iM)%eIEN(b-msh(iM)%eNoN,e)
+                  END IF
+                  IF (colN .EQ. 0) CYCLE
+                  DO i=1, mnnzeic
+                     IF (uInd(i,rowN) .EQ. 0) THEN
+                        uInd(i,rowN) = colN
+                        EXIT
+                     END IF
+                     IF (colN .GT. uInd(i,rowN)) CYCLE
+                     IF (colN .EQ. uInd(i,rowN)) EXIT
+                     IF (uInd(mnnzeic,rowN) .NE. 0) GOTO 003
+                     DO j=mnnzeic, i+1, -1
+                        uInd(j,rowN) = uInd(j-1,rowN)
+                     END DO
+                     uInd(i,rowN) = colN
+                     EXIT
+                  END DO
+                  IF (i .GT. mnnzeic) GOTO 003
+               END DO
+            END DO
+         END DO
+      END DO
 
 !--------------------------------------------------------------------
 !     Finding number of non-zeros in colPtr vector
@@ -105,7 +138,7 @@
             IF (uInd(i,rowN) .NE. 0) THEN
                nnz = nnz + 1
             END IF
-         END DO  
+         END DO
       END DO
 
 !--------------------------------------------------------------------
@@ -126,14 +159,11 @@
 
       RETURN
       END SUBROUTINE LHSA
-
 !####################################################################
 !     This subroutine assembels the element stiffness matrix into the
 !     global stiffness matrix (Val sparse matrix formatted as a vector)
       SUBROUTINE DOASSEM (d, eqN, lK, lR)
-
       USE COMMOD, ONLY: dof, rowPtr, colPtr, R, Val
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: d, eqN(d)
@@ -143,9 +173,11 @@
 
       DO a=1, d
          rowN = eqN(a)
+         IF (rowN .EQ. 0) CYCLE
          R(:,rowN) = R(:,rowN) + lR(:,a)
          DO b=1, d
             colN = eqN(b)
+            IF (colN .EQ. 0) CYCLE
             left  = rowPtr(rowN)
             right = rowPtr(rowN+1)
             ptr   = (right + left)/2
@@ -163,3 +195,4 @@
 
       RETURN
       END SUBROUTINE DOASSEM
+!####################################################################

@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,25 +31,25 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 !
 !--------------------------------------------------------------------
 !     Graduate minimum residual algorithm is implemented here for vector
-!     and scaler problems. 
+!     and scaler problems.
 !--------------------------------------------------------------------
-      
+
       SUBROUTINE GMRES(lhs, ls, dof, Val, R, X)
-      
+
       INCLUDE "FSILS_STD.h"
 
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
@@ -57,7 +57,7 @@
       INTEGER, INTENT(IN) :: dof
       REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz), R(dof,lhs%nNo)
       REAL(KIND=8), INTENT(OUT) :: X(dof,lhs%nNo)
-     
+
       INTEGER nNo, mynNo, i, j, k, l
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
       REAL(KIND=8) eps, tmp, time
@@ -153,7 +153,7 @@
             END DO
             y(j) = y(j)/h(j,j)
          END DO
- 
+
          DO j=1, i
             CALL OMPSUMV(dof, nNo, y(j), X, u(:,:,j))
             !X = X + u(:,:,j)*y(j)
@@ -169,16 +169,16 @@
       END SUBROUTINE GMRES
 
 !====================================================================
-      
+
       SUBROUTINE GMRESS(lhs, ls, Val, R)
-      
+
       INCLUDE "FSILS_STD.h"
 
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
       REAL(KIND=8), INTENT(IN) :: Val(lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
- 
+
       INTEGER nNo, mynNo, i, j, k, l
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS, FSILS_NCDOTS
       REAL(KIND=8) eps, tmp
@@ -190,7 +190,7 @@
 
       ALLOCATE(h(ls%sD+1,ls%sD), u(nNo,ls%sD+1), X(nNo), y(ls%sD),      &
      &   c(ls%sD), s(ls%sD), err(ls%sD+1))
-       
+
       ls%callD  = FSILS_CPUT()
       ls%suc    = .FALSE.
       eps       = FSILS_NORMS(mynNo, lhs%commu, R)
@@ -209,7 +209,7 @@
          ls%dB = ls%fNorm
          ls%itr = ls%itr + 1
          CALL FSILS_SPARMULSS(lhs, lhs%rowPtr, lhs%colPtr, Val,X,u(:,1))
-         
+
          u(:,1) = R - u(:,1)
          err(1) = FSILS_NORMS(mynNo, lhs%commu, u(:,1))
          u(:,1) = u(:,1)/err(1)
@@ -217,7 +217,7 @@
             ls%itr = ls%itr + 1
             CALL FSILS_SPARMULSS(lhs, lhs%rowPtr, lhs%colPtr, Val,      &
      &         u(:,i), u(:,i+1))
-            
+
             DO j=1, i+1
                h(j,i) = FSILS_NCDOTS(mynno, u(:,j), u(:,i+1))
             END DO
@@ -258,7 +258,7 @@
             END DO
             y(j) = y(j)/h(j,j)
          END DO
- 
+
          DO j=1, i
             CALL OMPSUMS(nNo, y(j), X, u(:,j))
             !X = X + u(:,j)*y(j)
@@ -273,9 +273,9 @@
       RETURN
       END SUBROUTINE GMRESS
 !====================================================================
-      
+
       SUBROUTINE GMRESV(lhs, ls, dof, Val, R)
-      
+
       INCLUDE "FSILS_STD.h"
 
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
@@ -283,7 +283,7 @@
       INTEGER, INTENT(IN) :: dof
       REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
- 
+
       LOGICAL flag
       INTEGER nNo, mynNo, i, j, k, l
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
@@ -297,7 +297,7 @@
 
       ALLOCATE(h(ls%sD+1,ls%sD), u(dof,nNo,ls%sD+1), X(dof,nNo),        &
      &   y(ls%sD), c(ls%sD), s(ls%sD), err(ls%sD+1), unCondU(dof,nNo))
-       
+
       ls%callD  = FSILS_CPUT()
       ls%suc    = .FALSE.
       eps       = FSILS_NORMV(dof, mynNo, lhs%commu, R)
@@ -306,7 +306,7 @@
       eps       = MAX(ls%absTol,ls%relTol*eps)
       ls%itr    = 0
       X         = 0D0
-      
+
       CALL BCPRE
 
       IF (ls%iNorm .LE. ls%absTol) THEN
@@ -321,7 +321,7 @@
          CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, dof, Val, X, &
      &      u(:,:,1))
          CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, dof, X, u(:,:,1))
- 
+
          u(:,:,1) = R - u(:,:,1)
          IF (ANY(lhs%face%coupledFlag).AND.flag) THEN
             unCondU = u(:,:,1)
@@ -343,7 +343,7 @@
                h(j,i) = FSILS_NCDOTV(dof, mynno, u(:,:,j), u(:,:,i+1))
             END DO
             CALL FSILS_BCASTV(i+1, h(:,i), lhs%commu)
-            
+
             DO j=1, i
                CALL OMPSUMV(dof, nNo, -h(j,i), u(:,:,i+1), u(:,:,j))
 !              u(:,:,i+1) = u(:,:,i+1) - h(j,i)*u(:,:,j)
@@ -379,7 +379,7 @@
             END DO
             y(j) = y(j)/h(j,j)
          END DO
- 
+
          DO j=1, i
             CALL OMPSUMV(dof, nNo, y(j), X, u(:,:,j))
             !X = X + u(:,:,j)*y(j)

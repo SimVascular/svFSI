@@ -35,7 +35,7 @@
 !     general structure of the code.
 !
 !--------------------------------------------------------------------
-
+!####################################################################
       PROGRAM MAIN
 
       USE COMMOD
@@ -43,8 +43,8 @@
 
       IMPLICIT NONE
 
-      LOGICAL l1, l2, l3, l4, l5
-      INTEGER i, a, Ac, e, ierr, iEqOld, iBc, eNoN, iM, j, fid
+      LOGICAL l1, l2, l3, l4
+      INTEGER i, a, b, Ac, e, ierr, iEqOld, iBc, eNoN, iM, j, fid, ibl
 c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       REAL(KIND=8) timeP(3)
       CHARACTER(LEN=stdL) fName, tmpS
@@ -53,14 +53,14 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       INTEGER, ALLOCATABLE :: ptr(:), incL(:), ltgReordered(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), Ag(:,:), al(:,:), Yg(:,:),
      2   yl(:,:), Dg(:,:), dl(:,:), dol(:,:), fNl(:,:), res(:),
-     3   RTrilinos(:,:), dirW(:,:)
+     3   ADg(:,:), adl(:,:), pS0l(:,:), fIBl(:,:), RTrilinos(:,:),
+     4   dirW(:,:)
 
 !--------------------------------------------------------------------
       l1 = .FALSE.
       l2 = .FALSE.
       l3 = .FALSE.
       l4 = .FALSE.
-      l5 = .FALSE.
 
       fid       = 27
       savedOnce = .FALSE.
@@ -84,7 +84,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     format
       CALL INITIALIZE(timeP)
 
-!     only compute once
+!     Only compute once
       IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
          ALLOCATE(ltgReordered(tnNo))
          DO i = 1, tnNo
@@ -94,20 +94,12 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
       dbg = 'Allocating intermediate variables'
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo),
-     3   res(nFacesLS), incL(nFacesLS), isS(tnNo))
+     3   ADg(nsd,tnNo), res(nFacesLS), incL(nFacesLS), isS(tnNo))
       isS = .FALSE.
       DO Ac=1, tnNo
          IF (ISDOMAIN(1, Ac, phys_struct)) isS(Ac) = .TRUE.
       END DO
 
-#ifdef WITH_TRILINOS
-#else
-      IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-           write(*,*) "svFSI is not compiled with Trilinos:
-     2         currently FSILS preconditioning will be used instead.
-     3         Use FSILS in the input file or set it default."
-      ENDIF
-#endif
 !--------------------------------------------------------------------
 !     Outer loop for marching in time. When entring this loop, all old
 !     variables are completely set and satisfy BCs.
@@ -134,6 +126,8 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
 !     Predictor step
          CALL PICP
+
+!     Apply Dirichlet BCs strongly
          CALL SETBCDIR(An, Yn, Dn)
 
 !     Inner loop for iteration
@@ -144,15 +138,20 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                CALL SETBCCPL
                CALL SETBCDIR(An, Yn, Dn)
             END IF
-!     Initiator step
-            CALL PICI(Ag, Yg, Dg)
+
+!     Initiator step (quantities at n+am, n+af)
+            CALL PICI(Ag, Yg, Dg, ADg)
+            IF (ALLOCATED(Rd)) THEN
+               Rd = 0D0
+               Kd = 0D0
+            END IF
 
             dbg = 'Allocating the RHS and LHS'
             IF (ALLOCATED(R)) THEN
                IF (SIZE(R,1) .NE. dof) THEN
                   DEALLOCATE(R)
                   ALLOCATE (R(dof,tnNo))
-                  IF (.NOT. useTrilinosAssemAndLS) THEN
+                  IF (.NOT.useTrilinosAssemAndLS) THEN
                      DEALLOCATE(Val)
                      ALLOCATE (Val(dof*dof,lhs%nnz))
                   END IF
@@ -169,7 +168,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                END IF
             ELSE
                ALLOCATE (R(dof,tnNo))
-               IF (.NOT. useTrilinosAssemAndLS) THEN
+               IF (.NOT.useTrilinosAssemAndLS) THEN
                   ALLOCATE(Val(dof*dof,lhs%nnz))
                END IF
 #ifdef WITH_TRILINOS
@@ -193,42 +192,91 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                R(:,a) = 0D0
             END DO
 !$OMP END DO
+
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, e, a, Ac, al, yl, dl,
 !$OMP&   xl, fNl, ptr, cDmn)
             dbg = "Assembling equation <"//eq(cEq)%sym//">"
             DO iM=1, nMsh
-               eNoN = msh(iM)%eNoN
-               i    = nsd + 2
-               j    = 2*nsd + 1
+!        For shells, consider extended patch around an element
+               IF (msh(iM)%lShl .AND. (msh(iM)%eType.EQ.eType_TRI))THEN
+                  eNoN = 2*msh(iM)%eNoN
+               ELSE
+                  eNoN = msh(iM)%eNoN
+               END IF
+               i = nsd + 2
+               j = 2*nsd + 1
+!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, e, a, Ac, al, yl, dl, dol, xl,
+!$OMP&   fNl, adl, pS0l, fIBl, ptr, cDmn)
                ALLOCATE(al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN),
-     2            dol(nsd,eNoN), xl(nsd,eNoN), fNl(nsd,eNoN),
-     3            ptr(eNoN))
+     2            dol(nsd,eNoN), xl(nsd,eNoN), fNl(nFn*nsd,eNoN),
+     3            adl(nsd,eNoN), pS0l(nstd,eNoN), fIBl(nsd,eNoN),
+     4            ptr(eNoN))
 !$OMP DO SCHEDULE(GUIDED,mpBs)
                DO e=1, msh(iM)%nEl
-                  fNl = 0D0
+                  al   = 0D0
+                  yl   = 0D0
+                  dl   = 0D0
+                  dol  = 0D0
+                  xl   = 0D0
+                  fNl  = 0D0
+                  pS0l = 0D0
+                  fIBl = 0D0
+                  ibl  = 0
                   DO a=1, eNoN
-                     Ac      = msh(iM)%IEN(a,e)
-                     ptr(a)  = Ac
+                     IF (a .LE. msh(iM)%eNoN) THEN
+                        Ac     = msh(iM)%IEN(a,e)
+                        ptr(a) = Ac
+                        ibl    = ibl + iblank(Ac)
+                     ELSE
+                        b      = a - msh(iM)%eNoN
+                        Ac     = msh(iM)%eIEN(b,e)
+                        ptr(a) = Ac
+                        IF (Ac .EQ. 0) CYCLE
+                     END IF
                      xl(:,a) = x (:,Ac)
                      al(:,a) = Ag(:,Ac)
                      yl(:,a) = Yg(:,Ac)
                      dl(:,a) = Dg(:,Ac)
-                     IF (mvMsh) THEN
-                        dol(:,a) = Do(i:j,Ac)
-                     END IF
-                     IF (ALLOCATED(fN)) fNl(:,a) = fN(:,Ac)
+                     IF (mvMsh) dol(:,a) = Do(i:j,Ac)
+                     IF (ALLOCATED(fN))  fNl(:,a)  = fN(:,Ac)
+                     IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+                     IF (ALLOCATED(fIB)) fIBl(:,a) = fIB(:,Ac)
+                     adl(:,a) = ADg(:,Ac)
                   END DO
+                  IF (ibl .EQ. msh(iM)%eNoN) THEN
+                     IF (ib%mthd .NE. ibMthd_IFEM) CYCLE
+                  END IF
 !     Add contribution of current equation to the LHS/RHS
-                  CALL CONSTRUCT(msh(iM), al, yl, dl, dol, xl, fNl,
-     2               ptr, e)
+                  CALL CONSTRUCT(msh(iM), e, eNoN, al, yl, dl, dol, adl,
+     2               xl, fNl, pS0l, fIBl, ptr)
                END DO
-!$OMP END DO
-               DEALLOCATE(al, yl, dl, xl, dol, fNl, ptr)
+               DEALLOCATE(al, yl, dl, xl, dol, fNl, adl, pS0l, fIBl,ptr)
                dbg = "Mesh "//iM//" is assembled"
+!$OMP END DO
             END DO
 
 !     Constructing the element stiffness matrix for boundaries
             CALL SETBCNEU(Yg, Dg)
+
+!     Apply CMM BC conditions
+            CALL SETBCCMM(Ag, Yg, Dg)
+
+!     Apply traction boundary conditions
+            CALL SETBCTRAC(Yg)
+
+!     Apply weakly applied Dirichlet BCs
+            CALL SETBCDIRW(Yg, Dg)
+
+!     Treat Dirichlet BCs for IBs
+            IF (ibFlag) CALL IB_SETBCDIRA(Yg, Dg)
+
+!     Constructing the element stiffness matrix due to traction forces
+!     or follower loads for shells
+            CALL SETSHELLFP(Dg)
+
+!     Apply contact model and add its contribution to residue
+            IF (iCntct) CALL CONTACTFORCES(Dg)
+
             incL = 0
             IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
             DO iBc=1, eq(cEq)%nBc
@@ -238,11 +286,15 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   incL(i) = 1
                END IF
             END DO
+            IF (ibLSptr.NE.0) incL(ibLSptr) = 1
 !$OMP END PARALLEL
 
+            IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
+               CALL USTRUCT_updateValR()
+            END IF
+
             dbg = "Solving equation <"//eq(cEq)%sym//">"
-!     Initialize Dirichlet and coupled Neumann resistnace BC
-!     for Trilinos
+!     Initialize Dir and coupled Neu Resistance BC for Trilinos
 #ifdef WITH_TRILINOS
             IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
                CALL INIT_DIR_AND_COUPNEU_BC(incL, res, dirW)
@@ -269,7 +321,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             ELSE
 #endif
                CALL FSILS_SOLVE(lhs, eq(cEq)%FSILS, dof, R, Val, isS,
-     2                          incL, res)
+     2            incL, res)
 #ifdef WITH_TRILINOS
             END IF
 !     For trilinos case need to do the reordering
@@ -292,6 +344,15 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          END DO
 !     End of inner loop
 
+!     Immersed body treatment
+         IF (ibFlag) THEN
+!        Compute feedback forcing for penalty methods
+            CALL IB_SETFBF()
+
+!        Compute FSI forcing for IFEM formulation
+            CALL IB_GETFFSI(An, Yn, Dn)
+         END IF
+
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
 
@@ -310,56 +371,48 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          IF (cm%mas()) INQUIRE(FILE=stopTrigName, EXIST=l1)
          CALL cm%bcast(l1)
          l2 = cTS .GE. nTS
+         l3 = MOD(cTS,stFileIncr) .EQ. 0
 !     Saving the result to restart simulation in the future
-         IF (.NOT. stFileIncr .EQ. 0) THEN
-            l3 = MOD(cTS,stFileIncr) .EQ. 0
-            IF (l1 .OR. l2 .OR. l3) THEN
-               fName = TRIM(stFileName)//"_last.bin"
-               tmpS  = fName
-               IF (.NOT.stFileRepl) THEN
-                  WRITE(fName,'(I3.3)') cTS
-                  IF (cTS .GE. 1000) fName = STR(cTS)
-                  fName = TRIM(stFileName)//"_"//TRIM(fName)//".bin"
-               END IF
-               IF (cm%mas()) THEN
-                  OPEN(fid, FILE=TRIM(fName))
-                  CLOSE(fid, STATUS='DELETE')
-               END IF
+         IF (l1 .OR. l2 .OR. l3) THEN
+            fName = TRIM(stFileName)//"_last.bin"
+            tmpS  = fName
+            IF (.NOT.stFileRepl) THEN
+               WRITE(fName,'(I3.3)') cTS
+               IF (cTS .GE. 1000) fName = STR(cTS)
+               fName = TRIM(stFileName)//"_"//TRIM(fName)//".bin"
+            END IF
+            IF (cm%mas()) THEN
+               OPEN(fid, FILE=TRIM(fName))
+               CLOSE(fid, STATUS='DELETE')
+            END IF
 !     This call is to block all processors
-               CALL cm%bcast(l1)
-               OPEN(fid, FILE=TRIM(fName), ACCESS='DIRECT', RECL=recLn)
-               IF (dFlag) THEN
-                  IF (rmsh%isReqd .AND. saveAve) THEN
-                     WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
-     3                  rmsh%Aav, rmsh%Yav, rmsh%Dav
-                  ELSE
-                     WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn
-                  END IF
+            CALL cm%bcast(l1)
+            OPEN(fid, FILE=TRIM(fName), ACCESS='DIRECT', RECL=recLn)
+            IF (dFlag) THEN
+               IF (pstEq) THEN
+                  WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,pS0
                ELSE
                   WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An
+     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn
                END IF
-               CLOSE(fid)
-               IF (.NOT.stFileRepl .AND. cm%mas()) THEN
-                  CALL SYSTEM("ln -f "//TRIM(fName)//" "//TRIM(tmpS))
-               END IF
+            ELSE
+               WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2            CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An
+            END IF
+            CLOSE(fid)
+            IF (.NOT.stFileRepl .AND. cm%mas()) THEN
+               CALL SYSTEM("ln -f "//TRIM(fName)//" "//TRIM(tmpS))
             END IF
          END IF
 
          l3 = MOD(cTS,saveIncr) .EQ. 0
-         l4 = saveFormat .NE. saveF_none
-         l5 = cTS .GE. saveATS
+         l4 = cTS .GE. saveATS
 !     Writing results into the disk with VTU format
-         IF (l3 .AND. l4 .AND. l5) THEN
+         IF (l3 .AND. l4) THEN
             CALL OUTRESULT(timeP, 3, iEqOld)
             CALL WRITEVTUS(An, Yn, Dn)
-            IF (rmsh%isReqd .AND. saveAve) THEN
-               rmsh%Aav = rmsh%Aav + An
-               rmsh%Yav = rmsh%Yav + Yn
-               rmsh%Dav = rmsh%Dav + Dn
-            END IF
+            IF (ibFlag) CALL IB_WRITEVTUS(ib%Ao, ib%Yo, ib%Uo)
          ELSE
             CALL OUTRESULT(timeP, 2, iEqOld)
          END IF
@@ -371,6 +424,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          Ao = An
          Yo = Yn
          IF (dFlag) Do = Dn
+         IF (ALLOCATED(ADo)) ADo = ADn
          cplBC%xo = cplBC%xn
       END DO
 !     End of outer loop
@@ -378,6 +432,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       IF (resetSim) THEN
          CALL REMESHRESTART(timeP)
          DEALLOCATE(Ag, Yg, Dg, incL, res, isS)
+         IF (ALLOCATED(ADg)) DEALLOCATE(ADg)
          IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
             DEALLOCATE(ltgReordered, dirW, RTrilinos)
          END IF
@@ -398,9 +453,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       CALL MPI_FINALIZE(ierr)
 
       END PROGRAM MAIN
-
-!--------------------------------------------------------------------
-
+!####################################################################
       SUBROUTINE STOPSIM()
 
       CALL FINALIZE
@@ -408,15 +461,12 @@ c      CALL cm%fStop()
       STOP "MPI is forced to stop by a fatal error"
 
       END SUBROUTINE STOPSIM
-
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE INIT_DIR_AND_COUPNEU_BC(incL, res, dirW)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
-      !define input arguments
+
       INTEGER, INTENT(IN) :: incL(lhs%nFaces)
       REAL(KIND=8), INTENT(IN) :: res(lhs%nFaces)
       REAL(KIND=8), INTENT(INOUT) :: dirW(dof,tnNo)
@@ -487,3 +537,4 @@ c      CALL cm%fStop()
       DEALLOCATE(v)
 
       END SUBROUTINE INIT_DIR_AND_COUPNEU_BC
+!####################################################################

@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,20 +31,20 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 !
 !--------------------------------------------------------------------
-!     Jacobi symmetic preconditioner, to precondition both LHS and RHS. 
+!     Jacobi symmetic preconditioner, to precondition both LHS and RHS.
 !--------------------------------------------------------------------
 
       SUBROUTINE PRECOND(lhs, rowPtr, colPtr, diagPtr, dof, Val, R, W)
@@ -60,7 +60,7 @@
       REAL(KIND=8), INTENT(OUT) :: W(dof,lhs%nNo)
 
       INTEGER nNo, i, j, a, b, d, Ac, faIn
- 
+
       nNo = lhs%nNo
 
 !     Calculating W: W = diag(K)
@@ -101,7 +101,7 @@
 
       CALL FSILS_COMMUV(lhs, dof, W)
 !     Accounding for Dirichlet BC and inversing W = W^{-1/2}
-      
+
       DO Ac=1, nNo
          d = diagPtr(Ac)
          DO i=1, dof
@@ -166,7 +166,7 @@
 
 !     Multipling R with W: R = W*R
       R = W*R
-      
+
 !     Now post-multipling K by W: K = K*W
       SELECT CASE (dof)
       CASE (1)
@@ -175,7 +175,7 @@
                a = colPtr(i)
                Val(1,i) = Val(1,i)*W(1,a)
             END DO
-         END DO 
+         END DO
       CASE (2)
          DO Ac=1, nNo
             DO i=rowPtr(1,Ac), rowPtr(2,Ac)
@@ -214,7 +214,7 @@
             END DO
          END DO
       END SELECT
-  
+
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
             DO a=1, lhs%face(faIn)%nNo

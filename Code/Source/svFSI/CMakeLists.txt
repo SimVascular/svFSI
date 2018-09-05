@@ -28,7 +28,7 @@
 # NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# add include path for headers on third party libraries 
+# add include path for headers on third party libraries
 include_directories(${SV_SOURCE_DIR}/ThirdParty/parmetis_svfsi/simvascular_parmetis_svfsi/ParMETISLib)
 include_directories(${SV_SOURCE_DIR}/ThirdParty/tetgen/simvascular_tetgen)
 include_directories(${MPI_C_INCLUDE_PATH})
@@ -45,8 +45,8 @@ if(SV_USE_TRILINOS)
 
   # source: https://github.com/trilinos/Trilinos_tutorial/wiki/CMakeFindPackageTrilinosExample
 
-  # It may be required to add a path for Trilinos 
-  # This can be accomplished by adding the Trilinos 
+  # It may be required to add a path for Trilinos
+  # This can be accomplished by adding the Trilinos
   # -DCMAKE_PREFIX_PATH=~/sfw/Trilinos_build/lib/cmake/Trilinos
   FIND_PACKAGE(Trilinos)
 
@@ -90,57 +90,68 @@ if(SV_USE_TRILINOS)
 
 endif()
 
-# add trilinos flags and defines 
+# add trilinos flags and defines
 if(WITH_TRILINOS)
   ADD_DEFINITIONS(-DWITH_TRILINOS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
-# svFSI requires LAPACK 
+# svFSI requires LAPACK
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
 
-set(FSRCS UTIL.f 
-         COMU.f 
-         CHNL.f 
-         LIST.f 
-         MOD.f 
-         MATFUN.f 
-         ALLFUN.f 
-         BBO.f 
-         BAFINI.f 
-         CONSTRUCT.f 
-         DISTRIBUTE.f 
-         FFT.f 
-         FLUID.f 
-         HEAT.f 
-         INITIALIZE.f 
-         LELAS.f 
-         LHSA.f 
-         LOADMSH.f 
-         LOADNRB.f 
-         MAIN.f 
-         MATMODELS.f 
-         NN.f 
-         NURBS.f 
-         OUTPUT.f 
-         PIC.f 
-         POST.f 
-         READFILES.f 
-         READMSH.f 
+set(FSRCS UTIL.f
+         COMU.f
+         CHNL.f
+         LIST.f
+         MATFUN.f
+         CEPMOD_AP.f
+         CEPMOD_FN.f
+         CEPMOD_TTP.f
+         CEPMOD.f
+         MOD.f
+         ALLFUN.f
+         BBO.f
+         BAFINI.f
+         CEP.f
+         CMM.f
+         CONSTRUCT.f
+         CONTACT.f
+         DISTRIBUTE.f
+         FC.f
+         FFT.f
+         FLUID.f
+         HEAT.f
+         IB.f
+         INITIALIZE.f
+         LELAS.f
+         LHSA.f
+         LOADMSH.f
+         LOADNRB.f
+         MAIN.f
+         MATMODELS.f
+         NN.f
+         NURBS.f
+         OUTPUT.f
+         PIC.f
+         POST.f
+         READFILES.f
+         READMSH.f
          REMESH.f
-         SETBC.f 
-         STRUCT.f 
-         TXT.f 
-         VTKXML.f) 
+         SETBC.f
+         SHELLS.f
+         STRUCT.f
+         TXT.f
+         USTRUCT.f
+         VTKXML.f)
 
 set(F90SRCS vtkComMod.f90
             vtkTypeParams.f90
             vtkXMLParser.f90
             vtkLegacyParser.f90)
 
-set(CSRCS SPLIT.c 
+set(CSRCS SPLIT.c
           vtkZpipe.c)
 
 set(CXXSRCS remeshTet.cpp)
@@ -149,7 +160,7 @@ set(CXXSRCS remeshTet.cpp)
 if(WITH_TRILINOS)
   set(CXXSRCS ${CXXSRCS} trilinos_linear_solver.cpp)
 
-  # trilinos directories and libraries 
+  # trilinos directories and libraries
   include_directories(${Trilinos_TPL_INCLUDE_DIRS})
   include_directories(${Trilinos_INCLUDE_DIRS})
   link_directories(${Trilinos_LIBRARY_DIRS})
@@ -172,7 +183,7 @@ target_link_libraries(${SV_SVFSI_EXE}
   ${GLOBAL_LIBRARIES}
   ${INTELRUNTIME_LIBRARIES}
   ${ZLIB_LIBRARY}
-  ${BLAS_LIBRARIES} 
+  ${BLAS_LIBRARIES}
   ${LAPACK_LIBRARIES}
   ${METIS_SVFSI_LIBRARY_NAME}
   ${PARMETIS_SVFSI_LIBRARY_NAME}
@@ -181,7 +192,7 @@ target_link_libraries(${SV_SVFSI_EXE}
   ${SV_LIB_SVFSILS_NAME}${SV_MPI_NAME_EXT}
   )
 
-# extra MPI libraries only if there are not set to NOT_FOUND or other null 
+# extra MPI libraries only if there are not set to NOT_FOUND or other null
 if(SV_MPI_EXTRA_LIBRARY)
   target_link_libraries(${SV_SVFSI_EXE} ${SV_MPI_EXTRA_LIBRARY})
 endif()

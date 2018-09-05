@@ -30,17 +30,15 @@
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
 !--------------------------------------------------------------------
-!      
+!
 !     This is to calculate average/flux of variables at the boundaries
 !     and print them into the "B_" files.
-!      
+!
 !--------------------------------------------------------------------
 
       SUBROUTINE TXT(flag)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       LOGICAL, INTENT(IN) :: flag
@@ -50,12 +48,12 @@
 
       LOGICAL ltmp, wtn(2)
       REAL(KIND=8), ALLOCATABLE :: tmpV(:,:)
-      
+
       fid = 1
       ALLOCATE (tmpV(maxnsd,tnNo))
 
-!     Writing data related to cplBC 
-      IF (.NOT.resetSim) THEN     
+!     Writing data related to cplBC
+      IF (.NOT.resetSim) THEN
          IF (cm%mas() .AND. cplBC%coupled) THEN
             IF (flag) THEN
                INQUIRE(FILE=cplBC%saveName, EXIST=ltmp)
@@ -70,7 +68,7 @@
                DO i=1, cplBC%nX
                   WRITE(fid,'(A)',ADVANCE='NO') STR(cplBC%xo(i))//" "
                END DO
-               WRITE(fid,*) 
+               WRITE(fid,*)
                CLOSE(fid)
             END IF
          END IF
@@ -84,7 +82,7 @@
             l = eq(iEq)%output(iOut)%l
             s = eq(iEq)%s + eq(iEq)%output(iOut)%o
             e = s + l - 1
-            
+
             oGrp = eq(iEq)%output(iOut)%grp
             SELECT CASE (oGrp)
             CASE (outGrp_NA)
@@ -95,7 +93,7 @@
                tmpV(1:l,:) = Yn(s:e,:)
             CASE (outGrp_D)
                tmpV(1:l,:) = Dn(s:e,:)
-            CASE (outGrp_WSS, outGrp_vort)
+            CASE (outGrp_WSS, outGrp_vort, outGrp_trac)
                CALL ALLPOST(tmpV, Yn, Dn, oGrp, iEq)
                DO a=1, tnNo
                   tmpV(1,a) = SQRT(NORM(tmpV(1:nsd,a)))
@@ -136,10 +134,8 @@
 !--------------------------------------------------------------------
 !     This is to check/create the txt file
       SUBROUTINE CCTXT(lEq, fName, wtn)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(eqType), INTENT(IN) :: lEq
@@ -151,7 +147,7 @@
       LOGICAL flag
       INTEGER iM, iFa, fid, iDmn, i
       CHARACTER(LEN=stdL) stmp
-      
+
       fid = 1
       IF (cm%slv()) RETURN
 
@@ -171,14 +167,14 @@
                DO iFa=1, msh(iM)%nFa
                   stmp = msh(iM)%fa(iFa)%name
                   IF (LEN(TRIM(stmp)) .LE. prL) THEN
-                     WRITE(fid,'(A)', ADVANCE='NO') 
+                     WRITE(fid,'(A)', ADVANCE='NO')
      2                  ADJUSTR(stmp(1:prL))//" "
                   ELSE
                      WRITE(fid,'(A)',ADVANCE='NO') TRIM(stmp)//" "
                   END IF
                END DO
             END DO
-            WRITE(fid,*) 
+            WRITE(fid,*)
             DO iM=1, nMsh
                DO iFa=1, msh(iM)%nFa
                   stmp = STR(msh(iM)%fa(iFa)%area,prL)
@@ -191,14 +187,14 @@
                IF (lEq%dmn(iDmn)%Id .EQ. -1) stmp = "ENTIRE"
                WRITE(fid,'(A)', ADVANCE='NO') ADJUSTR(stmp(1:prL))//" "
             END DO
-            WRITE(fid,*) 
+            WRITE(fid,*)
             DO iDmn=1, lEq%nDmn
                stmp = STR(lEq%dmn(iDmn)%v,prL)
                WRITE(fid,'(A)', ADVANCE='NO') stmp(1:prL+1)
             END DO
          END IF
-         WRITE(fid,*) 
-         WRITE(fid,*) 
+         WRITE(fid,*)
+         WRITE(fid,*)
          CLOSE(fid)
       END DO
 
@@ -208,10 +204,8 @@
 !--------------------------------------------------------------------
 !     This is to write to txt file
       SUBROUTINE WTXT(lEq, m, fName, tmpV, wtn)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(eqType), INTENT(IN) :: lEq
@@ -221,7 +215,7 @@
       LOGICAL, INTENT(IN) :: wtn(2)
 
       INTEGER, PARAMETER :: prL = 10
-      
+
       INTEGER iM, iFa, fid, i, iDmn
       REAL(KIND=8) tmp
 
@@ -229,7 +223,7 @@
       DO i=1, 2
          IF (.NOT.wtn(i)) CYCLE
 
-         IF (cm%mas()) OPEN(fid, FILE=TRIM(fName(i)), STATUS='OLD', 
+         IF (cm%mas()) OPEN(fid, FILE=TRIM(fName(i)), STATUS='OLD',
      2      POSITION='APPEND')
 
          IF (i .EQ. 1) THEN
@@ -243,19 +237,19 @@
                   ELSE
                      err = "WTXT only accepts 1 and nsd"
                   END IF
-                  IF (cm%mas()) 
+                  IF (cm%mas())
      2               WRITE(fid,'(A)',ADVANCE='NO') STR(tmp,prL)//" "
                END DO
             END DO
          ELSE
             DO iDmn=1, lEq%nDmn
                tmp = Integ(lEq%dmn(iDmn)%Id, tmpV, 1, m)/lEq%dmn(iDmn)%v
-               IF (cm%mas()) 
+               IF (cm%mas())
      2            WRITE(fid,'(A)', ADVANCE='NO') STR(tmp,prL)//" "
             END DO
          END IF
          IF (cm%mas()) THEN
-            WRITE(fid,*) 
+            WRITE(fid,*)
             CLOSE(fid)
          END IF
       END DO
@@ -264,12 +258,10 @@
       END SUBROUTINE WTXT
 
 !--------------------------------------------------------------------
-!     Only keeping first "n" lines of fileName      
+!     Only keeping first "n" lines of fileName
       SUBROUTINE TRIMFILE(n, fileName)
-
-      USE COMMOD 
+      USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: n
@@ -325,7 +317,7 @@
       CLOSE(fout)
       sTmp = "rm "//TRIM(fTmp)
       CALL SYSTEM(TRIM(sTmp))
-      
+
       RETURN
       END SUBROUTINE TRIMFILE
 

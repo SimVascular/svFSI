@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,18 +31,18 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
-!      
+!
 !--------------------------------------------------------------------
 !     Biconjugate-gradient algorithm, available for scaler and vectors
 !--------------------------------------------------------------------
@@ -55,7 +55,7 @@
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
       REAL(KIND=8), INTENT(IN) :: K(lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
-     
+
       INTEGER nNo, mynNo, i
       REAL(KIND=8) errO, err, alpha, beta, rho, rhoO, omega, eps
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
@@ -65,7 +65,7 @@
       mynNo = lhs%mynNo
 
       ALLOCATE(P(nNo), Rh(nNo), X(nNo), V(nNo), S(nNo), T(nNo))
-      
+
       ls%callD = FSILS_CPUT()
       ls%suc   = .FALSE.
       err      = FSILS_NORMS(mynNo, lhs%commu, R)
@@ -112,7 +112,7 @@
       RETURN
       END SUBROUTINE BICGSS
 !====================================================================
-       
+
       SUBROUTINE BICGSV(lhs, ls, dof, K, R)
       
       INCLUDE "FSILS_STD.h"
@@ -122,7 +122,7 @@
       INTEGER, INTENT(IN) :: dof
       REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
-     
+
       INTEGER nNo, mynNo, i
       REAL(KIND=8) errO, err, alpha, beta, rho, rhoO, omega, eps
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV
@@ -134,7 +134,7 @@
 
       ALLOCATE(P(dof,nNo), Rh(dof,nNo), X(dof,nNo), V(dof,nNo),         &
      &   S(dof,nNo), T(dof,nNo))
-      
+
       ls%callD = FSILS_CPUT()
       ls%suc   = .FALSE.
       err      = FSILS_NORMV(dof, mynNo, lhs%commu, R)

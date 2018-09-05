@@ -267,7 +267,7 @@
       INTEGER i
 
       DO i=1, LEN(str)
-         IF (str(i:i) .NE. " " .AND. str(i:i) .NE. "	") EXIT
+         IF (str(i:i) .NE. " " .AND. str(i:i) .NE. "  ") EXIT
       END DO
       IF (i .GT. LEN(str)) THEN
          ADJUSTC = ""
@@ -486,6 +486,9 @@
       TYPE(queueType), INTENT(INOUT) :: que
       INTEGER, INTENT(IN) :: iVal
 
+      LOGICAL flag
+      INTEGER i
+
       INTEGER, ALLOCATABLE :: tmp(:)
 
       IF (que%maxN .EQ. 0) THEN
@@ -503,6 +506,15 @@
             ALLOCATE(que%v(que%maxN))
             que%v(1:que%n) = tmp
          END IF
+!     Check if the new val to be added is already a member of the queue
+         flag = .TRUE.
+         DO i=1, que%n
+            IF (que%v(i) .EQ. iVal) THEN
+               flag = .FALSE.
+               EXIT
+            END IF
+         END DO
+         IF (.NOT.flag) RETURN
          que%n = que%n + 1
          que%v(que%n) = iVal
       END IF

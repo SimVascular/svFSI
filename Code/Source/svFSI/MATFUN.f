@@ -37,15 +37,14 @@
 !     your routine.
 !
 !--------------------------------------------------------------------
-      
+
 !####################################################################
 !     Matrix and tensor operations
       MODULE MATFUN
-      
       IMPLICIT NONE
-      
+
       INTEGER, ALLOCATABLE :: t_ind(:,:)
-      
+
       CONTAINS
 !--------------------------------------------------------------------
 !     Create a second order identity matrix of rank nd
@@ -53,14 +52,14 @@
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8) :: A(nd,nd)
-      
+
       INTEGER :: i
-      
+
       A = 0D0
       DO i=1, nd
          A(i,i) = 1D0
       END DO
-      
+
       RETURN
       END FUNCTION MAT_ID
 !--------------------------------------------------------------------
@@ -70,14 +69,14 @@
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8), INTENT(IN) :: A(nd,nd)
       REAL(KIND=8) :: trA
-      
+
       INTEGER :: i
-      
+
       trA = 0D0
       DO i=1, nd
          trA = trA + A(i,i)
       END DO
-      
+
       RETURN
       END FUNCTION MAT_TRACE
 !--------------------------------------------------------------------
@@ -87,27 +86,47 @@
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8), INTENT(IN) :: u(nd), v(nd)
       REAL(KIND=8) :: A(nd,nd)
-      
+
       INTEGER :: i, j
-      
+
       DO j=1, nd
          DO i=1, nd
             A(i,j) = u(i)*v(j)
          END DO
       END DO
-      
+
       RETURN
       END FUNCTION MAT_DYADPROD
+!--------------------------------------------------------------------
+!     Double dot product of 2 square matrices
+      FUNCTION MAT_DDOT(A, B, nd) RESULT(s)
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd), B(nd,nd)
+      REAL(KIND=8) :: s
+
+      INTEGER :: i, j
+
+      s = 0D0
+      DO j=1, nd
+         DO i=1, nd
+            s = s + A(i,j) * B(i,j)
+         END DO
+      END DO
+
+      RETURN
+      END FUNCTION MAT_DDOT
 !--------------------------------------------------------------------
 !     Computes the determinant of a square matrix
       RECURSIVE FUNCTION MAT_DET(A, nd) RESULT(D)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8), INTENT(IN) :: A(nd,nd)
-      
+
       INTEGER :: i, j, n
       REAL(KIND=8) :: D, Am(nd-1,nd-1)
-      
+
       D = 0D0
       IF (nd .EQ. 2) THEN
          D = A(1,1)*A(2,2) - A(1,2)*A(2,1)
@@ -126,11 +145,11 @@
      2                 MAT_DET(Am,nd-1) )
          END DO ! i
       END IF ! nd.EQ.2
-      
+
       RETURN
       END FUNCTION MAT_DET
 !--------------------------------------------------------------------
-!     This function uses LAPACK library to compute eigen values of a 
+!     This function uses LAPACK library to compute eigen values of a
 !     square matrix, A of dimension nd
       FUNCTION MAT_EIG(A, nd)
       IMPLICIT NONE
@@ -138,16 +157,16 @@
       REAL(KIND=8), INTENT(IN) :: A(nd,nd)
       COMPLEX*16 :: Amat(nd,nd), MAT_EIG(nd), b(nd), DUMMY(1,1),
      2   WORK(2*nd)
-      
+
       INTEGER :: i, j, iok
-      
+
       Amat = (0D0, 0D0)
       DO j=1, nd
          DO i=1, nd
             Amat(i,j) = CMPLX(A(i,j))
          END DO
       END DO
-      
+
       CALL ZGEEV('N', 'N', nd, Amat, nd, b, DUMMY, 1, DUMMY, 1, WORK,
      2   2*nd, WORK, iok)
       IF (iok .NE. 0) THEN
@@ -156,55 +175,78 @@
       ELSE
          MAT_EIG(:) = b(:)
       END IF
-      
+
       RETURN
       END FUNCTION MAT_EIG
 !--------------------------------------------------------------------
-!     This function computes inverse of a square matrix using 
-!     Gauss Elimination method
-      FUNCTION MAT_INV(A, nd)
+!     This function computes inverse of a square matrix
+      FUNCTION MAT_INV(A, nd) RESULT(Ainv)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nd
-      REAL(KIND=8), INTENT(IN) :: A(:,:)
-      REAL(KIND=8), ALLOCATABLE :: MAT_INV(:,:)
-      
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd)
+      REAL(KIND=8) :: Ainv(nd,nd)
+
       REAL(KIND=8), PARAMETER :: epsil = EPSILON(epsil)
-      
-      INTEGER :: i, j, k
-      REAL(KIND=8) :: d, B(nd,2*nd)
-      
-      d = MAT_DET(A, nd)
-      IF (ABS(d) .LT. 1D2*epsil) THEN
+
+      INTEGER :: iok = 0
+      REAL(KIND=8) :: d
+
+      IF (nd .EQ. 2) THEN
+         d = MAT_DET(A, nd)
+         IF (ABS(d) .LT. 1D2*epsil) iok = -1
+
+         Ainv(1,1) =  A(2,2)/d
+         Ainv(1,2) = -A(1,2)/d
+
+         Ainv(2,1) = -A(2,1)/d
+         Ainv(2,2) =  A(1,1)/d
+
+      ELSE IF (nd .EQ. 3) THEN
+         d = MAT_DET(A, nd)
+         IF (ABS(d) .LT. 1D2*epsil) iok = -1
+
+         Ainv(1,1) = (A(2,2)*A(3,3)-A(2,3)*A(3,2)) / d
+         Ainv(1,2) = (A(1,3)*A(3,2)-A(1,2)*A(3,3)) / d
+         Ainv(1,3) = (A(1,2)*A(2,3)-A(1,3)*A(2,2)) / d
+
+         Ainv(2,1) = (A(2,3)*A(3,1)-A(2,1)*A(3,3)) / d
+         Ainv(2,2) = (A(1,1)*A(3,3)-A(1,3)*A(3,1)) / d
+         Ainv(2,3) = (A(1,3)*A(2,1)-A(1,1)*A(2,3)) / d
+
+         Ainv(3,1) = (A(2,1)*A(3,2)-A(2,2)*A(3,1)) / d
+         Ainv(3,2) = (A(1,2)*A(3,1)-A(1,1)*A(3,2)) / d
+         Ainv(3,3) = (A(1,1)*A(2,2)-A(1,2)*A(2,1)) / d
+
+      ELSE IF (nd.GT.3 .AND. nd.LT.10) THEN
+         d = MAT_DET(A, nd)
+         IF (ABS(d) .LT. 1D2*epsil) iok = -1
+         Ainv = MAT_INV_GE(A, nd)
+
+      ELSE
+         Ainv = MAT_INV_LP(A, nd)
+
+      END IF
+
+      IF (iok .ne. 0) THEN
          WRITE(*,'(A)') "Singular matrix detected to compute inverse"
+         WRITE(*,'(A)') "ERROR: Matrix inversion failed"
          CALL STOPSIM()
       END IF
-      
-      ALLOCATE(MAT_INV(nd,nd))
-      
-      IF (nd .EQ. 2) THEN
-         MAT_INV(1,1) =  A(2,2)/d
-         MAT_INV(1,2) = -A(1,2)/d
-         
-         MAT_INV(2,1) = -A(2,1)/d
-         MAT_INV(2,2) =  A(1,1)/d
-         
-         RETURN
-      ELSE IF (nd .EQ. 3) THEN
-         MAT_INV(1,1) = (A(2,2)*A(3,3)-A(2,3)*A(3,2)) / d
-         MAT_INV(1,2) = (A(1,3)*A(3,2)-A(1,2)*A(3,3)) / d
-         MAT_INV(1,3) = (A(1,2)*A(2,3)-A(1,3)*A(2,2)) / d
-         
-         MAT_INV(2,1) = (A(2,3)*A(3,1)-A(2,1)*A(3,3)) / d
-         MAT_INV(2,2) = (A(1,1)*A(3,3)-A(1,3)*A(3,1)) / d
-         MAT_INV(2,3) = (A(1,3)*A(2,1)-A(1,1)*A(2,3)) / d
-         
-         MAT_INV(3,1) = (A(2,1)*A(3,2)-A(2,2)*A(3,1)) / d
-         MAT_INV(3,2) = (A(1,2)*A(3,1)-A(1,1)*A(3,2)) / d
-         MAT_INV(3,3) = (A(1,1)*A(2,2)-A(1,2)*A(2,1)) / d
-         
-         RETURN
-      END IF
-      
+
+      RETURN
+      END FUNCTION MAT_INV
+!--------------------------------------------------------------------
+!     This function computes inverse of a square matrix using
+!     Gauss Elimination method
+      FUNCTION MAT_INV_GE(A, nd) RESULT(Ainv)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd)
+      REAL(KIND=8) :: Ainv(nd,nd)
+
+      INTEGER :: i, j, k
+      REAL(KIND=8) :: d, B(nd,2*nd)
+
 !     Auxillary matrix
       B = 0D0
       DO i=1, nd
@@ -213,7 +255,7 @@
          END DO
          B(i,nd+i) = 1D0
       END DO
-      
+
 !     Pivoting
       DO i=nd, 2, -1
          IF (B(i,1) .GT. B(i-1,1)) THEN
@@ -224,7 +266,7 @@
             END DO
          END IF
       END DO
-      
+
 !     Do row-column operations and reduce to diagonal
       DO i=1, nd
          DO j=1, nd
@@ -236,7 +278,7 @@
             END IF
          END DO
       END DO
-      
+
 !     Unit matrix
       DO i=1, nd
          d = B(i,i)
@@ -244,28 +286,58 @@
             B(i,j) = B(i,j)/d
          END DO
       END DO
-      
+
 !     Inverse
       DO i=1, nd
          DO j=1, nd
-            MAT_INV(i,j) = B(i,j+nd)
+            Ainv(i,j) = B(i,j+nd)
          END DO
       END DO
-      
+
       RETURN
-      END FUNCTION MAT_INV
+      END FUNCTION MAT_INV_GE
+!--------------------------------------------------------------------
+!     This function computes inverse of a square matrix using
+!     Lapack functions (DGETRF + DGETRI)
+      FUNCTION MAT_INV_LP(A, nd) RESULT(Ainv)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd, nd)
+      REAL(KIND=8) :: Ainv(nd,nd)
+
+      INTEGER iok, IPIV(nd)
+      REAL(KIND=8) :: Ad(nd,nd), WORK(2*nd)
+
+      Ad = A
+      CALL DGETRF(nd, nd, Ad, nd, IPIV, iok)
+      IF (iok .NE. 0) THEN
+         WRITE(*,'(A)') "Singular matrix detected to compute inverse"
+         WRITE(*,'(A)') "ERROR: Matrix inversion failed"
+         CALL STOPSIM()
+      END IF
+
+      CALL DGETRI(nd, Ad, nd, IPIV, WORK, 2*nd, iok)
+      IF (iok .NE. 0) THEN
+         WRITE(*,'(A)') "ERROR: Matrix inversion failed (LAPACK)"
+         CALL STOPSIM()
+      END IF
+
+      Ainv(:,:) = Ad(:,:)
+
+      RETURN
+      END FUNCTION MAT_INV_LP
 !--------------------------------------------------------------------
 !     Initialize tensor index pointer
       SUBROUTINE TEN_INIT(nd)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nd
-      
+
       INTEGER :: ii, nn, i, j, k, l
-      
+
       nn = nd**4
       IF (ALLOCATED(t_ind)) DEALLOCATE(t_ind)
       ALLOCATE(t_ind(4,nn))
-      
+
       ii = 0
       DO l=1, nd
          DO k=1, nd
@@ -280,7 +352,7 @@
             END DO
          END DO
       END DO
-      
+
       RETURN
       END SUBROUTINE TEN_INIT
 !--------------------------------------------------------------------
@@ -289,9 +361,9 @@
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8) :: A(nd,nd,nd,nd)
-      
+
       INTEGER :: i, j
-      
+
       A = 0D0
       DO j=1, nd
          DO i=1, nd
@@ -299,7 +371,7 @@
             A(i,j,j,i) = A(i,j,j,i) + 5D-1
          END DO
       END DO
-      
+
       RETURN
       END FUNCTION TEN_IDs
 !--------------------------------------------------------------------
@@ -309,9 +381,9 @@
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8), INTENT(IN) :: A(nd,nd), B(nd,nd)
       REAL(KIND=8) :: C(nd,nd,nd,nd)
-      
+
       INTEGER :: ii, nn, i, j, k, l
-      
+
       nn = nd**4
       DO ii=1, nn
          i = t_ind(1,ii)
@@ -320,7 +392,7 @@
          l = t_ind(4,ii)
          C(i,j,k,l) = A(i,j) * B(k,l)
       END DO
-      
+
       RETURN
       END FUNCTION TEN_DYADPROD
 !--------------------------------------------------------------------
@@ -331,9 +403,9 @@
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8), INTENT(IN) :: A(nd,nd), B(nd,nd)
       REAL(KIND=8) :: C(nd,nd,nd,nd)
-      
+
       INTEGER :: ii, nn, i, j, k, l
-      
+
       nn = nd**4
       DO ii=1, nn
          i = t_ind(1,ii)
@@ -342,196 +414,105 @@
          l = t_ind(4,ii)
          C(i,j,k,l) = 5D-1 * ( A(i,k)*B(j,l) + A(i,l)*B(j,k) )
       END DO
-      
+
       RETURN
       END FUNCTION TEN_SYMMPROD
 !--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on first index (2D)
-      FUNCTION TEN_MATMULT2D_1(A, T) RESULT(C)
+!     Transpose of a 4th order tensor [A^T]_ijkl = [A]_klij
+      FUNCTION TEN_TRANSPOSE(A, nd) RESULT(B)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(2,2), T(2,2,2,2)
-      REAL(KIND=8) :: C(2,2,2,2)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 16
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd,nd,nd)
+      REAL(KIND=8) :: B(nd,nd,nd,nd)
+
+      INTEGER :: ii, nn, i, j, k, l
+
+      nn = nd**4
+      DO ii=1, nn
          i = t_ind(1,ii)
          j = t_ind(2,ii)
          k = t_ind(3,ii)
          l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(i,1)*T(1,j,k,l) + A(i,2)*T(2,j,k,l)
+         B(i,j,k,l) = A(k,l,i,j)
       END DO
-      
+
       RETURN
-      END FUNCTION TEN_MATMULT2D_1
+      END FUNCTION TEN_TRANSPOSE
 !--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on second index (2D)
-      FUNCTION TEN_MATMULT2D_2(A, T) RESULT(C)
+!     Double dot product of a 4th order tensor and a 2nd order tensor
+!     C_ij = (A_ijkl * B_kl)
+      FUNCTION TEN_MDDOT(A, B, nd) RESULT(C)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(2,2), T(2,2,2,2)
-      REAL(KIND=8) :: C(2,2,2,2)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 16
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(j,1)*T(i,1,k,l) + A(j,2)*T(i,2,k,l)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT2D_2
-!--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on third index (2D)
-      FUNCTION TEN_MATMULT2D_3(A, T) RESULT(C)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(2,2), T(2,2,2,2)
-      REAL(KIND=8) :: C(2,2,2,2)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 16
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(k,1)*T(i,j,1,l) + A(k,2)*T(i,j,2,l)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT2D_3
-!--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on fourth index (2D)
-      FUNCTION TEN_MATMULT2D_4(A, T) RESULT(C)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(2,2), T(2,2,2,2)
-      REAL(KIND=8) :: C(2,2,2,2)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 16
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(l,1)*T(i,j,k,1) + A(l,2)*T(i,j,k,2)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT2D_4
-!--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on first index (3D)
-      FUNCTION TEN_MATMULT3D_1(A, T) RESULT(C)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(3,3), T(3,3,3,3)
-      REAL(KIND=8) :: C(3,3,3,3)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 81
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(i,1)*T(1,j,k,l) + 
-     2      A(i,2)*T(2,j,k,l) + A(i,3)*T(3,j,k,l)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT3D_1
-!--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on second index (3D)
-      FUNCTION TEN_MATMULT3D_2(A, T) RESULT(C)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(3,3), T(3,3,3,3)
-      REAL(KIND=8) :: C(3,3,3,3)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 81
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(j,1)*T(i,1,k,l) + 
-     2      A(j,2)*T(i,2,k,l) + A(j,3)*T(i,3,k,l)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT3D_2
-!--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on third index (3D)
-      FUNCTION TEN_MATMULT3D_3(A, T) RESULT(C)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(3,3), T(3,3,3,3)
-      REAL(KIND=8) :: C(3,3,3,3)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 81
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(k,1)*T(i,j,1,l) + 
-     2      A(k,2)*T(i,j,2,l) + A(k,3)*T(i,j,3,l)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT3D_3
-!--------------------------------------------------------------------
-!     Matrix-Tensor multiplication with contraction on fourth index (3D)
-      FUNCTION TEN_MATMULT3D_4(A, T) RESULT(C)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: A(3,3), T(3,3,3,3)
-      REAL(KIND=8) :: C(3,3,3,3)
-      
-      INTEGER :: ii, i, j, k, l
-      
-      C  = 0D0
-      DO ii=1, 81
-         i = t_ind(1,ii)
-         j = t_ind(2,ii)
-         k = t_ind(3,ii)
-         l = t_ind(4,ii)
-         C(i,j,k,l) = C(i,j,k,l) + A(l,1)*T(i,j,k,1) + 
-     2      A(l,2)*T(i,j,k,2) + A(l,3)*T(i,j,k,3)
-      END DO
-      
-      RETURN
-      END FUNCTION TEN_MATMULT3D_4
-!--------------------------------------------------------------------
-      SUBROUTINE MAT_DISP(A, m, n)
-      IMPLICIT NONE
-      INTEGER, INTENT(IN) :: m
-      INTEGER, INTENT(IN), OPTIONAL :: n
-      REAL(KIND=8), INTENT(IN) :: A(:,:)
-      
-      INTEGER :: i, j, nr, nc
-      
-      nr = m
-      nc = nr
-      IF (PRESENT(n)) nc = n
-      
-      DO i=1, nr
-         WRITE(*,'(3X,A)',ADVANCE='NO')
-         DO j=1, nc
-            WRITE(*,'(X,1pE15.6,X,A)',ADVANCE='NO') A(i,j), ' | '
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd,nd,nd), B(nd,nd)
+      REAL(KIND=8) :: C(nd,nd)
+
+      INTEGER :: i, j
+
+      IF (nd .EQ. 2) THEN
+         DO i=1, nd
+            DO j=1, nd
+               C(i,j) = A(i,j,1,1)*B(1,1) + A(i,j,1,2)*B(1,2)
+     2                + A(i,j,2,1)*B(2,1) + A(i,j,2,2)*B(2,2)
+            END DO
          END DO
-         WRITE(*,'(A)')
-      END DO
-      
+      ELSE
+         DO i=1, nd
+            DO j=1, nd
+               C(i,j) = A(i,j,1,1)*B(1,1) + A(i,j,1,2)*B(1,2)
+     2                + A(i,j,1,3)*B(1,3) + A(i,j,2,1)*B(2,1)
+     3                + A(i,j,2,2)*B(2,2) + A(i,j,2,3)*B(2,3)
+     4                + A(i,j,3,1)*B(3,1) + A(i,j,3,2)*B(3,2)
+     5                + A(i,j,3,3)*B(3,3)
+            END DO
+         END DO
+      END IF
+
       RETURN
-      END SUBROUTINE MAT_DISP
+      END FUNCTION TEN_MDDOT
+!--------------------------------------------------------------------
+!     Double dot product of 2 4th order tensors (A_ijmn * B_klmn)
+      FUNCTION TEN_DDOT(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd,nd,nd), B(nd,nd,nd,nd)
+      REAL(KIND=8) :: C(nd,nd,nd,nd)
+
+      INTEGER :: ii, nn, i, j, k, l
+
+      C  = 0D0
+      nn = nd**4
+      IF (nd .EQ. 2) THEN
+         DO ii=1, nn
+            i = t_ind(1,ii)
+            j = t_ind(2,ii)
+            k = t_ind(3,ii)
+            l = t_ind(4,ii)
+            C(i,j,k,l) = C(i,j,k,l) + A(i,j,1,1)*B(k,l,1,1)
+     2                              + A(i,j,1,2)*B(k,l,1,2)
+     3                              + A(i,j,2,1)*B(k,l,2,1)
+     4                              + A(i,j,2,2)*B(k,l,2,2)
+         END DO
+      ELSE
+         DO ii=1, nn
+            i = t_ind(1,ii)
+            j = t_ind(2,ii)
+            k = t_ind(3,ii)
+            l = t_ind(4,ii)
+            C(i,j,k,l) = C(i,j,k,l) + A(i,j,1,1)*B(k,l,1,1)
+     2                              + A(i,j,1,2)*B(k,l,1,2)
+     3                              + A(i,j,1,3)*B(k,l,1,3)
+     4                              + A(i,j,2,1)*B(k,l,2,1)
+     5                              + A(i,j,2,2)*B(k,l,2,2)
+     6                              + A(i,j,2,3)*B(k,l,2,3)
+     7                              + A(i,j,3,1)*B(k,l,3,1)
+     8                              + A(i,j,3,2)*B(k,l,3,2)
+     9                              + A(i,j,3,3)*B(k,l,3,3)
+         END DO
+      END IF
+
+      RETURN
+      END FUNCTION TEN_DDOT
 !--------------------------------------------------------------------
       END MODULE MATFUN
 !####################################################################

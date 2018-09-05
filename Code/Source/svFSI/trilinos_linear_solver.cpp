@@ -692,6 +692,7 @@ void setMLPrec(AztecOO &Solver)
   int *options = new int[AZ_OPTIONS_SIZE];
   double *params = new double[AZ_PARAMS_SIZE];
   ML_Epetra::SetDefaults("SA",MLList, options, params);
+  //MLList.set("XML input file", "/home/augustin/programs/MUPFES/trunk/examples/conf-files/ml_ParameterList_sGS.xml");
 
   // ML general options
   // output level, 0 being silent and 10 verbose
