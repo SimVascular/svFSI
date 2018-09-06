@@ -141,6 +141,8 @@
          CALL cm%bcast(nTS)
          CALL cm%bcast(nEq)
          CALL cm%bcast(dt)
+         CALL cm%bcast(useTrilinosLS)
+         CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
