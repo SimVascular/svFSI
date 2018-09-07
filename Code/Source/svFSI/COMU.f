@@ -402,7 +402,8 @@
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
-      ftag = MOD(ftag + cm%id(), MPI_TAG_UB)
+
+      ftag = ftag + cm%id()
 
       IF (to .EQ. cm%id()) RETURN
       m = SIZE(u)
@@ -422,7 +423,8 @@
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
-      ftag = MOD(ftag + from, MPI_TAG_UB)
+
+      ftag = ftag + cm%id()
 
       IF (from .EQ. cm%id()) RETURN
       m = SIZE(u)
@@ -444,7 +446,8 @@
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
-      ftag = MOD(ftag + cm%id(), MPI_TAG_UB)
+
+      ftag = ftag + cm%id()
 
       req = MPI_REQUEST_NULL
       IF (to .EQ. cm%id()) RETURN
@@ -466,7 +469,8 @@
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
-      ftag = MOD(ftag + from, MPI_TAG_UB)
+
+      ftag = ftag + cm%id()
 
       req = MPI_REQUEST_NULL
       IF (from .EQ. cm%id()) RETURN
