@@ -43,11 +43,12 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER :: iEq, iM, iFa, a, e, Ac
+      INTEGER :: iEq, iM, iFa, a, e, i, Ac
 
       INTEGER, ALLOCATABLE :: part(:), gmtl(:)
       REAL, ALLOCATABLE :: iWgt(:)
-      REAL(KIND=8), ALLOCATABLE :: wgt(:,:), wrk(:), tmpX(:,:)
+      REAL(KIND=8), ALLOCATABLE :: wgt(:,:), wrk(:), tmpX(:,:),
+     2   tmpX3(:,:,:)
       TYPE(mshType), ALLOCATABLE :: tMs(:)
 
 !     Preparing IO incase of error or warning. I'm keeping dbg channel
@@ -113,7 +114,27 @@
             END DO
          END DO
       END DO
-      IF (cm%seq()) RETURN
+      IF (cm%seq()) THEN
+!        Rearrange body force structure, if necessary
+         DO iM=1, nMsh
+            IF (ALLOCATED(msh(iM)%bf)) THEN
+               ALLOCATE(tmpX3(msh(iM)%bf%dof,gtnNo,msh(iM)%bf%nTP))
+               tmpX3 = msh(iM)%bf%d
+               DEALLOCATE(msh(iM)%bf%d)
+               ALLOCATE(msh(iM)%bf%d(msh(iM)%bf%dof,msh(iM)%nNo,
+     2            msh(iM)%bf%nTP))
+               msh(iM)%bf%d = 0D0
+               DO i=1, msh(iM)%bf%nTP
+                  DO a=1, msh(iM)%nNo
+                     Ac = msh(iM)%gN(a)
+                     msh(iM)%bf%d(:,a,i) = tmpX3(:,Ac,i)
+                  END DO
+               END DO
+               DEALLOCATE(tmpX3)
+            END IF
+         END DO
+         RETURN
+      END IF
 
 !     Partitioning the faces
       DO iM=1, nMsh
@@ -227,6 +248,39 @@
          pS0 = LOCAL(tmpX)
          DEALLOCATE(tmpX)
       END IF
+
+!     Distribute body force to processors
+      DO iM=1, nMsh
+         flag = ALLOCATED(msh(iM)%bf)
+         CALL cm%bcast(flag)
+         IF (flag) THEN
+            IF (cm%slv()) ALLOCATE(msh(iM)%bf)
+            CALL cm%bcast(msh(iM)%bf%dof)
+            CALL cm%bcast(msh(iM)%bf%nTP)
+            CALL cm%bcast(msh(iM)%bf%period)
+            IF (cm%slv()) ALLOCATE(msh(iM)%bf%t(msh(iM)%bf%nTP))
+            CALL cm%bcast(msh(iM)%bf%t)
+
+            IF (cm%mas()) THEN
+               ALLOCATE(tmpX3(msh(iM)%bf%dof,gtnNo,msh(iM)%bf%nTP))
+               tmpX3 = msh(iM)%bf%d
+               DEALLOCATE(msh(iM)%bf%d)
+            ELSE
+               ALLOCATE(tmpX3(0,0,0))
+            END IF
+            ALLOCATE(tmpX(msh(iM)%bf%dof,tnNo),
+     2         msh(iM)%bf%d(msh(iM)%bf%dof,msh(iM)%nNo,msh(iM)%bf%nTP))
+            msh(iM)%bf%d = 0D0
+            DO i=1, msh(iM)%bf%nTP
+               tmpX = LOCAL(tmpX3(:,:,i))
+               DO a=1, msh(iM)%nNo
+                  Ac = msh(iM)%gN(a)
+                  msh(iM)%bf%d(:,a,i) = tmpX(:,Ac)
+               END DO
+            END DO
+            DEALLOCATE(tmpX3, tmpX)
+         END IF
+      END DO
 
 !     And distributing eq to processors
       IF (cm%slv()) ALLOCATE(eq(nEq))

@@ -35,8 +35,8 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE STRUCT3D (eNoN, w, N, Nx, al, yl, dl, fNl, pS0l, pSl,
-     2   lR, lK)
+      SUBROUTINE STRUCT3D (eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
+     2   pSl, lR, lK)
 
       USE COMMOD
       USE ALLFUN
@@ -45,8 +45,8 @@
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), pS0l(nstd,eNoN),
-     3   fNl(nFn*nsd,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
+     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN)
       REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
@@ -79,9 +79,9 @@
       F(3,3) = 1D0
       S0     = 0D0
       DO a=1, eNoN
-         ud(1) = ud(1) + N(a)*(rho*al(i,a) + dmp*yl(i,a))
-         ud(2) = ud(2) + N(a)*(rho*al(j,a) + dmp*yl(j,a))
-         ud(3) = ud(3) + N(a)*(rho*al(k,a) + dmp*yl(k,a))
+         ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
+         ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
+         ud(3) = ud(3) + N(a)*(rho*(al(k,a)-bfl(3,a)) + dmp*yl(k,a))
 
          F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
          F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
@@ -257,16 +257,16 @@
       RETURN
       END SUBROUTINE STRUCT3D
 !####################################################################
-      SUBROUTINE STRUCT2D (eNoN, w, N, Nx, al, yl, dl, fNl, pS0l, pSl,
-     2   lR, lK)
+      SUBROUTINE STRUCT2D (eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
+     2   pSl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), pS0l(nstd,eNoN),
-     3   fNl(nFn*nsd,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
+     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN)
       REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
@@ -296,8 +296,8 @@
       F(2,2) = 1D0
       S0     = 0D0
       DO a=1, eNoN
-         ud(1) = ud(1) + N(a)*(al(i,a) + dmp*yl(i,a))
-         ud(2) = ud(2) + N(a)*(al(j,a) + dmp*yl(j,a))
+         ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
+         ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
 
          F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
          F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)

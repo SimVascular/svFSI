@@ -35,7 +35,7 @@
 !     general structure of the code.
 !
 !--------------------------------------------------------------------
-!####################################################################
+
       PROGRAM MAIN
 
       USE COMMOD
@@ -54,7 +54,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), Ag(:,:), al(:,:), Yg(:,:),
      2   yl(:,:), Dg(:,:), dl(:,:), dol(:,:), fNl(:,:), res(:),
      3   ADg(:,:), adl(:,:), pS0l(:,:), fIBl(:,:), RTrilinos(:,:),
-     4   dirW(:,:)
+     4   dirW(:,:), bfg(:,:), bfl(:,:)
 
 !--------------------------------------------------------------------
       l1 = .FALSE.
@@ -129,6 +129,23 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
 !     Apply Dirichlet BCs strongly
          CALL SETBCDIR(An, Yn, Dn)
+
+!     Get body force for current time if present
+         l1 = .FALSE.
+         DO iM=1, nMsh
+            IF (ALLOCATED(msh(iM)%bf)) THEN
+               l1 = .TRUE.
+               EXIT
+            END IF
+         END DO
+         IF (l1) THEN
+            IF (ALLOCATED(bfg)) DEALLOCATE(bfg)
+            ALLOCATE(bfg(nsd,tnNo))
+            bfg = 0D0
+            DO iM=1, nMsh
+               IF (ALLOCATED(msh(iM)%bf)) CALL GETBF(msh(iM), bfg)
+            END DO
+         END IF
 
 !     Inner loop for iteration
          DO
@@ -210,7 +227,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                ALLOCATE(al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN),
      2            dol(nsd,eNoN), xl(nsd,eNoN), fNl(nFn*nsd,eNoN),
      3            adl(nsd,eNoN), pS0l(nstd,eNoN), fIBl(nsd,eNoN),
-     4            ptr(eNoN))
+     4            bfl(nsd,eNoN), ptr(eNoN))
 !$OMP DO SCHEDULE(GUIDED,mpBs)
                DO e=1, msh(iM)%nEl
                   al   = 0D0
@@ -221,6 +238,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   fNl  = 0D0
                   pS0l = 0D0
                   fIBl = 0D0
+                  bfl  = 0D0
                   ibl  = 0
                   DO a=1, eNoN
                      IF (a .LE. msh(iM)%eNoN) THEN
@@ -241,6 +259,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                      IF (ALLOCATED(fN))  fNl(:,a)  = fN(:,Ac)
                      IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
                      IF (ALLOCATED(fIB)) fIBl(:,a) = fIB(:,Ac)
+                     IF (ALLOCATED(bfg)) bfl(:,a)  = bfg(:,Ac)
                      adl(:,a) = ADg(:,Ac)
                   END DO
                   IF (ibl .EQ. msh(iM)%eNoN) THEN
@@ -248,9 +267,10 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   END IF
 !     Add contribution of current equation to the LHS/RHS
                   CALL CONSTRUCT(msh(iM), e, eNoN, al, yl, dl, dol, adl,
-     2               xl, fNl, pS0l, fIBl, ptr)
+     2               xl, fNl, pS0l, fIBl, bfl, ptr)
                END DO
-               DEALLOCATE(al, yl, dl, xl, dol, fNl, adl, pS0l, fIBl,ptr)
+               DEALLOCATE(al, yl, dl, xl, dol, fNl, adl, pS0l, fIBl,
+     2            bfl, ptr)
                dbg = "Mesh "//iM//" is assembled"
 !$OMP END DO
             END DO

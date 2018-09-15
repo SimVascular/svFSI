@@ -70,8 +70,8 @@
 
       INTERFACE DESTROY
          MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYEQ,
-     2      DESTROYBS, DESTROYDATA, DESTROYSTACK, DESTROYQUEUE,
-     3      DESTROYADJ, DESTROYTRACE, DESTROYFCELL
+     2      DESTROYBS, DESTROYMB, DESTROYDATA, DESTROYADJ, DESTROYSTACK,
+     3      DESTROYQUEUE, DESTROYTRACE, DESTROYFCELL
       END INTERFACE DESTROY
 
       INTERFACE GETNADJCNCY
@@ -967,6 +967,10 @@ c      END INTERFACE
       CALL DESTROYADJ(lM%nAdj)
       CALL DESTROYADJ(lM%eAdj)
       CALL DESTROYTRACE(lM%trc)
+      IF (ALLOCATED(lM%bf)) THEN
+         CALL DESTROYMB(lM%bf)
+         DEALLOCATE(lM%bf)
+      END IF
 
       lM%lShl  = .FALSE.
       lM%eType = eType_NA
@@ -1044,6 +1048,19 @@ c      END INTERFACE
       RETURN
       END SUBROUTINE DESTROYEQ
 !--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYMB(lMB)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(MBType), INTENT(OUT) :: lMB
+
+      IF (ALLOCATED(lMB%t)) DEALLOCATE(lMB%t)
+      IF (ALLOCATED(lMB%d)) DEALLOCATE(lMB%d)
+
+      lMB%nTP = 0
+
+      RETURN
+      END SUBROUTINE DESTROYMB
+!--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYBS(bs)
       USE COMMOD
       IMPLICIT NONE
@@ -1066,6 +1083,18 @@ c      END INTERFACE
 
       RETURN
       END SUBROUTINE DESTROYDATA
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYADJ(adj)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(adjType), INTENT(OUT) :: adj
+
+      IF (ALLOCATED(adj%prow)) DEALLOCATE(adj%prow)
+      IF (ALLOCATED(adj%pcol)) DEALLOCATE(adj%pcol)
+      adj%nnz = 0
+
+      RETURN
+      END SUBROUTINE DESTROYADJ
 !--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYSTACK(stk)
       USE COMMOD
@@ -1092,18 +1121,6 @@ c      END INTERFACE
 
       RETURN
       END SUBROUTINE DESTROYQUEUE
-!--------------------------------------------------------------------
-      PURE SUBROUTINE DESTROYADJ(adj)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(adjType), INTENT(OUT) :: adj
-
-      IF (ALLOCATED(adj%prow)) DEALLOCATE(adj%prow)
-      IF (ALLOCATED(adj%pcol)) DEALLOCATE(adj%pcol)
-      adj%nnz = 0
-
-      RETURN
-      END SUBROUTINE DESTROYADJ
 !--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYTRACE(trc)
       USE COMMOD

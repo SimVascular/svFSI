@@ -4339,7 +4339,7 @@ c      CALL IB_SYNC(sA)
       Ub = 0D0
       DO a=1, ib%tnNo
          DO i=1, nsd
-            Ub(i,a) = Ub(i,a) + ib%Yo(i,a)*dt
+            Ub(i,a) = ib%Uo(i,a) + ib%Yo(i,a)*dt
          END DO
       END DO
 

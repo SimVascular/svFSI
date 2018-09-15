@@ -1030,7 +1030,7 @@ c     2         "can be applied for Neumann boundaries only"
          iFa = lBc%iFa
          IF (a .NE. msh(iM)%fa(iFa)%nNo) THEN
             err = "Number of nodes does not match between "//
-     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//fTmp%fname
+     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//TRIM(fTmp%fname)
          END IF
          IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
      2      " is violated in "//fTmp%fname

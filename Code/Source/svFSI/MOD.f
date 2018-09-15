@@ -597,6 +597,8 @@
          TYPE(faceType), ALLOCATABLE :: fa(:)
 !        IB: tracers
          TYPE(traceType) :: trc
+!        General type for body force
+         TYPE(MBtype), ALLOCATABLE :: bf
       END TYPE mshType
 
 !     Equation type

@@ -367,6 +367,13 @@
          END DO
       END IF
 
+!     Read general body force data
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+         lPtr => lPM%get(fTmp, "Body force file path")
+         IF (ASSOCIATED(lPtr)) CALL READBF(msh(iM), fTmp%open())
+      END DO
+
 !     Initialize pressure field from file
       flag = .FALSE.
       DO iM=1, nMsh
@@ -494,6 +501,60 @@
 
       RETURN
       END SUBROUTINE READMSH
+!--------------------------------------------------------------------
+      SUBROUTINE READBF(lM, fid)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER, INTENT(IN) :: fid
+
+      INTEGER a, i, j, nTP, nNo, Ac
+      REAL(KIND=8) rtmp
+
+      READ (fid,*) i, nTP, nNo
+      IF (nNo .GT. lM%gnNo) err = "No. of nodes out of bounds"//
+     2   " (body force for mesh <"//TRIM(lM%name)//">)"
+      IF (i .NE. nsd) err = "DOF should equal spatial dimension "//nsd//
+     2   " (body force for mesh <"//TRIM(lM%name)//">)"
+
+      WRITE(*,*) gtnNo
+      ALLOCATE(lM%bf)
+      lM%bf%dof = i
+      lM%bf%nTP = nTP
+
+      ALLOCATE(lM%bf%t(nTP), lM%bf%d(i,gtnNo,nTP))
+      lM%bf%d = 0D0
+
+      DO j=1, nTP
+         READ(fid,*) rtmp
+         lM%bf%t(j) = rtmp
+         IF (j .EQ. 1) THEN
+            IF (.NOT.ISZERO(rtmp)) err = "First time step should be 0"//
+     2         " (body force for mesh <"//TRIM(lM%name)//">)"
+         ELSE
+            rtmp = rtmp - lM%bf%t(j-1)
+            IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-increasing "//
+     2         "time trend found (body force for mesh <"//
+     3         TRIM(lM%name)//">)"
+         END IF
+      END DO
+
+      lM%bf%period = HUGE(rtmp) !lM%bf%t(nTP)
+      DO a=1, nNo
+         READ(fid,*) Ac
+         IF (Ac.GT.lM%gnNo .OR. Ac.LE.0) THEN
+            err = "Entry "//Ac//" is out of bounds"//
+     2         " (body force for mesh <"//TRIM(lM%name)//">)"
+         END IF
+         Ac = lM%gN(Ac)
+         DO j=1, nTP
+            READ(fid,*) (lM%bf%d(i,Ac,j), i=1, lM%bf%dof)
+         END DO
+      END DO
+      CLOSE(fid)
+
+      RETURN
+      END SUBROUTINE READBF
 !####################################################################
 !     This routines associates two faces with each other and sets gN
       SUBROUTINE SETPROJECTOR(list, avNds)

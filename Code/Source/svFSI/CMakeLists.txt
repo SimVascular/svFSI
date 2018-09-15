@@ -112,8 +112,9 @@ set(FSRCS UTIL.f
          CEPMOD.f
          MOD.f
          ALLFUN.f
-         BBO.f
          BAFINI.f
+         BBO.f
+         BF.f
          CEP.f
          CMM.f
          CONSTRUCT.f

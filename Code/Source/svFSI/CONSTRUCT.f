@@ -37,7 +37,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE CONSTRUCT(lM, e, eNoN, al, yl, dl, dol, adl, xl, fNl,
-     2   ps0l, fIBl, ptr)
+     2   ps0l, fIBl, bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -46,7 +46,8 @@
       INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), dol(nsd,eNoN), adl(nsd,eNoN),
-     3   fNl(nFn*nsd,eNoN), fIBl(nsd,eNoN), pS0l(nstd,eNoN)
+     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN), fIBl(nsd,eNoN),
+     4   bfl(nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys
@@ -165,11 +166,11 @@
 
          CASE (phys_struct, phys_preSt)
             IF (nsd .EQ. 3) THEN
-               CALL STRUCT3D(eNoN, w, N, Nx, al, yl, dl, fNl, pS0l, pSl,
-     2            lR, lK)
+               CALL STRUCT3D(eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
+     2            pSl, lR, lK)
             ELSE
-               CALL STRUCT2D(eNoN, w, N, Nx, al, yl, dl, fNl, pS0l, pSl,
-     2            lR, lK)
+               CALL STRUCT2D(eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
+     2            pSl, lR, lK)
             END IF
 
 !      Map pSl values to global nodal vector
