@@ -517,7 +517,6 @@
       IF (i .NE. nsd) err = "DOF should equal spatial dimension "//nsd//
      2   " (body force for mesh <"//TRIM(lM%name)//">)"
 
-      WRITE(*,*) gtnNo
       ALLOCATE(lM%bf)
       lM%bf%dof = i
       lM%bf%nTP = nTP
@@ -539,7 +538,7 @@
          END IF
       END DO
 
-      lM%bf%period = HUGE(rtmp) !lM%bf%t(nTP)
+      lM%bf%period = lM%bf%t(nTP)
       DO a=1, nNo
          READ(fid,*) Ac
          IF (Ac.GT.lM%gnNo .OR. Ac.LE.0) THEN
