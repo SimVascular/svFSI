@@ -31,11 +31,12 @@
 !
 !--------------------------------------------------------------------
 !
-!     Neccessary contribution to LHS/RHS are calculated for fluid NS
-!     problem  in this routine.
+!     This is for solving fluid transport equation solving Navier-Stokes
+!     equations. Dirichlet boundary conditions are either treated
+!     strongly, weakly or using penalty methods for immersed boundaries.
 !
 !--------------------------------------------------------------------
-!####################################################################
+
       PURE SUBROUTINE FLUID3D (eNoN, w, N, Nx, al, yl, fIBl, ksix, lR,
      2   lK)
       USE COMMOD

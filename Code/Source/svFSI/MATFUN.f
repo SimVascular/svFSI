@@ -31,14 +31,11 @@
 !
 !--------------------------------------------------------------------
 !
-!     All the routines that require an interface are included here.
-!     This Mainly involves small routines with a very well-defined
-!     functionality. To use these routines, just add "USE ALLFUN" to
-!     your routine.
+!     This module defines generally performed matrix and tensor
+!     operations.
 !
 !--------------------------------------------------------------------
 
-!####################################################################
 !     Matrix and tensor operations
       MODULE MATFUN
       IMPLICIT NONE

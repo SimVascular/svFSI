@@ -31,8 +31,8 @@
 !
 !--------------------------------------------------------------------
 !
-!     In this subroutine Dirichlet and Nuemann BC are updated based
-!     on the specified flow rate or the type of outlet BC.
+!     Here Dirichlet, Neumann, Traction and Coupled BCs are applied on
+!     the boundary faces.
 !
 !--------------------------------------------------------------------
 
@@ -190,7 +190,11 @@
          IF (.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) CYCLE
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
-         CALL SETBCNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
+         IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) THEN
+            CALL SETBCNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
+         ELSE IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) THEN
+            CALL SETBCTRACL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
+         END IF
       END DO
 
       RETURN
@@ -205,21 +209,24 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, Ac, e, s
+      INTEGER a, Ac, e, s, nNo, eNoN
       REAL(KIND=8) Q, h, tmp
 
       INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: hg(:), tmpA(:), yl(:,:), hl(:)
+      REAL(KIND=8), ALLOCATABLE :: hl(:), hg(:), yl(:,:), tmpA(:)
+
+      nNo  = lFa%nNo
+      eNoN = lFa%eNoN
 
 !     Geting the contribution of Neu BC
       IF (BTEST(lBc%bType,bType_cpl)) THEN
          h = lBc%g
       ELSE
          IF (BTEST(lBc%bType,bType_gen)) THEN
-!     Using "hg" as a temporary variable here
-            ALLOCATE(tmpA(lFa%nNo), hg(lFa%nNo))
-            CALL IGBC(lBc%gm, tmpA, hg)
-            DEALLOCATE(hg)
+!     Using "hl" as a temporary variable here
+            ALLOCATE(tmpA(nNo), hl(nNo))
+            CALL IGBC(lBc%gm, tmpA, hl)
+            DEALLOCATE(hl)
          ELSE IF (BTEST(lBc%bType,bType_res)) THEN
             Q = Integ(lFa, Yn, eq(cEq)%s, eq(cEq)%s+nsd-1)
             h = Q*lBc%r
@@ -232,22 +239,22 @@
          END IF
       END IF
 
-      ALLOCATE(hg(tnNo), yl(tDof,lFa%eNoN), hl(lFa%eNoN), ptr(lFa%eNoN))
+      ALLOCATE(hg(tnNo), yl(tDof,eNoN), hl(eNoN), ptr(eNoN))
 !     Transforming it to a unified format
       IF (BTEST(lBc%bType,bType_gen)) THEN
-         DO a=1, lFa%nNo
+         DO a=1, nNo
             Ac     = lFa%gN(a)
             hg(Ac) = tmpA(a)
          END DO
       ELSE IF (BTEST(lBc%bType,bType_ddep)) THEN
          s = eq(cEq)%s
          IF (eq(cEq)%dof .EQ. 1) THEN
-            DO a=1, lFa%nNo
+            DO a=1, nNo
                Ac     = lFa%gN(a)
                hg(Ac) = -h*Dg(s,Ac)
             END DO
          ELSE IF (eq(cEq)%dof .GE. nsd) THEN
-            DO a=1, lFa%nNo
+            DO a=1, nNo
                Ac     = lFa%gN(a)
                hg(Ac) = -h*NORM(Dg(s:s+nsd-1,Ac),lFa%nV(:,a))
             END DO
@@ -255,18 +262,18 @@
             err = "Correction in SETBCNEU is needed"
          END IF
       ELSE
-         DO a=1, lFa%nNo
+         DO a=1, nNo
             Ac     = lFa%gN(a)
             hg(Ac) = -h*lBc%gx(a)
          END DO
       END IF
 
-!     Constructing LHS/RHS contribution and assembiling them
+!     Constructing LHS/RHS contribution and assembling them
       IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
          CALL BUSTRUCTNEU(lFa, hg, Dg)
       ELSE
          DO e=1, lFa%nEl
-            DO a=1, lFa%eNoN
+            DO a=1, eNoN
                Ac      = lFa%IEN(a,e)
                ptr(a)  = Ac
                yl(:,a) = Yg(:,Ac)
@@ -279,68 +286,44 @@
 
       RETURN
       END SUBROUTINE SETBCNEUL
-!####################################################################
-!     Here traction vector is applied for the outlets
-      SUBROUTINE SETBCTRAC(Yg)
-
-      USE COMMOD
-
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
-
-      INTEGER iFa, iBc, iM
-
-      DO iBc=1, eq(cEq)%nBc
-         IF (.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) CYCLE
-         iFa = eq(cEq)%bc(iBc)%iFa
-         iM  = eq(cEq)%bc(iBc)%iM
-         IF (eq(cEq)%phys .NE. phys_preSt) err = "Traction BC is "//
-     2      "applied for prestress equation only"
-         CALL SETBCTRACL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg)
-      END DO
-
-      RETURN
-      END SUBROUTINE SETBCTRAC
 !--------------------------------------------------------------------
-      SUBROUTINE SETBCTRACL(lBc, lFa, Yg)
-
+      SUBROUTINE SETBCTRACL(lBc, lFa, Yg, Dg)
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER :: a, Ac, e, g, iM, nNo, eNoN, cPhys
-      REAL(KIND=8) :: w, nV(nsd), y(tDof), Jac, h(nsd)
+      REAL(KIND=8) :: w, Jac, nV(nsd), y(tDof), h(nsd)
 
       INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:), yl(:,:), hl(:,:),hg(:,:),
+      REAL(KIND=8), ALLOCATABLE :: N(:), yl(:,:), hl(:,:), hg(:,:),
      2   tmpA(:,:), lR(:,:), lK(:,:,:)
 
       iM   = lFa%iM
       nNo  = lFa%nNo
       eNoN = lFa%eNoN
 
-      IF (.NOT.ALLOCATED(lBc%gm)) err = "Correction needed in SETBCTRAC"
-
 !     Geting the contribution of traction BC
-      ALLOCATE(tmpA(nsd,nNo), hg(nsd,nNo))
-      CALL IGBC(lBc%gm, tmpA, hg)
-      DEALLOCATE(hg)
+      ALLOCATE(hg(nsd,tnNo))
+      IF (BTEST(lBc%bType,btype_gen)) THEN
+!     Using "hl" as a temporary variable here
+         ALLOCATE(tmpA(nsd,nNo), hl(nsd,nNo))
+         CALL IGBC(lBc%gm, tmpA, hl)
+         DO a=1, nNo
+            Ac       = lFa%gN(a)
+            hg(:,Ac) = tmpA(:,a)
+         END DO
+         DEALLOCATE(tmpA, hl)
+      ELSE
+         err = "Correction in SETBCTRAC is needed"
+      END IF
 
-      ALLOCATE(hg(nsd,tnNo), hl(nsd,eNoN), yl(tDof,eNoN), ptr(eNoN),
-     2   N(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
-
-!     Transforming it to a unified format
-      DO a=1, nNo
-         Ac       = lFa%gN(a)
-         hg(:,Ac) = tmpA(:,a)
-      END DO
-      DEALLOCATE(tmpA)
+      ALLOCATE(N(eNoN), ptr(eNoN), hl(nsd,eNoN), yl(tDof,eNoN),
+     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
 !     Constructing LHS/RHS contribution and assembiling them
       DO e=1, lFa%nEl
@@ -356,8 +339,6 @@
          lR = 0D0
          cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
          cPhys = eq(cEq)%dmn(cDmn)%phys
-         IF (cPhys .NE. phys_preSt) CYCLE
-
          IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
          DO g=1, lFa%nG

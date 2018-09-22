@@ -32,7 +32,7 @@
 !--------------------------------------------------------------------
 !
 !     This subroutine is intended for reading the input information
-!     and allocating required space for program
+!     and allocating required space for program.
 !
 !--------------------------------------------------------------------
 
@@ -879,17 +879,11 @@
      2      lBc%bType = IBSET(lBc%bType,bType_bfs)
       CASE ("Traction","Trac")
          lBc%bType = IBSET(lBc%bType,bType_trac)
-         lBc%bType = IBSET(lBc%bType,bType_gen)
-         lBc%bType = IBSET(lBc%bType,bType_impD)
-         lBc%bType = IBSET(lBc%bType,bType_flat)
+         IF (phys .NE. phys_preSt) err = "Traction BC is applied for "//
+     2      "prestress equation only. Use Neumann BC instead."
+         lPtr => list%get(fTmp, "Traction values file path (vtp)",1)
          iM  = lBc%iM
          iFa = lBc%iFa
-
-         IF (phys .NE. phys_preSt) err = " Traction type BC " //
-     2      "can be used for prestress calculations only"
-         lPtr => list%get(fTmp, "Traction values file path (vtp)",1)
-         lPtr => list%get(rtmp, "Traction multiplier",1)
-         IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
          i = nsd
          j = 2
          a = msh(iM)%fa(iFa)%nNo
@@ -901,6 +895,11 @@
          lBc%gm%t(2) = HUGE(rtmp)
 
          CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
+         lBc%bType = IBSET(lBc%bType,bType_gen)
+         lBc%bType = IBSET(lBc%bType,bType_flat)
+
+         lPtr => list%get(rtmp, "Traction multiplier",1)
+         IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
          lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
 
          ALLOCATE(lBc%eDrn(nsd))
@@ -1503,8 +1502,9 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(listType), INTENT(INOUT) :: lPD
 
       TYPE(listType), POINTER :: lPtr, list
-      CHARACTER(LEN=stdL) ctmp
+      INTEGER iFn
       REAL(KIND=8) rtmp
+      CHARACTER(LEN=stdL) ctmp
 
       lPtr => lPD%get(ctmp, "Electrophysiology model")
       SELECT CASE(TRIM(ctmp))
@@ -1520,7 +1520,12 @@ c     2         "can be applied for Neumann boundaries only"
 
       lPtr => lPD%get(lDmn%cep%nX,"State variables",ll=1)
       lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
-      lPtr => lPD%get(lDmn%cep%Dani,"Conductivity (ani)",ll=0D0)
+      IF (ALLOCATED(fN)) THEN
+         IF (nFn .GT. 2) err = "EP physics allows only 2 fiber families"
+         DO iFn=1, nFn
+            lPtr => lPD%get(lDmn%cep%Dani(iFn),"Conductivity (ani)",iFn)
+         END DO
+      END IF
 
       lDmn%cep%Istim%A  = 0.0d0
       lDmn%cep%Istim%Ts = HUGE(rtmp)

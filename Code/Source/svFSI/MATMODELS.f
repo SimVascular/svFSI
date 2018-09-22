@@ -31,9 +31,11 @@
 !
 !--------------------------------------------------------------------
 !
-!     This routines is for material models for structural dynamics.
+!     Here, second Piola-Kirchhoff stress tensor and the material
+!     stiffness tensors are computed for material constitutive models.
 !
 !--------------------------------------------------------------------
+
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
       SUBROUTINE GETPK2CC (stM, F, nfd, fl, S, CC)
@@ -47,7 +49,7 @@
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
       REAL(KIND=8) :: nd, Kp, J, J2d, trE, p, pl, Inv1, Inv2, Inv4,
-     2   Inv6, Inv8
+     2   Inv6
       REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
      3   f0f0(nsd,nsd), g0g0(nsd,nsd)
@@ -64,7 +66,7 @@
       E    = 5D-1 * (C - IDm)
       Ci   = MAT_INV(C, nsd)
 
-      trE  = MAT_TRACE(E,nsd)
+      trE  = MAT_TRACE(E, nsd)
       Inv1 = J2d*MAT_TRACE(C,nsd)
       Inv2 = 5D-1*( Inv1*Inv1 - J2d*J2d*MAT_TRACE(MATMUL(C,C), nsd) )
 
@@ -196,69 +198,16 @@
       RETURN
       END SUBROUTINE GETPK2CC
 !####################################################################
-!     Compute rho and beta depending on the Gibb's free-energy based
-!     volumetric penalty model
-      SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt)
-      USE MATFUN
-      USE COMMOD
-      IMPLICIT NONE
-
-      TYPE(stModelType), INTENT(IN) :: stM
-      REAL(KIND=8), INTENT(IN) :: p
-      REAL(KIND=8), INTENT(OUT) :: bt, dbt, dro
-      REAL(KIND=8), INTENT(INOUT) :: ro
-
-      REAL(KIND=8) :: Kp, r1, r2
-
-      bt  = 0D0
-      dbt = 0D0
-      dro = 0D0
-      IF (stM%iFlag) RETURN
-
-      Kp = stM%Kpen
-      SELECT CASE (stM%volType)
-      CASE (stVol_Quad)
-         r1  = Kp - p
-
-         ro  = ro*Kp/r1
-         bt  = 1D0/r1
-         dro = ro/r1
-         dbt = bt/r1
-
-      CASE (stVol_M94)
-         r1  = ro/Kp
-         r2  = Kp + p
-
-         ro  = r1*r2
-         bt  = 1D0/r2
-         dro = r1
-         dbt = -bt/r2
-
-      CASE (stVol_ST91)
-         r1  = ro/Kp
-         r2  = SQRT(p**2 + Kp**2)
-
-         ro  = r1*(p + r2)
-         bt  = 1D0/r2
-         dro = ro/r2
-         dbt = -bt*p/(p**2 + Kp**2)
-
-      CASE DEFAULT
-         err = "Undefined volumetric material constitutive model"
-      END SELECT
-
-      RETURN
-      END SUBROUTINE GVOLPEN
-!####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev (stM, F, fl, S, CC)
+      SUBROUTINE GETPK2CCdev (stM, F, nfd, fl, S, CC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(stModelType), INTENT(IN) :: stM
-      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nFn)
+      INTEGER, INTENT(IN) :: nfd
+      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
       REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6
@@ -277,7 +226,7 @@
       E    = 5D-1 * (C - IDm)
       Ci   = MAT_INV(C, nsd)
 
-      trE  = MAT_TRACE(E,nsd)
+      trE  = MAT_TRACE(E, nsd)
       Inv1 = J2d*MAT_TRACE(C,nsd)
       Inv2 = 5D-1*( Inv1*Inv1 - J2d*J2d*MAT_TRACE(MATMUL(C,C), nsd) )
 
@@ -365,6 +314,60 @@
 
       RETURN
       END SUBROUTINE GETPK2CCdev
+!####################################################################
+!     Compute rho and beta depending on the Gibb's free-energy based
+!     volumetric penalty model
+      SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(stModelType), INTENT(IN) :: stM
+      REAL(KIND=8), INTENT(IN) :: p
+      REAL(KIND=8), INTENT(OUT) :: bt, dbt, dro
+      REAL(KIND=8), INTENT(INOUT) :: ro
+
+      REAL(KIND=8) :: Kp, r1, r2
+
+      bt  = 0D0
+      dbt = 0D0
+      dro = 0D0
+      IF (stM%iFlag) RETURN
+
+      Kp = stM%Kpen
+      SELECT CASE (stM%volType)
+      CASE (stVol_Quad)
+         r1  = Kp - p
+
+         ro  = ro*Kp/r1
+         bt  = 1D0/r1
+         dro = ro/r1
+         dbt = bt/r1
+
+      CASE (stVol_M94)
+         r1  = ro/Kp
+         r2  = Kp + p
+
+         ro  = r1*r2
+         bt  = 1D0/r2
+         dro = r1
+         dbt = -bt/r2
+
+      CASE (stVol_ST91)
+         r1  = ro/Kp
+         r2  = SQRT(p**2 + Kp**2)
+
+         ro  = r1*(p + r2)
+         bt  = 1D0/r2
+         dro = ro/r2
+         dbt = -bt*p/(p**2 + Kp**2)
+
+      CASE DEFAULT
+         err = "Undefined volumetric material constitutive model"
+      END SELECT
+
+      RETURN
+      END SUBROUTINE GVOLPEN
 !####################################################################
 !     Compute stabilization parameter, tauM for a given material model
       SUBROUTINE GETTAU (stM, Je, F, fl, tauM, tauC)

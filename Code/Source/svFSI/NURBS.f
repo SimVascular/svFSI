@@ -32,9 +32,10 @@
 !--------------------------------------------------------------------
 !
 !     This file contains routines for reading, calculating shape
-!     function and computing NURBS
+!     function and computing NURBS.
 !
 !--------------------------------------------------------------------
+
 !     Calculates shape function values "N" and first and second order
 !     derivatives "Nxi, Nxxi" of BSpline "bs" at Gauss points, given
 !     the knot "ni".

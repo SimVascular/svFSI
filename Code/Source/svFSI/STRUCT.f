@@ -31,7 +31,8 @@
 !
 !--------------------------------------------------------------------
 !
-!     This routines is for solving nonlinear structural problem.
+!     This routines is for solving nonlinear structural mechanics
+!     problem using pure displacement-based formulation.
 !
 !--------------------------------------------------------------------
 

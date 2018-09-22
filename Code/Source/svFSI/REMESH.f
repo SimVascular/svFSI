@@ -32,7 +32,7 @@
 !--------------------------------------------------------------------
 !
 !     This routine remeshes any deteriorated mesh during run-time
-!     and restarts the simulation
+!     and restarts the simulation.
 !
 !--------------------------------------------------------------------
 

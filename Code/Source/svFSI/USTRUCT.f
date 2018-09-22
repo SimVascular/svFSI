@@ -1,10 +1,41 @@
-!--------------------------------------------------------------------
+!
+! Copyright (c) Stanford University, The Regents of the University of
+!               California, and others.
+!
+! All Rights Reserved.
+!
+! See Copyright-SimVascular.txt for additional details.
+!
+! Permission is hereby granted, free of charge, to any person obtaining
+! a copy of this software and associated documentation files (the
+! "Software"), to deal in the Software without restriction, including
+! without limitation the rights to use, copy, modify, merge, publish,
+! distribute, sublicense, and/or sell copies of the Software, and to
+! permit persons to whom the Software is furnished to do so, subject
+! to the following conditions:
+!
+! The above copyright notice and this permission notice shall be included
+! in all copies or substantial portions of the Software.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+! IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+! TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+! PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+! OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+! EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+! PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+! PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+! LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!
+!-----------------------------------------------------------------------
 !
 !     This routines is for solving nonlinear structural problem using
-!     velocity based formulation
+!     velocity based formulation.
 !
 !--------------------------------------------------------------------
-!####################################################################
+
       SUBROUTINE USTRUCT3D(eNoN, w, Je, N, Nx, al, yl, dl, adl, fNl,
      2   lRd, lKd, lR, lK)
       USE COMMOD
@@ -109,7 +140,7 @@
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(stModel, F, fl, Siso, CCiso)
+      CALL GETPK2CCdev(stModel, F, nFn, fl, Siso, CCiso)
 
 !     Compute stabilization parameters
       CALL GETTAU(stModel, Je, F, fl, tauM, tauC)
@@ -509,7 +540,7 @@
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(stModel, F, fl, Siso, CCiso)
+      CALL GETPK2CCdev(stModel, F, nFn, fl, Siso, CCiso)
 
 !     Compute stabilization parameters
       CALL GETTAU(stModel, Je, F, fl, tauM, tauC)
@@ -706,7 +737,7 @@
       INTEGER :: a, b, e, g, iM, Ac, Ec, eNoN, eNoNb, cPhys
       REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), nV(nsd), ksix(nsd,nsd),
      2   rt
-      LOGICAL :: l1, l2
+      LOGICAL :: flag
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:), Nx(:,:),
@@ -747,18 +778,18 @@
             END DO
 
             xi = msh(iM)%xi(:,1)
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, l1)
-            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
+            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, flag)
+!           If Newton's method fails
+            IF (.NOT.flag) err = "Newton method failed to converge. "//
+     2         "(BUSTRUCTNEU)"
 
-            a  = 0
-            rt = 0D0
+            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
+            a = 0
             DO b=1, eNoN
-               rt = rt + N(b)
                IF (N(b).GT.-1E-4 .AND. N(b).LT.1.0001D0) a = a + 1
             END DO
-            l2 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
-            IF (.NOT.l1 .OR. .NOT.l2 .OR. a.NE.eNoN) err =
-     2         " Error in computing face derivatives (BUSTRUCTNEU)"
+            IF (a .NE. eNoN) err =
+     2         "Error in computing face derivatives (BUSTRUCTNEU)"
 
             IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
      2         CALL GNN(eNoN, Nxi, xl, Nx, rt, ksix)
@@ -774,10 +805,18 @@
                CALL BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lKd)
             END IF
          END DO
-!$OMP CRITICAL
+
          CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lRd)
-         CALL DOASSEM(eNoN, ptr, lK, lR)
-!$OMP END CRITICAL
+
+#ifdef WITH_TRILINOS
+         IF (useTrilinosAssemAndLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
       END DO
 
       RETURN
@@ -794,8 +833,8 @@
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(3*dof,eNoN,eNoN)
 
       INTEGER :: a, b, i, j, k
-      REAL(KIND=8) :: af, Jac, h, F(3,3), Fi(3,3), nFi(3), NxFi(3,eNoN),
-     2   wl, T1, T2
+      REAL(KIND=8) :: af, Jac, wl, T1, T2, h, F(3,3), Fi(3,3), nFi(3),
+     2   NxFi(3,eNoN)
 
       af = eq(cEq)%af*eq(cEq)%gam*dt
       i  = eq(cEq)%s

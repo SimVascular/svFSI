@@ -1,9 +1,41 @@
+!
+! Copyright (c) Stanford University, The Regents of the University of
+!               California, and others.
+!
+! All Rights Reserved.
+!
+! See Copyright-SimVascular.txt for additional details.
+!
+! Permission is hereby granted, free of charge, to any person obtaining
+! a copy of this software and associated documentation files (the
+! "Software"), to deal in the Software without restriction, including
+! without limitation the rights to use, copy, modify, merge, publish,
+! distribute, sublicense, and/or sell copies of the Software, and to
+! permit persons to whom the Software is furnished to do so, subject
+! to the following conditions:
+!
+! The above copyright notice and this permission notice shall be included
+! in all copies or substantial portions of the Software.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+! IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+! TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+! PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+! OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+! EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+! PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+! PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+! LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!
 !-----------------------------------------------------------------------
 !
-!     This is for solving electrophysiology model equation.
+!     This routine embodies formulation for solving electrophysiology
+!     model equation using operator-splitting method.
 !
 !-----------------------------------------------------------------------
-!#######################################################################
+
 !     This is for solving 3D electrophysiology diffusion equations
       PURE SUBROUTINE CEP3D (eNoN, w, N, Nx, al, yl, fNl, lR, lK)
       USE COMMOD
@@ -11,12 +43,12 @@
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), fNl(nsd,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), fNl(nFn*nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER i, a, b
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani, fg(nsd),
-     2   D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
+      INTEGER a, b, i, iFn
+      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(2),
+     2   fl(nsd,nFn), D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
 
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
@@ -26,22 +58,33 @@
 
       wl = w*T1
 
-      fg = 0D0
+      fl = 0D0
       DO a=1, eNoN
-         fg = fg + N(a)*fNl(:,a)
+         DO iFn=1, nFn
+            b = (iFn-1)*nsd
+            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
+            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
+            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
+         END DO
       END DO
 
-      D(1,1) = Diso + Dani*fg(1)*fg(1)
-      D(1,2) = Dani*fg(1)*fg(2)
-      D(1,3) = Dani*fg(1)*fg(3)
+      D(:,:) = 0D0
+      D(1,1) = Diso
+      D(2,2) = Diso
+      D(3,3) = Diso
+      DO iFn=1, nFn
+         D(1,1) = D(1,1) + Dani(iFn)*fl(1,iFn)*fl(1,iFn)
+         D(1,2) = D(1,2) + Dani(iFn)*fl(1,iFn)*fl(2,iFn)
+         D(1,3) = D(1,3) + Dani(iFn)*fl(1,iFn)*fl(3,iFn)
 
-      D(2,1) = Dani*fg(2)*fg(1)
-      D(2,2) = Diso + Dani*fg(2)*fg(2)
-      D(2,3) = Dani*fg(2)*fg(3)
+         D(2,1) = D(2,1) + Dani(iFn)*fl(2,iFn)*fl(1,iFn)
+         D(2,2) = D(2,2) + Dani(iFn)*fl(2,iFn)*fl(2,iFn)
+         D(2,3) = D(2,3) + Dani(iFn)*fl(2,iFn)*fl(3,iFn)
 
-      D(3,1) = Dani*fg(3)*fg(1)
-      D(3,2) = Dani*fg(3)*fg(2)
-      D(3,3) = Diso + Dani*fg(3)*fg(3)
+         D(3,1) = D(3,1) + Dani(iFn)*fl(3,iFn)*fl(1,iFn)
+         D(3,2) = D(3,2) + Dani(iFn)*fl(3,iFn)*fl(2,iFn)
+         D(3,3) = D(3,3) + Dani(iFn)*fl(3,iFn)*fl(3,iFn)
+      END DO
 
       Td = 0D0
       Tx = 0D0
@@ -102,12 +145,12 @@
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), fNl(nsd,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), fNl(nFn*nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER i, a, b
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani, fg(nsd),
-     2   D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
+      INTEGER a, b, i, iFn
+      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(2),
+     2   fl(nsd,nFn), D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
 
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
@@ -116,16 +159,26 @@
       i    = eq(cEq)%s
       wl   = w*T1
 
-      fg = 0D0
+      fl = 0D0
       DO a=1, eNoN
-         fg = fg + N(a)*fNl(:,a)
+         DO iFn=1, nFn
+            b = (iFn-1)*nsd
+            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
+            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
+            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
+         END DO
       END DO
 
-      D(1,1) = Diso + Dani*fg(1)*fg(1)
-      D(1,2) = Dani*fg(1)*fg(2)
+      D(:,:) = 0D0
+      D(1,1) = Diso
+      D(2,2) = Diso
+      DO iFn=1, nFn
+         D(1,1) = D(1,1) + Dani(iFn)*fl(1,iFn)*fl(1,iFn)
+         D(1,2) = D(1,2) + Dani(iFn)*fl(1,iFn)*fl(2,iFn)
 
-      D(2,1) = Dani*fg(2)*fg(1)
-      D(2,2) = Diso + Dani*fg(2)*fg(2)
+         D(2,1) = D(2,1) + Dani(iFn)*fl(2,iFn)*fl(1,iFn)
+         D(2,2) = D(2,2) + Dani(iFn)*fl(2,iFn)*fl(2,iFn)
+      END DO
 
       Td = 0D0
       Tx = 0D0

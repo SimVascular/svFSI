@@ -29,8 +29,11 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**************************************************
+!--------------------------------------------------------------------
+!
+!     General data structures interfaced with custom VTK functions.
+!
+!--------------------------------------------------------------------
 
       module stdParams
         character(len=8), parameter :: ftab1="(4X,A)"

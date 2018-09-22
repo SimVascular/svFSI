@@ -32,7 +32,7 @@
 !--------------------------------------------------------------------
 !
 !     This module contains a set of routine that are handy, such as
-!     string manupulation, file handeling, and norm
+!     string manupulation, file handeling, and norm.
 !
 !--------------------------------------------------------------------
 

@@ -28,6 +28,11 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+//--------------------------------------------------------------------
+//
+// Interface to ZLIB for data inflation and deflation.
+//
+//--------------------------------------------------------------------
 
    #include <stdio.h>
    #include <string.h>

@@ -31,8 +31,7 @@
 !
 !--------------------------------------------------------------------
 !
-!     This routine is desinged to read isoparametric meshes and
-!     retype it upon request
+!     This routine is desinged to read isoparametric meshes.
 !
 !--------------------------------------------------------------------
 

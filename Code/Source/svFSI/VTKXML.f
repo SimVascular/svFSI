@@ -29,8 +29,12 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**********************************************************************
+!--------------------------------------------------------------------
+!
+!     Here data (mesh, solution) input/output is handled interfacing
+!     with fortran-based VTK module.
+!
+!--------------------------------------------------------------------
 
       SUBROUTINE READVTU(lM, fName)
       USE COMMOD

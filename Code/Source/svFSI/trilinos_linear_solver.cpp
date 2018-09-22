@@ -29,6 +29,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//--------------------------------------------------------------------
+//
+// Interface to Trilinos linear solver library.
+//
+//--------------------------------------------------------------------
+
 /*!
   \file    trilinos_linear_solver.cpp
   \brief   wrap Trilinos solver functions

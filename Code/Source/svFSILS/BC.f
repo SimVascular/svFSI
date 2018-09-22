@@ -47,7 +47,6 @@
 !     The structure of BC input is created here.
 !--------------------------------------------------------------------
 
-
       SUBROUTINE FSILS_BC_CREATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
      &   Val)
 

@@ -32,7 +32,7 @@
 !--------------------------------------------------------------------
 !
 !     This routine is desinged to read NURBS patches and if neccessary
-!     refine it by knot insertion
+!     refine it by knot insertion.
 !
 !--------------------------------------------------------------------
 

@@ -35,7 +35,7 @@
 !     done here.
 !
 !--------------------------------------------------------------------
-!####################################################################
+
 !     This is a routine that performs POST/BPOST on all meshes
       SUBROUTINE ALLPOST(res, lY, lD, outGrp, iEq)
       USE COMMOD

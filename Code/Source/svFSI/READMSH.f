@@ -32,9 +32,10 @@
 !--------------------------------------------------------------------
 !
 !     This routine is desinged to read the mesh/es that may come in
-!     several formats and setup all parameters related to meshes
+!     several formats and setup all parameters related to meshes.
 !
 !--------------------------------------------------------------------
+
 !     The higher level routine that calls other routines
       SUBROUTINE READMSH(list)
       USE COMMOD

@@ -275,14 +275,12 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !$OMP END DO
             END DO
 
-!     Constructing the element stiffness matrix for boundaries
+!     Treatment of boundary conditions on faces
+!     Apply Neumman or Traction boundary conditions
             CALL SETBCNEU(Yg, Dg)
 
 !     Apply CMM BC conditions
             CALL SETBCCMM(Ag, Yg, Dg)
-
-!     Apply traction boundary conditions
-            CALL SETBCTRAC(Yg)
 
 !     Apply weakly applied Dirichlet BCs
             CALL SETBCDIRW(Yg, Dg)
