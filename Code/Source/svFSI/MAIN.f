@@ -53,8 +53,8 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       INTEGER, ALLOCATABLE :: ptr(:), incL(:), ltgReordered(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), Ag(:,:), al(:,:), Yg(:,:),
      2   yl(:,:), Dg(:,:), dl(:,:), dol(:,:), fNl(:,:), res(:),
-     3   ADg(:,:), adl(:,:), pS0l(:,:), fIBl(:,:), RTrilinos(:,:),
-     4   dirW(:,:), bfg(:,:), bfl(:,:)
+     3   ADg(:,:), adl(:,:), pS0l(:,:), RTrilinos(:,:), dirW(:,:),
+     4   bfg(:,:), bfl(:,:)
 
 !--------------------------------------------------------------------
       l1 = .FALSE.
@@ -223,11 +223,11 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                i = nsd + 2
                j = 2*nsd + 1
 !$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, e, a, Ac, al, yl, dl, dol, xl,
-!$OMP&   fNl, adl, pS0l, fIBl, ptr, cDmn)
+!$OMP&   fNl, adl, pS0l, bfl, ptr, cDmn)
                ALLOCATE(al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN),
      2            dol(nsd,eNoN), xl(nsd,eNoN), fNl(nFn*nsd,eNoN),
-     3            adl(nsd,eNoN), pS0l(nstd,eNoN), fIBl(nsd,eNoN),
-     4            bfl(nsd,eNoN), ptr(eNoN))
+     3            adl(nsd,eNoN), pS0l(nstd,eNoN), bfl(nsd,eNoN),
+     4            ptr(eNoN))
 !$OMP DO SCHEDULE(GUIDED,mpBs)
                DO e=1, msh(iM)%nEl
                   al   = 0D0
@@ -237,7 +237,6 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   xl   = 0D0
                   fNl  = 0D0
                   pS0l = 0D0
-                  fIBl = 0D0
                   bfl  = 0D0
                   ibl  = 0
                   DO a=1, eNoN
@@ -258,7 +257,6 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                      IF (mvMsh) dol(:,a) = Do(i:j,Ac)
                      IF (ALLOCATED(fN))  fNl(:,a)  = fN(:,Ac)
                      IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
-                     IF (ALLOCATED(fIB)) fIBl(:,a) = fIB(:,Ac)
                      IF (ALLOCATED(bfg)) bfl(:,a)  = bfg(:,Ac)
                      adl(:,a) = ADg(:,Ac)
                   END DO
@@ -267,10 +265,9 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   END IF
 !     Add contribution of current equation to the LHS/RHS
                   CALL CONSTRUCT(msh(iM), e, eNoN, al, yl, dl, dol, adl,
-     2               xl, fNl, pS0l, fIBl, bfl, ptr)
+     2               xl, fNl, pS0l, bfl, ptr)
                END DO
-               DEALLOCATE(al, yl, dl, xl, dol, fNl, adl, pS0l, fIBl,
-     2            bfl, ptr)
+               DEALLOCATE(al, yl, dl, xl, dol, fNl, adl, pS0l, bfl, ptr)
                dbg = "Mesh "//iM//" is assembled"
 !$OMP END DO
             END DO
@@ -285,8 +282,8 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     Apply weakly applied Dirichlet BCs
             CALL SETBCDIRW(Yg, Dg)
 
-!     Treat Dirichlet BCs for IBs
-            IF (ibFlag) CALL IB_SETBCDIRA(Yg, Dg)
+!     Add contribution from IB to residue
+            IF (ibFlag) CALL IB_CONSTRUCT(Yg, Dg)
 
 !     Constructing the element stiffness matrix due to traction forces
 !     or follower loads for shells

@@ -778,10 +778,8 @@
          REAL(KIND=8), ALLOCATABLE :: Un(:,:)
 !        Displacement (old)
          REAL(KIND=8), ALLOCATABLE :: Uo(:,:)
-!        Feedback forcing
-         REAL(KIND=8), ALLOCATABLE :: Rfb(:,:)
-!        FSI force
-         REAL(KIND=8), ALLOCATABLE :: f(:,:)
+!        FSI force (IFEM method) or feedback forcing (Penalty method)
+         REAL(KIND=8), ALLOCATABLE :: R(:,:)
 
 !        DERIVED TYPE VARIABLES
 !        IB meshes
@@ -971,8 +969,8 @@
       REAL(KIND=8), ALLOCATABLE :: Vinit(:,:)
       REAL(KIND=8), ALLOCATABLE :: Dinit(:,:)
 
-!     FSI force on fluid due to IB (for IFEM method)
-      REAL(KIND=8), ALLOCATABLE :: fIB(:,:)
+!     FSI force on fluid due to IB (IFEM method)
+      REAL(KIND=8), ALLOCATABLE :: Rib(:,:)
 
 !     DERIVED TYPE VARIABLES
 !     Coupled BCs structures used for multidomain simulations

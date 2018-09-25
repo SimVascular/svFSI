@@ -631,7 +631,7 @@
       IF (ALLOCATED(Vinit))    DEALLOCATE(Vinit)
       IF (ALLOCATED(Pinit))    DEALLOCATE(Pinit)
       IF (ALLOCATED(Dinit))    DEALLOCATE(Dinit)
-      IF (ALLOCATED(fIB))      DEALLOCATE(fIB)
+      IF (ALLOCATED(Rib))      DEALLOCATE(Rib)
 
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
@@ -650,7 +650,7 @@
          IF (ALLOCATED(ib%Yo))     DEALLOCATE(ib%Yo)
          IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
          IF (ALLOCATED(ib%Uo))     DEALLOCATE(ib%Uo)
-         IF (ALLOCATED(ib%Rfb))    DEALLOCATE(ib%Rfb)
+         IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
 
          DO iM=1, ib%nMsh
             CALL DESTROY(ib%msh(iM))

@@ -1016,15 +1016,12 @@ c     2         "can be applied for Neumann boundaries only"
       ib%Uo = 0D0
 
 !     Initialize feedback forcing for penalty methods
-      ALLOCATE(ib%Rfb(nsd,ib%tnNo))
-      ib%Rfb = 0D0
+      ALLOCATE(ib%R(nsd,ib%tnNo))
+      ib%R = 0D0
 
-!     Initialize FSI force for IFEM method
-      ALLOCATE(ib%f(nsd,ib%tnNo))
-      ib%f = 0D0
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-         ALLOCATE(fIB(nsd,tnNo))
-         fIB = 0D0
+         ALLOCATE(Rib(nsd,tnNo))
+         Rib = 0D0
       END IF
 
 !     Initialize IB face normals
@@ -3585,6 +3582,33 @@ c         CALL FLUSH(1000+cm%tF())
       RETURN
       END SUBROUTINE IB_PRJCTU
 !####################################################################
+!     Add contribution from IB to the residue (RHS)
+      SUBROUTINE IB_CONSTRUCT(Yg, Dg)
+      USE COMMOD
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
+
+      INTEGER a
+
+      IF (eq(cEq)%phys .NE. phys_fluid .AND.
+     2    eq(cEq)%phys .NE. phys_FSI) RETURN
+
+      IF (ib%mthd .EQ. ibMthd_Penalty .OR.
+     2    ib%mthd .EQ. ibMthd_Nitsche) THEN
+         CALL IB_SETBCDIRA(Yg, Dg)
+
+      ELSE IF (ib%mthd .EQ. ibMthd_IFEM) THEN
+         IF (.NOT.ALLOCATED(Rib)) err =
+     2      "Correction needed IFEM construct"
+         DO a=1, tnNo
+            R(1:nsd,a) = R(1:nsd,a) - Rib(:,a)
+         END DO
+      END IF
+
+      RETURN
+      END SUBROUTINE IB_CONSTRUCT
+!####################################################################
 !     Treat IB with Dir BCs using augmented Lagrange multiplier method
 !     (extended Nitsche), or using pure Penalty method w-/wo- feedback
       SUBROUTINE IB_SETBCDIRA(Yg, Dg)
@@ -3595,12 +3619,6 @@ c         CALL FLUSH(1000+cm%tF())
 
       INTEGER :: iBc, iFa, iM
       REAL(KIND=8) ctime
-
-      IF (eq(cEq)%phys .NE. phys_fluid .AND.
-     2    eq(cEq)%phys .NE. phys_FSI) RETURN
-
-      IF (ib%mthd .NE. ibMthd_Penalty .AND.
-     2    ib%mthd .NE. ibMthd_Nitsche) RETURN
 
       ctime = CPUT()
       DO iBc=1, eq(cEq)%nBcIB
@@ -3672,7 +3690,7 @@ c         CALL FLUSH(1000+cm%tF())
             Ac = lFa%IEN(a,e)
             xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             ubl(:,a) = ib%Yo(1:nsd,Ac)
-            fbl(:,a) = ib%Rfb(:,Ac)
+            fbl(:,a) = ib%R(:,Ac)
          END DO
 
          DO g=1, nG
@@ -3856,7 +3874,7 @@ c         CALL FLUSH(1000+cm%tF())
             Ac = lM%IEN(a,e)
             xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             ubl(:,a) = ib%Yo(1:nsd,Ac)
-            fbl(:,a) = ib%Rfb(:,Ac)
+            fbl(:,a) = ib%R(:,Ac)
          END DO
 
          DO g=1, nG
@@ -4019,14 +4037,14 @@ c         CALL FLUSH(1000+cm%tF())
          END DO
       END DO
 
-!     Synchronize ib%Rfb across all the processes
+!     Synchronize ib%R across all the processes
 c      CALL IB_SYNC(sF)
 c      CALL IB_SYNC(sA)
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(sA(a))) THEN
             DO i=1, nsd
-               ib%Rfb(i,a) = ib%Rfb(i,a) + (sF(i,a)/sA(a))
+               ib%R(i,a) = ib%R(i,a) + (sF(i,a)/sA(a))
             END DO
          END IF
       END DO
@@ -4532,12 +4550,10 @@ c      CALL IB_SYNC(Yb)
 
       LOGICAL :: flag
       INTEGER :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN, eNoNb, cPhys
-      REAL(KIND=8) :: w, ws, Jac, Jacs, ksix(nsd,nsd), xp(nsd), xi(nsd),
-     2   fp(nsd)
+      REAL(KIND=8) :: w, Jac, ksix(nsd,nsd), xp(nsd), xi(nsd), fp(nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nxs(:,:),
-     2   al(:,:), yl(:,:), ul(:,:), xl(:,:), xls(:,:), fNl(:,:),
-     3   lR(:,:), sA(:)
+      REAL(KIND=8), ALLOCATABLE :: sA(:), N(:), Nb(:), Nx(:,:), al(:,:),
+     2   yl(:,:), ul(:,:), xl(:,:), fNl(:,:), lR(:,:)
 
 !     TODO: This is temporary. Later we get domain based on each IB node
 !     and communicate across IB process boundaries
@@ -4546,33 +4562,19 @@ c      CALL IB_SYNC(Yb)
 !     We assemble the fluid and structure contribution on the IB nodes.
 !     Later we compute the FSI force at the IB integration point and
 !     project it to background mesh
-      ALLOCATE(sA(ib%tnNo))
-      sA   = 0D0
-      ib%F = 0D0
+      ib%R = 0D0
       DO iM=1, ib%nMsh
          eNoN = ib%msh(iM)%eNoN
-         ALLOCATE(N(eNoN), Nx(nsd,eNoN), Nxs(nsd,eNoN), xl(nsd,eNoN),
-     2      xls(nsd,eNoN), al(nsd,eNoN), yl(nsd+1,eNoN), ul(nsd,eNoN),
-     3      fNl(ib%nFn*nsd,eNoN), lR(nsd,eNoN))
+         ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN), al(nsd,eNoN),
+     2      yl(nsd+1,eNoN), ul(nsd,eNoN), fNl(ib%nFn*nsd,eNoN),
+     3      lR(nsd,eNoN))
          DO e=1, ib%msh(iM)%nEl
-
-!           Initialize element local arrays
-            al  = 0D0
-            yl  = 0D0
-            ul  = 0D0
-            xl  = 0D0
-            xls = 0D0
-            fNl = 0D0
-
-!           Transfer to local arrays. Phys is constructed on reference
-!           configuration
             DO a=1, eNoN
                Ac = ib%msh(iM)%IEN(a,e)
                al(:,a)  = ib%Ao(:,Ac)
                yl(:,a)  = ib%Yo(:,Ac)
                ul(:,a)  = Ub(:,Ac)
                xl(:,a)  = ib%x(:,Ac)
-               xls(:,a) = xl(:,a) + ul(:,a)
                IF (ALLOCATED(ib%fN)) fNl(:,a) = ib%fN(:,Ac)
             END DO
 
@@ -4587,53 +4589,38 @@ c      CALL IB_SYNC(Yb)
                CALL NRBNNX(ib%msh(iM), e)
             END IF
 
+            lR = 0D0
             DO g=1, ib%msh(iM)%nG
                IF (g.EQ.1 .OR. .NOT.ib%msh(iM)%lShpF) THEN
-!              Shape function derivatives in the reference config
                   CALL GNN(eNoN, ib%msh(iM)%Nx(:,:,g), xl, Nx, Jac,
-     2               ksix)
-!              Shape function derivatives in the spatial config
-                  CALL GNN(eNoN, ib%msh(iM)%Nx(:,:,g), xls, Nxs, Jacs,
      2               ksix)
                END IF
                IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e
                N  = ib%msh(iM)%N(:,g)
                w  = ib%msh(iM)%w(g) * Jac
-               ws = ib%msh(iM)%w(g) * Jacs
 
 !              Compute FSI force
-               lR = 0D0
                IF (nsd .EQ. 3) THEN
-c                  CALL IB_FFSI3D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
-                  CALL IB_FFSI3Ds(eNoN, ws, N, Nx, Nxs, al, yl, ul, fNl,
-     2               lR)
+                  CALL IB_FFSI3D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
                ELSE
-c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
-                  CALL IB_FFSI2Ds(eNoN, ws, N, Nx, Nxs, al, yl, ul, fNl,
-     2               lR)
+                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
                END IF
+            END DO ! g
 
 !           Add the FSI force residue contribution to the global vector
-               DO a=1, eNoN
-                  Ac = ib%msh(iM)%IEN(a,e)
-                  sA(Ac)     = sA(Ac)     + ws*N(a)
-                  ib%F(:,Ac) = ib%F(:,Ac) + lR(:,a)
-               END DO ! a
-            END DO ! g
+            DO a=1, eNoN
+               Ac = ib%msh(iM)%IEN(a,e)
+               ib%R(:,Ac) = ib%R(:,Ac) + lR(:,a)
+            END DO ! a
          END DO ! e
-         DEALLOCATE(N, Nx, Nxs, xl, xls, al, yl, ul, fNl, lR)
+         DEALLOCATE(N, Nx, xl, al, yl, ul, fNl, lR)
       END DO ! iM
 
-      DO a=1, ib%tnNo
-         IF (.NOT.ISZERO(sA(a))) ib%F(:,a) = ib%F(:,a) / sA(a)
-      END DO
-      DEALLOCATE(sA)
-
-!     Project ib%F to background fluid mesh using the same domain of
-!     influence that was used to project flow variables
+!     Project ib%R to background fluid mesh using the same domain of
+!     influence that was used to project flow variables.
       ALLOCATE(sA(tnNo))
       sA  = 0D0
-      fIB = 0D0
+      Rib = 0D0
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
          ALLOCATE(Nb(eNoNb))
@@ -4649,15 +4636,15 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
             DO a=1, eNoNb
                Ac = ib%msh(iM)%IEN(a,e)
                xp = xp + Nb(a)*(ib%x(:,Ac) + ib%Uo(:,Ac))
-               fp = fp + Nb(a)*ib%F(:,Ac)
+               fp = fp + Nb(a)*ib%R(:,Ac)
             END DO
 
-            eNoN = msh(jM)%eNoN
+            eNoN  = msh(jM)%eNoN
             ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN))
             DO b=1, eNoN
                Bc = msh(jM)%IEN(b,Ec)
                xl(:,b) = x(:,Bc)
-               IF (mvMsh) xl(:,b) = xl(:,b) + Dg(e+2:e+nsd+1,Bc)
+               IF (mvMsh) xl(:,b) = xl(:,b) + Dg(nsd+2:2*nsd+1,Bc)
             END DO
 
             xi = 0D0
@@ -4683,19 +4670,19 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
             DO b=1, eNoN
                Bc = msh(jM)%IEN(b,Ec)
                sA(Bc) = sA(Bc) + N(b)
-               fIB(:,Bc) = fIB(:,Bc) + N(b)*fp(:)
+               Rib(:,Bc) = Rib(:,Bc) + N(b)*fp(:)
             END DO
             DEALLOCATE(N, Nx, xl)
          END DO
          DEALLOCATE(Nb)
       END DO
 
-!     Synchronize fIB across process interfaces
-      CALL COMMU(fIB)
+!     Synchronize Rib across process interfaces
+      CALL COMMU(Rib)
       CALL COMMU(sA)
 
       DO a=1, tnNo
-         IF (.NOT.ISZERO(sA(a))) fIB(:,a) = fIB(:,a) / sA(a)
+         IF (.NOT.ISZERO(sA(a))) Rib(:,a) = Rib(:,a) / sA(a)
       END DO
       DEALLOCATE(sA)
 
@@ -4714,10 +4701,10 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
       REAL(KIND=8), INTENT(INOUT) :: lR(3,eNoN)
 
       INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: rho_s, rho_f, rho, wl, wrl, eM_s, nu_s, nu_f, Jac,
-     2   bf(3), vd(3), v(3), vx(3,3), F(3,3), Fi(3,3), S(3,3), P(3,3),
-     3   rM(3), NxFi(3,eNoN), VxFi(3,3), vVx(3), VxNx(3), NxP(3),
-     4   CC(3,3,3,3), fl(3,ib%nFn)
+      REAL(KIND=8) :: wl, Jac, rho_s, rho_f, eM_s, nu_s, mu_f, bf(3),
+     2   vd(3), v(3), rM(3), vx(3,3), F(3,3), Fi(3,3), S(3,3), P(3,3),
+     3   NxFi(3,eNoN), VxFi(3,3), vVx(3), VxNx(3), NxP(3), CC(3,3,3,3),
+     4   fl(3,ib%nFn)
       TYPE(stModelType) :: stModel
 
 !     Define IB struct parameters
@@ -4730,7 +4717,7 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
 
 !     Define fluid parameters
       rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      nu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity) / rho_f
+      mu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity)
 
 !     Body force
       bf(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
@@ -4833,9 +4820,7 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
       vVx(2) = v(1)*VxFi(2,1) + v(2)*VxFi(2,2) + v(3)*VxFi(2,3)
       vVx(3) = v(1)*VxFi(3,1) + v(2)*VxFi(3,2) + v(3)*VxFi(3,3)
 
-      rho    = 1D0 - (rho_s/rho_f)
       wl     = w * Jac
-      wrl    = w / rho_f
       DO a=1, eNoN
 !        Viscous stress due to fluid
 !        grad N_A . (grad v + grad v^T)
@@ -4856,13 +4841,13 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
          NxP(2) = Nx(1,a)*P(2,1) + Nx(2,a)*P(2,2) + Nx(3,a)*P(2,3)
          NxP(3) = Nx(1,a)*P(3,1) + Nx(2,a)*P(3,2) + Nx(3,a)*P(3,3)
 
-         rM(1) = rho*N(a)*(vd(1) + vVx(1)) + nu_f*VxNx(1)
-         rM(2) = rho*N(a)*(vd(2) + vVx(2)) + nu_f*VxNx(2)
-         rM(3) = rho*N(a)*(vd(3) + vVx(3)) + nu_f*VxNx(3)
+         rM(1) = (rho_f-rho_s)*N(a)*(vd(1) + vVx(1)) + mu_f*VxNx(1)
+         rM(2) = (rho_f-rho_s)*N(a)*(vd(2) + vVx(2)) + mu_f*VxNx(2)
+         rM(3) = (rho_f-rho_s)*N(a)*(vd(3) + vVx(3)) + mu_f*VxNx(3)
 
-         lR(1,a) = lR(1,a) + wl*rM(1) - wrl*NxP(1)
-         lR(2,a) = lR(2,a) + wl*rM(2) - wrl*NxP(2)
-         lR(3,a) = lR(3,a) + wl*rM(3) - wrl*NxP(3)
+         lR(1,a) = lR(1,a) + wl*rM(1) - w*NxP(1)
+         lR(2,a) = lR(2,a) + wl*rM(2) - w*NxP(2)
+         lR(3,a) = lR(3,a) + wl*rM(3) - w*NxP(3)
       END DO
 
       RETURN
@@ -4880,10 +4865,10 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
       REAL(KIND=8), INTENT(INOUT) :: lR(2,eNoN)
 
       INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: rho_s, rho_f, rho, wl, wrl, eM_s, nu_s, nu_f, Jac,
-     2   bf(2), vd(2), v(2), vx(2,2), F(2,2), Fi(2,2), S(2,2), P(2,2),
-     3   rM(2), NxFi(2,eNoN), VxFi(2,2), vVx(2), VxNx(2), NxP(2),
-     4   CC(2,2,2,2), fl(2,ib%nFn)
+      REAL(KIND=8) :: wl, Jac, rho_s, rho_f, eM_s, nu_s, mu_f, bf(2),
+     2   vd(2), v(2), rM(2), vx(2,2), F(2,2), Fi(2,2), S(2,2), P(2,2),
+     3   NxFi(2,eNoN), VxFi(2,2), vVx(2), VxNx(2), NxP(2), CC(2,2,2,2),
+     4   fl(2,ib%nFn)
       TYPE(stModelType) :: stModel
 
 !     Define IB struct parameters
@@ -4896,7 +4881,7 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
 
 !     Define fluid parameters
       rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      nu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity) / rho_f
+      mu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity)
 
 !     Body force
       bf(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
@@ -4966,9 +4951,7 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
       vVx(1) = v(1)*VxFi(1,1) + v(2)*VxFi(1,2)
       vVx(2) = v(1)*VxFi(2,1) + v(2)*VxFi(2,2)
 
-      rho    = 1D0 - (rho_s/rho_f)
       wl     = w * Jac
-      wrl    = w / rho_f
       DO a=1, eNoN
 !        Viscous stress due to fluid
 !        grad N_A . (grad v + grad v^T)
@@ -4982,278 +4965,13 @@ c                  CALL IB_FFSI2D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
          NxP(1) = Nx(1,a)*P(1,1) + Nx(2,a)*P(1,2)
          NxP(2) = Nx(1,a)*P(2,1) + Nx(2,a)*P(2,2)
 
-         rM(1) = rho*N(a)*(vd(1) + vVx(1)) + nu_f*VxNx(1)
-         rM(2) = rho*N(a)*(vd(2) + vVx(2)) + nu_f*VxNx(2)
+         rM(1) = (rho_f-rho_s)*N(a)*(vd(1) + vVx(1)) + mu_f*VxNx(1)
+         rM(2) = (rho_f-rho_s)*N(a)*(vd(2) + vVx(2)) + mu_f*VxNx(2)
 
-         lR(1,a) = lR(1,a) + wl*rM(1) - wrl*NxP(1)
-         lR(2,a) = lR(2,a) + wl*rM(2) - wrl*NxP(2)
+         lR(1,a) = lR(1,a) + wl*rM(1) - w*NxP(1)
+         lR(2,a) = lR(2,a) + wl*rM(2) - w*NxP(2)
       END DO
 
       RETURN
       END SUBROUTINE IB_FFSI2D
-!--------------------------------------------------------------------
-!     Compute the 3D FSI force due to IB in spatial configuration
-      SUBROUTINE IB_FFSI3Ds(eNoN, w, N, Nxr, Nxs, al, yl, ul, fNl, lR)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nxr(3,eNoN), Nxs(3,eNoN),
-     2   al(3,eNoN), yl(4,eNoN), ul(3,eNoN), fNl(3*ib%nFn,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(3,eNoN)
-
-      INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: rho_s, rho_f, rho, eM_s, nu_s, nu_f, Jac, bf(3),
-     2   vd(3), v(3), vx(3,3), F(3,3), S(3,3), P(3,3), sg_s(3,3),
-     3   sg_f(3,3), vVx(3), NxSg(3), rM(3), CC(3,3,3,3), fl(3,ib%nFn)
-      TYPE(stModelType) :: stModel
-
-!     Define IB struct parameters
-      iEq     = ib%cEq
-      iDmn    = ib%cDmn
-      stModel = eq(iEq)%dmnIB(iDmn)%stM
-      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
-      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-
-!     Define fluid parameters
-      rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      nu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity) / rho_f
-
-!     Body force
-      bf(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-      bf(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-      bf(3)   = eq(iEq)%dmnIB(iDmn)%prop(f_z)
-
-!     Inertia, body force and deformation tensor (F)
-      vd      = -bf
-      v       = 0D0
-      vx      = 0D0
-      fl      = 0D0
-      F       = 0D0
-      F(1,1)  = 1D0
-      F(2,2)  = 1D0
-      F(3,3)  = 1D0
-      DO a=1, eNoN
-!        Acceleration (dv_i/dt)
-         vd(1) = vd(1) + N(a)*al(1,a)
-         vd(2) = vd(2) + N(a)*al(2,a)
-         vd(3) = vd(3) + N(a)*al(3,a)
-
-!        Velocity, v
-         v(1) = v(1) + N(a)*yl(1,a)
-         v(2) = v(2) + N(a)*yl(2,a)
-         v(3) = v(3) + N(a)*yl(3,a)
-
-!        grad v (v_i,I) w.r.t. spatial coordinates
-         vx(1,1) = vx(1,1) + yl(1,a)*Nxs(1,a)
-         vx(1,2) = vx(1,2) + yl(1,a)*Nxs(2,a)
-         vx(1,3) = vx(1,3) + yl(1,a)*Nxs(3,a)
-         vx(2,1) = vx(2,1) + yl(2,a)*Nxs(1,a)
-         vx(2,2) = vx(2,2) + yl(2,a)*Nxs(2,a)
-         vx(2,3) = vx(2,3) + yl(2,a)*Nxs(3,a)
-         vx(3,1) = vx(3,1) + yl(3,a)*Nxs(1,a)
-         vx(3,2) = vx(3,2) + yl(3,a)*Nxs(2,a)
-         vx(3,3) = vx(3,3) + yl(3,a)*Nxs(3,a)
-
-         DO iFn=1, ib%nFn
-            b = 3*(iFn-1)
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
-         END DO
-
-!        Deformation tensor, F_{iI}. Here the shape function derivatives
-!        are w.r.t. the reference coordinates
-         F(1,1)  = F(1,1)  + ul(1,a)*Nxr(1,a)
-         F(1,2)  = F(1,2)  + ul(1,a)*Nxr(2,a)
-         F(1,3)  = F(1,3)  + ul(1,a)*Nxr(3,a)
-         F(2,1)  = F(2,1)  + ul(2,a)*Nxr(1,a)
-         F(2,2)  = F(2,2)  + ul(2,a)*Nxr(2,a)
-         F(2,3)  = F(2,3)  + ul(2,a)*Nxr(3,a)
-         F(3,1)  = F(3,1)  + ul(3,a)*Nxr(1,a)
-         F(3,2)  = F(3,2)  + ul(3,a)*Nxr(2,a)
-         F(3,3)  = F(3,3)  + ul(3,a)*Nxr(3,a)
-      END DO
-      Jac = MAT_DET(F, nsd)
-
-!     V. grad V
-      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
-      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
-      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
-
-!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
-
-!     1st Piola-Kirchhoff tensor (P)
-      P(1,1) = F(1,1)*S(1,1) + F(1,2)*S(2,1) + F(1,3)*S(3,1)
-      P(1,2) = F(1,1)*S(1,2) + F(1,2)*S(2,2) + F(1,3)*S(3,2)
-      P(1,3) = F(1,1)*S(1,3) + F(1,2)*S(2,3) + F(1,3)*S(3,3)
-      P(2,1) = F(2,1)*S(1,1) + F(2,2)*S(2,1) + F(2,3)*S(3,1)
-      P(2,2) = F(2,1)*S(1,2) + F(2,2)*S(2,2) + F(2,3)*S(3,2)
-      P(2,3) = F(2,1)*S(1,3) + F(2,2)*S(2,3) + F(2,3)*S(3,3)
-      P(3,1) = F(3,1)*S(1,1) + F(3,2)*S(2,1) + F(3,3)*S(3,1)
-      P(3,2) = F(3,1)*S(1,2) + F(3,2)*S(2,2) + F(3,3)*S(3,2)
-      P(3,3) = F(3,1)*S(1,3) + F(3,2)*S(2,3) + F(3,3)*S(3,3)
-
-!     Cauchy stress for solids
-      sg_s(1,1) = P(1,1)*F(1,1) + P(1,2)*F(1,2) + P(1,3)*F(1,3)
-      sg_s(1,2) = P(1,1)*F(2,1) + P(1,2)*F(2,2) + P(1,3)*F(2,3)
-      sg_s(1,3) = P(1,1)*F(3,1) + P(1,2)*F(3,2) + P(1,3)*F(3,3)
-      sg_s(2,1) = P(2,1)*F(1,1) + P(2,2)*F(1,2) + P(2,3)*F(1,3)
-      sg_s(2,2) = P(2,1)*F(2,1) + P(2,2)*F(2,2) + P(2,3)*F(2,3)
-      sg_s(2,3) = P(2,1)*F(3,1) + P(2,2)*F(3,2) + P(2,3)*F(3,3)
-      sg_s(3,1) = P(3,1)*F(1,1) + P(3,2)*F(1,2) + P(3,3)*F(1,3)
-      sg_s(3,2) = P(3,1)*F(2,1) + P(3,2)*F(2,2) + P(3,3)*F(2,3)
-      sg_s(3,3) = P(3,1)*F(3,1) + P(3,2)*F(3,2) + P(3,3)*F(3,3)
-      sg_s(:,:) = sg_s(:,:) / Jac / rho_f
-
-!     Cauchy stress for fluids
-      sg_f(1,1) = nu_f*(vx(1,1) + vx(1,1))
-      sg_f(1,2) = nu_f*(vx(1,2) + vx(2,1))
-      sg_f(1,3) = nu_f*(vx(1,3) + vx(3,1))
-      sg_f(2,1) = nu_f*(vx(2,1) + vx(1,2))
-      sg_f(2,2) = nu_f*(vx(2,2) + vx(2,2))
-      sg_f(2,3) = nu_f*(vx(2,3) + vx(3,2))
-      sg_f(3,1) = nu_f*(vx(3,1) + vx(1,3))
-      sg_f(3,2) = nu_f*(vx(3,2) + vx(2,3))
-      sg_f(3,3) = nu_f*(vx(3,3) + vx(3,3))
-
-      rho = 1D0 - (rho_s/rho_f)
-      DO a=1, eNoN
-         NxSg(1) = Nxs(1,a)*(sg_f(1,1) - sg_s(1,1)) +
-     2             Nxs(2,a)*(sg_f(1,2) - sg_s(1,2)) +
-     3             Nxs(3,a)*(sg_f(1,3) - sg_s(1,3))
-         NxSg(2) = Nxs(1,a)*(sg_f(2,1) - sg_s(2,1)) +
-     2             Nxs(2,a)*(sg_f(2,2) - sg_s(2,2)) +
-     3             Nxs(3,a)*(sg_f(2,3) - sg_s(2,3))
-         NxSg(3) = Nxs(1,a)*(sg_f(3,1) - sg_s(3,1)) +
-     2             Nxs(2,a)*(sg_f(3,2) - sg_s(3,2)) +
-     3             Nxs(3,a)*(sg_f(3,3) - sg_s(3,3))
-
-         rM(1)   = rho*N(a)*(vd(1) + vVx(1)) + NxSg(1)
-         rM(2)   = rho*N(a)*(vd(2) + vVx(2)) + NxSg(2)
-         rM(3)   = rho*N(a)*(vd(3) + vVx(3)) + NxSg(3)
-
-         lR(1,a) = lR(1,a) + w*rM(1)
-         lR(2,a) = lR(2,a) + w*rM(2)
-         lR(3,a) = lR(3,a) + w*rM(3)
-      END DO
-
-      RETURN
-      END SUBROUTINE IB_FFSI3Ds
-!--------------------------------------------------------------------
-!     Compute the 2D FSI force due to IB in spatial configuration
-      SUBROUTINE IB_FFSI2Ds(eNoN, w, N, Nxr, Nxs, al, yl, ul, fNl, lR)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nxr(2,eNoN), Nxs(2,eNoN),
-     2   al(2,eNoN), yl(3,eNoN), ul(2,eNoN), fNl(2*ib%nFn,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(2,eNoN)
-
-      INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: rho_s, rho_f, rho, eM_s, nu_s, nu_f, Jac, bf(2),
-     2   vd(2), v(2), vx(2,2), F(2,2), S(2,2), P(2,2), sg_s(2,2),
-     3   sg_f(2,2), vVx(2), NxSg(2), rM(2), CC(2,2,2,2), fl(2,ib%nFn)
-      TYPE(stModelType) :: stModel
-
-!     Define IB struct parameters
-      iEq     = ib%cEq
-      iDmn    = ib%cDmn
-      stModel = eq(iEq)%dmnIB(iDmn)%stM
-      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
-      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-
-!     Define fluid parameters
-      rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      nu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity) / rho_f
-
-!     Body force
-      bf(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-      bf(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-
-!     Inertia, body force and deformation tensor (F)
-      vd      = -bf
-      v       = 0D0
-      vx      = 0D0
-      fl      = 0D0
-      F       = 0D0
-      F(1,1)  = 1D0
-      F(2,2)  = 1D0
-      DO a=1, eNoN
-!        Acceleration (dv_i/dt)
-         vd(1) = vd(1) + N(a)*al(1,a)
-         vd(2) = vd(2) + N(a)*al(2,a)
-
-!        Velocity, v
-         v(1) = v(1) + N(a)*yl(1,a)
-         v(2) = v(2) + N(a)*yl(2,a)
-
-!        grad v (v_i,I) w.r.t. spatial coordinates
-         vx(1,1) = vx(1,1) + yl(1,a)*Nxs(1,a)
-         vx(1,2) = vx(1,2) + yl(1,a)*Nxs(2,a)
-         vx(2,1) = vx(2,1) + yl(2,a)*Nxs(1,a)
-         vx(2,2) = vx(2,2) + yl(2,a)*Nxs(2,a)
-
-         DO iFn=1, ib%nFn
-            b = 2*(iFn-1)
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-         END DO
-
-!        Deformation tensor, F_{iI}. Here the shape function derivatives
-!        are w.r.t. the reference coordinates
-         F(1,1)  = F(1,1)  + ul(1,a)*Nxr(1,a)
-         F(1,2)  = F(1,2)  + ul(1,a)*Nxr(2,a)
-         F(2,1)  = F(2,1)  + ul(2,a)*Nxr(1,a)
-         F(2,2)  = F(2,2)  + ul(2,a)*Nxr(2,a)
-      END DO
-      Jac = MAT_DET(F, nsd)
-
-!     V. grad V
-      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2)
-      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2)
-
-!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
-
-!     1st Piola-Kirchhoff tensor (P)
-      P(1,1) = F(1,1)*S(1,1) + F(1,2)*S(2,1)
-      P(1,2) = F(1,1)*S(1,2) + F(1,2)*S(2,2)
-      P(2,1) = F(2,1)*S(1,1) + F(2,2)*S(2,1)
-      P(2,2) = F(2,1)*S(1,2) + F(2,2)*S(2,2)
-
-!     Cauchy stress for solids
-      sg_s(1,1) = (P(1,1)*F(1,1) + P(1,2)*F(1,2)) / Jac / rho_f
-      sg_s(1,2) = (P(1,1)*F(2,1) + P(1,2)*F(2,2)) / Jac / rho_f
-      sg_s(2,1) = (P(2,1)*F(1,1) + P(2,2)*F(1,2)) / Jac / rho_f
-      sg_s(2,2) = (P(2,1)*F(2,1) + P(2,2)*F(2,2)) / Jac / rho_f
-
-!     Cauchy stress for fluids
-      sg_f(1,1) = nu_f*(vx(1,1) + vx(1,1))
-      sg_f(1,2) = nu_f*(vx(1,2) + vx(2,1))
-      sg_f(2,1) = nu_f*(vx(2,1) + vx(1,2))
-      sg_f(2,2) = nu_f*(vx(2,2) + vx(2,2))
-
-      rho = 1D0 - (rho_s/rho_f)
-      DO a=1, eNoN
-         NxSg(1) = Nxs(1,a)*(sg_f(1,1) - sg_s(1,1)) +
-     2             Nxs(2,a)*(sg_f(1,2) - sg_s(1,2))
-         NxSg(2) = Nxs(1,a)*(sg_f(2,1) - sg_s(2,1)) +
-     2             Nxs(2,a)*(sg_f(2,2) - sg_s(2,2))
-
-         rM(1)   = rho*N(a)*(vd(1) + vVx(1)) + NxSg(1)
-         rM(2)   = rho*N(a)*(vd(2) + vVx(2)) + NxSg(2)
-
-         lR(1,a) = lR(1,a) + w*rM(1)
-         lR(2,a) = lR(2,a) + w*rM(2)
-      END DO
-
-      RETURN
-      END SUBROUTINE IB_FFSI2Ds
 !####################################################################

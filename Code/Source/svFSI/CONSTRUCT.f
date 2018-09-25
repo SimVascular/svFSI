@@ -37,7 +37,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE CONSTRUCT(lM, e, eNoN, al, yl, dl, dol, adl, xl, fNl,
-     2   ps0l, fIBl, bfl, ptr)
+     2   ps0l, bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -46,8 +46,7 @@
       INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), dol(nsd,eNoN), adl(nsd,eNoN),
-     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN), fIBl(nsd,eNoN),
-     4   bfl(nsd,eNoN)
+     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN), bfl(nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys
@@ -131,16 +130,16 @@
          SELECT CASE (cPhys)
          CASE (phys_fluid)
             IF (nsd .EQ. 3) THEN
-               CALL FLUID3D(eNoN, w, N, Nx, al, yl, fIBl, ksix, lR, lK)
+               CALL FLUID3D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
             ELSE
-               CALL FLUID2D(eNoN, w, N, Nx, al, yl, fIBl, ksix, lR, lK)
+               CALL FLUID2D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
             END IF
 
          CASE (phys_CMM)
             IF(nsd .EQ. 3) THEN
-               CALL FLUID3D(eNoN, w, N, Nx, al, yl, fIBl, ksix, lR, lK)
+               CALL FLUID3D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
             ELSE
-               CALL FLUID2D(eNoN, w, N, Nx, al, yl, fIBl, ksix, lR, lK)
+               CALL FLUID2D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
             END IF
 
          CASE (phys_heatS)
