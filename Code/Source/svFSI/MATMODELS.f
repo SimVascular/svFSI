@@ -38,7 +38,7 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC (stM, F, nfd, fl, S, CC)
+      SUBROUTINE GETPK2CC(stM, F, nfd, fl, S, CC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
@@ -200,7 +200,7 @@
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev (stM, F, nfd, fl, S, CC)
+      SUBROUTINE GETPK2CCdev(stM, F, nfd, fl, S, CC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
@@ -324,25 +324,34 @@
 
       TYPE(stModelType), INTENT(IN) :: stM
       REAL(KIND=8), INTENT(IN) :: p
-      REAL(KIND=8), INTENT(OUT) :: bt, dbt, dro
-      REAL(KIND=8), INTENT(INOUT) :: ro
+      REAL(KIND=8), INTENT(OUT) :: ro, bt, dro, dbt
 
       REAL(KIND=8) :: Kp, r1, r2
 
+      ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       bt  = 0D0
       dbt = 0D0
       dro = 0D0
-      IF (stM%iFlag) RETURN
+      IF (incompFlag) RETURN
 
       Kp = stM%Kpen
       SELECT CASE (stM%volType)
       CASE (stVol_Quad)
-         r1  = Kp - p
+         r1  = 1.0D0/(Kp - p)
 
-         ro  = ro*Kp/r1
-         bt  = 1D0/r1
-         dro = ro/r1
-         dbt = bt/r1
+         ro  = ro*Kp*r1
+         bt  = r1
+         dro = ro*r1
+         dbt = r1*r1
+
+      CASE (stVol_ST91)
+         r1  = ro/Kp
+         r2  = SQRT(p**2.0D0 + Kp**2.0D0)
+
+         ro  = r1*(p + r2)
+         bt  = 1D0/r2
+         dro = ro*bt
+         dbt = -bt*p/(p**2 + Kp**2)
 
       CASE (stVol_M94)
          r1  = ro/Kp
@@ -353,15 +362,6 @@
          dro = r1
          dbt = -bt/r2
 
-      CASE (stVol_ST91)
-         r1  = ro/Kp
-         r2  = SQRT(p**2 + Kp**2)
-
-         ro  = r1*(p + r2)
-         bt  = 1D0/r2
-         dro = ro/r2
-         dbt = -bt*p/(p**2 + Kp**2)
-
       CASE DEFAULT
          err = "Undefined volumetric material constitutive model"
       END SELECT
@@ -369,68 +369,34 @@
       RETURN
       END SUBROUTINE GVOLPEN
 !####################################################################
-!     Compute stabilization parameter, tauM for a given material model
-      SUBROUTINE GETTAU (stM, Je, F, fl, tauM, tauC)
+!     Compute stabilization parameters tauM and tauC
+      SUBROUTINE GETTAU(stM, Je, tauM, tauC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(stModelType), INTENT(IN) :: stM
-      REAL(KIND=8), INTENT(IN) :: Je, F(nsd,nsd), fl(nsd,nFn)
+      REAL(KIND=8), INTENT(IN) :: Je
       REAL(KIND=8), INTENT(OUT) :: tauM, tauC
 
-      REAL(KIND=8), PARAMETER :: cTauM = 1D-1, cTauC = 1D-1
-      REAL(KIND=8) :: J, J23, Inv1, Inv2, Inv4, Inv6, C(nsd,nsd)
-      REAL(KIND=8) :: g1, g2, g3, r1, r2, rho, he, Kp, cK
+      REAL(KIND=8), PARAMETER :: ctM = 1D-1, ctC = 1D-1
+      REAL(KIND=8) :: he, rho, Em, nu, mu, lam, c
 
-      he   = 5D-1 * Je**(1D0/nsd)
-      rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      Kp   = stM%Kpen
-      J    = MAT_DET(F, nsd)
-      J23  = J**(-2D0/3D0)
-      C    = MATMUL(TRANSPOSE(F), F)
-      Inv1 = J23*MAT_TRACE(C,nsd)
-      Inv2 = 5D-1*( Inv1*Inv1 - J23*J23*MAT_TRACE(MATMUL(C,C), nsd) )
+      he  = 5D-1 * Je**(1D0/REAL(nsd,KIND=8))
+      rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
+      Em  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
+      nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
 
-      SELECT CASE (stM%isoType)
-      CASE (stIso_nHook)
-         g1 = stM%C10
-         g2 = 0D0
-
-      CASE (stIso_MR)
-         g1 = stM%C10
-         g2 = stM%C01
-
-      CASE (stIso_HGO)
-         Inv4 = J23*NORM(fl(:,1), MATMUL(C, fl(:,1)))
-         Inv6 = J23*NORM(fl(:,2), MATMUL(C, fl(:,2)))
-
-         r1   = stM%kap*Inv1 + (1D0-3D0*stM%kap)*Inv4 - 1D0
-         r2   = stM%kap*Inv1 + (1D0-3D0*stM%kap)*Inv6 - 1D0
-
-         g1   = stM%C10
-         g2   = stM%aff * EXP(stM%bff*r1**2) * r1
-         g3   = stM%ass * EXP(stM%bss*r2**2) * r2
-
-         g1   = g1 + stM%kap*(g2 + g3)
-         g2   = 0D0
-
-      CASE DEFAULT
-         err = "Undefined isochoric material constitutive model"
-      END SELECT
-
-      IF (stM%iFlag) THEN
-         cK  = SQRT( (g1 + g2) / rho )
+      mu  = 5D-1*Em / (1.0D0 + nu)
+      IF (incompFlag) THEN
+         c = SQRT(mu / rho)
       ELSE
-         cK = SQRT( (Kp + 4D0*(g1 + g2)/3D0) / rho )
+         lam = 2.0D0*mu*nu / (1.0D0-2.0D0*nu)
+         c = SQRT((lam + 2.0D0*mu)/rho)
       END IF
 
-c      dtK = he / cK
-c      tauM = MIN(dtK, dt)
-c      tauM = 5D-1*MAX(dtK/1D2, tauM)
-c      IF (stM%iFlag) tauM = cTauM * tauM
-      tauM = cTauM * he / cK
-      tauC = cTauC * he * cK
+      tauM = ctM * he / c / rho
+      tauC = ctC * he * c * rho
 
       RETURN
       END SUBROUTINE GETTAU

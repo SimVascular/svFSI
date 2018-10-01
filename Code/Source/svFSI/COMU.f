@@ -137,9 +137,7 @@
       cm%nProcs = 1
       CALL MPI_COMM_RANK(comHandle, cm%taskId, ierr)
       CALL MPI_COMM_SIZE(comHandle, cm%nProcs, ierr)
-!$OMP PARALLEL
-      cm%nThreads = 1!OMP_GET_NUM_THREADS()
-!$OMP END PARALLEL
+      cm%nThreads = 1
 
       IF (cm%nProcs .EQ. 1) RETURN
 

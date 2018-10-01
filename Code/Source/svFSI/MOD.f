@@ -159,8 +159,7 @@
 
 !     Type of constitutive model (isochoric) for structure equation:
 !     St.Venant-Kirchhoff, modified St.Venant-Kirchhoff, NeoHookean,
-!     Mooney-Rivlin, Yeoh, Arruda & Boyce, Holzapfel orthotropic,
-!     modified Holzapfel-Gasser-Ogden with dispersion
+!     Mooney-Rivlin, modified Holzapfel-Gasser-Ogden with dispersion
       INTEGER, PARAMETER :: stIso_NA = 600, stIso_StVK = 601,
      2   stIso_mStVK = 602, stIso_nHook = 603, stIso_MR = 604,
      4   stIso_HGO = 605
@@ -212,10 +211,6 @@
       END TYPE bsType
 
       TYPE stModelType
-!        Incompressible solid
-         LOGICAL :: iFlag = .FALSE.
-!        If fiber reinforcement needed, requires fN to be provided
-         LOGICAL :: fFlag = .FALSE.
 !        Type of constitutive model (volumetric) for struct/FSI
          INTEGER :: volType = stVol_NA
 !        Penalty parameter
@@ -227,11 +222,6 @@
          REAL(KIND=8) :: C10 = 0D0
 !        Mooney-Rivlin model (C10, C01)
          REAL(KIND=8) :: C01 = 0D0
-!        Yeoh model (C10, C20, C30)
-         REAL(KIND=8) :: C20 = 0D0
-         REAL(KIND=8) :: C30 = 0D0
-!        Arruda & Boycce model (n, C10=mu)
-         INTEGER :: n = 0
 !        Holzapfel model(a, b, aff, bff, ass, bss, afs, bfs, kap)
          REAL(KIND=8) :: a   = 0D0
          REAL(KIND=8) :: b   = 0D0
@@ -439,6 +429,8 @@
          REAL(KIND=8) :: tauF = 0D0
 !        Direction vector for imposing the BC
          INTEGER, ALLOCATABLE :: eDrn(:)
+!        Defined steady vector
+         REAL(KIND=8), ALLOCATABLE :: h(:)
 !        Spatial depanadant BC (profile data)
          REAL(KIND=8), ALLOCATABLE :: gx(:)
 !        General BC (unsteady and UD combination)
@@ -850,6 +842,8 @@
       LOGICAL useTrilinosLS
 !     Use C++ Trilinos framework for assembly and for linear solvers
       LOGICAL useTrilinosAssemAndLS
+!     Incompressible solid
+      LOGICAL :: incompFlag = .FALSE.
 
 !     INTEGER VARIABLES
 !     Current domain
@@ -947,17 +941,6 @@
       REAL(KIND=8), ALLOCATABLE :: Yn(:,:)
 !     Fiber direction (for electrophysiology / structure mechanics)
       REAL(KIND=8), ALLOCATABLE :: fN(:,:)
-
-!     Additional arrays for velocity-based formulation of nonlinear
-!     solid mechanics
-!     Old time derivative of displacement
-      REAL(KIND=8), ALLOCATABLE :: ADo(:,:)
-!     New time derivative of displacement
-      REAL(KIND=8), ALLOCATABLE :: ADn(:,:)
-!     Residue of the displacement equation
-      REAL(KIND=8), ALLOCATABLE :: Rd(:,:)
-!     LHS matrix
-      REAL(KIND=8), ALLOCATABLE :: Kd(:,:)
 
 !     Variables for prestress calculations
       REAL(KIND=8), ALLOCATABLE :: pS0(:,:)

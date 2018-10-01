@@ -187,13 +187,12 @@
       INTEGER iFa, iBc, iM
 
       DO iBc=1, eq(cEq)%nBc
-         IF (.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) CYCLE
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
          IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) THEN
             CALL SETBCNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
          ELSE IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) THEN
-            CALL SETBCTRACL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
+            CALL SETBCTRACL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
          END IF
       END DO
 
@@ -287,21 +286,20 @@
       RETURN
       END SUBROUTINE SETBCNEUL
 !--------------------------------------------------------------------
-      SUBROUTINE SETBCTRACL(lBc, lFa, Yg, Dg)
+      SUBROUTINE SETBCTRACL(lBc, lFa)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER :: a, Ac, e, g, iM, nNo, eNoN, cPhys
-      REAL(KIND=8) :: w, Jac, nV(nsd), y(tDof), h(nsd)
+      INTEGER :: a, e, g, Ac, iM, nNo, eNoN, cPhys
+      REAL(KIND=8) :: w, Jac, nV(nsd), h(nsd)
 
       INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:), yl(:,:), hl(:,:), hg(:,:),
-     2   tmpA(:,:), lR(:,:), lK(:,:,:)
+      REAL(KIND=8), ALLOCATABLE :: N(:), hl(:,:), hg(:,:), tmpA(:,:),
+     2   lR(:,:), lK(:,:,:)
 
       iM   = lFa%iM
       nNo  = lFa%nNo
@@ -318,29 +316,33 @@
             hg(:,Ac) = tmpA(:,a)
          END DO
          DEALLOCATE(tmpA, hl)
+      ELSE IF (BTEST(lBc%bType,bType_std)) THEN
+         DO a=1, nNo
+            Ac = lFa%gN(a)
+            hg(:,Ac) = lBc%h(:)
+         END DO
       ELSE
-         err = "Correction in SETBCTRAC is needed"
+         err = "Undefined time dependence for traction BC on face <"//
+     2      TRIM(lFa%name)//">"
       END IF
 
-      ALLOCATE(N(eNoN), ptr(eNoN), hl(nsd,eNoN), yl(tDof,eNoN),
-     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+      ALLOCATE(N(eNoN), ptr(eNoN), hl(nsd,eNoN), lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN))
 
 !     Constructing LHS/RHS contribution and assembiling them
       DO e=1, lFa%nEl
-         DO a=1, eNoN
-            Ac      = lFa%IEN(a,e)
-            ptr(a)  = Ac
-            yl(:,a) = Yg(:,Ac)
-            hl(:,a) = hg(:,Ac)
-         END DO
-
-!     Add Traction BCs contribution to the LHS/RHS
-         lK = 0D0
-         lR = 0D0
          cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
          cPhys = eq(cEq)%dmn(cDmn)%phys
          IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
+         DO a=1, eNoN
+            Ac      = lFa%IEN(a,e)
+            ptr(a)  = Ac
+            hl(:,a) = hg(:,Ac)
+         END DO
+
+         lK = 0D0
+         lR = 0D0
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nV)
             Jac = SQRT(NORM(nV))
@@ -349,10 +351,8 @@
             N   = lFa%N(:,g)
 
             h = 0D0
-            y = 0D0
             DO a=1, eNoN
                h(:) = h(:) + N(a)*hl(:,a)
-               y(:) = y(:) + N(a)*yl(:,a)
             END DO
 
             DO a=1, eNoN
@@ -370,6 +370,8 @@
          END IF
 #endif
       END DO
+
+      DEALLOCATE(N, ptr, hl, lR, lK)
 
       RETURN
       END SUBROUTINE SETBCTRACL

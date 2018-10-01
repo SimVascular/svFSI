@@ -49,12 +49,10 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       REAL(KIND=8) timeP(3)
       CHARACTER(LEN=stdL) fName, tmpS
 
-      LOGICAL, ALLOCATABLE :: isS(:)
       INTEGER, ALLOCATABLE :: ptr(:), incL(:), ltgReordered(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), Ag(:,:), al(:,:), Yg(:,:),
      2   yl(:,:), Dg(:,:), dl(:,:), dol(:,:), fNl(:,:), res(:),
-     3   ADg(:,:), adl(:,:), pS0l(:,:), RTrilinos(:,:), dirW(:,:),
-     4   bfg(:,:), bfl(:,:)
+     3   pS0l(:,:), RTrilinos(:,:), dirW(:,:), bfg(:,:), bfl(:,:)
 
 !--------------------------------------------------------------------
       l1 = .FALSE.
@@ -94,11 +92,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
       dbg = 'Allocating intermediate variables'
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo),
-     3   ADg(nsd,tnNo), res(nFacesLS), incL(nFacesLS), isS(tnNo))
-      isS = .FALSE.
-      DO Ac=1, tnNo
-         IF (ISDOMAIN(1, Ac, phys_struct)) isS(Ac) = .TRUE.
-      END DO
+     2   res(nFacesLS), incL(nFacesLS))
 
 !--------------------------------------------------------------------
 !     Outer loop for marching in time. When entring this loop, all old
@@ -157,11 +151,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             END IF
 
 !     Initiator step (quantities at n+am, n+af)
-            CALL PICI(Ag, Yg, Dg, ADg)
-            IF (ALLOCATED(Rd)) THEN
-               Rd = 0D0
-               Kd = 0D0
-            END IF
+            CALL PICI(Ag, Yg, Dg)
 
             dbg = 'Allocating the RHS and LHS'
             IF (ALLOCATED(R)) THEN
@@ -197,21 +187,9 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 #endif
             END IF
 
-            IF (.NOT. useTrilinosAssemAndLS) THEN
-!$OMP DO SCHEDULE(GUIDED,mpBs)
-               DO i=1, lhs%nnz
-                  Val(:,i) = 0D0
-               END DO
-!$OMP END DO
-            END IF
-!$OMP DO SCHEDULE(GUIDED,mpBs)
-            DO a=1, tnNo
-               R(:,a) = 0D0
-            END DO
-!$OMP END DO
+            IF (.NOT. useTrilinosAssemAndLS) Val(:,:) = 0D0
+            R(:,:) = 0D0
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, e, a, Ac, al, yl, dl,
-!$OMP&   xl, fNl, ptr, cDmn)
             dbg = "Assembling equation <"//eq(cEq)%sym//">"
             DO iM=1, nMsh
 !        For shells, consider extended patch around an element
@@ -222,13 +200,9 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                END IF
                i = nsd + 2
                j = 2*nsd + 1
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(i, e, a, Ac, al, yl, dl, dol, xl,
-!$OMP&   fNl, adl, pS0l, bfl, ptr, cDmn)
                ALLOCATE(al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN),
      2            dol(nsd,eNoN), xl(nsd,eNoN), fNl(nFn*nsd,eNoN),
-     3            adl(nsd,eNoN), pS0l(nstd,eNoN), bfl(nsd,eNoN),
-     4            ptr(eNoN))
-!$OMP DO SCHEDULE(GUIDED,mpBs)
+     3            pS0l(nstd,eNoN), bfl(nsd,eNoN), ptr(eNoN))
                DO e=1, msh(iM)%nEl
                   al   = 0D0
                   yl   = 0D0
@@ -258,18 +232,16 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                      IF (ALLOCATED(fN))  fNl(:,a)  = fN(:,Ac)
                      IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
                      IF (ALLOCATED(bfg)) bfl(:,a)  = bfg(:,Ac)
-                     adl(:,a) = ADg(:,Ac)
                   END DO
                   IF (ibl .EQ. msh(iM)%eNoN) THEN
                      IF (ib%mthd .NE. ibMthd_IFEM) CYCLE
                   END IF
 !     Add contribution of current equation to the LHS/RHS
-                  CALL CONSTRUCT(msh(iM), e, eNoN, al, yl, dl, dol, adl,
-     2               xl, fNl, pS0l, bfl, ptr)
+                  CALL CONSTRUCT(msh(iM), e, eNoN, al, yl, dl, dol, xl,
+     2               fNl, pS0l, bfl, ptr)
                END DO
-               DEALLOCATE(al, yl, dl, xl, dol, fNl, adl, pS0l, bfl, ptr)
+               DEALLOCATE(al, yl, dl, xl, dol, fNl, pS0l, bfl, ptr)
                dbg = "Mesh "//iM//" is assembled"
-!$OMP END DO
             END DO
 
 !     Treatment of boundary conditions on faces
@@ -302,11 +274,6 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                END IF
             END DO
             IF (ibLSptr.NE.0) incL(ibLSptr) = 1
-!$OMP END PARALLEL
-
-            IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
-               CALL USTRUCT_updateValR()
-            END IF
 
             dbg = "Solving equation <"//eq(cEq)%sym//">"
 !     Initialize Dir and coupled Neu Resistance BC for Trilinos
@@ -335,8 +302,8 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
      7            eq(cEq)%ls%PREC_Type)
             ELSE
 #endif
-               CALL FSILS_SOLVE(lhs, eq(cEq)%FSILS, dof, R, Val, isS,
-     2            incL, res)
+               CALL FSILS_SOLVE(lhs, eq(cEq)%FSILS, dof, R, Val,
+     2            incL=incL, res=res)
 #ifdef WITH_TRILINOS
             END IF
 !     For trilinos case need to do the reordering
@@ -439,15 +406,13 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          Ao = An
          Yo = Yn
          IF (dFlag) Do = Dn
-         IF (ALLOCATED(ADo)) ADo = ADn
          cplBC%xo = cplBC%xn
       END DO
 !     End of outer loop
 
       IF (resetSim) THEN
          CALL REMESHRESTART(timeP)
-         DEALLOCATE(Ag, Yg, Dg, incL, res, isS)
-         IF (ALLOCATED(ADg)) DEALLOCATE(ADg)
+         DEALLOCATE(Ag, Yg, Dg, incL, res)
          IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
             DEALLOCATE(ltgReordered, dirW, RTrilinos)
          END IF
@@ -463,7 +428,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          DEALLOCATE(ltgReordered, dirW, RTrilinos)
       END IF
 #endif
-      DEALLOCATE(Ag, Yg, Dg, incL, res, isS)
+      DEALLOCATE(Ag, Yg, Dg, incL, res)
 
       CALL MPI_FINALIZE(ierr)
 

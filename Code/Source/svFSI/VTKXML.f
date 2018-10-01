@@ -483,19 +483,20 @@
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
                CASE (outGrp_stress)
-! Subroutine TPOST currently not correct
-                  DEALLOCATE(tmpV)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nstd,msh(iM)%nNo))
-                  tmpV = 0D0
+                  IF (eq(iEq)%phys .EQ. phys_struct .OR.
+     2                eq(iEq)%phys .EQ. phys_ustruct) THEN
+                     tmpV = 0D0
+                  ELSE IF (eq(iEq)%phys .EQ. phys_preSt) THEN
+                     DO a=1, msh(iM)%nNo
+                        Ac = msh(iM)%gN(a)
+                        tmpV(:,a) = pS0(:,Ac)
+                     END DO
+                  END IF
+                  CALL TPOST(msh(iM), tmpV, lD, iEq)
                   DO a=1, msh(iM)%nNo
-                     Ac  = msh(iM)%gN(a)
-                     tmpV(:,a) = pS0(:,Ac)
-                  END DO
-!                  CALL TPOST(msh(iM), tmpV, lD, iEq)
-                  DO a=1, msh(iM)%nNo
-!                     Ac = msh(iM)%gN(a)
                      d(iM)%x(is:ie,a) = tmpV(:,a)
-!                     d(iM)%x(is:ie,a) = pS0(:,Ac)
                   END DO
                CASE (outGrp_vort, outGrp_eFlx, outGrp_hFlx,
      2            outGrp_stInv, outGrp_vortex)

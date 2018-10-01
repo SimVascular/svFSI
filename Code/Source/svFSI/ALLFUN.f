@@ -998,6 +998,7 @@ c      END INTERFACE
          IF (ALLOCATED(lBc%gm%d))    DEALLOCATE(lBc%gm%d)
          DEALLOCATE(lBc%gm)
       END IF
+      IF (ALLOCATED(lBc%h))    DEALLOCATE(lBc%h)
       IF (ALLOCATED(lBc%gx))   DEALLOCATE(lBc%gx)
       IF (ALLOCATED(lBc%eDrn)) DEALLOCATE(lBc%eDrn)
 

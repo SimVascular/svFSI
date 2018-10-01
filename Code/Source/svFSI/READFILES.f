@@ -232,7 +232,7 @@
             IF (ctmp .NE. "mesh") err = "mesh equation"//
      2         " has to be specified after FSI equation"
          END IF
-         IF (rmsh%isReqd .AND. eq(1)%phys .NE. phys_FSI) THEN
+         IF (rmsh%isReqd .AND. eq(1)%phys.NE.phys_FSI) THEN
             err = "Remeshing is applicable only for FSI equation"
          END IF
          IF (iCntct) THEN
@@ -424,15 +424,37 @@
          IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/5,1,0,0/)
+         nDOP = (/6,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_fibDir
-         outputs(3) = out_strainInv
-         outPuts(4) = out_velocity
-         outPuts(5) = out_acceleration
+         outPuts(3) = out_stress
+         outputs(4) = out_strainInv
+         outPuts(5) = out_velocity
+         outPuts(6) = out_acceleration
 
          CALL READLS(lSolver_CG, lEq, list)
 !     PRESTRESS equation solver---------------------
+      CASE ('ustruct')
+         lEq%phys = phys_ustruct
+
+         propL(1,1) = solid_density
+         propL(2,1) = elasticity_modulus
+         propL(3,1) = poisson_ratio
+         propL(4,1) = f_x
+         propL(5,1) = f_y
+         IF (nsd .EQ. 3) propL(6,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/6,1,0,0/)
+         outPuts(1) = out_displacement
+         outPuts(2) = out_velocity
+         outPuts(3) = out_pressure
+         outPuts(4) = out_stress
+         outPuts(5) = out_fibDir
+         outputs(6) = out_strainInv
+
+         CALL READLS(lSolver_CG, lEq, list)
+
       CASE ('prestress')
          lEq%phys = phys_preSt
          propL(1,1) = solid_density
@@ -592,26 +614,6 @@
          CALL READLS(lSolver_GMRES, lEq, list)
 
 !     STRUCTURAL with nonlinear velocity-based equation solver---------
-      CASE ('ustruct')
-         lEq%phys = phys_ustruct
-
-         propL(1,1) = solid_density
-         propL(2,1) = elasticity_modulus
-         propL(3,1) = poisson_ratio
-         propL(4,1) = f_x
-         propL(5,1) = f_y
-         IF (nsd .EQ. 3) propL(6,1) = f_z
-         CALL READDOMAIN(lEq, propL, list)
-
-         nDOP = (/5,1,0,0/)
-         outPuts(1) = out_displacement
-         outPuts(2) = out_velocity
-         outPuts(3) = out_pressure
-         outPuts(4) = out_fibDir
-         outputs(5) = out_strainInv
-
-         CALL READLS(lSolver_CG, lEq, list)
-
       CASE DEFAULT
          err = "Equation type "//TRIM(eqName)//" is not defined"
       END SELECT
@@ -698,13 +700,15 @@
                lEq%dmn(iDmn)%phys = phys_fluid
             CASE("struct")
                lEq%dmn(iDmn)%phys = phys_struct
+            CASE("ustruct")
+               lEq%dmn(iDmn)%phys = phys_ustruct
             CASE("lElas")
                lEq%dmn(iDmn)%phys = phys_lElas
             CASE("CMM")
                lEq%dmn(iDmn)%phys = phys_CMM
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/lElas/CMM"
+     2            "Equation must be fluid/struct/ustruct/lElas/CMM"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys
@@ -776,7 +780,8 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct) THEN
+     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct .OR.
+     3       lEq%dmn(iDmn)%phys.EQ.phys_preSt) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
 
@@ -879,32 +884,34 @@
      2      lBc%bType = IBSET(lBc%bType,bType_bfs)
       CASE ("Traction","Trac")
          lBc%bType = IBSET(lBc%bType,bType_trac)
-         IF (phys .NE. phys_preSt) err = "Traction BC is applied for "//
-     2      "prestress equation only. Use Neumann BC instead."
-         lPtr => list%get(fTmp, "Traction values file path (vtp)",1)
-         iM  = lBc%iM
-         iFa = lBc%iFa
-         i = nsd
-         j = 2
-         a = msh(iM)%fa(iFa)%nNo
-         ALLOCATE(lBc%gm)
-         lBc%gm%nTP = j
-         lBc%gm%dof = i
-         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
-         lBc%gm%t(1) = 0D0
-         lBc%gm%t(2) = HUGE(rtmp)
+         lPtr => list%get(fTmp, "Traction values file path (vtp)")
+         IF (ASSOCIATED(lPtr)) THEN
+            iM  = lBc%iM
+            iFa = lBc%iFa
+            i = nsd
+            j = 2
+            a = msh(iM)%fa(iFa)%nNo
+            ALLOCATE(lBc%gm)
+            lBc%gm%nTP = j
+            lBc%gm%dof = i
+            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
+            lBc%gm%t(1) = 0D0
+            lBc%gm%t(2) = HUGE(rtmp)
 
-         CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
-         lBc%bType = IBSET(lBc%bType,bType_gen)
-         lBc%bType = IBSET(lBc%bType,bType_flat)
+            CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
+            lBc%bType = IBSET(lBc%bType,bType_gen)
+            lBc%bType = IBSET(lBc%bType,bType_flat)
 
-         lPtr => list%get(rtmp, "Traction multiplier",1)
-         IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
-         lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
+            lPtr => list%get(rtmp, "Traction multiplier",1)
+            IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
+            lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
 
-         ALLOCATE(lBc%eDrn(nsd))
-         lBc%eDrn = 0
-         RETURN
+            ALLOCATE(lBc%eDrn(nsd), lBc%h(nsd))
+            lBc%eDrn    = 0
+            lBc%h       = 0D0
+            lBc%weakDir = .FALSE.
+            RETURN
+         END IF
       CASE ("Coupled Momentum","CMM")
          lBc%bType = IBSET(lBc%bType,bType_CMM)
       CASE ("Periodic","Per")
@@ -913,6 +920,10 @@
       CASE DEFAULT
          err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
       END SELECT
+
+!     Allocate traction
+      ALLOCATE(lBc%h(nsd))
+      lBc%h = 0D0
 
 !     Weak Dirichlet BC for fluid/FSI equations
       lBc%weakDir = .FALSE.
@@ -968,9 +979,15 @@ c     2         "can be applied for Neumann boundaries only"
       SELECT CASE (ctmp)
       CASE ('Steady')
          lBc%bType = IBSET(lBc%bType,bType_std)
-         lPtr => list%get(lBc%g,"Value",1)
+         IF (BTEST(lBc%bType, bType_trac)) THEN
+            lPtr => list%get(lBc%h,"Value",1)
+         ELSE
+            lPtr => list%get(lBc%g,"Value",1)
+         END IF
       CASE ('Unsteady')
          lBc%bType = IBSET(lBc%bType,bType_ustd)
+         IF (BTEST(lBc%bType,bType_trac)) err =
+     2      "For unsteady traction, use general time dependence"
          ALLOCATE(lBc%gt)
          lPtr => list%get(fTmp,"Temporal values file path")
          IF (ASSOCIATED(lPtr)) THEN
@@ -1592,37 +1609,32 @@ c     2         "can be applied for Neumann boundaries only"
       mu  = E/(1D0+nu)/2D0
 
 !     Incompressible material
-      lPtr => lPD%get(lDmn%stM%iFlag, "Incompressible")
+      IF (ISZERO(nu-0.5D0)) THEN
+         IF (.NOT.incompFlag) incompFlag = .TRUE.
+      END IF
 
 !     Bulk modulus for compressible case
-      IF (.NOT.lDmn%stM%iFlag) THEN
+      IF (.NOT.incompFlag) THEN
          kap = E/(1D0-2D0*nu)/3D0
          lam = E*nu/(1D0+nu)/(1D0-2D0*nu)
       END IF
 
       lSt => lPD%get(ctmp, "Constitutive model")
 
-!     Default: St.Venant-Kirchhoff material model
+!     Default: NeoHookean model
       IF (.NOT.ASSOCIATED(lSt)) THEN
-         IF (lDmn%stM%iFlag) err = "No constitutive model specified "//
-     2      "for incompressible solids"
-         lDmn%stM%isoType = stIso_stVK
-         lDmn%stM%C10 = lam
-         lDmn%stM%C01 = mu
+         lDmn%stM%isoType = stIso_nHook
+         lDmn%stM%C10 = mu/2.0D0
          RETURN
       END IF
 
       SELECT CASE (TRIM(ctmp))
       CASE ("stVK", "stVenantKirchhoff")
-         IF (lDmn%stM%iFlag) err = "St.Venant-Kirchhoff material "//
-     2      "model cannot be applied for incompressible solids"
          lDmn%stM%isoType = stIso_stVK
          lDmn%stM%C10 = lam
          lDmn%stM%C01 = mu
 
       CASE ("m-stVK", "modified-stVK",  "modified-stVenantKirchhoff")
-         IF (lDmn%stM%iFlag) err = "St.Venant-Kirchhoff material "//
-     2      "model cannot be applied for incompressible solids"
          lDmn%stM%isoType = stIso_mStVK
          lDmn%stM%C10 = kap
          lDmn%stM%C01 = mu
@@ -1630,9 +1642,6 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("nHK", "nHK91", "neoHookean", "neoHookeanSimo91")
          lDmn%stM%isoType = stIso_nHook
          lDmn%stM%C10 = mu/2D0
-         lPtr => lPD%get(lDmn%stM%fFlag, "Fiber reinforcement")
-         IF (lDmn%stM%fFlag .AND. .NOT.ALLOCATED(fN)) err =
-     2      " Fiber directions not yet provided"
 
       CASE ("MR", "Mooney-Rivlin")
          lDmn%stM%isoType = stIso_MR
@@ -1643,7 +1652,6 @@ c     2         "can be applied for Neumann boundaries only"
       ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
          lDmn%stM%isoType = stIso_HGO
          lDmn%stM%C10 = mu/2D0
-         lDmn%stM%fFlag = .TRUE.
          lPtr => lSt%get(lDmn%stM%aff, "a4")
          lPtr => lSt%get(lDmn%stM%bff, "b4")
          lPtr => lSt%get(lDmn%stM%ass, "a6")
@@ -1652,24 +1660,14 @@ c     2         "can be applied for Neumann boundaries only"
          IF (nFn .NE. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
 
-      CASE ("Guccione")
-         err = "Guccione material model still under development.."
-c         lDmn%stM%isoType = stIso_Gucc
-c         lPtr => lSt%get(lDmn%stM%C10, "C")
-c         lPtr => lSt%get(lDmn%stM%bff, "bf")
-c         lPtr => lSt%get(lDmn%stM%bss, "bt")
-c         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
-
       CASE DEFAULT
          err = "Undefined constitutive model used"
       END SELECT
 
-      IF (lDmn%stM%iFlag) RETURN
+      IF (incompFlag) RETURN
 
       IF (lDmn%stM%isoType.EQ.stIso_stVK .OR.
-     2    lDmn%stM%isoType.EQ.stIso_mStVK) THEN
-         RETURN
-      END IF
+     2    lDmn%stM%isoType.EQ.stIso_mStVK) RETURN
 
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")
@@ -1691,7 +1689,7 @@ c         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
 
 !     Default penalty parameter is equal to bulk modulus
       lDmn%stM%Kpen = kap
-      lPtr => lPD%get(rtmp, "Penalty constant")
+      lPtr => lPD%get(rtmp, "Penalty value")
       IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
 
       RETURN

@@ -507,7 +507,9 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys .EQ. phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_ustruct) THEN
+     2       lEq%dmn(iDmn)%phys .EQ. phys_ustruct .OR.
+     3       lEq%dmn(iDmn)%phys .EQ. phys_preSt) THEN
+            CALL cm%bcast(incompFlag)
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
       END DO
@@ -570,12 +572,13 @@
 
       CALL cm%bcast(lBc%cplBCptr)
       CALL cm%bcast(lBc%bType)
-      IF (cm%slv()) ALLOCATE(lBc%eDrn(nsd))
+      IF (cm%slv()) ALLOCATE(lBc%eDrn(nsd), lBc%h(nsd))
       CALL cm%bcast(lBc%eDrn)
       CALL cm%bcast(lBc%iFa)
       CALL cm%bcast(lBc%iM)
       CALL cm%bcast(lBc%r)
       CALL cm%bcast(lBc%g)
+      CALL cm%bcast(lBc%h)
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
 
@@ -804,16 +807,11 @@
 
       TYPE(stModelType), INTENT(INOUT) :: lStM
 
-      CALL cm%bcast(lStM%iFlag)
-      CALL cm%bcast(lStM%fFlag)
       CALL cm%bcast(lStM%volType)
       CALL cm%bcast(lStM%Kpen)
       CALL cm%bcast(lStM%isoType)
       CALL cm%bcast(lStM%C01)
       CALL cm%bcast(lStM%C10)
-      CALL cm%bcast(lStM%C20)
-      CALL cm%bcast(lStM%C30)
-      CALL cm%bcast(lStM%n)
       CALL cm%bcast(lStM%a)
       CALL cm%bcast(lStM%b)
       CALL cm%bcast(lStM%aff)

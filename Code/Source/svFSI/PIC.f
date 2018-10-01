@@ -48,8 +48,8 @@
       DO iEq=1, nEq
          IF (eq(iEq)%phys .EQ. phys_preSt) THEN
             pS0 = pS0 + pSn
-            eq(cEq)%iNorm = 0D0
-            eq(cEq)%pNorm = HUGE(coef)
+            eq(iEq)%iNorm = 0D0
+            eq(iEq)%pNorm = HUGE(coef)
             Ao = 0D0
             Yo = 0D0
             Do = 0D0
@@ -69,18 +69,15 @@
 
          Yn(s:e,:) = Yo(s:e,:)
 
-!        struct, lElas, mesh
+!        struct, lElas, mesh, ustruct
          IF (dFlag) THEN
-            coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
-     2         /(eq(iEq)%gam - 1D0)
-            Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
-         END IF
-
-!        ustruct
-         IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
-            coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
-            ADn(1:nsd,:) = ADo(1:nsd,:)*coef
-            Dn(s:e,:)    = Do(s:e,:)
+            IF (eq(iEq)%phys .NE. phys_ustruct) THEN
+               coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
+     2            /(eq(iEq)%gam - 1D0)
+               Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
+            ELSE
+               Dn(s:e,:) = Do(s:e,:)
+            END IF
          END IF
       END DO
 
@@ -88,12 +85,12 @@
       END SUBROUTINE PICP
 !====================================================================
 !     This is the initiator
-      SUBROUTINE PICI(Ag, Yg, Dg, ADg)
+      SUBROUTINE PICI(Ag, Yg, Dg)
       USE COMMOD
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(INOUT) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo), ADg(nsd,tnNo)
+     2   Dg(tDof,tnNo)
 
       INTEGER s, e, i, a
       REAL(KIND=8) coef(4)
@@ -101,9 +98,7 @@
       dof         = eq(cEq)%dof
       eq(cEq)%itr = eq(cEq)%itr + 1
 
-      ADg = 0D0
       DO i=1, nEq
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, s, e, coef)
          s       = eq(i)%s
          e       = eq(i)%e
          coef(1) = 1D0 - eq(i)%am
@@ -111,42 +106,28 @@
          coef(3) = 1D0 - eq(i)%af
          coef(4) = eq(i)%af
 
-!$OMP DO SCHEDULE(GUIDED,mpBs)
          DO a=1, tnNo
             Ag(s:e,a) = Ao(s:e,a)*coef(1) + An(s:e,a)*coef(2)
             Yg(s:e,a) = Yo(s:e,a)*coef(3) + Yn(s:e,a)*coef(4)
             Dg(s:e,a) = Do(s:e,a)*coef(3) + Dn(s:e,a)*coef(4)
          END DO
-!$OMP END DO
 
-         IF (eq(i)%phys.EQ.phys_fluid .OR.
-     2       eq(i)%phys.EQ.phys_FSI   .OR.
-     3       eq(i)%phys.EQ.phys_CMM) THEN
-!$OMP DO SCHEDULE(GUIDED,mpBs)
+!        Reset pressure variable initiator
+         IF (eq(i)%phys .EQ. phys_fluid .OR.
+     2       eq(i)%phys .EQ. phys_CMM   .OR.
+     3       eq(i)%phys .EQ. phys_FSI) THEN
             DO a=1, tnNo
                Yg(e,a) = Yn(e,a)
             END DO
-!$OMP END DO
          END IF
 
-         IF(eq(i)%phys .EQ. phys_ustruct) THEN
-!$OMP DO SCHEDULE(GUIDED,mpBs)
-            DO a=1, tnNo
-               ADg(:,a) = ADo(:,a)*coef(1) + ADn(:,a)*coef(2)
-            END DO
-!$OMP END DO
-         END IF
-
-!$OMP END PARALLEL
+         IF (eq(i)%phys .EQ. phys_preSt) pSn(:,:) = 0D0
       END DO
-
-      IF (eq(cEq)%phys .EQ. phys_preSt) pSn = 0D0
 
       RETURN
       END SUBROUTINE PICI
 !====================================================================
-!     This is the corrector. Decision for next equation is also made
-!     here
+!     This is the corrector. Decision for next eqn is also made here
       SUBROUTINE PICC
       USE COMMOD
       USE ALLFUN
@@ -154,54 +135,42 @@
 
       LOGICAL :: l1, l2, l3, l4
       INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(5), lRd(nsd), rtmp
+      REAL(KIND=8) :: coef(4), rtmp
       CHARACTER(LEN=stdL) :: sCmd
 
-!$OMP PARALLEL DEFAULT(SHARED) PRIVATE(a, s, e, coef, lRd, rtmp)
       s       = eq(cEq)%s
       e       = eq(cEq)%e
       coef(1) = eq(cEq)%gam*dt
       coef(2) = coef(1)*eq(cEq)%af
       coef(3) = eq(cEq)%beta*dt*dt
-      coef(4) = 1D0/eq(cEq)%am
-      coef(5) = coef(2)*coef(4)
-      lRd(:)  = 0D0
+      coef(4) = coef(1)*coef(2)/eq(cEq)%am
 
-      IF (eq(cEq)%phys.EQ.phys_fluid .OR.
-     2    eq(cEq)%phys.EQ.phys_FSI   .OR.
-     3    eq(cEq)%phys.EQ.phys_CMM) THEN
-!$OMP DO SCHEDULE(GUIDED,mpBs)
+      IF (eq(cEq)%phys .EQ. phys_fluid .OR.
+     2    eq(cEq)%phys .EQ. phys_CMM   .OR.
+     3    eq(cEq)%phys .EQ. phys_FSI) THEN
          DO a=1, tnNo
             An(s:e,a)   = An(s:e,a)   - R(:,a)
             Yn(s:e-1,a) = Yn(s:e-1,a) - R(1:dof-1,a)*coef(1)
             Yn(e,a)     = Yn(e,a)     - R(dof,a)*coef(2)
             Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
          END DO
-!$OMP END DO
       ELSE IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
-!$OMP DO SCHEDULE(GUIDED,mpBs)
          DO a=1, tnNo
-            lRd(:)      = Rd(:,a)*coef(4) + R(1:nsd,a)*coef(5)
-            An(s:e,a)   = An(s:e,a)   - R(:,a)
-            Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
-            ADn(:,a)    = ADn(:,a)    - lRd(:)
-            Dn(s:e-1,a) = Dn(s:e-1,a) - lRd(:)*coef(1)
+            An(s:e,a) = An(s:e,a) - R(:,a)
+            Yn(s:e,a) = Yn(s:e,a) - R(:,a)*coef(1)
+            Dn(s:e,a) = Dn(s:e,a) - R(:,a)*coef(4)
          END DO
-!$OMP END DO
       ELSE
-!$OMP DO SCHEDULE(GUIDED,mpBs)
          DO a=1, tnNo
             An(s:e,a) = An(s:e,a) - R(:,a)
             Yn(s:e,a) = Yn(s:e,a) - R(:,a)*coef(1)
             Dn(s:e,a) = Dn(s:e,a) - R(:,a)*coef(3)
          END DO
-!$OMP END DO
       END IF
 
       IF (eq(cEq)%phys .EQ. phys_FSI) THEN
          s = eq(2)%s
          e = eq(2)%e
-!$OMP DO SCHEDULE(GUIDED,mpBs)
          DO Ac=1, tnNo
             IF (ISDOMAIN(cEq, Ac, phys_struct)) THEN
                An(s:e,Ac) = An(1:nsd,Ac)
@@ -209,9 +178,7 @@
                Dn(s:e,Ac) = Dn(1:nsd,Ac)
             END IF
          END DO
-!$OMP END DO
       END IF
-!$OMP END PARALLEL
 
 !     Update prestress at the nodes and re-initialize
       IF (eq(cEq)%phys .EQ. phys_preSt) THEN

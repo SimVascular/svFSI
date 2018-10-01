@@ -98,9 +98,8 @@
             eq(iEq)%sym = 'ST'
          CASE (phys_ustruct)
             dFlag = .TRUE.
-            flag  = .TRUE.
             eq(iEq)%dof = nsd + 1
-            eq(iEq)%sym = 'US'
+            eq(iEq)%sym = 'ST'
          CASE (phys_preSt)
             dFlag = .TRUE.
             pstEq = .TRUE.
@@ -197,12 +196,6 @@
      2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo))
 
 !     Additional physics dependent variables
-!     USTRUCT phys
-      IF (flag) THEN
-         ALLOCATE(ADo(nsd,tnNo), ADn(nsd,tnNo))
-         ALLOCATE(Rd(nsd,tnNo), Kd(nsd*(nsd+1),nnz))
-      END IF
-
 !     PRESTRESS phys
       IF (pstEq) THEN
          IF (ALLOCATED(pS0)) err = "Prestress already allocated. "//
@@ -378,7 +371,6 @@
       Ao = 0D0
       Yo = 0D0
       Do = 0D0
-      IF (ALLOCATED(ADo)) ADo = 0D0
 
       IF (rmsh%isReqd) THEN
          rmsh%A0 = 0D0
@@ -618,11 +610,6 @@
       IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
       IF (ALLOCATED(R))        DEALLOCATE(R)
       IF (ALLOCATED(fN))       DEALLOCATE(fN)
-
-      IF (ALLOCATED(ADo))      DEALLOCATE(ADo)
-      IF (ALLOCATED(ADn))      DEALLOCATE(ADn)
-      IF (ALLOCATED(Rd))       DEALLOCATE(Rd)
-      IF (ALLOCATED(Kd))       DEALLOCATE(Kd)
 
       IF (ALLOCATED(pS0))      DEALLOCATE(pS0)
       IF (ALLOCATED(pSn))      DEALLOCATE(pSn)

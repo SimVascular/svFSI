@@ -36,8 +36,8 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE CONSTRUCT(lM, e, eNoN, al, yl, dl, dol, adl, xl, fNl,
-     2   ps0l, bfl, ptr)
+      SUBROUTINE CONSTRUCT(lM, e, eNoN, al, yl, dl, dol, xl, fNl, pS0l,
+     2   bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -45,15 +45,15 @@
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), dol(nsd,eNoN), adl(nsd,eNoN),
-     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN), bfl(nsd,eNoN)
+     2   dl(tDof,eNoN), dol(nsd,eNoN), fNl(nFn*nsd,eNoN),
+     3   pS0l(nstd,eNoN), bfl(nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys
       REAL(KIND=8) w, Jac, ksix(nsd,nsd), ctime
 
       REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:),
-     2   dc(:,:), lKd(:,:,:), lRd(:,:), pSl(:)
+     2   dc(:,:), pSl(:)
 
       TYPE(fCellType) :: fCell
 
@@ -68,12 +68,6 @@
       lR    = 0D0
       pSl   = 0D0
       cPhys = eq(cEq)%dmn(cDmn)%phys
-
-      IF (cPhys .EQ. phys_ustruct) THEN
-         ALLOCATE(lKd(nsd*dof,eNoN,eNoN), lRd(nsd,eNoN))
-         lKd = 0D0
-         lRd = 0D0
-      END IF
 
 !     If neccessary correct X, if mesh is moving
       IF (mvMsh) THEN
@@ -183,11 +177,11 @@
 
          CASE (phys_ustruct)
             IF (nsd .EQ. 3) THEN
-               CALL USTRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, adl, fNl,
-     2            lRd, lKd, lR, lK)
+               CALL USTRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, fNl, lR,
+     2            lK)
             ELSE
-               CALL USTRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, adl, fNl,
-     2            lRd, lKd, lR, lK)
+               CALL USTRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, fNl, lR,
+     2            lK)
             END IF
 
          CASE (phys_mesh)
@@ -219,19 +213,13 @@
          END SELECT
       END DO
 
-      IF (cPhys .EQ. phys_ustruct) THEN
-         CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lRd)
-      END IF
-
 !     Now doing the assembly part
 #ifdef WITH_TRILINOS
       IF (useTrilinosAssemAndLS) THEN
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
       ELSE
 #endif
-!$OMP CRITICAL
          CALL DOASSEM(eNoN, ptr, lK, lR)
-!$OMP END CRITICAL
 #ifdef WITH_TRILINOS
       END IF
 #endif
@@ -315,9 +303,7 @@
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
       ELSE
 #else
-!$OMP CRITICAL
          CALL DOASSEM(eNoN, ptr, lK, lR)
-!$OMP END CRITICAL
 #endif
 #ifdef WITH_TRILINOS
       END IF
@@ -387,9 +373,7 @@
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
       ELSE
 #else
-!$OMP CRITICAL
          CALL DOASSEM(eNoN, ptr, lK, lR)
-!$OMP END CRITICAL
 #endif
 #ifdef WITH_TRILINOS
       END IF

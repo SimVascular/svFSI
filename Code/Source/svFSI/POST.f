@@ -391,7 +391,6 @@
 
       RETURN
       END SUBROUTINE BPOST
-
 !####################################################################
 !     Routine for post processing stress tensor
       SUBROUTINE TPOST(lM, res, lD, iEq)
@@ -401,34 +400,39 @@
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(OUT) :: res(nstd,lM%nNo)
+      REAL(KIND=8), INTENT(INOUT) :: res(nstd,lM%nNo)
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
       INTEGER, INTENT(IN) :: iEq
 
-      INTEGER a, b, e, g, Ac, eNoN, i, j, k, iFn, l
-      REAL(KIND=8) w, Jac, ksix(nsd,nsd), F(nsd,nsd),
-     2   S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
+      REAL(KIND=8) w, Jac, detF, ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
+     2   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), pSl(:),
      2   Nx(:,:), N(:), sA(:), sF(:,:), fl(:,:)
       TYPE(stModelType) :: stModel
 
       IF (.NOT.ALLOCATED(pS0)) err = " Unexpected behavior in TPOST"
 
-      eNoN  = lM%eNoN
-      dof   = eq(iEq)%dof
-      i      = eq(iEq)%s
-      j      = i + 1
-      k      = j + 1
+      eNoN = lM%eNoN
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
 
       ALLOCATE (sA(tnNo), sF(nstd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
      2   fNl(nFn*nsd,eNoN), pSl(nstd), Nx(nsd,eNoN), N(eNoN))
 
-      res = 0D0
-      sA  = 0.0d0
-      sF  = pS0
+      sA = 0D0
+      sF = 0D0
       DO e=1, lM%nEl
-         cDmn = DOMAIN(lM, iEq, e)
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_struct .AND.
+     2       cPhys .NE. phys_preSt  .AND.
+     3       cPhys .NE. phys_ustruct) CYCLE
+
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
          fNl = 0D0
          DO a=1, eNoN
             Ac      = lM%IEN(a,e)
@@ -449,15 +453,22 @@
             F  = 0D0
             fl = 0D0
             DO a=1, eNoN
-               F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-               F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-               F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
-               F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-               F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
-               F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
-               F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
-               F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
-               F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+               IF (nsd .EQ. 3) THEN
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                  F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                  F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                  F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+               ELSE
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+               END IF
 
                DO iFn=1, nFn
                   b = (iFn-1)*nsd
@@ -466,15 +477,31 @@
                   END DO
                END DO
             END DO
+            detF = MAT_DET(F, nsd)
 
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
-            CALL GETPK2CC(stModel, F, fl, 0D0, S, CC)
-            pSl(1) = S(1,1)
-            pSl(2) = S(2,2)
-            pSl(3) = S(3,3)
-            pSl(4) = S(1,2)
-            pSl(5) = S(1,3)
-            pSl(6) = S(2,3)
+            IF (cPhys .EQ. phys_ustruct) THEN
+               CALL GETPK2CCdev(stModel, F, nFn, fl, S, CC)
+               P = MATMUL(F, S)
+               sigma = MATMUL(P, TRANSPOSE(F))
+               IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
+            ELSE
+               CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
+               sigma = S
+            END IF
+
+            IF (nsd .EQ. 3) THEN
+               pSl(1) = sigma(1,1)
+               pSl(2) = sigma(2,2)
+               pSl(3) = sigma(3,3)
+               pSl(4) = sigma(1,2)
+               pSl(5) = sigma(1,3)
+               pSl(6) = sigma(2,3)
+            ELSE
+               pSl(1) = sigma(1,1)
+               pSl(2) = sigma(2,2)
+               pSl(3) = sigma(1,2)
+            END IF
 
             DO a=1, eNoN
                Ac       = lM%IEN(a,e)
@@ -490,11 +517,12 @@
       DO a=1, lM%nNo
          Ac = lM%gN(a)
          IF (.NOT. iszero(sA(Ac))) THEN
-           res(:,a) = sF(:,Ac)/sA(Ac)
+           res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
          ENDIF
       END DO
 
+      DEALLOCATE (sA, sF, xl, dl, fNl, pSl, N, Nx)
+
       RETURN
       END SUBROUTINE TPOST
-
 !####################################################################
