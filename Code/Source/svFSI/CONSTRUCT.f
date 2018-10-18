@@ -53,7 +53,7 @@
       REAL(KIND=8) w, Jac, ksix(nsd,nsd), ctime
 
       REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:),
-     2   dc(:,:), pSl(:)
+     2   dc(:,:), pSl(:), lKd(:,:,:)
 
       TYPE(fCellType) :: fCell
 
@@ -68,6 +68,11 @@
       lR    = 0D0
       pSl   = 0D0
       cPhys = eq(cEq)%dmn(cDmn)%phys
+
+      IF (cPhys .EQ. phys_ustruct) THEN
+         ALLOCATE(lKd(dof*nsd,eNoN,eNoN))
+         lKd = 0D0
+      END IF
 
 !     If neccessary correct X, if mesh is moving
       IF (mvMsh) THEN
@@ -177,11 +182,11 @@
 
          CASE (phys_ustruct)
             IF (nsd .EQ. 3) THEN
-               CALL USTRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, fNl, lR,
-     2            lK)
+               CALL USTRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl, fNl,
+     2            lR, lK, lKd)
             ELSE
-               CALL USTRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, fNl, lR,
-     2            lK)
+               CALL USTRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl, fNl,
+     2            lR, lK, lKd)
             END IF
 
          CASE (phys_mesh)
@@ -212,6 +217,10 @@
             err = "Undefined phys in CONSTRUCT"
          END SELECT
       END DO
+
+      IF (cPhys .EQ. phys_ustruct) THEN
+         CALL USTRUCT_DOASSEM(eNoN, ptr, lKd)
+      END IF
 
 !     Now doing the assembly part
 #ifdef WITH_TRILINOS

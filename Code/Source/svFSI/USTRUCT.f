@@ -36,23 +36,26 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE USTRUCT3D(eNoN, w, Je, N, Nx, al, yl, dl, fNl, lR, lK)
+      SUBROUTINE USTRUCT3D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl, lR,
+     2   lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(3,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), fNl(3*nFn,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
+     3   fNl(3*nFn,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*3,eNoN,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, l, a, b, iFn
-      REAL(KIND=8) :: bf(3), am, af, aff, v(3), vd(3), vx(3,3), p, pd,
+      REAL(KIND=8) :: bf(3), am, af, afm, v(3), vd(3), vx(3,3), p, pd,
      2   px(3), fl(3,nFn), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta,
      3   Siso(3,3), CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6),
-     4   Pdev(3,3), Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3), T1,
-     5   T2, T3, PxFi(3), VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN),
-     6   Ku
+     4   Pdev(3,3), Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3),
+     5   PxFi(3), VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2,
+     6   T3, Ku
 
       TYPE (stModelType) :: stModel
 
@@ -63,7 +66,7 @@
       bf(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
       am      = eq(cEq)%am
       af      = eq(cEq)%af*eq(cEq)%gam*dt
-      aff     = af*af/am
+      afm     = af / am
 
 !     {i,j,k} := velocity dofs; {l} := pressure dof
       i       = eq(cEq)%s
@@ -80,15 +83,18 @@
       pd = 0D0
       px = 0D0
       fl = 0D0
-      F  = MAT_ID(3)
+      F  = 0D0
+      F(1,1) = 1D0
+      F(2,2) = 1D0
+      F(3,3) = 1D0
       DO a=1, eNoN
          v(1)    = v(1)  + N(a)*yl(i,a)
          v(2)    = v(2)  + N(a)*yl(j,a)
          v(3)    = v(3)  + N(a)*yl(k,a)
 
-         vd(1)   = vd(1) + N(a)*al(i,a)
-         vd(2)   = vd(2) + N(a)*al(j,a)
-         vd(3)   = vd(3) + N(a)*al(k,a)
+         vd(1)   = vd(1) + N(a)*(al(i,a)-bfl(1,a))
+         vd(2)   = vd(2) + N(a)*(al(j,a)-bfl(2,a))
+         vd(3)   = vd(3) + N(a)*(al(k,a)-bfl(3,a))
 
          vx(1,1) = vx(1,1) + Nx(1,a)*yl(i,a)
          vx(1,2) = vx(1,2) + Nx(2,a)*yl(i,a)
@@ -126,12 +132,12 @@
       Jac = MAT_DET(F, 3)
       Fi  = MAT_INV(F, 3)
 
-!     Compute rho and beta depending on the volumetric penalty model
-      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
-
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
       CALL GETPK2CCdev(stModel, F, nFn, fl, Siso, CCiso)
+
+!     Compute rho and beta depending on the volumetric penalty model
+      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
 
 !     Compute stabilization parameters
       CALL GETTAU(stModel, Je, tauM, tauC)
@@ -275,11 +281,12 @@
      3             Bm(5,1,a)*DBm(5,1) + Bm(6,1,a)*DBm(6,1)
             T1   = Jac*rho*vd(1)*N(a)*NxFi(1,b)
             T2   = -tauC*Jac*NxFi(1,a)*VxNx(1,b)
-            Ku   = aff*(T1 + T2 + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx)
+            lKd(1,a,b) = lKd(1,a,b) + Ku
 
             T1   = am*Jac*rho*N(a)*N(b)
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(1,b) + T1
-            lK(1,a,b) = lK(1,a,b) + w*(T2 + Ku)
+            lK(1,a,b)  = lK(1,a,b) + w*T2 + afm*Ku
 
 !           dM_1/dV_2 + af/am *dM_1/dU_2
             BtDB = Bm(1,1,a)*DBm(1,2) + Bm(2,1,a)*DBm(2,2) +
@@ -288,10 +295,11 @@
             T1   = Jac*rho*vd(1)*N(a)*NxFi(2,b)
             T2   = -tauC*Jac*NxFi(1,a)*VxNx(2,b)
             T3   = Jac*rCl*(NxFi(1,a)*NxFi(2,b) - NxFi(2,a)*NxFi(1,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(2,a,b) = lKd(2,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(2,b)
-            lK(2,a,b) = lK(2,a,b) + w*(T2 + Ku)
+            lK(2,a,b) = lK(2,a,b) + w*T2 + afm*Ku
 
 !           dM_1/dV_3 + af/am *dM_1/dU_3
             BtDB = Bm(1,1,a)*DBm(1,3) + Bm(2,1,a)*DBm(2,3) +
@@ -300,10 +308,11 @@
             T1   = Jac*rho*vd(1)*N(a)*NxFi(3,b)
             T2   = -tauC*Jac*NxFi(1,a)*VxNx(3,b)
             T3   = Jac*rCl*(NxFi(1,a)*NxFi(3,b) - NxFi(3,a)*NxFi(1,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(3,a,b) = lKd(3,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(3,b)
-            lK(3,a,b) = lK(3,a,b) + w*(T2 + Ku)
+            lK(3,a,b) = lK(3,a,b) + w*T2 + afm*Ku
 
 !           dM_2/dV_1 + af/am *dM_2/dU_1
             BtDB = Bm(1,2,a)*DBm(1,1) + Bm(2,2,a)*DBm(2,1) +
@@ -312,10 +321,11 @@
             T1   = Jac*rho*vd(2)*N(a)*NxFi(1,b)
             T2   = -tauC*Jac*NxFi(2,a)*VxNx(1,b)
             T3   = Jac*rCl*(NxFi(2,a)*NxFi(1,b) - NxFi(1,a)*NxFi(2,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(4,a,b) = lKd(4,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(1,b)
-            lK(5,a,b) = lK(5,a,b) + w*(T2 + Ku)
+            lK(5,a,b) = lK(5,a,b) + w*T2 + afm*Ku
 
 !           dM_2/dV_2 + af/am *dM_2/dU_2
             BtDB = Bm(1,2,a)*DBm(1,2) + Bm(2,2,a)*DBm(2,2) +
@@ -323,11 +333,12 @@
      3             Bm(5,2,a)*DBm(5,2) + Bm(6,2,a)*DBm(6,2)
             T1   = Jac*rho*vd(2)*N(a)*NxFi(2,b)
             T2   = -tauC*Jac*NxFi(2,a)*VxNx(2,b)
-            Ku   = aff*(T1 + T2 + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx)
+            lKd(5,a,b) = lKd(5,a,b) + Ku
 
             T1   = am*Jac*rho*N(a)*N(b)
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(2,b) + T1
-            lK(6,a,b) = lK(6,a,b) + w*(T2 + Ku)
+            lK(6,a,b) = lK(6,a,b) + w*T2 + afm*Ku
 
 !           dM_2/dV_3 + af/am *dM_2/dU_3
             BtDB = Bm(1,2,a)*DBm(1,3) + Bm(2,2,a)*DBm(2,3) +
@@ -336,10 +347,11 @@
             T1   = Jac*rho*vd(2)*N(a)*NxFi(3,b)
             T2   = -tauC*Jac*NxFi(2,a)*VxNx(3,b)
             T3   = Jac*rCl*(NxFi(2,a)*NxFi(3,b) - NxFi(3,a)*NxFi(2,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(6,a,b) = lKd(6,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(3,b)
-            lK(7,a,b) = lK(7,a,b) + w*(T2 + Ku)
+            lK(7,a,b) = lK(7,a,b) + w*T2 + afm*Ku
 
 !           dM_3/dV_1 + af/am *dM_3/dU_1
             BtDB = Bm(1,3,a)*DBm(1,1) + Bm(2,3,a)*DBm(2,1) +
@@ -348,10 +360,11 @@
             T1   = Jac*rho*vd(3)*N(a)*NxFi(1,b)
             T2   = -tauC*Jac*NxFi(3,a)*VxNx(1,b)
             T3   = Jac*rCl*(NxFi(3,a)*NxFi(1,b) - NxFi(1,a)*NxFi(3,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(7,a,b) = lKd(7,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(3,a)*NxFi(1,b)
-            lK(9,a,b) = lK(9,a,b) + w*(T2 + Ku)
+            lK(9,a,b) = lK(9,a,b) + w*T2 + afm*Ku
 
 !           dM_3/dV_2 + af/am *dM_3/dU_2
             BtDB = Bm(1,3,a)*DBm(1,2) + Bm(2,3,a)*DBm(2,2) +
@@ -360,10 +373,11 @@
             T1   = Jac*rho*vd(3)*N(a)*NxFi(2,b)
             T2   = -tauC*Jac*NxFi(3,a)*VxNx(2,b)
             T3   = Jac*rCl*(NxFi(3,a)*NxFi(2,b) - NxFi(2,a)*NxFi(3,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(8,a,b) = lKd(8,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(3,a)*NxFi(2,b)
-            lK(10,a,b) = lK(10,a,b) + w*(T2 + Ku)
+            lK(10,a,b) = lK(10,a,b) + w*T2 + afm*Ku
 
 !           dM_3/dV_3 + af/am *dM_3/dU_3
             BtDB = Bm(1,3,a)*DBm(1,3) + Bm(2,3,a)*DBm(2,3) +
@@ -371,38 +385,42 @@
      3             Bm(5,3,a)*DBm(5,3) + Bm(6,3,a)*DBm(6,3)
             T1   = Jac*rho*vd(3)*N(a)*NxFi(3,b)
             T2   = -tauC*Jac*NxFi(3,a)*VxNx(3,b)
-            Ku   = aff*(T1 + T2 + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx)
+            lKd(9,a,b) = lKd(9,a,b) + Ku
 
             T1   = am*Jac*rho*N(a)*N(b)
             T2   = af*Jac*tauC*rho*NxFi(3,a)*NxFi(3,b) + T1
-            lK(11,a,b) = lK(11,a,b) + w*(T2 + Ku)
+            lK(11,a,b) = lK(11,a,b) + w*T2 + afm*Ku
 
 !           dC/dV_1 + af/am *dC/dU_1
             T1   = N(a)*(rC*NxFi(1,b) - VxNx(1,b))
             T2   = tauM*(rMNx(a)*NxFi(1,b) - rMNx(b)*NxFi(1,a))
             T3   = -tauM*NxNx*PxFi(1)
-            Ku   = aff*(T1 + T2 + T3)
+            Ku   = w*af*Jac*(T1 + T2 + T3)
+            lKd(10,a,b) = lKd(10,a,b) + Ku
 
             T2   = (am*tauM*rho)*NxFi(1,a)*N(b) + af*N(a)*NxFi(1,b)
-            lK(13,a,b) = lK(13,a,b) + w*Jac*(T2 + Ku)
+            lK(13,a,b) = lK(13,a,b) + w*Jac*T2 + afm*Ku
 
 !           dC/dV_2 + af/am *dC/dU_2
             T1   = N(a)*(rC*NxFi(2,b) - VxNx(2,b))
             T2   = tauM*(rMNx(a)*NxFi(2,b) - rMNx(b)*NxFi(2,a))
             T3   = -tauM*NxNx*PxFi(2)
-            Ku   = aff*(T1 + T2 + T3)
+            Ku   = w*af*Jac*(T1 + T2 + T3)
+            lKd(11,a,b) = lKd(11,a,b) + Ku
 
             T2 = (am*tauM*rho)*NxFi(2,a)*N(b) + af*N(a)*NxFi(2,b)
-            lK(14,a,b) = lK(14,a,b) + w*Jac*(T2 + Ku)
+            lK(14,a,b) = lK(14,a,b) + w*Jac*T2 + afm*Ku
 
 !           dC/dV_3 + af/am *dC/dU_3
             T1   = N(a)*(rC*NxFi(3,b) - VxNx(3,b))
             T2   = tauM*(rMNx(a)*NxFi(3,b) - rMNx(b)*NxFi(3,a))
             T3   = -tauM*NxNx*PxFi(3)
-            Ku   = aff*(T1 + T2 + T3)
+            Ku   = w*af*Jac*(T1 + T2 + T3)
+            lKd(12,a,b) = lKd(12,a,b) + Ku
 
             T2 = (am*tauM*rho)*NxFi(3,a)*N(b) + af*N(a)*NxFi(3,b)
-            lK(15,a,b) = lK(15,a,b) + w*Jac*(T2 + Ku)
+            lK(15,a,b) = lK(15,a,b) + w*Jac*T2 + afm*Ku
 
 !           dM_1/dP
             T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1.0D0)
@@ -428,23 +446,26 @@
       RETURN
       END SUBROUTINE USTRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE USTRUCT2D(eNoN, w, Je, N, Nx, al, yl, dl, fNl, lR, lK)
+      SUBROUTINE USTRUCT2D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl, lR,
+     2   lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(2,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), fNl(2*nFn,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN),
+     3   fNl(2*nFn,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*2,eNoN,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, a, b, iFn
-      REAL(KIND=8) :: bf(2), am, af, aff, v(2), vd(2), vx(2,2), p, pd,
+      REAL(KIND=8) :: bf(2), am, af, afm, v(2), vd(2), vx(2,2), p, pd,
      2   px(2), fl(2,nFn), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta,
      3   Siso(2,2), CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3),
-     4   Pdev(2,2), Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2), T1,
-     5   T2, T3, PxFi(2), VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN),
-     6   Ku
+     4   Pdev(2,2), Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2),
+     5   PxFi(2), VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2,
+     6   T3, Ku
 
       TYPE (stModelType) :: stModel
 
@@ -454,7 +475,7 @@
       bf(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
       af      = eq(cEq)%af*eq(cEq)%gam*dt
-      aff     = af*af/am
+      afm     = af / am
 
 !     {i,j} := velocity dofs; {k} := pressure dof
       i       = eq(cEq)%s
@@ -470,13 +491,15 @@
       pd = 0D0
       px = 0D0
       fl = 0D0
-      F  = MAT_ID(2)
+      F      = 0D0
+      F(1,1) = 1D0
+      F(2,2) = 1D0
       DO a=1, eNoN
          v(1)    = v(1)  + N(a)*yl(i,a)
          v(2)    = v(2)  + N(a)*yl(j,a)
 
-         vd(1)   = vd(1) + N(a)*al(i,a)
-         vd(2)   = vd(2) + N(a)*al(j,a)
+         vd(1)   = vd(1) + N(a)*(al(i,a)-bfl(1,a))
+         vd(2)   = vd(2) + N(a)*(al(j,a)-bfl(2,a))
 
          vx(1,1) = vx(1,1) + Nx(1,a)*yl(i,a)
          vx(1,2) = vx(1,2) + Nx(2,a)*yl(i,a)
@@ -502,12 +525,12 @@
       Jac = F(1,1)*F(2,2) - F(1,2)*F(2,1)
       Fi  = MAT_INV(F, 2)
 
-!     Compute rho and beta depending on the volumetric penalty model
-      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
-
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
       CALL GETPK2CCdev(stModel, F, nFn, fl, Siso, CCiso)
+
+!     Compute rho and beta depending on the volumetric penalty model
+      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
 
 !     Compute stabilization parameters
       CALL GETTAU(stModel, Je, tauM, tauC)
@@ -608,11 +631,12 @@
      2              Bm(3,1,a)*DBm(3,1)
             T1   = Jac*rho*vd(1)*N(a)*NxFi(1,b)
             T2   = -tauC*Jac*NxFi(1,a)*VxNx(1,b)
-            Ku   = aff*(T1 + T2 + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx)
+            lKd(1,a,b) = lKd(1,a,b) + Ku
 
             T1   = am*Jac*rho*N(a)*N(b)
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(1,b) + T1
-            lK(1,a,b) = lK(1,a,b) + w*(T2 + Ku)
+            lK(1,a,b) = lK(1,a,b) + w*T2 + afm*Ku
 
 !           dM_1/dV_2 + af/am *dM_1/dU_2
             BtDB = Bm(1,1,a)*DBm(1,2) + Bm(2,1,a)*DBm(2,2) +
@@ -620,10 +644,11 @@
             T1   = Jac*rho*vd(1)*N(a)*NxFi(2,b)
             T2   = -tauC*Jac*NxFi(1,a)*VxNx(2,b)
             T3   = Jac*rCl*(NxFi(1,a)*NxFi(2,b) - NxFi(2,a)*NxFi(1,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(2,a,b) = lKd(2,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(2,b)
-            lK(2,a,b) = lK(2,a,b) + w*(T2 + Ku)
+            lK(2,a,b) = lK(2,a,b) + w*T2 + afm*Ku
 
 !           dM_2/dV_1 + af/am *dM_2/dU_1
             BtDB = Bm(1,2,a)*DBm(1,1) + Bm(2,2,a)*DBm(2,1) +
@@ -631,38 +656,42 @@
             T1   = Jac*rho*vd(2)*N(a)*NxFi(1,b)
             T2   = -tauC*Jac*NxFi(2,a)*VxNx(1,b)
             T3   = Jac*rCl*(NxFi(2,a)*NxFi(1,b) - NxFi(1,a)*NxFi(2,b))
-            Ku   = aff*(T1 + T2 + T3 + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB)
+            lKd(3,a,b) = lKd(3,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(1,b)
-            lK(4,a,b) = lK(4,a,b) + w*(T2 + Ku)
+            lK(4,a,b) = lK(4,a,b) + w*T2 + afm*Ku
 
 !           dM_2/dV_2 + af/am *dM_2/dU_2
             BtDB = Bm(1,2,a)*DBm(1,2) + Bm(2,2,a)*DBm(2,2) +
      2             Bm(3,2,a)*DBm(3,2)
             T1   = Jac*rho*vd(2)*N(a)*NxFi(2,b)
             T2   = -tauC*Jac*NxFi(2,a)*VxNx(2,b)
-            Ku   = aff*(T1 + T2 + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx)
+            lKd(4,a,b) = lKd(4,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(2,b) + T1
-            lK(5,a,b) = lK(5,a,b) + w*(T2 + Ku)
+            lK(5,a,b) = lK(5,a,b) + w*T2 + afm*Ku
 
 !           dC/dV_1 + af/am *dC/dU_1
             T1   = N(a)*(rC*NxFi(1,b) - VxNx(1,b))
             T2   = tauM*(rMNx(a)*NxFi(1,b) - rMNx(b)*NxFi(1,a))
             T3   = -tauM*NxNx*PxFi(1)
-            Ku   = aff*(T1 + T2 + T3)
+            Ku   = w*af*Jac*(T1 + T2 + T3)
+            lKd(5,a,b) = lKd(5,a,b) + Ku
 
             T2   = (am*tauM*rho)*NxFi(1,a)*N(b) + af*N(a)*NxFi(1,b)
-            lK(7,a,b) = lK(7,a,b) + w*Jac*(T2 + Ku)
+            lK(7,a,b) = lK(7,a,b) + w*Jac*T2 + afm*Ku
 
 !           dC/dV_2 + af/am *dC/dU_2
             T1   = N(a)*(rC*NxFi(2,b) - VxNx(2,b))
             T2   = tauM*(rMNx(a)*NxFi(2,b) - rMNx(b)*NxFi(2,a))
             T3   = -tauM*NxNx*PxFi(2)
-            Ku   = aff*(T1 + T2 + T3)
+            Ku   = w*af*Jac*(T1 + T2 + T3)
+            lKd(6,a,b) = lKd(6,a,b) + Ku
 
             T2 = (am*tauM*rho)*NxFi(2,a)*N(b) + af*N(a)*NxFi(2,b)
-            lK(8,a,b) = lK(8,a,b) + w*Jac*(T2 + Ku)
+            lK(8,a,b) = lK(8,a,b) + w*Jac*T2 + afm*Ku
 
 !           dM_1/dP
             T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1.0D0)
@@ -699,7 +728,7 @@
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:), Nx(:,:),
-     2   dl(:,:), hl(:), lR(:,:), lK(:,:,:)
+     2   dl(:,:), hl(:), lR(:,:), lK(:,:,:), lKd(:,:,:)
 
       iM    = lFa%iM
       eNoNb = lFa%eNoN
@@ -707,7 +736,7 @@
 
       ALLOCATE(xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN),
      2   ptr(eNoN), dl(tDof,eNoN), hl(eNoN),lR(dof,eNoN),
-     3   lK(dof*dof,eNoN,eNoN))
+     3   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
 
       DO e=1, lFa%nEl
          Ec    = lFa%gE(e)
@@ -715,8 +744,6 @@
          cPhys = eq(cEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_ustruct) CYCLE
 
-         lR    = 0D0
-         lK    = 0D0
          DO a=1, eNoN
             Ac      = msh(iM)%IEN(a,Ec)
             ptr(a)  = Ac
@@ -725,6 +752,9 @@
             hl(a)   = hg(Ac)
          END DO
 
+         lR    = 0D0
+         lK    = 0D0
+         lKd   = 0D0
          DO g=1, lFa%nG
             xp = 0D0
             DO a=1, eNoNb
@@ -755,11 +785,13 @@
             w   = lFa%w(g)*Jac
 
             IF (nsd .EQ. 3) THEN
-               CALL BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+               CALL BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
             ELSE
-               CALL BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+               CALL BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
             END IF
          END DO
+
+         CALL USTRUCT_DOASSEM(eNoN, ptr, lKd)
 
 #ifdef WITH_TRILINOS
          IF (useTrilinosAssemAndLS) THEN
@@ -775,7 +807,7 @@
       RETURN
       END SUBROUTINE BUSTRUCTNEU
 !--------------------------------------------------------------------
-      SUBROUTINE BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+      SUBROUTINE BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -783,20 +815,24 @@
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), hl(eNoN),
      2   dl(tDof,eNoN), nV(3)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*3,eNoN,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, a, b
-      REAL(KIND=8) :: af, Jac, h, wl, afl, T1, F(3,3), Fi(3,3), nFi(3),
+      REAL(KIND=8) :: af, afm, h, Jac, wl, Ku, F(3,3), Fi(3,3), nFi(3),
      2   NxFi(3,eNoN)
 
-      af = eq(cEq)%af*eq(cEq)%gam*dt
-      af = af * af / eq(cEq)%am
-      i  = eq(cEq)%s
-      j  = i + 1
-      k  = j + 1
+      af     = eq(cEq)%af*eq(cEq)%gam*dt
+      afm    = af / eq(cEq)%am
+      i      = eq(cEq)%s
+      j      = i + 1
+      k      = j + 1
 
-      h  = 0D0
-      F  = MAT_ID(3)
+      h      = 0D0
+      F      = 0D0
+      F(1,1) = 1D0
+      F(2,2) = 1D0
+      F(3,3) = 1D0
       DO a=1, eNoN
          h       = h      + N(a)*hl(a)
 
@@ -823,38 +859,40 @@
       nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2) + nV(3)*Fi(3,2)
       nFi(3) = nV(1)*Fi(1,3) + nV(2)*Fi(2,3) + nV(3)*Fi(3,3)
 
-      wl  = w*Jac*h
-      afl = af*wl
+      wl = w*Jac*h
       DO a=1, eNoN
          lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
          lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
          lR(3,a) = lR(3,a) - wl*N(a)*nFi(3)
 
          DO b=1, eNoN
-            T1 = nFi(1)*NxFi(2,b) - nFi(2)*NxFi(1,b)
-            lK(2,a,b) = lK(2,a,b) - afl*N(a)*T1
+            Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
+            lKd(2,a,b) = lKd(2,a,b) + Ku
+            lK(2,a,b)  = lK(2,a,b)  + afm*Ku
 
-            T1 = nFi(1)*NxFi(3,b) - nFi(3)*NxFi(1,b)
-            lK(3,a,b) = lK(3,a,b) - afl*N(a)*T1
+            lKd(4,a,b) = lKd(4,a,b) - Ku
+            lK(5,a,b)  = lK(5,a,b)  - afm*Ku
 
-            T1 = nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b)
-            lK(5,a,b) = lK(5,a,b) - afl*N(a)*T1
+            Ku = wl*af*N(a)*(nFi(3)*NxFi(1,b) - nFi(1)*NxFi(3,b))
+            lKd(3,a,b) = lKd(3,a,b) + Ku
+            lK(3,a,b)  = lK(3,a,b)  + afm*Ku
 
-            T1 = nFi(2)*NxFi(3,b) - nFi(3)*NxFi(2,b)
-            lK(7,a,b) = lK(7,a,b) - afl*N(a)*T1
+            lKd(7,a,b) = lKd(7,a,b) - Ku
+            lK(9,a,b)  = lK(9,a,b)  - afm*Ku
 
-            T1 = nFi(3)*NxFi(1,b) - nFi(1)*NxFi(3,b)
-            lK(9,a,b) = lK(9,a,b) - afl*N(a)*T1
+            Ku = wl*af*N(a)*(nFi(3)*NxFi(2,b) - nFi(2)*NxFi(3,b))
+            lKd(6,a,b) = lKd(6,a,b) + Ku
+            lK(7,a,b)  = lK(7,a,b)  + afm*Ku
 
-            T1 = nFi(3)*NxFi(2,b) - nFi(2)*NxFi(3,b)
-            lK(10,a,b) = lK(10,a,b) - afl*N(a)*T1
+            lKd(8,a,b) = lKd(8,a,b) - Ku
+            lK(10,a,b) = lK(10,a,b) - afm*Ku
          END DO
       END DO
 
       RETURN
       END SUBROUTINE BUSTRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+      SUBROUTINE BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -862,19 +900,22 @@
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), hl(eNoN),
      2   dl(tDof,eNoN), nV(2)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*2,eNoN,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, a, b
-      REAL(KIND=8) :: af, Jac, h, wl, afl, T1, F(2,2), Fi(2,2), nFi(2),
+      REAL(KIND=8) :: af, afm, h, Jac, wl, Ku, F(2,2), Fi(2,2), nFi(2),
      2   NxFi(2,eNoN)
 
-      af = eq(cEq)%af*eq(cEq)%gam*dt
-      af = af * af / eq(cEq)%am
-      i  = eq(cEq)%s
-      j  = i + 1
+      af     = eq(cEq)%af*eq(cEq)%gam*dt
+      afm    = af / eq(cEq)%am
+      i      = eq(cEq)%s
+      j      = i + 1
 
-      h  = 0D0
-      F  = MAT_ID(2)
+      h      = 0D0
+      F      = 0D0
+      F(1,1) = 1D0
+      F(2,2) = 1D0
       DO a=1, eNoN
          h       = h      + N(a)*hl(a)
 
@@ -894,21 +935,109 @@
       nFi(1) = nV(1)*Fi(1,1) + nV(2)*Fi(2,1)
       nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2)
 
-      wl  = w*Jac*h
-      afl = af*wl
+      wl = w*Jac*h
       DO a=1, eNoN
          lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
          lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
 
          DO b=1, eNoN
-            T1 = nFi(1)*NxFi(2,b) - nFi(2)*NxFi(1,b)
-            lK(2,a,b) = lK(2,a,b) - afl*N(a)*T1
+            Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
+            lKd(2,a,b) = lKd(2,a,b) + Ku
+            lK(2,a,b)  = lK(2,a,b)  + afm*Ku
 
-            T1 = nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b)
-            lK(4,a,b) = lK(4,a,b) - afl*N(a)*T1
+            lKd(3,a,b) = lKd(3,a,b) - Ku
+            lK(4,a,b)  = lK(4,a,b)  - afm*Ku
          END DO
       END DO
 
       RETURN
       END SUBROUTINE BUSTRUCT2D
+!####################################################################
+      SUBROUTINE USTRUCT_DOASSEM(d, eqN, lKd)
+      USE COMMOD, ONLY: dof, nsd, rowPtr, colPtr, Kd
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: d, eqN(d)
+      REAL(KIND=8), INTENT(IN) :: lKd(dof*nsd,d,d)
+
+      INTEGER a, b, ptr, rowN, colN, left, right
+
+      DO a=1, d
+         rowN = eqN(a)
+         DO b=1, d
+            colN  = eqN(b)
+            left  = rowPtr(rowN)
+            right = rowPtr(rowN+1)
+            ptr   = (right + left)/2
+            DO WHILE (colN .NE. colPtr(ptr))
+               IF (colN .GT. colPtr(ptr)) THEN
+                  left  = ptr
+               ELSE
+                  right = ptr
+               END IF
+               ptr = (right + left)/2
+            END DO
+            Kd(:,ptr) = Kd(:,ptr) + lKd(:,a,b)
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE USTRUCT_DOASSEM
+!--------------------------------------------------------------------
+      SUBROUTINE USTRUCTR(ADg, Yg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: ADg(nsd,tnNo), Yg(tDof,tnNo)
+
+      INTEGER :: i, j, c, s, e
+      REAL(KIND=8) :: ami, afl, KdRd(dof)
+
+      s = eq(cEq)%s
+      e = s + nsd - 1
+      ami = 1D0/eq(cEq)%am
+
+      DO i=1, tnNo
+         Rd(1:nsd,i) = ADg(1:nsd,i) - Yg(s:e,i)
+      END DO
+
+      IF (nsd .EQ. 3) THEN
+!        Update RHS
+         DO i=1, tnNo
+            KdRd = 0D0
+            DO j=rowPtr(i), rowPtr(i+1)-1
+               c = colPtr(j)
+               KdRd(1) = KdRd(1) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
+     2                           + Kd(3 ,j)*Rd(3,c)
+               KdRd(2) = KdRd(2) + Kd(4 ,j)*Rd(1,c) + Kd(5 ,j)*Rd(2,c)
+     2                           + Kd(6 ,j)*Rd(3,c)
+               KdRd(3) = KdRd(3) + Kd(7 ,j)*Rd(1,c) + Kd(8 ,j)*Rd(2,c)
+     2                           + Kd(9 ,j)*Rd(3,c)
+               KdRd(4) = KdRd(4) + Kd(10,j)*Rd(1,c) + Kd(11,j)*Rd(2,c)
+     2                           + Kd(12,j)*Rd(3,c)
+            END DO
+            R(1,i) = R(1,i) - ami*KdRd(1)
+            R(2,i) = R(2,i) - ami*KdRd(2)
+            R(3,i) = R(3,i) - ami*KdRd(3)
+            R(4,i) = R(4,i) - ami*KdRd(4)
+         END DO
+      ELSE
+!        Update RHS
+         DO i=1, tnNo
+            KdRd = 0D0
+            DO j=rowPtr(i), rowPtr(i+1)-1
+               c = colPtr(j)
+               KdRd(1) = KdRd(1) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
+               KdRd(2) = KdRd(2) + Kd(3 ,j)*Rd(1,c) + Kd(4 ,j)*Rd(2,c)
+               KdRd(3) = KdRd(3) + Kd(5 ,j)*Rd(1,c) + Kd(6 ,j)*Rd(2,c)
+            END DO
+            R(1,i) = R(1,i) - ami*KdRd(1)
+            R(2,i) = R(2,i) - ami*KdRd(2)
+            R(3,i) = R(3,i) - ami*KdRd(3)
+         END DO
+      END IF
+
+      RETURN
+      END SUBROUTINE USTRUCTR
 !####################################################################

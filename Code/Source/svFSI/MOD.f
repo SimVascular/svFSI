@@ -834,6 +834,8 @@
       LOGICAL pstEq
 !     Whether CMM equation is solved
       LOGICAL cmmEq
+!     USTRUCT: consistent update of displacement residue
+      LOGICAL ustRd
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required
@@ -842,8 +844,6 @@
       LOGICAL useTrilinosLS
 !     Use C++ Trilinos framework for assembly and for linear solvers
       LOGICAL useTrilinosAssemAndLS
-!     Incompressible solid
-      LOGICAL :: incompFlag = .FALSE.
 
 !     INTEGER VARIABLES
 !     Current domain
@@ -941,6 +941,17 @@
       REAL(KIND=8), ALLOCATABLE :: Yn(:,:)
 !     Fiber direction (for electrophysiology / structure mechanics)
       REAL(KIND=8), ALLOCATABLE :: fN(:,:)
+
+!     Additional arrays for velocity-based formulation of nonlinear
+!     solid mechanics
+!     Old time derivative of displacement
+      REAL(KIND=8), ALLOCATABLE :: ADo(:,:)
+!     New time derivative of displacement
+      REAL(KIND=8), ALLOCATABLE :: ADn(:,:)
+!     Residue of the displacement equation
+      REAL(KIND=8), ALLOCATABLE :: Rd(:,:)
+!     LHS matrix for displacement equation
+      REAL(KIND=8), ALLOCATABLE :: Kd(:,:)
 
 !     Variables for prestress calculations
       REAL(KIND=8), ALLOCATABLE :: pS0(:,:)

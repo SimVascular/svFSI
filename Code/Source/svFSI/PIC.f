@@ -76,6 +76,8 @@
      2            /(eq(iEq)%gam - 1D0)
                Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
             ELSE
+               coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
+               IF (ustRd) ADn(1:nsd,:) = ADo(1:nsd,:)*coef
                Dn(s:e,:) = Do(s:e,:)
             END IF
          END IF
@@ -85,12 +87,12 @@
       END SUBROUTINE PICP
 !====================================================================
 !     This is the initiator
-      SUBROUTINE PICI(Ag, Yg, Dg)
+      SUBROUTINE PICI(Ag, Yg, Dg, ADg)
       USE COMMOD
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(INOUT) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo)
+     2   Dg(tDof,tnNo), ADg(nsd,tnNo)
 
       INTEGER s, e, i, a
       REAL(KIND=8) coef(4)
@@ -98,6 +100,7 @@
       dof         = eq(cEq)%dof
       eq(cEq)%itr = eq(cEq)%itr + 1
 
+      ADg(:,:) = 0D0
       DO i=1, nEq
          s       = eq(i)%s
          e       = eq(i)%e
@@ -121,6 +124,12 @@
             END DO
          END IF
 
+         IF (ustRd) THEN
+            DO a=1, tnNo
+               ADg(:,a) = ADo(:,a)*coef(1) + ADn(:,a)*coef(2)
+            END DO
+         END IF
+
          IF (eq(i)%phys .EQ. phys_preSt) pSn(:,:) = 0D0
       END DO
 
@@ -135,15 +144,16 @@
 
       LOGICAL :: l1, l2, l3, l4
       INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(4), rtmp
+      REAL(KIND=8) :: coef(5), rtmp, ADl(nsd)
       CHARACTER(LEN=stdL) :: sCmd
 
       s       = eq(cEq)%s
       e       = eq(cEq)%e
       coef(1) = eq(cEq)%gam*dt
-      coef(2) = coef(1)*eq(cEq)%af
+      coef(2) = eq(cEq)%af*coef(1)
       coef(3) = eq(cEq)%beta*dt*dt
-      coef(4) = coef(1)*coef(2)/eq(cEq)%am
+      coef(4) = 1D0 / eq(cEq)%am
+      coef(5) = coef(2)*coef(4)
 
       IF (eq(cEq)%phys .EQ. phys_fluid .OR.
      2    eq(cEq)%phys .EQ. phys_CMM   .OR.
@@ -156,9 +166,11 @@
          END DO
       ELSE IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
          DO a=1, tnNo
-            An(s:e,a) = An(s:e,a) - R(:,a)
-            Yn(s:e,a) = Yn(s:e,a) - R(:,a)*coef(1)
-            Dn(s:e,a) = Dn(s:e,a) - R(:,a)*coef(4)
+            An(s:e,a)   = An(s:e,a)   - R(:,a)
+            Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
+            ADl(:)      = Rd(:,a)*coef(4) + R(1:dof-1,a)*coef(5)
+            Dn(s:e-1,a) = Dn(s:e-1,a) - ADl(:)*coef(1)
+            IF (ustRd) ADn(:,a) = ADn(:,a) - ADl(:)
          END DO
       ELSE
          DO a=1, tnNo

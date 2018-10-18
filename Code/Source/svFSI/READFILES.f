@@ -89,6 +89,7 @@
          ichckIEN     = .TRUE.
          zeroAve      = .FALSE.
          ibFlag       = .FALSE.
+         ustRd        = .FALSE.
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
 
@@ -286,6 +287,7 @@
       INTEGER, PARAMETER :: maxOutput = 11
       INTEGER fid, iBc, phys(2), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
+      LOGICAL flag
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) fTmp
@@ -433,7 +435,8 @@
          outPuts(6) = out_acceleration
 
          CALL READLS(lSolver_CG, lEq, list)
-!     PRESTRESS equation solver---------------------
+
+!     Velocity-Pressure based nonlinear STRUCTURAL mechanics solver ---
       CASE ('ustruct')
          lEq%phys = phys_ustruct
 
@@ -454,7 +457,11 @@
          outputs(6) = out_strainInv
 
          CALL READLS(lSolver_CG, lEq, list)
+         ustRd = .TRUE.
+         lPtr => list%get(flag,"Consistent residue update")
+         IF (ASSOCIATED(lPtr)) ustRd = flag
 
+!     PRESTRESS equation solver---------------------
       CASE ('prestress')
          lEq%phys = phys_preSt
          propL(1,1) = solid_density
@@ -471,6 +478,8 @@
          outPuts(2) = out_stress
 
          CALL READLS(lSolver_CG, lEq, list)
+
+!     Nonlinear SHELL mechanics solver --------
       CASE ('shell')
          IF (nsd .NE. 3) err = "Shell mechanics can be solved only"//
      2      " in 3-dimensions"
@@ -741,7 +750,11 @@
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
             CASE (poisson_ratio)
-               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ub=5D-1)
+               IF (lEq%dmn(iDmn)%phys .EQ. phys_ustruct) THEN
+                  lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0)
+               ELSE
+                  lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ub=5D-1)
+               END IF
             CASE (initialization_pressure)
                lPtr => lPD%get(rtmp,"Initialization Pressure",1,lb=0D0)
             CASE (conductivity)
@@ -1598,6 +1611,7 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(listType), INTENT(INOUT) :: lPD
 
       TYPE(listType), POINTER :: lPtr, lSt
+      LOGICAL incompFlag
       CHARACTER(LEN=stdL) ctmp
       REAL(KIND=8) :: E, nu, lam, mu, kap, rtmp
 
@@ -1609,9 +1623,8 @@ c     2         "can be applied for Neumann boundaries only"
       mu  = E/(1D0+nu)/2D0
 
 !     Incompressible material
-      IF (ISZERO(nu-0.5D0)) THEN
-         IF (.NOT.incompFlag) incompFlag = .TRUE.
-      END IF
+      incompFlag = .FALSE.
+      IF (ISZERO(nu-0.5D0)) incompFlag = .TRUE.
 
 !     Bulk modulus for compressible case
       IF (.NOT.incompFlag) THEN

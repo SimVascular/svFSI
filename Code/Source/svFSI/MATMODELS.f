@@ -52,7 +52,7 @@
      2   Inv6
       REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
-     3   f0f0(nsd,nsd), g0g0(nsd,nsd)
+     3   Eff, Ess, kap, Hff(nsd,nsd), Hss(nsd,nsd)
       REAL(KIND=8) :: r1, r2, g1, g2, g3
 
 !     Some preliminaries
@@ -152,29 +152,30 @@
 !     the anisotropic fiber-based strain-energy terms
       CASE (stIso_HGO)
 
+         kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
 
-         f0f0 = (1D0-3D0*stM%kap)*MAT_DYADPROD(fl(:,1), fl(:,1), nsd) +
-     2      stM%kap*IDm
-         g0g0 = (1D0-3D0*stM%kap)*MAT_DYADPROD(fl(:,2), fl(:,2), nsd) +
-     2      stM%kap*IDm
+         Eff  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv4 - 1.0D0
+         Ess  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv6 - 1.0D0
 
-         r1   = stM%kap*Inv1 + (1D0-3D0*stM%kap)*Inv4 - 1D0
-         r2   = stM%kap*Inv1 + (1D0-3D0*stM%kap)*Inv6 - 1D0
+         Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+         Hff  = kap*IDm + (1.0D0-3.0D0*kap)*Hff
+         Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+         Hss  = kap*IDm + (1.0D0-3.0D0*kap)*Hss
 
          g1   = stM%C10
-         g2   = stM%aff * EXP(stM%bff*r1**2) * r1
-         g3   = stM%ass * EXP(stM%bss*r2**2) * r2
-         Sb   = 2D0*(g1*IDm + g2*f0f0 + g3*g0g0)
+         g2   = stM%aff * Eff * EXP(stM%bff*Eff**2)
+         g3   = stM%ass * Ess * EXP(stM%bss*Ess**2)
+         Sb   = 2D0*(g1*IDm + g2*Hff + g3*Hss)
 
-         g1   = stM%aff * EXP(stM%bff*r1**2) * (1D0 + 2D0*stM%bff*r1**2)
-         g2   = stM%ass * EXP(stM%bss*r2**2) * (1D0 + 2D0*stM%bss*r2**2)
-         g1   = g1 * 4D0*J2d*J2d
-         g2   = g2 * 4D0*J2d*J2d
+         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff**2)*EXP(stM%bff*Eff**2)
+         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess**2)*EXP(stM%bss*Ess**2)
+         g1   = 4D0*J2d*J2d * g1
+         g2   = 4D0*J2d*J2d * g2
 
-         CCb  = g1 * TEN_DYADPROD(f0f0, f0f0, nsd) +
-     2          g2 * TEN_DYADPROD(g0g0, g0g0, nsd)
+         CCb  = g1 * TEN_DYADPROD(Hff, Hff, nsd) +
+     2          g2 * TEN_DYADPROD(Hss, Hss, nsd)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -210,10 +211,10 @@
       REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
-      REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6
-      REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
-     2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
-     3   f0f0(nsd,nsd), g0g0(nsd,nsd)
+      REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6,
+     2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
+     3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd), kap, Eff, Ess,
+     4   Hff(nsd,nsd), Hss(nsd,nsd)
       REAL(KIND=8) :: r1, r2, g1, g2, g3
 
 !     Some preliminaries
@@ -271,29 +272,30 @@
 !     the anisotropic fiber-based strain-energy terms
       CASE (stIso_HGO)
 
+         kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
 
-         f0f0 = (1D0-3D0*stM%kap)*MAT_DYADPROD(fl(:,1), fl(:,1), nsd) +
-     2      stM%kap*IDm
-         g0g0 = (1D0-3D0*stM%kap)*MAT_DYADPROD(fl(:,2), fl(:,2), nsd) +
-     2      stM%kap*IDm
+         Eff  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv4 - 1.0D0
+         Ess  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv6 - 1.0D0
 
-         r1   = stM%kap*Inv1 + (1D0-3D0*stM%kap)*Inv4 - 1D0
-         r2   = stM%kap*Inv1 + (1D0-3D0*stM%kap)*Inv6 - 1D0
+         Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+         Hff  = kap*IDm + (1.0D0-3.0D0*kap)*Hff
+         Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+         Hss  = kap*IDm + (1.0D0-3.0D0*kap)*Hss
 
          g1   = stM%C10
-         g2   = stM%aff * EXP(stM%bff*r1**2) * r1
-         g3   = stM%ass * EXP(stM%bss*r2**2) * r2
-         Sb   = 2D0*(g1*IDm + g2*f0f0 + g3*g0g0)
+         g2   = stM%aff * Eff * EXP(stM%bff*Eff**2)
+         g3   = stM%ass * Ess * EXP(stM%bss*Ess**2)
+         Sb   = 2D0*(g1*IDm + g2*Hff + g3*Hss)
 
-         g1   = stM%aff * EXP(stM%bff*r1**2) * (1D0 + 2D0*stM%bff*r1**2)
-         g2   = stM%ass * EXP(stM%bss*r2**2) * (1D0 + 2D0*stM%bss*r2**2)
-         g1   = g1 * 4D0*J2d*J2d
-         g2   = g2 * 4D0*J2d*J2d
+         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff**2)*EXP(stM%bff*Eff**2)
+         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess**2)*EXP(stM%bss*Ess**2)
+         g1   = 4D0*J2d*J2d * g1
+         g2   = 4D0*J2d*J2d * g2
 
-         CCb  = g1 * TEN_DYADPROD(f0f0, f0f0, nsd) +
-     2          g2 * TEN_DYADPROD(g0g0, g0g0, nsd)
+         CCb  = g1 * TEN_DYADPROD(Hff, Hff, nsd) +
+     2          g2 * TEN_DYADPROD(Hss, Hss, nsd)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -326,13 +328,14 @@
       REAL(KIND=8), INTENT(IN) :: p
       REAL(KIND=8), INTENT(OUT) :: ro, bt, dro, dbt
 
-      REAL(KIND=8) :: Kp, r1, r2
+      REAL(KIND=8) :: Kp, nu, r1, r2
 
       ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)
+      nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       bt  = 0D0
       dbt = 0D0
       dro = 0D0
-      IF (incompFlag) RETURN
+      IF (ISZERO(nu-0.5D0)) RETURN
 
       Kp = stM%Kpen
       SELECT CASE (stM%volType)
@@ -388,7 +391,7 @@
       nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
 
       mu  = 5D-1*Em / (1.0D0 + nu)
-      IF (incompFlag) THEN
+      IF (ISZERO(nu-0.5D0)) THEN
          c = SQRT(mu / rho)
       ELSE
          lam = 2.0D0*mu*nu / (1.0D0-2.0D0*nu)

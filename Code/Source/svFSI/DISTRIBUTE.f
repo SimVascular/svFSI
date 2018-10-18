@@ -165,6 +165,7 @@
          CALL cm%bcast(useTrilinosLS)
          CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
+         CALL cm%bcast(ustRd)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)
@@ -509,7 +510,6 @@
          IF (lEq%dmn(iDmn)%phys .EQ. phys_struct  .OR.
      2       lEq%dmn(iDmn)%phys .EQ. phys_ustruct .OR.
      3       lEq%dmn(iDmn)%phys .EQ. phys_preSt) THEN
-            CALL cm%bcast(incompFlag)
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
       END DO

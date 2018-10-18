@@ -43,8 +43,9 @@
       REAL(KIND=8), INTENT(INOUT) :: lA(tDof, tnNo), lY(tDof, tnNo),
      2   lD(tDof, tnNo)
 
-      INTEGER iFa, a, Ac, iEq, iBc, s, e, iM, nNo, lDof, i
       LOGICAL :: eDir(maxnsd)
+      INTEGER iFa, a, Ac, iEq, iBc, s, e, iM, nNo, lDof, i, j
+      REAL(KIND=8) :: c1, c2
 
       REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:)
 
@@ -86,10 +87,11 @@
             ALLOCATE(tmpA(lDof,nNo), tmpY(lDof,nNo))
             CALL SETBCDIRL(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), tmpA, tmpY,
      2         lDof)
+
             IF (ANY(eDir)) THEN
-               DO a=1, msh(iM)%fa(iFa)%nNo
-                  Ac = msh(iM)%fa(iFa)%gN(a)
-                  IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
+               IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
+                  DO a=1, msh(iM)%fa(iFa)%nNo
+                     Ac = msh(iM)%fa(iFa)%gN(a)
                      DO i=1, nsd
                         lDof = 0
                         IF (eDir(i)) THEN
@@ -98,7 +100,10 @@
                            lD(s+i-1,Ac) = tmpY(lDof,a)
                         END IF
                      END DO
-                  ELSE
+                  END DO
+               ELSE
+                  DO a=1, msh(iM)%fa(iFa)%nNo
+                     Ac = msh(iM)%fa(iFa)%gN(a)
                      DO i=1, nsd
                         lDof = 0
                         IF (eDir(i)) THEN
@@ -107,21 +112,84 @@
                            lY(s+i-1,Ac) = tmpY(lDof,a)
                         END IF
                      END DO
-                  END IF
-               END DO
+                  END DO
+               END IF
             ELSE
-               DO a=1, msh(iM)%fa(iFa)%nNo
-                  Ac = msh(iM)%fa(iFa)%gN(a)
-                  IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
+               IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
+                  DO a=1, msh(iM)%fa(iFa)%nNo
+                     Ac = msh(iM)%fa(iFa)%gN(a)
                      lY(s:e,Ac) = tmpA(:,a)
                      lD(s:e,Ac) = tmpY(:,a)
-                  ELSE
+                  END DO
+               ELSE
+                  DO a=1, msh(iM)%fa(iFa)%nNo
+                     AC = msh(iM)%fa(iFa)%gN(a)
                      lA(s:e,Ac) = tmpA(:,a)
                      lY(s:e,Ac) = tmpY(:,a)
-                  END IF
-               END DO
+                  END DO
+               END IF
             END IF
-         END DO
+
+            IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
+               c1 = eq(iEq)%gam * dt
+               c2 = (1.0D0 - eq(iEq)%gam)*dt
+               IF (ANY(eDir)) THEN
+                  IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
+                     DO a=1, msh(iM)%fa(iFa)%nNo
+                        Ac = msh(iM)%fa(iFa)%gN(a)
+                        DO i=1, nsd
+                           IF (eDir(i)) THEN
+                              j = s + i - 1
+                              lA(j,Ac)  = (1.0D0/c1) *
+     2                           (lY(j,Ac) - Yo(j,Ac) - c2*Ao(j,Ac))
+                              IF (ustRd) THEN
+                                 ADn(i,Ac) = (1.0D0/c1) *
+     2                              (lD(j,Ac) - Do(j,Ac) - c2*ADo(i,Ac))
+                              END IF
+                           END IF
+                        END DO
+                     END DO
+                  ELSE
+                     DO a=1, msh(iM)%fa(iFa)%nNo
+                        Ac = msh(iM)%fa(iFa)%gN(a)
+                        DO i=1, nsd
+                           IF (eDir(i)) THEN
+                              j = s + i - 1
+                              lD(j,Ac) = Do(j,Ac) + c1*lY(j,Ac) +
+     2                           c2*Yo(j,Ac)
+                              IF (ustRd) THEN
+                                 ADn(i,Ac) = (1.0D0/c1) *
+     2                              (lD(j,Ac) - Do(j,Ac) - c2*ADo(i,Ac))
+                              END IF
+                           END IF
+                        END DO
+                     END DO
+                  END IF
+               ELSE
+                  IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
+                     DO a=1, msh(iM)%fa(iFa)%nNo
+                        Ac = msh(iM)%fa(iFa)%gN(a)
+                        lA(s:e,Ac) = (1.0d0/c1) *
+     2                     (lY(s:e,Ac) - Yo(s:e,Ac) - c2*Ao(s:e,Ac))
+                        IF (ustRd) THEN
+                           ADn(1:nsd,Ac) = (1.0D0/c1) * (lD(s:e,Ac)  -
+     2                        Do(s:e,Ac) - c2*ADo(1:nsd,Ac))
+                        END IF
+                     END DO
+                  ELSE
+                     DO a=1, msh(iM)%fa(iFa)%nNo
+                        Ac = msh(iM)%fa(iFa)%gN(a)
+                        lD(s:e,Ac) = Do(s:e,Ac) + c1*lY(s:e,Ac) +
+     2                     c2*Yo(s:e,Ac)
+                        IF (ustRd) THEN
+                           ADn(1:nsd,Ac) = (1.0D0/c1) * (lD(s:e,Ac) -
+     2                        Do(s:e,Ac) - c2*ADo(1:nsd,Ac))
+                        END IF
+                     END DO
+                  END IF
+               END IF
+            END IF
+         END DO ! iBc
 
          IF (ibFlag) THEN
             CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
@@ -132,7 +200,7 @@
                END IF
             END IF
          END IF
-      END DO
+      END DO ! iEq
 
       RETURN
       END SUBROUTINE SETBCDIR
@@ -346,7 +414,6 @@
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nV)
             Jac = SQRT(NORM(nV))
-            nV  = nV/Jac
             w   = lFa%w(g)*Jac
             N   = lFa%N(:,g)
 
@@ -356,7 +423,7 @@
             END DO
 
             DO a=1, eNoN
-               lR(:,a) = lR(:,a) - w*N(a)*h(:)
+               lR(1:nsd,a) = lR(1:nsd,a) - w*N(a)*h(:)
             END DO
          END DO
 

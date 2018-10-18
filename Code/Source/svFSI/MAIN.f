@@ -52,7 +52,8 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       INTEGER, ALLOCATABLE :: ptr(:), incL(:), ltgReordered(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), Ag(:,:), al(:,:), Yg(:,:),
      2   yl(:,:), Dg(:,:), dl(:,:), dol(:,:), fNl(:,:), res(:),
-     3   pS0l(:,:), RTrilinos(:,:), dirW(:,:), bfg(:,:), bfl(:,:)
+     3   pS0l(:,:), RTrilinos(:,:), dirW(:,:), bfg(:,:), bfl(:,:),
+     4   ADg(:,:)
 
 !--------------------------------------------------------------------
       l1 = .FALSE.
@@ -92,7 +93,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
       dbg = 'Allocating intermediate variables'
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo),
-     2   res(nFacesLS), incL(nFacesLS))
+     2   res(nFacesLS), incL(nFacesLS), ADg(nsd,tnNo))
 
 !--------------------------------------------------------------------
 !     Outer loop for marching in time. When entring this loop, all old
@@ -151,7 +152,11 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             END IF
 
 !     Initiator step (quantities at n+am, n+af)
-            CALL PICI(Ag, Yg, Dg)
+            CALL PICI(Ag, Yg, Dg, ADg)
+            IF (ALLOCATED(Rd)) THEN
+               Rd = 0D0
+               Kd = 0D0
+            END IF
 
             dbg = 'Allocating the RHS and LHS'
             IF (ALLOCATED(R)) THEN
@@ -263,6 +268,11 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
 !     Apply contact model and add its contribution to residue
             IF (iCntct) CALL CONTACTFORCES(Dg)
+
+!     Consistently update residue for displacement equation
+            IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
+               IF (ustRd) CALL USTRUCTR(ADg, Yg)
+            END IF
 
             incL = 0
             IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
@@ -406,13 +416,14 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          Ao = An
          Yo = Yn
          IF (dFlag) Do = Dn
+         IF (ALLOCATED(ADo)) ADo = ADn
          cplBC%xo = cplBC%xn
       END DO
 !     End of outer loop
 
       IF (resetSim) THEN
          CALL REMESHRESTART(timeP)
-         DEALLOCATE(Ag, Yg, Dg, incL, res)
+         DEALLOCATE(Ag, Yg, Dg, ADg, incL, res)
          IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
             DEALLOCATE(ltgReordered, dirW, RTrilinos)
          END IF
@@ -428,7 +439,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          DEALLOCATE(ltgReordered, dirW, RTrilinos)
       END IF
 #endif
-      DEALLOCATE(Ag, Yg, Dg, incL, res)
+      DEALLOCATE(Ag, Yg, Dg, ADg, incL, res)
 
       CALL MPI_FINALIZE(ierr)
 
