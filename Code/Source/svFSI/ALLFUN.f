@@ -71,7 +71,7 @@
       INTERFACE DESTROY
          MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYEQ,
      2      DESTROYBS, DESTROYMB, DESTROYDATA, DESTROYADJ, DESTROYSTACK,
-     3      DESTROYQUEUE, DESTROYTRACE, DESTROYFCELL
+     3      DESTROYQUEUE, DESTROYTRACE, DESTROYFCELL, DESTROYIBCM
       END INTERFACE DESTROY
 
       INTERFACE GETNADJCNCY
@@ -82,9 +82,9 @@
          MODULE PROCEDURE GETEADJ_MSH, GETEADJ_FACE
       END INTERFACE
 
-c      INTERFACE IB_SYNC
-c         MODULE PROCEDURE IB_SYNCS, IB_SYNCV
-c      END INTERFACE
+      INTERFACE IB_SYNC
+         MODULE PROCEDURE IB_SYNCS, IB_SYNCV
+      END INTERFACE
 
       CONTAINS
 !####################################################################
@@ -1159,6 +1159,17 @@ c      END INTERFACE
 
       RETURN
       END SUBROUTINE DESTROYFCELL
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYIBCM(ibCm)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(ibCommType), INTENT(OUT) :: ibCm
+
+      IF (ALLOCATED(ibCm%n))  DEALLOCATE(ibCm%n)
+      IF (ALLOCATED(ibCm%gE)) DEALLOCATE(ibCm%gE)
+
+      RETURN
+      END SUBROUTINE DESTROYIBCM
 !####################################################################
 !     Spliting "m" jobs between "n" workers. "b" contains amount of jobs
 !     and "A" will store the distribution of jobs
@@ -1896,150 +1907,203 @@ c         CALL FLUSH(1000+cm%tF())
 
       RETURN
       END SUBROUTINE FINDE
-c!####################################################################
-c      SUBROUTINE IB_SYNCS(U)
-c      USE COMMOD
-c      IMPLICIT NONE
+!####################################################################
+      SUBROUTINE IB_SYNCS(U)
+      USE COMMOD
+      IMPLICIT NONE
 
-c      REAL(KIND=8), INTENT(INOUT) :: U(:)
+      REAL(KIND=8), INTENT(INOUT) :: U(:)
 
-c      INTEGER a, i, Ac, iM, nl, ng, ierr
+      INTEGER i, a, e, Ac, iM, iFa, nl, ng, ierr, tag, sReq
 
-c      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
-c      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
+      INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
 
-c      IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
-c     2   "to synchronize IB data"
+      IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
+     2   "to synchronize IB data"
 
-c      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
-c     2   "initialized. Correction necessary"
+      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+     2   "initialized. Correction necessary"
 
-c      nl = 0
-c      DO iM=1, ib%nMsh
-c         nl = nl + ib%msh(iM)%trc%nNo
-c      END DO
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
+            DO i=1, ib%msh(iM)%trc%n
+               e = ib%msh(iM)%trc%gE(1,i)
+               DO a=1, ib%msh(iM)%eNoN
+                  Ac = ib%msh(iM)%IEN(a,e)
+                  incNd(Ac) = 1
+               END DO
+            END DO
+         ELSE
+            DO iFa=1, ib%msh(iM)%nFa
+               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
+                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
+                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
+                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
+                     incNd(Ac) = 1
+                  END DO
+               END DO
+            END DO
+         END IF
+      END DO
 
-c      ALLOCATE(lU(nl))
-c      nl = 0
-c      DO iM=1, ib%nMsh
-c         DO a=1, ib%msh(iM)%trc%nNo
-c            nl = nl + 1
-c            Ac = ib%msh(iM)%trc%gN(a)
-c            lU(nl) = U(Ac)
-c         END DO
-c      END DO
+      nl = SUM(incNd)
+      ALLOCATE(lU(nl))
+      nl = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .EQ. 1) THEN
+            nl = nl + 1
+            lU(nl) = U(a)
+         END IF
+      END DO
+      DEALLOCATE(incNd)
 
-c      ALLOCATE(sCount(cm%np()), disp(cm%np()))
-c      sCount = 0
-c      disp   = 0
-c      IF (cm%mas()) THEN
-c         sCount(:) = ib%cm%n(:)
-c         DO i=2, cm%np()
-c            disp(i) = disp(i-1) + sCount(i-1)
-c         END DO
-c      END IF
+      ng = SUM(ib%cm%n)
+      ALLOCATE(gU(ng))
+      IF (cm%mas()) THEN
+         ALLOCATE(rReq(cm%np()))
+         rReq = 0
+         gU   = 0D0
+         ng   = 0
+         DO i=1, cm%np()
+            nl = ib%cm%n(i)
+            IF (nl .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               gU(ng+1:ng+nl) = lU(1:nl)
+            ELSE
+               tag = i * 100
+               CALL MPI_IRECV(gU(ng+1:ng+nl), nl, mpreal, i-1, tag,
+     2            cm%com(), rReq(i), ierr)
+            END IF
+            ng = ng + nl
+         END DO
 
-c      ng = SUM(sCount)
-c      ALLOCATE(gU(ng))
-c      CALL MPI_GATHERV(lU, nl, mpreal, gU, sCount, disp, mpreal, master,
-c     2   cm%com(), ierr)
-c      DEALLOCATE(lU, sCount, disp)
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%n(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
 
-c      U = 0D0
-c      IF (cm%mas()) THEN
-c         ALLOCATE(sCount(ib%tnNo))
-c         sCount = 0
-c         DO a=1, ng
-c            Ac = ib%cm%gN(a)
-c            U(Ac)  = U(Ac) + gU(a)
-c            sCount(Ac) = sCount(Ac) + 1
-c         END DO
+         U = 0D0
+         DO a=1, ng
+            Ac    = ib%cm%gE(a)
+            U(Ac) = U(Ac) + gU(a)
+         END DO
+      ELSE IF (nl .NE. 0) THEN
+         tag = cm%tF() * 100
+         CALL MPI_SEND(lU, nl, mpreal, master, tag, cm%com(), ierr)
+      END IF
 
-c         DO a=1, ib%tnNo
-c            IF (sCount(a) .GT. 0) U(a) = U(a) / REAL(sCount(a),KIND=8)
-c         END DO
-c      END IF
-c      DEALLOCATE(gU)
+      DEALLOCATE(lU, gU)
 
-c      CALL cm%bcast(U)
+      CALL cm%bcast(U)
 
-c      RETURN
-c      END SUBROUTINE IB_SYNCS
-c!--------------------------------------------------------------------
-c      SUBROUTINE IB_SYNCV(U)
-c      USE COMMOD
-c      IMPLICIT NONE
+      RETURN
+      END SUBROUTINE IB_SYNCS
+!--------------------------------------------------------------------
+      SUBROUTINE IB_SYNCV(U)
+      USE COMMOD
+      IMPLICIT NONE
 
-c      REAL(KIND=8), INTENT(INOUT) :: U(:,:)
+      REAL(KIND=8), INTENT(INOUT) :: U(:,:)
 
-c      INTEGER a, i, Ac, iM, m, nl, ng, ierr
+      INTEGER m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag, sReq
 
-c      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
-c      REAL(KIND=8), ALLOCATABLE :: lU(:,:), gU(:,:)
+      INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
 
-c      m = SIZE(U,1)
-c      IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//
-c     2   "to synchronize IB data"
+      m = SIZE(U,1)
+      IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//
+     2   "to synchronize IB data"
 
-c      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
-c     2   "initialized. Correction necessary"
+      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+     2   "initialized. Correction necessary"
 
-c      nl = 0
-c      DO iM=1, ib%nMsh
-c         nl = nl + ib%msh(iM)%trc%nNo
-c      END DO
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
+            DO i=1, ib%msh(iM)%trc%n
+               e = ib%msh(iM)%trc%gE(1,i)
+               DO a=1, ib%msh(iM)%eNoN
+                  Ac = ib%msh(iM)%IEN(a,e)
+                  incNd(Ac) = 1
+               END DO
+            END DO
+         ELSE
+            DO iFa=1, ib%msh(iM)%nFa
+               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
+                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
+                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
+                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
+                     incNd(Ac) = 1
+                  END DO
+               END DO
+            END DO
+         END IF
+      END DO
 
-c      ALLOCATE(lU(m,nl))
-c      nl = 0
-c      DO iM=1, ib%nMsh
-c         DO a=1, ib%msh(iM)%trc%nNo
-c            nl = nl + 1
-c            Ac = ib%msh(iM)%trc%gN(a)
-c            lU(:,nl) = U(:,Ac)
-c         END DO
-c      END DO
+      nl = SUM(incNd)
+      ALLOCATE(lU(m*nl))
+      nl = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .EQ. 1) THEN
+            nl = nl + 1
+            s  = (nl-1)*m + 1
+            e  = (nl-1)*m + m
+            lU(s:e) = U(1:m,a)
+         END IF
+      END DO
+      DEALLOCATE(incNd)
 
-c      ALLOCATE(sCount(cm%np()), disp(cm%np()))
-c      sCount = 0
-c      disp   = 0
-c      IF (cm%mas()) THEN
-c         sCount(:) = ib%cm%n(:) * m
-c         DO i=2, cm%np()
-c            disp(i) = disp(i-1) + sCount(i-1)
-c         END DO
-c      END IF
+      ng = SUM(ib%cm%n)
+      ALLOCATE(gU(m*ng))
+      IF (cm%mas()) THEN
+         ALLOCATE(rReq(cm%np()))
+         rReq = 0
+         gU   = 0D0
+         ng   = 0
+         DO i=1, cm%np()
+            nl = ib%cm%n(i)
+            IF (nl .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               s = 1
+               e = nl*m
+               gU(s:e) = lU(:)
+            ELSE
+               tag = i * 100
+               s = ng*m + 1
+               e = ng*m + nl*m
+               CALL MPI_IRECV(gU(s:e), nl*m, mpreal, i-1, tag,
+     2            cm%com(), rReq(i), ierr)
+            END IF
+            ng = ng + nl
+         END DO
 
-c      ng = SUM(sCount) / m
-c      IF (SIZE(ib%cm%gN,1) .NE. ng) err = " Inconsistent size of IB "//
-c     2   "comm structure. Correction needed"
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%n(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
 
-c      ALLOCATE(gU(m,ng))
-c      CALL MPI_GATHERV(lU, m*nl, mpreal, gU, sCount, disp, mpreal,
-c     2   master, cm%com(), ierr)
+         U = 0D0
+         DO a=1, ng
+            Ac = ib%cm%gE(a)
+            s  = (a-1)*m + 1
+            e  = (a-1)*m + m
+            U(1:m,Ac) = U(1:m,Ac) + gU(s:e)
+         END DO
+      ELSE IF (nl .NE. 0) THEN
+         tag = cm%tF() * 100
+         CALL MPI_SEND(lU, nl*m, mpreal, master, tag, cm%com(), ierr)
+      END IF
 
-c      DEALLOCATE(lU, sCount, disp)
+      DEALLOCATE(lU, gU)
 
-c      U = 0D0
-c      IF (cm%mas()) THEN
-c         ALLOCATE(sCount(ib%tnNo))
-c         sCount = 0
-c         DO a=1, ng
-c            Ac = ib%cm%gN(a)
-c            U(:,Ac)  = U(:,Ac) + gU(:,a)
-c            sCount(Ac) = sCount(Ac) + 1
-c         END DO
+      CALL cm%bcast(U)
 
-c         DO a=1, ib%tnNo
-c            i = sCount(a)
-c            IF (i .GT. 0) U(:,a) = U(:,a) / REAL(i,KIND=8)
-c         END DO
-c      END IF
-c      DEALLOCATE(gU)
-
-c      CALL cm%bcast(U)
-
-c      RETURN
-c      END SUBROUTINE IB_SYNCV
-c!####################################################################
+      RETURN
+      END SUBROUTINE IB_SYNCV
+!####################################################################
       END MODULE ALLFUN
 !####################################################################

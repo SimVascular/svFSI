@@ -1086,6 +1086,9 @@ c     2         "can be applied for Neumann boundaries only"
          CALL IB_INITTRACES(ib%msh(iM), lD)
       END DO
 
+!     Initialize IB communication structure
+      CALL IB_SETCOMMU()
+
 !     Identify ghost cells for immersed boundaries
       CALL IB_SETIGHOST()
 
@@ -1834,8 +1837,8 @@ c     2                STR(Ec)
 c               END DO
 c            END DO
 c            CALL FLUSH(1000+cm%tF())
-            std = " WARNING: Detected "//STR(i)//" IB traces out of "
-     2         //STR(j)//" on IB mesh "//CLR(lM%name)
+            std = " WARNING (IB INIT): Detected "//STR(i)//
+     2       " IB traces out of "//STR(j)//" on IB mesh "//CLR(lM%name)
          END IF
 
          DEALLOCATE(incEl, ePtr)
@@ -1885,8 +1888,9 @@ c     2                   STR(Ec)
 c                  END DO
 c               END DO
 c               CALL FLUSH(1000+cm%tF())
-               std = " WARNING: Detected "//STR(i)//" IB traces out of "
-     2            //STR(j)//" on IB face "//CLR(lM%fa(iFa)%name)
+               std = " WARNING (IB INIT): Detected "//STR(i)//
+     2          " IB traces out of "//STR(j)//" on IB face "//
+     3          CLR(lM%fa(iFa)%name)
             END IF
             DEALLOCATE(incEl, ePtr)
          END DO
@@ -1929,6 +1933,9 @@ c               CALL FLUSH(1000+cm%tF())
             END DO
          END IF
       END DO
+
+!     Reset IB communicator
+      CALL IB_SETCOMMU()
 
 !     Now that we have updated iblank field and IB traces, time to
 !     update ghost cells
@@ -1981,9 +1988,9 @@ c               CALL FLUSH(1000+cm%tF())
 !     neighborhood of previous element tracers
       ALLOCATE(gPtr(2,lM%nG,lM%nEl), ichk(lM%nEl), xl(nsd,lM%eNoN))
       gPtr = 0
-      iswp = 0
+      iswp = 1
       ichk = .FALSE.
-      DO WHILE (iswp.LE.1 .AND. ipass)
+      DO WHILE (iswp.LE.3 .AND. ipass)
          DO e=1, lM%nEl
             DO a=1, lM%eNoN
                Ac = lM%IEN(a,e)
@@ -2033,13 +2040,13 @@ c               CALL FLUSH(1000+cm%tF())
       DEALLOCATE(ePtr)
 
 !     Reset incEl for the elements whose traces are newly determined
+      incEl = 1
       DO e=1, lM%nEl
          i = 0
          DO g=1, lM%nG
             IF (gPtr(1,g,e) .NE. 0) i = i + 1
          END DO
          IF (i .EQ. lM%nG) incEl(e) = 0
-         IF (.NOT.ichk(e)) incEl(e) = 1
       END DO
 
 !     Perform a general search for all the remaining nodes including
@@ -2087,8 +2094,8 @@ c     2            STR(Ec)
 c            END DO
 c         END DO
 c         CALL FLUSH(1000+cm%tF())
-         std = " WARNING: Detected "//STR(i)//" IB traces out of "
-     2      //STR(j)//" on IB mesh "//CLR(lM%name)
+         std = " WARNING (IB UPDATE): Detected "//STR(i)//
+     2    " IB traces out of "//STR(j)//" on IB mesh "//CLR(lM%name)
       END IF
 
       DEALLOCATE(incEl, gPtr)
@@ -2192,13 +2199,13 @@ c         CALL FLUSH(1000+cm%tF())
       DEALLOCATE(ePtr)
 
 !     Reset incEl for the elements whose traces are newly determined
+      incEl = 1
       DO e=1, lFa%nEl
          i = 0
          DO g=1, lFa%nG
             IF (gPtr(1,g,e) .NE. 0) i = i + 1
          END DO
          IF (i .EQ. lFa%nG) incEl(e) = 0
-         IF (.NOT.ichk(e)) incEl(e) = 1
       END DO
 
 !     Perform a general search for all the remaining nodes including
@@ -2246,8 +2253,8 @@ c     2            STR(Ec)
 c            END DO
 c         END DO
 c         CALL FLUSH(1000+cm%tF())
-         std = " WARNING: Detected "//STR(i)//" IB traces out of "
-     2      //STR(j)//" on IB mesh "//CLR(lFa%name)
+         std = " WARNING (IB UPDATE): Detected "//STR(i)//
+     2    " IB traces out of "//STR(j)//" on IB mesh "//CLR(lFa%name)
       END IF
 
       DEALLOCATE(incEl, gPtr)
@@ -3029,6 +3036,127 @@ c         CALL FLUSH(1000+cm%tF())
 
       RETURN
       END SUBROUTINE IB_FPSRCH
+!####################################################################
+!     Communication structure for IB is initialized here. Here we
+!     create a list of nodal traces on master that are local to other
+!     processes. The master then gathers all the data, projects flow
+!     variables (acceleration, velocity and pressure) and broadcasts to
+!     all the processes.
+      SUBROUTINE IB_SETCOMMU()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER i, a, e, n, Ac, iM, iFa, ierr, tag, sReq
+
+      INTEGER, ALLOCATABLE :: incNd(:), ptr(:), rA(:,:), rReq(:)
+
+!     Free memory if already allocated
+      CALL DESTROY(ib%cm)
+
+!     Map trace pointers local to a process into a nodal vector. Note,
+!     however, that the traces point to integration point of an element.
+!     Therefore, we set all the nodes of an element that get contribution
+!     from a valid trace.
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
+            DO i=1, ib%msh(iM)%trc%n
+               e = ib%msh(iM)%trc%gE(1,i)
+               DO a=1, ib%msh(iM)%eNoN
+                  Ac = ib%msh(iM)%IEN(a,e)
+                  incNd(Ac) = 1
+               END DO
+            END DO
+         ELSE
+            DO iFa=1, ib%msh(iM)%nFa
+               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
+                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
+                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
+                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
+                     incNd(Ac) = 1
+                  END DO
+               END DO
+            END DO
+         END IF
+      END DO
+
+!     All the included IB nodes are now mapped to a local vector
+      n = SUM(incNd)
+      ALLOCATE(ptr(n))
+      i = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .NE. 0) THEN
+            i = i + 1
+            ptr(i) = a
+         END IF
+      END DO
+
+!     Set IB comm data structures for sequential run
+      IF (cm%seq()) THEN
+         ALLOCATE(ib%cm%n(1), ib%cm%gE(n))
+         ib%cm%n(1)  = n
+         ib%cm%gE(:) = ptr
+         DEALLOCATE(incNd, ptr)
+         RETURN
+      END IF
+
+!     Gather no of included nodes from each process on master. Data at
+!     these nodes will later be gathered by master from other processes
+      ALLOCATE(ib%cm%n(cm%np()))
+      ib%cm%n = 0
+      CALL MPI_GATHER(n, 1, mpint, ib%cm%n, 1, mpint, master, cm%com(),
+     2   ierr)
+
+!     The processes that do not have any nodal traces return
+      IF (.NOT.cm%mas() .AND. n.EQ.0) THEN
+         DEALLOCATE(incNd, ptr)
+         ALLOCATE(ib%cm%gE(0))
+         RETURN
+      END IF
+
+!     Master receives list of all nodal traces from other processes
+      IF (cm%mas()) THEN
+         n = SUM(ib%cm%n)
+         a = MAXVAL(ib%cm%n)
+         ALLOCATE(ib%cm%gE(n), rA(a,cm%np()), rReq(cm%np()))
+         ib%cm%gE  = 0
+         rA(:,:)   = 0
+         DO i=1, cm%np()
+            n = ib%cm%n(i)
+            IF (n .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               rA(1:n,i) = ptr(:)
+            ELSE
+               tag = i*100
+               CALL MPI_IRECV(rA(1:n,i), n, mpint, i-1, tag, cm%com(),
+     2            rReq(i), ierr)
+            END IF
+         END DO
+
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%n(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
+         DEALLOCATE(rReq)
+
+         a = 0
+         DO i=1, cm%np()
+            n = ib%cm%n(i)
+            ib%cm%gE(a+1:a+n) = rA(1:n,i)
+            a = a + n
+         END DO
+      ELSE
+         ALLOCATE(ib%cm%gE(0), rA(0,0))
+         tag = cm%tF() * 100
+         CALL MPI_SEND(ptr, n, mpint, master, tag, cm%com(), ierr)
+      END IF
+
+      DEALLOCATE(incNd, ptr, rA)
+
+      RETURN
+      END SUBROUTINE IB_SETCOMMU
 !####################################################################
 !     Set ighost field
 !        ighost is set for both solids and shells
@@ -4368,7 +4496,7 @@ c      CALL IB_SYNC(sA)
       REAL(KIND=8), ALLOCATABLE :: Ub(:,:)
 
       INTEGER a, i, iEq
-      REAL(KIND=8) ctime
+      REAL(KIND=8) ctime, cmtime, utime
 
       ib%cEq = 0
       DO iEq=1, nEq
@@ -4382,7 +4510,7 @@ c      CALL IB_SYNC(sA)
       ctime = CPUT()
 !     First, project fluid variables (velocity, pressure, acceleration)
 !     at previous time step from fluid mesh to IB solid mesh
-      CALL IB_PROJFVAR(Ag, Yg, Dg, ib%Ao, ib%Yo, ib%Uo)
+      CALL IB_PROJFVAR(Ag, Yg, Dg, ib%Ao, ib%Yo, ib%Uo, cmtime)
 
 !     Update IB solid displacement from the projected solid velocity
       ALLOCATE(Ub(nsd,ib%tnNo))
@@ -4398,22 +4526,34 @@ c      CALL IB_SYNC(sA)
 
 !     Use new displacement field data to update tracer pointers
       ib%Uo = Ub
+      utime = CPUT()
       CALL IB_UPDATE(Dg)
+      utime = CPUT() - utime
       DEALLOCATE(Ub)
+
       ib%callD = CPUT() - ctime
+
+      IF (cm%mas()) THEN
+         WRITE(*,'(A)') " "//REPEAT("-", 52)
+         WRITE(*,'(A,F6.2,A)') " IB call duration: ", ib%callD, ' sec'//
+     2      " (comm."//STR(NINT(1D2*cmtime/ib%callD),3)//
+     3      "%, updt."//STR(NINT(1D2*utime/ib%callD),3)//"%)"
+         WRITE(*,'(A)') " "//REPEAT("-", 52)
+      END IF
 
       RETURN
       END SUBROUTINE IB_GETFFSI
 !--------------------------------------------------------------------
 !     Poject fluid velocity, pressure and acceleration onto IB
-      SUBROUTINE IB_PROJFVAR(Ag, Yg, Dg, Ab, Yb, Ub)
+      SUBROUTINE IB_PROJFVAR(Ag, Yg, Dg, Ab, Yb, Ub, cmtime)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2  Dg(tDof,tnNo), Ub(nsd,ib%tnNo)
-      REAL(KIND=8), INTENT(OUT) :: Ab(nsd,ib%tnNo), Yb(nsd+1,ib%tnNo)
+     2   Dg(tDof,tnNo), Ub(nsd,ib%tnNo)
+      REAL(KIND=8), INTENT(OUT) :: Ab(nsd,ib%tnNo), Yb(nsd+1,ib%tnNo),
+     2   cmtime
 
       LOGICAL :: flag
       INTEGER :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM, eNoN, eNoNb
@@ -4519,11 +4659,12 @@ c      CALL IB_SYNC(sA)
          DEALLOCATE(Nb, Nbx, xbl)
       END DO
 
-c!     Synchronize Ab, Yb across all the processes
-c      CALL IB_SYNC(Ab)
-c      CALL IB_SYNC(Yb)
-
-!     TODO: Communication across IB domain boundaries
+!     Synchronize Ab, Yb across all the processes
+      cmtime = CPUT()
+      CALL IB_SYNC(Ab)
+      CALL IB_SYNC(Yb)
+      CALL IB_SYNC(sA)
+      cmtime = CPUT() - cmtime
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(sA(a))) THEN

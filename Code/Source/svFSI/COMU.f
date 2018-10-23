@@ -123,7 +123,6 @@
       CONTAINS
 
 !####################################################################
-
       SUBROUTINE NEWCM(cm, comHandle)
       IMPLICIT NONE
       CLASS(cmType) cm
@@ -253,9 +252,7 @@
 
       RETURN
       END SUBROUTINE FSTOP
-
 !####################################################################
-
       SUBROUTINE BCASTLS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -386,9 +383,7 @@
 
       RETURN
       END SUBROUTINE BCASTSV
-
 !####################################################################
-
       SUBROUTINE SENDRV(cm, u, to, tag)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -504,9 +499,7 @@
 
       RETURN
       END SUBROUTINE WAITV
-
 !####################################################################
-
       FUNCTION REDUCERS(cm, u, iOp) RESULT(gU)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -594,9 +587,7 @@
 
       RETURN
       END FUNCTION REDUCERV
-
 !####################################################################
-
       FUNCTION createCH(cm, pid) RESULT(ch)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -614,9 +605,7 @@
 
       RETURN
       END FUNCTION createCH
-
 !####################################################################
-
       SUBROUTINE cmAssignCm(s,r)
       IMPLICIT NONE
       CLASS(cmType), INTENT(OUT) :: s
@@ -631,3 +620,4 @@
       END SUBROUTINE cmAssignCm
 
       END MODULE CMMOD
+!####################################################################

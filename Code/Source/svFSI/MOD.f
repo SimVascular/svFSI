@@ -778,6 +778,8 @@
          TYPE(mshType), ALLOCATABLE :: msh(:)
 !        FSILS data structure to produce LHS sparse matrix
          TYPE(FSILS_lhsType) lhs
+!        IB communicator
+         TYPE(ibCommType) :: cm
       END TYPE ibType
 
 !     Finite cell type

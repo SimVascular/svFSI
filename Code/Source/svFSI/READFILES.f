@@ -1367,11 +1367,11 @@ c     2         "can be applied for Neumann boundaries only"
       CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
 
 !     Default Preconditioners
-      IF (useTrilinosLS) THEN
-         lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
-      ELSE
-         lEq%ls%PREC_Type = PREC_NONE
-      END IF
+      lEq%ls%PREC_Type = PREC_NONE
+#ifdef WITH_TRILINOS
+      useTrilinosLS = .TRUE.
+      lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+#endif
 
       IF (ASSOCIATED(lPL)) THEN
          lPtr => lPL%get(ctmp, "Preconditioner")
@@ -1379,6 +1379,8 @@ c     2         "can be applied for Neumann boundaries only"
             SELECT CASE(TRIM(ctmp))
             CASE('fsiLS', 'FSILS', 'svFSI')
                lEq%ls%PREC_Type = PREC_FSILS
+               useTrilinosLS = .FALSE.
+#ifdef WITH_TRILINOS
             CASE('Trilinos-Diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
                useTrilinosLS = .TRUE.
@@ -1400,12 +1402,12 @@ c     2         "can be applied for Neumann boundaries only"
             CASE ('Trilinos-ML')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
                useTrilinosLS = .TRUE.
+#endif
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
      2          //" Undefined type"
-               lEq%ls%PREC_Type = PREC_NONE
             END SELECT
-            std = "Using Preconditioner: "//TRIM(ctmp)
+            std = " Using preconditioner: "//TRIM(ctmp)
          END IF
 
 !        Set solver options file
@@ -1458,11 +1460,9 @@ c     2         "can be applied for Neumann boundaries only"
 
       IF (useTrilinosLS) THEN
          IF (lSolverType .EQ. lSolver_NS) err =
-     2   "NS solver is not supported with Trilinos or PETSc. Use FSILS"
+     2   "NS solver is not supported with Trilinos or PETSc. "//
+     3   "Use GMRES or BICG instead."
       END IF
-
-      IF (useTrilinosLS .AND. lEq%ls%PREC_Type.EQ.PREC_FSILS) err =
-     2   "Cannot combine FSILS preconditioner with Trilinos"
 
       RETURN
       END SUBROUTINE READLS

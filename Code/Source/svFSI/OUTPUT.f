@@ -111,20 +111,14 @@ c      END DO
       tmp = CPUT()
 
       sepLine = REPEAT("-", 58)
-      IF (ibFlag) sepLine = REPEAT("-", 68)
 
       IF (co .EQ. 1) THEN
          timeP(1) = tmp - timeP(1)
          timeP(2) = 0D0
          std = " "
          std = TRIM(sepLine)
-         IF (ibFlag) THEN
-            std = "Eq     N-i     T      dB   Ri/R0    "//
-     2         "R/Ri     lsIt  dB  %t   %t(IB)"
-         ELSE
-            std = "Eq     N-i     T      dB   Ri/R0    R/Ri     lsIt"//
+         std = "Eq     N-i     T      dB   Ri/R0    R/Ri     lsIt"//
      2      "  dB  %t"
-         END IF
          IF (nEq .EQ. 1) std = TRIM(sepLine)
          RETURN
       END IF
@@ -169,11 +163,6 @@ c      END DO
       END IF
       sOut = TRIM(sOut)//"  "//c1//STR(eq(iEq)%FSILS%RI%itr,4)//" "//
      2   STR(NINT(eq(iEq)%FSILS%RI%dB),3)//" "//STR(NINT(tmp),3)//c2
-
-      IF (ibFlag) THEN
-         tmp  = tmp*ib%callD / eq(iEq)%FSILS%RI%callD
-         sOut = TRIM(sOut)//"   ("//STR(NINT(tmp),3)//")"
-      END IF
 
       IF (nEq .GT. 1) THEN
          std = CLR(sOut,iEq)

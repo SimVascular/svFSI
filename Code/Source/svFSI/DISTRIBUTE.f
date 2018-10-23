@@ -334,10 +334,11 @@
          END DO
       END DO
 
+      CALL cm%bcast(ib%nFn)
       flag = ALLOCATED(ib%fN)
       CALL cm%bcast(flag)
       IF (flag) THEN
-         IF (cm%slv()) ALLOCATE(ib%fN(nsd,ib%tnNo))
+         IF (cm%slv()) ALLOCATE(ib%fN(ib%nFn*nsd,ib%tnNo))
          CALL cm%bcast(ib%fN)
       END IF
 
@@ -520,6 +521,7 @@
             CALL cm%bcast(lEq%dmnIB(iDmn)%phys)
             CALL cm%bcast(lEq%dmnIB(iDmn)%Id)
             CALL cm%bcast(lEq%dmnIB(iDmn)%prop)
+            CALL DIST_MATCONSTS(lEq%dmnIB(iDmn)%stM)
             flag = ALLOCATED(lEq%dmnIB(iDmn)%shlFp)
             CALL cm%bcast(flag)
             IF (flag) THEN
