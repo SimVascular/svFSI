@@ -98,8 +98,8 @@
          R(:,lhs%map(a)) = Ri(:,a)
       END DO
 
-      CALL FSILS_COMMUV(lhs, dof, R)
-      CALL PRECOND(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr,dof,Val,R,W)
+      CALL PRECOND(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, Val,
+     &   R, W)
 
       SELECT CASE (ls%LS_type)
          CASE (LS_TYPE_NS)

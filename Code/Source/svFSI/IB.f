@@ -4693,8 +4693,9 @@ c      CALL IB_SYNC(sA)
       INTEGER :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN, eNoNb, cPhys
       REAL(KIND=8) :: w, Jac, ksix(nsd,nsd), xp(nsd), xi(nsd), fp(nsd)
 
+      INTEGER, ALLOCATABLE :: incNd(:)
       REAL(KIND=8), ALLOCATABLE :: sA(:), N(:), Nb(:), Nx(:,:), al(:,:),
-     2   yl(:,:), ul(:,:), xl(:,:), fNl(:,:), lR(:,:)
+     2   yl(:,:), ul(:,:), xl(:,:), fNl(:,:), lR(:,:), gR(:,:)
 
 !     TODO: This is temporary. Later we get domain based on each IB node
 !     and communicate across IB process boundaries
@@ -4759,9 +4760,10 @@ c      CALL IB_SYNC(sA)
 
 !     Project ib%R to background fluid mesh using the same domain of
 !     influence that was used to project flow variables.
-      ALLOCATE(sA(tnNo))
+      ALLOCATE(sA(tnNo), incNd(tnNo))
       sA  = 0D0
       Rib = 0D0
+      incNd = 0
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
          ALLOCATE(Nb(eNoNb))
@@ -4810,6 +4812,7 @@ c      CALL IB_SYNC(sA)
 
             DO b=1, eNoN
                Bc = msh(jM)%IEN(b,Ec)
+               incNd(Bc) = 1
                sA(Bc) = sA(Bc) + N(b)
                Rib(:,Bc) = Rib(:,Bc) + N(b)*fp(:)
             END DO
@@ -4823,9 +4826,14 @@ c      CALL IB_SYNC(sA)
       CALL COMMU(sA)
 
       DO a=1, tnNo
-         IF (.NOT.ISZERO(sA(a))) Rib(:,a) = Rib(:,a) / sA(a)
+         IF (.NOT.ISZERO(sA(a))) THEN
+            Rib(:,a) = Rib(:,a) / sA(a)
+            incNd(a) = 1
+         END IF
       END DO
       DEALLOCATE(sA)
+
+c      CALL DEBUGIBR(incNd)
 
       RETURN
       END SUBROUTINE IB_PROJFFSI
@@ -5115,4 +5123,93 @@ c      CALL IB_SYNC(sA)
 
       RETURN
       END SUBROUTINE IB_FFSI2D
+!####################################################################
+      SUBROUTINE DEBUGIBR(incNd)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: incNd(ib%tnNo)
+
+      INTEGER :: a, i, Ac, iM, fid, ierr
+      REAL(KIND=8) :: s, lo, hi, av
+      CHARACTER(LEN=stdL) :: fName
+
+      INTEGER, ALLOCATABLE :: lI(:), gI(:)
+      REAL(KIND=8), ALLOCATABLE :: lR(:,:), gR(:,:)
+
+!     DEBUG ib%R
+      fid = 1289
+      IF (cm%mas()) THEN
+         WRITE(fName,'(A)') TRIM(appPath)//"dbg_ibR_hist.dat"
+         IF (cTS .EQ. 1) THEN
+            OPEN(fid,FILE=TRIM(fName))
+            CLOSE(fid,STATUS='DELETE')
+         END IF
+         OPEN(fid,FILE=TRIM(fName),POSITION='APPEND')
+         WRITE(fid,'(A)',ADVANCE='NO') STR(cTS)
+         av = 0D0
+         lo = 1000000.0D0
+         hi = -999999.0D0
+
+         DO a=1, ib%tnNo
+            s = 0D0
+            DO i=1, nsd
+               s = s + ib%R(i,a)**2
+            END DO
+            s = SQRT(s)
+            av = av + s
+            IF (s .LT. lo) lo = s
+            IF (s .GT. hi) hi = s
+         END DO
+         av = av / REAL(ib%tnNo, KIND=8)
+         WRITE(fid,'(A)',ADVANCE='NO') " "//STR(av)//" "//
+     2      STR(hi-lo)
+      END IF
+
+!     DEBUG Rib
+      DO iM=1, nMsh
+         ALLOCATE(lR(nsd,msh(iM)%nNo), lI(msh(iM)%nNo))
+         IF (cm%mas()) THEN
+            ALLOCATE(gR(nsd,msh(iM)%gnNo), gI(msh(iM)%gnNo))
+         ELSE
+            ALLOCATE(gR(0,0), gI(0))
+         END IF
+         lR = 0D0
+         lI = 0
+         DO a=1, msh(iM)%nNo
+            Ac = msh(iM)%gN(a)
+            lR(:,a) = Rib(:,Ac)
+            lI(a)   = incNd(Ac)
+         END DO
+         gR = GLOBAL(msh(iM), lR)
+         gI = GLOBAL(msh(iM), lI)
+         DEALLOCATE(lR, lI)
+
+         IF (cm%mas()) THEN
+            av = 0D0
+            lo = 10000000.0D0
+            hi = -9999999.0D0
+            DO a=1, msh(iM)%gnNo
+               IF (gI(a) .EQ. 0) CYCLE
+               s = 0D0
+               DO i=1, nsd
+                  s = s + gR(i,a)**2
+               END DO
+               s = SQRT(s)
+               av = av + s
+               IF (s .LT. lo) lo = s
+               IF (s .GT. hi) hi = s
+            END DO
+            av = av / REAL(SUM(gI(:)), KIND=8)
+            WRITE(fid,'(A)') " "//STR(av)//" "//STR(hi-lo)
+            CLOSE(fid)
+         END IF
+         DEALLOCATE(gR, gI)
+      END DO
+
+      iM = cm%reduce(iM)
+
+      RETURN
+      END SUBROUTINE DEBUGIBR
 !####################################################################

@@ -80,6 +80,8 @@
                IF (ustRd) ADn(1:nsd,:) = ADo(1:nsd,:)*coef
                Dn(s:e,:) = Do(s:e,:)
             END IF
+         ELSE
+            Dn(s:e,:) = Do(s:e,:)
          END IF
       END DO
 

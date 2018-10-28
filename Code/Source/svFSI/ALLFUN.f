@@ -1919,6 +1919,8 @@ c         CALL FLUSH(1000+cm%tF())
       INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
 
+      IF (cm%seq()) RETURN
+
       IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
      2   "to synchronize IB data"
 
@@ -2012,6 +2014,8 @@ c         CALL FLUSH(1000+cm%tF())
 
       INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
+
+      IF (cm%seq()) RETURN
 
       m = SIZE(U,1)
       IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//

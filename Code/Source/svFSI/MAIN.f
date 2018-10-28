@@ -259,9 +259,6 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     Apply weakly applied Dirichlet BCs
             CALL SETBCDIRW(Yg, Dg)
 
-!     Add contribution from IB to residue
-            IF (ibFlag) CALL IB_CONSTRUCT(Yg, Dg)
-
 !     Constructing the element stiffness matrix due to traction forces
 !     or follower loads for shells
             CALL SETSHELLFP(Dg)
@@ -273,6 +270,13 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
                IF (ustRd) CALL USTRUCTR(ADg, Yg)
             END IF
+
+!     Synchronize R across processes. Note: that it is important to
+!     synchronize residue, R before treating immersed boundaries
+            IF (.NOT.useTrilinosAssemAndLS) CALL COMMU(R)
+
+!     Add contribution from IB to residue
+            IF (ibFlag) CALL IB_CONSTRUCT(Yg, Dg)
 
             incL = 0
             IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
@@ -301,7 +305,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
      4            eq(cEq)%FSILS%RI%dB, eq(cEq)%FSILS%RI%suc,
      5            eq(cEq)%ls%LS_type, eq(cEq)%FSILS%RI%reltol,
      6            eq(cEq)%FSILS%RI%mItr, eq(cEq)%FSILS%RI%sD,
-     7            eq(cEq)%ls%PREC_Type)
+     7            eq(cEq)%ls%PREC_Type, useTrilinosAssemAndLS)
             ELSE IF(useTrilinosLS) THEN
                CALL TRILINOS_GLOBAL_SOLVE(Val, R, RTrilinos,
      2            dirW, eq(cEq)%FSILS%RI%fNorm, eq(cEq)%FSILS%RI%iNorm,
@@ -528,4 +532,85 @@ c      CALL cm%fStop()
       DEALLOCATE(v)
 
       END SUBROUTINE INIT_DIR_AND_COUPNEU_BC
+!####################################################################
+!     Writes solution data and residue to file for debugging. Can also
+!     be used with multiple processes
+      SUBROUTINE DEBUGR()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER a, i, Ac, fid, iM, nNo, gnNo
+      CHARACTER(LEN=stdL) fName
+
+      REAL(KIND=8), ALLOCATABLE :: lX(:,:), lA(:,:), lY(:,:), lD(:,:),
+     2   lR(:,:), gX(:,:), gA(:,:), gY(:,:), gD(:,:), gR(:,:)
+
+      fid = 1889
+      WRITE(fName,'(A)') TRIM(appPath)//"dbgR_"//STR(cTS)//"_"//
+     2   STR(eq(cEq)%itr)
+      IF (cm%mas()) OPEN(fid,FILE=TRIM(fName))
+
+      DO iM=1, nMsh
+         nNo  = msh(iM)%nNo
+         gnNo = msh(iM)%gnNo
+         ALLOCATE(lX(nsd,nNo), lA(tDof,nNo), lY(tDof,nNo), lD(tDof,nNo),
+     2      lR(dof,nNo))
+         IF (cm%mas()) THEN
+            ALLOCATE(gX(nsd,gnNo), gA(tDof,gnNo), gY(tDof,gnNo),
+     2       gD(tDof,tnNo), gR(dof,gnNo))
+         ELSE
+            ALLOCATE(gX(0,0), gA(0,0), gY(0,0), gD(0,0), gR(0,0))
+         END IF
+         lX = 0D0
+         lA = 0D0
+         lY = 0D0
+         lD = 0D0
+         lR = 0D0
+         DO a=1, msh(iM)%nNo
+            Ac = msh(iM)%gN(a)
+            lX(:,a) = x(:,Ac)
+            lA(:,a) = An(:,Ac)
+            lY(:,a) = Yn(:,Ac)
+            lD(:,a) = Dn(:,Ac)
+            lR(:,a) = R(:,Ac)
+         END DO
+
+         gX = GLOBAL(msh(iM), lX)
+         gA = GLOBAL(msh(iM), lA)
+         gY = GLOBAL(msh(iM), lY)
+         gD = GLOBAL(msh(iM), lD)
+         gR = GLOBAL(msh(iM), lR)
+
+         IF (cm%mas()) THEN
+            WRITE(fid,'(A)') "Mesh: <"//TRIM(msh(iM)%name)//">"
+            DO a=1, gnNo
+               WRITE(fid,'(A)',ADVANCE='NO') STR(a)
+               DO i=1, nsd
+                  WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gX(i,a))
+               END DO
+               DO i=1, dof
+                  WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gR(i,a))
+               END DO
+               DO i=1, tDof
+                  WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gA(i,a))
+               END DO
+               DO i=1, tDof
+                  WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gY(i,a))
+               END DO
+               DO i=1, tDof
+                  WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gD(i,a))
+               END DO
+               WRITE(fid,'(A)')
+            END DO
+         END IF
+         DEALLOCATE(lA, lY, lD, lR, gA, gY, gD, gR)
+      END DO
+
+      IF (cm%mas()) CLOSE(fid)
+
+      iM = cm%reduce(iM)
+
+      RETURN
+      END SUBROUTINE DEBUGR
 !####################################################################

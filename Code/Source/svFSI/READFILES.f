@@ -1416,6 +1416,9 @@ c     2         "can be applied for Neumann boundaries only"
          IF (.NOT.useTrilinosAssemAndLS) THEN
             lPtr => lPL%get(flag, "Use Trilinos for assembly")
             IF (ASSOCIATED(lPtr)) useTrilinosAssemAndLS = flag
+            IF (useTrilinosAssemAndLS .AND. ibFlag) err =
+     2         "Cannnot assemble immersed boundaries using Trilinos."//
+     3         " Use Trilinos for linear solver only."
          END IF
 
          lPtr => lPL%get(lEq%ls%mItr,"Max iterations",ll=1)
