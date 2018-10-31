@@ -95,7 +95,7 @@
             CALL FC_SET(fCell, lM, xl, ib%Uo)
             CALL FC_CONSTRUCT(fCell, al, yl, xl, lR, lK)
             CALL DOASSEM(eNoN, ptr, lK, lR)
-            ib%callD = ib%callD + CPUT() - ctime
+            ib%callD(1) = ib%callD(1) + CPUT() - ctime
             RETURN
          END IF
       END IF

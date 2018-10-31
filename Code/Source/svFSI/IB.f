@@ -985,9 +985,11 @@ c     2         "can be applied for Neumann boundaries only"
 
       INTEGER a, iM, iFa, iEq, iDmn, iBc, nnz
       REAL(KIND=8) lD(nsd,tnNo)
+      CHARACTER(LEN=stdL) sOut
       TYPE(FSILS_commuType) lsCom
 
-      ib%callD = CPUT()
+      ib%callD = 0D0
+      ib%callD(1) = CPUT()
 
       std = " ================================="
       std = " Initializing IB data structures.."
@@ -997,31 +999,6 @@ c     2         "can be applied for Neumann boundaries only"
          DO a=1, tnNo
             lD(:,a) = Dg(nsd+2:2*nsd+1,a)
          END DO
-      END IF
-
-!     Initialize tensor data structures for struct phys
-      DO iEq=1, nEq
-         DO iDmn=1, eq(iEq)%nDmnIB
-            IF (eq(iEq)%dmnIB(iDmn)%phys .EQ. phys_struct) THEN
-               CALL TEN_INIT(nsd)
-            END IF
-         END DO
-      END DO
-
-!     Allocate and initialize IB solution data structures
-      ALLOCATE(ib%Ao(nsd,ib%tnNo), ib%Yo(nsd+1,ib%tnNo),
-     2   ib%Uo(nsd,ib%tnNo))
-      ib%Ao = 0D0
-      ib%Yo = 0D0
-      ib%Uo = 0D0
-
-!     Initialize feedback forcing for penalty methods
-      ALLOCATE(ib%R(nsd,ib%tnNo))
-      ib%R = 0D0
-
-      IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-         ALLOCATE(Rib(nsd,tnNo))
-         Rib = 0D0
       END IF
 
 !     Initialize IB face normals
@@ -1092,9 +1069,11 @@ c     2         "can be applied for Neumann boundaries only"
 !     Identify ghost cells for immersed boundaries
       CALL IB_SETIGHOST()
 
-      ib%callD = CPUT() - ib%callD
-      IF (cm%mas()) WRITE(*,'(A,F6.2,A)')
-     2   "    Immersed boundary setting time: ", ib%callD, " sec"
+      ib%callD(1) = CPUT() - ib%callD(1)
+      WRITE(sOut,'(F6.2)') ib%callD(1)
+      WRITE(sOut,'(A)') "    Immersed boundary setting time: "//
+     2   TRIM(sOut)//" sec"
+      std = TRIM(sOut)
 
 !     Set Dirichlet BCs
       CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
@@ -1798,49 +1777,6 @@ c     2         "can be applied for Neumann boundaries only"
          incEl = 1
          ePtr  = 0
          CALL IB_FINDMSHTRACES(lM, lD, incEl, ePtr)
-
-!        Rearrange and save to trace data structure
-         i = 0
-         DO e=1, lM%nEl
-            DO g=1, lM%nG
-               IF (ePtr(1,g,e) .NE. 0) i = i + 1
-            END DO
-         END DO
-
-         lM%trc%n = i
-         ALLOCATE(lM%trc%gE(2,i), lM%trc%ptr(2,i))
-         i = 0
-         DO e=1, lM%nEl
-            DO g=1, lM%nG
-               IF (ePtr(1,g,e) .NE. 0) THEN
-                  i = i + 1
-                  Ec = ePtr(1,g,e)
-                  iM = ePtr(2,g,e)
-                  lM%trc%gE(1,i)  = e
-                  lM%trc%gE(2,i)  = g
-                  lM%trc%ptr(:,i) = ePtr(:,g,e)
-                  msh(iM)%iGC(Ec) = 1
-               END IF
-            END DO
-         END DO
-
-!        Make sure that all the traces are identified
-         i = cm%reduce(i)
-         j = lM%nEl * lM%nG
-         IF (i .LT. j) THEN
-c            DO e=1, lM%nEl
-c               DO g=1, lM%nG
-c                  Ec = ePtr(1,g,e)
-c                  IF (Ec .EQ. 0) CYCLE
-c                  WRITE(1000+cm%tF(),'(A)') STR(g)//" "//STR(e)//" "//
-c     2                STR(Ec)
-c               END DO
-c            END DO
-c            CALL FLUSH(1000+cm%tF())
-            std = " WARNING (IB INIT): Detected "//STR(i)//
-     2       " IB traces out of "//STR(j)//" on IB mesh "//CLR(lM%name)
-         END IF
-
          DEALLOCATE(incEl, ePtr)
       ELSE
          DO iFa=1, lM%nFa
@@ -1849,49 +1785,6 @@ c            CALL FLUSH(1000+cm%tF())
             incEl = 1
             ePtr  = 0
             CALL IB_FINDFACETRACES(lM%fa(iFa), lD, incEl, ePtr)
-
-!           Rearrange and save to trace data structure
-            i = 0
-            DO e=1, lM%fa(iFa)%nEl
-               DO g=1, lM%fa(iFa)%nG
-                  IF (ePtr(1,g,e) .NE. 0) i = i + 1
-               END DO
-            END DO
-
-            lM%fa(iFa)%trc%n = i
-            ALLOCATE(lM%fa(iFa)%trc%gE(2,i), lM%fa(iFa)%trc%ptr(2,i))
-            i = 0
-            DO e=1, lM%fa(iFa)%nEl
-               DO g=1, lM%fa(iFa)%nG
-                  IF (ePtr(1,g,e) .NE. 0) THEN
-                     i = i + 1
-                     Ec = ePtr(1,g,e)
-                     iM = ePtr(2,g,e)
-                     lM%fa(iFa)%trc%gE(1,i)  = e
-                     lM%fa(iFa)%trc%gE(2,i)  = g
-                     lM%fa(iFa)%trc%ptr(:,i) = ePtr(:,g,e)
-                     msh(iM)%iGC(Ec) = 1
-                  END IF
-               END DO
-            END DO
-
-!           Make sure that all the traces are identified
-            i = cm%reduce(i)
-            j = lM%fa(iFa)%nEl * lM%fa(iFa)%nG
-            IF (i .LT. j) THEN
-c               DO e=1, lM%fa(iFa)%nEl
-c                  DO g=1, lM%fa(iFa)%nG
-c                     Ec = ePtr(1,g,e)
-c                     IF (Ec .EQ. 0) CYCLE
-c                     WRITE(1000+cm%tF(),'(A)') STR(g)//" "//STR(e)//" "//
-c     2                   STR(Ec)
-c                  END DO
-c               END DO
-c               CALL FLUSH(1000+cm%tF())
-               std = " WARNING (IB INIT): Detected "//STR(i)//
-     2          " IB traces out of "//STR(j)//" on IB face "//
-     3          CLR(lM%fa(iFa)%name)
-            END IF
             DEALLOCATE(incEl, ePtr)
          END DO
       END IF
@@ -2052,52 +1945,6 @@ c               CALL FLUSH(1000+cm%tF())
 !     Perform a general search for all the remaining nodes including
 !     the ones that may have migrated into other process domains
       CALL IB_FINDMSHTRACES(lM, lD, incEl, gPtr)
-
-!     Deallocate previously allocated trace data structure
-      CALL DESTROY(lM%trc)
-
-!     Rearrange and save to trace data structure
-      i = 0
-      DO e=1, lM%nEl
-         DO g=1, lM%nG
-            IF (gPtr(1,g,e) .NE. 0) i = i + 1
-         END DO
-      END DO
-
-      lM%trc%n = i
-      ALLOCATE(lM%trc%gE(2,i), lM%trc%ptr(2,i))
-      i = 0
-      DO e=1, lM%nEl
-         DO g=1, lM%nG
-            IF (gPtr(1,g,e) .NE. 0) THEN
-               i  = i + 1
-               Ec = gPtr(1,g,e)
-               iM = gPtr(2,g,e)
-               lM%trc%gE(1,i)  = e
-               lM%trc%gE(2,i)  = g
-               lM%trc%ptr(:,i) = gPtr(:,g,e)
-               msh(iM)%iGC(Ec) = 1
-            END IF
-         END DO
-      END DO
-
-!     Make sure that all the IB nodal traces are identified
-      i = cm%reduce(i)
-      j = lM%nEl * lM%nG
-      IF (i .LT. j) THEN
-c         DO e=1, lM%nEl
-c            DO g=1, lM%nG
-c               Ec = gPtr(1,g,e)
-c               IF (Ec .EQ. 0) CYCLE
-c               WRITE(1000+cm%tF(),'(A)') STR(g)//" "//STR(e)//" "//
-c     2            STR(Ec)
-c            END DO
-c         END DO
-c         CALL FLUSH(1000+cm%tF())
-         std = " WARNING (IB UPDATE): Detected "//STR(i)//
-     2    " IB traces out of "//STR(j)//" on IB mesh "//CLR(lM%name)
-      END IF
-
       DEALLOCATE(incEl, gPtr)
 
       RETURN
@@ -2211,52 +2058,6 @@ c         CALL FLUSH(1000+cm%tF())
 !     Perform a general search for all the remaining nodes including
 !     the ones that may have migrated into other process domains
       CALL IB_FINDFACETRACES(lFa, lD, incEl, gPtr)
-
-!     Deallocate previously allocated trace data structure
-      CALL DESTROY(lFa%trc)
-
-!     Rearrange and save to trace data structure
-      i = 0
-      DO e=1, lFa%nEl
-         DO g=1, lFa%nG
-            IF (gPtr(1,g,e) .NE. 0) i = i + 1
-         END DO
-      END DO
-
-      lFa%trc%n = i
-      ALLOCATE(lFa%trc%gE(2,i), lFa%trc%ptr(2,i))
-      i = 0
-      DO e=1, lFa%nEl
-         DO g=1, lFa%nG
-            IF (gPtr(1,g,e) .NE. 0) THEN
-               i  = i + 1
-               Ec = gPtr(1,g,e)
-               iM = gPtr(2,g,e)
-               lFa%trc%gE(1,i)  = e
-               lFa%trc%gE(2,i)  = g
-               lFa%trc%ptr(:,i) = gPtr(:,g,e)
-               msh(iM)%iGC(Ec) = 1
-            END IF
-         END DO
-      END DO
-
-!     Make sure that all the IB nodal traces are identified
-      i = cm%reduce(i)
-      j = lFa%nEl * lFa%nG
-      IF (i .LT. j) THEN
-c         DO e=1, lFa%nEl
-c            DO g=1, lFa%nG
-c               Ec = gPtr(1,g,e)
-c               IF (Ec .EQ. 0) CYCLE
-c               WRITE(1000+cm%tF(),'(A)') STR(g)//" "//STR(e)//" "//
-c     2            STR(Ec)
-c            END DO
-c         END DO
-c         CALL FLUSH(1000+cm%tF())
-         std = " WARNING (IB UPDATE): Detected "//STR(i)//
-     2    " IB traces out of "//STR(j)//" on IB mesh "//CLR(lFa%name)
-      END IF
-
       DEALLOCATE(incEl, gPtr)
 
       RETURN
@@ -2274,12 +2075,13 @@ c         CALL FLUSH(1000+cm%tF())
       REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
       INTEGER, INTENT(INOUT) :: ePtr(2,lM%nG,lM%nEl)
 
-      INTEGER :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne
+      INTEGER :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
       REAL(KIND=8) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
 
       TYPE(queueType) :: probeElQ
       LOGICAL, ALLOCATABLE :: ichk(:)
-      INTEGER, ALLOCATABLE :: incEl(:), rootEl(:), eList(:), masEList(:)
+      INTEGER, ALLOCATABLE :: incEl(:), rootEl(:), eList(:), sCount(:),
+     2   disps(:), masEList(:), ptr(:), gptr(:), tmpI(:,:,:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), xpL(:,:)
 
 !     Create a list of all the mesh nodes
@@ -2418,11 +2220,10 @@ c         CALL FLUSH(1000+cm%tF())
          END DO E_LOOP
 
          IF (ALL(ichk(:))) THEN
-            DEALLOCATE(incEl, masElist, ichk, rootEl)
+            DEALLOCATE(incEl, masElist, ichk, rootEl, xl)
             CYCLE
          END IF
 
-         Ac = lM%gN(a)
          ePtr(1,g,e) = Ec
          ePtr(2,g,e) = iM
          rootEl(e)   = Ec
@@ -2492,6 +2293,7 @@ c         CALL FLUSH(1000+cm%tF())
                END DO
             END DO
          END DO
+         IF (ALLOCATED(eList)) DEALLOCATE(eList)
          CALL DESTROY(probeElQ)
 
 !        Perform a brute search on any missed elements
@@ -2522,6 +2324,193 @@ c         CALL FLUSH(1000+cm%tF())
 
       DEALLOCATE(xpL)
 
+!     Transfer ePtr to trace data structure
+      CALL DESTROY(lM%trc)
+      i = 0
+      DO e=1, lM%nEl
+         DO g=1, lM%nG
+            IF (ePtr(1,g,e) .NE. 0) i = i + 1
+         END DO
+      END DO
+      lM%trc%n = i
+      ALLOCATE(lM%trc%gE(2,i), lM%trc%ptr(2,i))
+      i = 0
+      DO e=1, lM%nEl
+         DO g=1, lM%nG
+            IF (ePtr(1,g,e) .NE. 0) THEN
+               i = i + 1
+               Ec = ePtr(1,g,e)
+               iM = ePtr(2,g,e)
+               lM%trc%gE(1,i)  = e
+               lM%trc%gE(2,i)  = g
+               lM%trc%ptr(:,i) = ePtr(:,g,e)
+               msh(iM)%iGC(Ec) = 1
+            END IF
+         END DO
+      END DO
+
+!     Check if all traces are found and return if yes
+      i = cm%reduce(lM%trc%n)
+      j = lM%nEl*lM%nG
+      IF (i .GE. j) RETURN
+
+!     If all traces are not found, add a fool-proof search on master
+!     list. If the search fails here, the element is perhaps distorted
+!     and hence, the simulation aborts.
+!     First, create a list of all successfully found traces on master
+      ALLOCATE(sCount(cm%np()), disps(cm%np()))
+      sCount = 0
+      disps  = 0
+      i = lM%trc%n
+      CALL MPI_GATHER(i, 1, mpint, sCount, 1, mpint, master, cm%com(),
+     2   ierr)
+
+      j = SUM(sCount(:))
+      sCount = 4*sCount(:)
+      DO i=2, cm%np()
+         disps(i) = disps(i-1) + sCount(i-1)
+      END DO
+
+      ALLOCATE(ptr(4*lM%trc%n), gptr(4*j))
+      DO i=1, lM%trc%n
+         ptr(4*i-3) = lM%trc%gE(1,i)
+         ptr(4*i-2) = lM%trc%gE(2,i)
+         ptr(4*i-1) = lM%trc%ptr(1,i)
+         ptr(4*i)   = lM%trc%ptr(2,i)
+      END DO
+
+      i = 4*lM%trc%n
+      CALL MPI_GATHERV(ptr, i, mpint, gptr, sCount, disps, mpint,
+     2   master, cm%com(), ierr)
+
+      DEALLOCATE(ptr, disps, sCount)
+
+      IF (cm%mas()) THEN
+         ALLOCATE(tmpI(2,lM%nG,lM%nEl), ptr(lM%nEl))
+         tmpI = 0
+         ptr  = 0
+         DO i=1, j
+            e  = gptr(4*i-3)
+            g  = gptr(4*i-2)
+            Ec = gptr(4*i-1)
+            iM = gptr(4*i)
+            tmpI(1,g,e) = Ec
+            tmpI(2,g,e) = iM
+         END DO
+
+         DO e=1, lM%nEl
+            DO g=1, lM%nG
+               Ec = tmpI(1,g,e)
+               iM = tmpI(2,g,e)
+               IF (Ec.EQ.0 .OR. iM.EQ.0) ptr(e) = 1
+            END DO
+         END DO
+
+         ne = SUM(ptr)
+         ALLOCATE(incEl(ne))
+         i = 0
+         DO e=1, lM%nEl
+            IF (ptr(e) .EQ. 1) THEN
+               i = i + 1
+               incEl(i) = e
+            END IF
+         END DO
+         DEALLOCATE(tmpI, ptr)
+      END IF
+
+!     Share the element list to all processes
+      CALL cm%bcast(ne)
+      IF (cm%slv()) ALLOCATE(incEl(ne))
+      CALL cm%bcast(incEl)
+
+!     Loop over all the background mesh and find traces of each left out
+!     integration point onto the elements of the background mesh
+      ALLOCATE(xl(nsd,lM%eNoN))
+      DO iM=1, nMsh
+!        Create a master list of elements of the background mesh based
+!        IB bounding box position
+         ALLOCATE(eList(msh(iM)%nEl))
+         eList = 0
+         DO e=1, msh(iM)%nEl
+            DO a=1, msh(iM)%eNoN
+               Ac = msh(iM)%IEN(a,e)
+               xp(:) = x(:,Ac) + lD(:,Ac)
+               b = 0
+               DO i=1, nsd
+                  IF (xp(i).GE.minb(i) .AND. xp(i).LE.maxb(i))
+     2               b = b + 1
+               END DO
+               IF (b .EQ. nsd) THEN
+                  eList(e) = 1
+                  EXIT
+               END IF
+            END DO
+         END DO
+         nNe = SUM(eList)
+         ALLOCATE(masElist(nNe))
+         i = 0
+         DO e=1, msh(iM)%nEl
+            IF (eList(e) .EQ. 1) THEN
+               i = i + 1
+               masElist(i) = e
+            END IF
+         END DO
+
+!        Now perform search for each integration point of an element
+!        whose trace was not determined earlier
+         DO i=1, ne
+            e = incEl(i)
+            DO a=1, lM%eNoN
+               Ac = lM%IEN(a,e)
+               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+            END DO
+            DO g=1, lM%nG
+               xp = 0D0
+               DO a=1, lM%eNoN
+                  xp = xp + xl(:,a)*lM%N(a,g)
+               END DO
+               CALL FINDE(xp, msh(iM), x, lD, tnNo, nNe, masElist, Ec,
+     2            xi)
+               IF (Ec .NE. 0) THEN
+                  ePtr(1,g,e) = Ec
+                  ePtr(2,g,e) = iM
+               END IF
+            END DO
+         END DO
+         DEALLOCATE(eList, masElist)
+      END DO
+      DEALLOCATE(xl)
+
+!     Transfer ePtr to trace data structure
+      CALL DESTROY(lM%trc)
+      i = 0
+      DO e=1, lM%nEl
+         DO g=1, lM%nG
+            IF (ePtr(1,g,e) .NE. 0) i = i + 1
+         END DO
+      END DO
+      lM%trc%n = i
+      ALLOCATE(lM%trc%gE(2,i), lM%trc%ptr(2,i))
+      i = 0
+      DO e=1, lM%nEl
+         DO g=1, lM%nG
+            IF (ePtr(1,g,e) .NE. 0) THEN
+               i = i + 1
+               Ec = ePtr(1,g,e)
+               iM = ePtr(2,g,e)
+               lM%trc%gE(1,i)  = e
+               lM%trc%gE(2,i)  = g
+               lM%trc%ptr(:,i) = ePtr(:,g,e)
+               msh(iM)%iGC(Ec) = 1
+            END IF
+         END DO
+      END DO
+
+!     Abort simulation if all traces are still not found
+      i = cm%reduce(lM%trc%n)
+      j = lM%nEl * lM%nG
+      IF (i .LT. j) CALL DEBUGIBMSHTRC(lM)
+
       RETURN
       END SUBROUTINE IB_FINDMSHTRACES
 !--------------------------------------------------------------------
@@ -2538,12 +2527,13 @@ c         CALL FLUSH(1000+cm%tF())
       INTEGER, INTENT(INOUT) :: ePtr(2,lFa%nG,lFa%nEl)
 
       LOGICAL lShl
-      INTEGER :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne
+      INTEGER :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
       REAL(KIND=8) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
 
       TYPE(queueType) :: probeElQ
       LOGICAL, ALLOCATABLE :: ichk(:)
-      INTEGER, ALLOCATABLE :: incEl(:), rootEl(:), eList(:), masEList(:)
+      INTEGER, ALLOCATABLE :: incEl(:), rootEl(:), eList(:), sCount(:),
+     2   disps(:), masEList(:), ptr(:), gptr(:), tmpI(:,:,:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), xpL(:,:)
 
 !     Create a list of all the face nodes
@@ -2694,7 +2684,7 @@ c         CALL FLUSH(1000+cm%tF())
          END DO E_LOOP
 
          IF (ALL(ichk(:))) THEN
-            DEALLOCATE(incEl, masElist, ichk, rootEl)
+            DEALLOCATE(incEl, masElist, ichk, rootEl, xl)
             CYCLE
          END IF
 
@@ -2767,6 +2757,7 @@ c         CALL FLUSH(1000+cm%tF())
                END DO
             END DO
          END DO
+         IF (ALLOCATED(eList)) DEALLOCATE(eList)
          CALL DESTROY(probeElQ)
 
 !        Perform a brute search on any missed elements
@@ -2796,6 +2787,193 @@ c         CALL FLUSH(1000+cm%tF())
       END DO
 
       DEALLOCATE(xpL)
+
+!     Transfer ePtr to trace data structure
+      CALL DESTROY(lFa%trc)
+      i = 0
+      DO e=1, lFa%nEl
+         DO g=1, lFa%nG
+            IF (ePtr(1,g,e) .NE. 0) i = i + 1
+         END DO
+      END DO
+      lFa%trc%n = i
+      ALLOCATE(lFa%trc%gE(2,i), lFa%trc%ptr(2,i))
+      i = 0
+      DO e=1, lFa%nEl
+         DO g=1, lFa%nG
+            IF (ePtr(1,g,e) .NE. 0) THEN
+               i = i + 1
+               Ec = ePtr(1,g,e)
+               iM = ePtr(2,g,e)
+               lFa%trc%gE(1,i)  = e
+               lFa%trc%gE(2,i)  = g
+               lFa%trc%ptr(:,i) = ePtr(:,g,e)
+               msh(iM)%iGC(Ec) = 1
+            END IF
+         END DO
+      END DO
+
+!     Check if all traces are found and return if yes
+      i = cm%reduce(lFa%trc%n)
+      j = lFa%nEl*lFa%nG
+      IF (i .GE. j) RETURN
+
+!     If all traces are not found, add a fool-proof search on master
+!     list. If the search fails here, the element is perhaps distorted
+!     and hence, the simulation aborts.
+!     First, create a list of all successfully found traces on master
+      ALLOCATE(sCount(cm%np()), disps(cm%np()))
+      sCount = 0
+      disps  = 0
+      i = lFa%trc%n
+      CALL MPI_GATHER(i, 1, mpint, sCount, 1, mpint, master, cm%com(),
+     2   ierr)
+
+      j = SUM(sCount(:))
+      sCount = 4*sCount(:)
+      DO i=2, cm%np()
+         disps(i) = disps(i-1) + sCount(i-1)
+      END DO
+
+      ALLOCATE(ptr(4*lFa%trc%n), gptr(4*j))
+      DO i=1, lFa%trc%n
+         ptr(4*i-3) = lFa%trc%gE(1,i)
+         ptr(4*i-2) = lFa%trc%gE(2,i)
+         ptr(4*i-1) = lFa%trc%ptr(1,i)
+         ptr(4*i)   = lFa%trc%ptr(2,i)
+      END DO
+
+      i = 4*lFa%trc%n
+      CALL MPI_GATHERV(ptr, i, mpint, gptr, sCount, disps, mpint,
+     2   master, cm%com(), ierr)
+
+      DEALLOCATE(ptr, disps, sCount)
+
+      IF (cm%mas()) THEN
+         ALLOCATE(tmpI(2,lFa%nG,lFa%nEl), ptr(lFa%nEl))
+         tmpI = 0
+         ptr  = 0
+         DO i=1, j
+            e  = gptr(4*i-3)
+            g  = gptr(4*i-2)
+            Ec = gptr(4*i-1)
+            iM = gptr(4*i)
+            tmpI(1,g,e) = Ec
+            tmpI(2,g,e) = iM
+         END DO
+
+         DO e=1, lFa%nEl
+            DO g=1, lFa%nG
+               Ec = tmpI(1,g,e)
+               iM = tmpI(2,g,e)
+               IF (Ec.EQ.0 .OR. iM.EQ.0) ptr(e) = 1
+            END DO
+         END DO
+
+         ne = SUM(ptr)
+         ALLOCATE(incEl(ne))
+         i = 0
+         DO e=1, lFa%nEl
+            IF (ptr(e) .EQ. 1) THEN
+               i = i + 1
+               incEl(i) = e
+            END IF
+         END DO
+         DEALLOCATE(tmpI, ptr)
+      END IF
+
+!     Share the element list to all processes
+      CALL cm%bcast(ne)
+      IF (cm%slv()) ALLOCATE(incEl(ne))
+      CALL cm%bcast(incEl)
+
+!     Loop over all the background mesh and find traces of each left out
+!     integration point onto the elements of the background mesh
+      ALLOCATE(xl(nsd,lFa%eNoN))
+      DO iM=1, nMsh
+!        Create a master list of elements of the background mesh based
+!        IB bounding box position
+         ALLOCATE(eList(msh(iM)%nEl))
+         eList = 0
+         DO e=1, msh(iM)%nEl
+            DO a=1, msh(iM)%eNoN
+               Ac = msh(iM)%IEN(a,e)
+               xp(:) = x(:,Ac) + lD(:,Ac)
+               b = 0
+               DO i=1, nsd
+                  IF (xp(i).GE.minb(i) .AND. xp(i).LE.maxb(i))
+     2               b = b + 1
+               END DO
+               IF (b .EQ. nsd) THEN
+                  eList(e) = 1
+                  EXIT
+               END IF
+            END DO
+         END DO
+         nNe = SUM(eList)
+         ALLOCATE(masElist(nNe))
+         i = 0
+         DO e=1, msh(iM)%nEl
+            IF (eList(e) .EQ. 1) THEN
+               i = i + 1
+               masElist(i) = e
+            END IF
+         END DO
+
+!        Now perform search for each integration point of an element
+!        whose trace was not determined earlier
+         DO i=1, ne
+            e = incEl(i)
+            DO a=1, lFa%eNoN
+               Ac = lFa%IEN(a,e)
+               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+            END DO
+            DO g=1, lFa%nG
+               xp = 0D0
+               DO a=1, lFa%eNoN
+                  xp = xp + xl(:,a)*lFa%N(a,g)
+               END DO
+               CALL FINDE(xp, msh(iM), x, lD, tnNo, nNe, masElist, Ec,
+     2            xi)
+               IF (Ec .NE. 0) THEN
+                  ePtr(1,g,e) = Ec
+                  ePtr(2,g,e) = iM
+               END IF
+            END DO
+         END DO
+         DEALLOCATE(eList, masElist)
+      END DO
+      DEALLOCATE(xl)
+
+!     Transfer ePtr to trace data structure
+      CALL DESTROY(lFa%trc)
+      i = 0
+      DO e=1, lFa%nEl
+         DO g=1, lFa%nG
+            IF (ePtr(1,g,e) .NE. 0) i = i + 1
+         END DO
+      END DO
+      lFa%trc%n = i
+      ALLOCATE(lFa%trc%gE(2,i), lFa%trc%ptr(2,i))
+      i = 0
+      DO e=1, lFa%nEl
+         DO g=1, lFa%nG
+            IF (ePtr(1,g,e) .NE. 0) THEN
+               i = i + 1
+               Ec = ePtr(1,g,e)
+               iM = ePtr(2,g,e)
+               lFa%trc%gE(1,i)  = e
+               lFa%trc%gE(2,i)  = g
+               lFa%trc%ptr(:,i) = ePtr(:,g,e)
+               msh(iM)%iGC(Ec) = 1
+            END IF
+         END DO
+      END DO
+
+!     Abort simulation if all traces are still not found
+      i = cm%reduce(lFa%trc%n)
+      j = lFa%nEl * lFa%nG
+      IF (i .LT. j) CALL DEBUGIBFATRC(lFa)
 
       RETURN
       END SUBROUTINE IB_FINDFACETRACES
@@ -3705,7 +3883,7 @@ c         CALL FLUSH(1000+cm%tF())
       END DO
       DEALLOCATE(sA, sV)
 
-      ib%callD = CPUT() - ctime
+      ib%callD(1) = CPUT() - ctime
 
       RETURN
       END SUBROUTINE IB_PRJCTU
@@ -3760,7 +3938,7 @@ c         CALL FLUSH(1000+cm%tF())
             CALL IB_SETBCDIRASL(eq(cEq)%bcIB(iBc), ib%msh(iM), Yg, Dg)
          END IF
       END DO
-      ib%callD = CPUT() - ctime
+      ib%callD(1) = CPUT() - ctime
 
       RETURN
       END SUBROUTINE IB_SETBCDIRA
@@ -4179,7 +4357,7 @@ c      CALL IB_SYNC(sA)
 
       DEALLOCATE(sA, sF)
 
-      ib%callD = ib%callD + CPUT() - ctime
+      ib%callD(1) = ib%callD(1) + CPUT() - ctime
 
       RETURN
       END SUBROUTINE IB_SETFBF
@@ -4496,7 +4674,6 @@ c      CALL IB_SYNC(sA)
       REAL(KIND=8), ALLOCATABLE :: Ub(:,:)
 
       INTEGER a, i, iEq
-      REAL(KIND=8) ctime, cmtime, utime
 
       ib%cEq = 0
       DO iEq=1, nEq
@@ -4507,10 +4684,10 @@ c      CALL IB_SYNC(sA)
       END DO
       IF (ib%cEq.EQ.0 .OR. ib%mthd.NE.ibMthd_IFEM) RETURN
 
-      ctime = CPUT()
+      ib%callD(1) = CPUT()
 !     First, project fluid variables (velocity, pressure, acceleration)
 !     at previous time step from fluid mesh to IB solid mesh
-      CALL IB_PROJFVAR(Ag, Yg, Dg, ib%Ao, ib%Yo, ib%Uo, cmtime)
+      CALL IB_PROJFVAR(Ag, Yg, Dg, ib%Ao, ib%Yo, ib%Uo, ib%callD(2))
 
 !     Update IB solid displacement from the projected solid velocity
       ALLOCATE(Ub(nsd,ib%tnNo))
@@ -4526,20 +4703,12 @@ c      CALL IB_SYNC(sA)
 
 !     Use new displacement field data to update tracer pointers
       ib%Uo = Ub
-      utime = CPUT()
+      ib%callD(3) = CPUT()
       CALL IB_UPDATE(Dg)
-      utime = CPUT() - utime
+      ib%callD(3) = CPUT() - ib%callD(3)
       DEALLOCATE(Ub)
 
-      ib%callD = CPUT() - ctime
-
-      IF (cm%mas()) THEN
-         WRITE(*,'(A)') " "//REPEAT("-", 52)
-         WRITE(*,'(A,F6.2,A)') " IB call duration: ", ib%callD, ' sec'//
-     2      " (comm."//STR(NINT(1D2*cmtime/ib%callD),3)//
-     3      "%, updt."//STR(NINT(1D2*utime/ib%callD),3)//"%)"
-         WRITE(*,'(A)') " "//REPEAT("-", 52)
-      END IF
+      ib%callD(1) = CPUT() - ib%callD(1)
 
       RETURN
       END SUBROUTINE IB_GETFFSI
@@ -5124,6 +5293,27 @@ c      CALL DEBUGIBR(incNd)
       RETURN
       END SUBROUTINE IB_FFSI2D
 !####################################################################
+!     Write IB call duration
+      SUBROUTINE IB_OUTR()
+      USE COMMOD
+      IMPLICIT NONE
+
+      CHARACTER(LEN=stdL) sOut
+
+      std = REPEAT("-",55)
+      WRITE(sOut,'(F6.2)') ib%callD(1)
+      WRITE(sOut,'(A)') " IB call duration: "//TRIM(sOut)//' sec'
+      WRITE(sOut,'(A)') TRIM(sOut)//" (comm."//
+     2   STR(NINT(1D2*ib%callD(2)/ib%callD(1)),3)//"%)"
+      WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
+     2   STR(NINT(1D2*ib%callD(3)/ib%callD(1)),3)//"%)"
+      std = sOut
+      std = REPEAT("-",55)
+
+      RETURN
+      END SUBROUTINE IB_OUTR
+!####################################################################
+!     Debugs FSI force on the IB
       SUBROUTINE DEBUGIBR(incNd)
       USE COMMOD
       USE ALLFUN
@@ -5212,4 +5402,196 @@ c      CALL DEBUGIBR(incNd)
 
       RETURN
       END SUBROUTINE DEBUGIBR
+!--------------------------------------------------------------------
+!     Debugs IB mesh traces
+      SUBROUTINE DEBUGIBMSHTRC(lM)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(IN) :: lM
+
+      INTEGER :: i, a, e, g, n, Ac, Ec, iM, fid, ierr
+      CHARACTER(LEN=stdL) :: fName
+      REAL(KIND=8) xp(nsd)
+
+      INTEGER, ALLOCATABLE :: sCount(:), disps(:), lE(:), gE(:),
+     2   eptr(:,:,:)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:)
+
+      ALLOCATE(sCount(cm%np()), disps(cm%np()))
+      sCount = 0
+      disps  = 0
+      i = lM%trc%n
+      CALL MPI_GATHER(i, 1, mpint, sCount, 1, mpint, master, cm%com(),
+     2   ierr)
+
+      n = SUM(sCount(:))
+      sCount = 4*sCount(:)
+      DO i=2, cm%np()
+         disps(i) = disps(i-1) + sCount(i-1)
+      END DO
+
+      ALLOCATE(lE(4*lM%trc%n), gE(4*n))
+      DO i=1, lM%trc%n
+         lE(4*i-3) = lM%trc%gE(1,i)
+         lE(4*i-2) = lM%trc%gE(2,i)
+         lE(4*i-1) = lM%trc%ptr(1,i)
+         lE(4*i)   = lM%trc%ptr(2,i)
+      END DO
+
+      i = 4*lM%trc%n
+      CALL MPI_GATHERV(lE, i, mpint, gE, sCount, disps, mpint, master,
+     2   cm%com(), ierr)
+
+      DEALLOCATE(lE, disps, sCount)
+
+      WRITE(fName,'(A)') TRIM(appPath)//"dbg_ib_trc_"//STR(cTS)//".dat"
+      IF (cm%mas()) THEN
+         ALLOCATE(eptr(2,lM%nG,lM%nEl))
+         eptr = 0
+         DO i=1, n
+            e  = gE(4*i-3)
+            g  = gE(4*i-2)
+            Ec = gE(4*i-1)
+            iM = gE(4*i)
+            ePtr(1,g,e) = Ec
+            ePtr(2,g,e) = iM
+         END DO
+
+         fid = 1289
+         OPEN(fid,FILE=TRIM(fName))
+         WRITE(fid,'(A)') "List of failed traces on mesh: "//
+     2      TRIM(lM%name)
+         ALLOCATE(xl(nsd,lM%eNoN))
+         DO e=1, lM%nEl
+            DO a=1, lM%eNoN
+               Ac = lM%IEN(a,e)
+               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+            END DO
+            DO g=1, lM%nG
+               Ec = ePtr(1,g,e)
+               iM = ePtr(2,g,e)
+               IF (Ec.EQ.0 .OR. iM.EQ.0) THEN
+                  xp = 0D0
+                  DO a=1, lM%eNoN
+                     xp(:) = xp(:) + lM%N(a,g)*xl(:,a)
+                  END DO
+                  WRITE(fid,'(2X,A)',ADVANCE='NO') STR(g)//" "//STR(e)
+                  DO i=1, nsd
+                     WRITE(fid,'(A)',ADVANCE='NO') " "//STR(xp(i))
+                  END DO
+                  WRITE(fid,'(A)')
+               END IF
+            END DO
+         END DO
+         DEALLOCATE(xl)
+         CLOSE(fid)
+      ELSE
+         ALLOCATE(ePtr(0,0,0))
+      END IF
+      DEALLOCATE(gE, ePtr)
+
+      i = cm%reduce(i)
+      err = "ERROR: Failed to detect all the traces on "//
+     2   TRIM(lM%name)//". See "//TRIM(fName)//" for more information."
+
+      RETURN
+      END SUBROUTINE DEBUGIBMSHTRC
+!--------------------------------------------------------------------
+!     Debugs IB face traces
+      SUBROUTINE DEBUGIBFATRC(lFa)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER :: i, a, e, g, n, Ac, Ec, iM, fid, ierr
+      CHARACTER(LEN=stdL) :: fName
+      REAL(KIND=8) xp(nsd)
+
+      INTEGER, ALLOCATABLE :: sCount(:), disps(:), lE(:), gE(:),
+     2   eptr(:,:,:)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:)
+
+      ALLOCATE(sCount(cm%np()), disps(cm%np()))
+      sCount = 0
+      disps  = 0
+      i = lFa%trc%n
+      CALL MPI_GATHER(i, 1, mpint, sCount, 1, mpint, master, cm%com(),
+     2   ierr)
+
+      n = SUM(sCount(:))
+      sCount = 4*sCount(:)
+      DO i=2, cm%np()
+         disps(i) = disps(i-1) + sCount(i-1)
+      END DO
+
+      ALLOCATE(lE(4*lFa%trc%n), gE(4*n))
+      DO i=1, lFa%trc%n
+         lE(4*i-3) = lFa%trc%gE(1,i)
+         lE(4*i-2) = lFa%trc%gE(2,i)
+         lE(4*i-1) = lFa%trc%ptr(1,i)
+         lE(4*i)   = lFa%trc%ptr(2,i)
+      END DO
+
+      i = 4*lFa%trc%n
+      CALL MPI_GATHERV(lE, i, mpint, gE, sCount, disps, mpint, master,
+     2   cm%com(), ierr)
+
+      DEALLOCATE(lE, disps, sCount)
+
+      WRITE(fName,'(A)') TRIM(appPath)//"dbg_ib_trc_"//STR(cTS)//".dat"
+      IF (cm%mas()) THEN
+         ALLOCATE(eptr(2,lFa%nG,lFa%nEl))
+         eptr = 0
+         DO i=1, n
+            e  = gE(4*i-3)
+            g  = gE(4*i-2)
+            Ec = gE(4*i-1)
+            iM = gE(4*i)
+            ePtr(1,g,e) = Ec
+            ePtr(2,g,e) = iM
+         END DO
+
+         fid = 1289
+         OPEN(fid,FILE=TRIM(fName))
+         WRITE(fid,'(A)') "List of failed traces on mesh: "//
+     2      TRIM(lFa%name)
+         ALLOCATE(xl(nsd,lFa%eNoN))
+         DO e=1, lFa%nEl
+            DO a=1, lFa%eNoN
+               Ac = lFa%IEN(a,e)
+               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+            END DO
+            DO g=1, lFa%nG
+               Ec = ePtr(1,g,e)
+               iM = ePtr(2,g,e)
+               IF (Ec.EQ.0 .OR. iM.EQ.0) THEN
+                  xp = 0D0
+                  DO a=1, lFa%eNoN
+                     xp(:) = xp(:) + lFa%N(a,g)*xl(:,a)
+                  END DO
+                  WRITE(fid,'(2X,A)',ADVANCE='NO') STR(g)//" "//STR(e)
+                  DO i=1, nsd
+                     WRITE(fid,'(A)',ADVANCE='NO') " "//STR(xp(i))
+                  END DO
+                  WRITE(fid,'(A)')
+               END IF
+            END DO
+         END DO
+         DEALLOCATE(xl)
+         CLOSE(fid)
+      ELSE
+         ALLOCATE(ePtr(0,0,0))
+      END IF
+      DEALLOCATE(gE, ePtr)
+
+      i = cm%reduce(i)
+      err = "ERROR: Failed to detect all the traces on "//
+     2   TRIM(lFa%name)//". See "//TRIM(fName)//" for more information."
+
+      RETURN
+      END SUBROUTINE DEBUGIBFATRC
 !####################################################################

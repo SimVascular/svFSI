@@ -384,17 +384,36 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     This call is to block all processors
             CALL cm%bcast(l1)
             OPEN(fid, FILE=TRIM(fName), ACCESS='DIRECT', RECL=recLn)
-            IF (dFlag) THEN
-               IF (pstEq) THEN
-                  WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,pS0
+            IF (.NOT.ibFlag) THEN
+               IF (dFlag) THEN
+                  IF (pstEq) THEN
+                     WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
+     3                  pS0
+                  ELSE
+                     WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn
+                  END IF
                ELSE
                   WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn
+     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An
                END IF
             ELSE
-               WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2            CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An
+               IF (dFlag) THEN
+                  IF (pstEq) THEN
+                     WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
+     3                  pS0, Rib, ib%Uo
+                  ELSE
+                     WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
+     3                  Rib, ib%Uo
+                  END IF
+               ELSE
+                  WRITE(fid, REC=cm%tF()) stamp, cTS, time,
+     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Rib,
+     3               ib%Uo
+               END IF
             END IF
             CLOSE(fid)
             IF (.NOT.stFileRepl .AND. cm%mas()) THEN
@@ -412,6 +431,8 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          ELSE
             CALL OUTRESULT(timeP, 2, iEqOld)
          END IF
+
+         IF (ibFlag) CALL IB_OUTR()
 
 !     Exiting outer loop if l1 or l2 happens
          IF (l1 .OR. l2) EXIT

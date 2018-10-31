@@ -747,7 +747,7 @@
 !        Number of IB faces in LHS passed to FSILS
          INTEGER :: nFacesLS
 !        IB call duration
-         REAL(KIND=8) :: callD
+         REAL(KIND=8) :: callD(3)
 !        IB Domain ID
          INTEGER, ALLOCATABLE :: dmnID(:)
 !        Row pointer (for sparse LHS matrix storage)

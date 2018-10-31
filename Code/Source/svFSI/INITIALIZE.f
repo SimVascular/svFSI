@@ -158,6 +158,7 @@
       IF (dFlag .AND. .NOT.cmmEq) i = 3
       IF (pstEq) i = i + nstd
       i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
+      IF (ibFlag) i = i + 8*nsd*(tnNo + ib%tnNo)
       IF (cm%seq()) THEN
          recLn = i
       ELSE
@@ -195,6 +196,13 @@
 !     Variable allocation and initialization
       ALLOCATE(Ao(tDof,tnNo), An(tDof,tnNo), Yo(tDof,tnNo),
      2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo))
+      IF (ibFlag) THEN
+         ALLOCATE(Rib(nsd,tnNo), ib%Uo(nsd,ib%tnNo), ib%Ao(nsd,ib%tnNo),
+     2      ib%Yo(nsd+1,ib%tnNo), ib%R(nsd,ib%tnNo))
+         ib%Ao = 0D0
+         ib%Yo = 0D0
+         ib%R  = 0D0
+      END IF
 
 !     Additional physics dependent variables
 !     USTRUCT phys
@@ -268,6 +276,7 @@
             i = 3
             IF (pstEq) i = i + nstd
             i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
+            IF (ibFlag) i = i + 8*nsd*(tnNo + ib%tnNo)
             IF (cm%seq()) THEN
                recLn = i
             ELSE
@@ -277,7 +286,7 @@
          END IF
 
 !        Load any explicitly provided solution variables
-         CALL INITSOLVAR()
+         CALL INITSOLNVAR()
 
          rsTS = cTS
       ELSE
@@ -388,6 +397,11 @@
          rmsh%D0 = 0D0
       END IF
 
+      IF (ibFlag) THEN
+         Rib   = 0D0
+         ib%Uo = 0D0
+      END IF
+
       RETURN
       END SUBROUTINE ZEROINIT
 !--------------------------------------------------------------------
@@ -442,17 +456,32 @@
 
       std = " Initializing from "//fName
       OPEN(fid, FILE=fName, ACCESS='DIRECT', RECL=recLn)
-      IF (dFlag .AND. .NOT.cmmEq) THEN
-         IF (pstEq) THEN
-            READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, Do, pS0
+      IF (.NOT.ibFlag) THEN
+         IF (dFlag .AND. .NOT.cmmEq) THEN
+            IF (pstEq) THEN
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
+            ELSE
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do
+            END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, Do
+     2         cplBC%xo, Yo, Ao
          END IF
       ELSE
-         READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2      cplBC%xo, Yo, Ao
+         IF (dFlag .AND. .NOT.cmmEq) THEN
+            IF (pstEq) THEN
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Rib, ib%Uo
+            ELSE
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, Rib, ib%Uo
+            END IF
+         ELSE
+            READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
+     2         cplBC%xo, Yo, Ao, Rib, ib%Uo
+         END IF
       END IF
       CLOSE(fid)
 
@@ -493,7 +522,7 @@
       RETURN
       END SUBROUTINE INITFROMBIN
 !--------------------------------------------------------------------
-      SUBROUTINE INITSOLVAR()
+      SUBROUTINE INITSOLNVAR()
       IMPLICIT NONE
 
       INTEGER a
@@ -567,7 +596,7 @@
       END IF
 
       RETURN
-      END SUBROUTINE INITSOLVAR
+      END SUBROUTINE INITSOLNVAR
 !--------------------------------------------------------------------
       END SUBROUTINE INITIALIZE
 !####################################################################

@@ -1805,7 +1805,7 @@
 !     Uses Newton method to compute the parametric coordinate (xi) of
 !     the probe with respect to an element for the given physical
 !     coordinate (xp). Elements are searched prescribed by eList.
-      SUBROUTINE FINDE(xp, lM, xg, Dg, nNo, ne, eList, Ec, xi)
+      SUBROUTINE FINDE(xp, lM, xg, Dg, nNo, ne, eList, Ec, xi, lDebug)
       USE COMMOD
       IMPLICIT NONE
 
@@ -1814,8 +1814,9 @@
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER, INTENT(OUT) :: Ec
       REAL(KIND=8), INTENT(OUT) :: xi(nsd)
+      LOGICAL, INTENT(IN), OPTIONAL :: lDebug
 
-      LOGICAL :: flag
+      LOGICAL :: flag, ldbg
       INTEGER :: a, e, i, Ac, eNoN
       REAL(KIND=8) :: rt
 
@@ -1824,23 +1825,27 @@
 
       IF (lM%lShl) err = " Finding traces is not applicable for shells"
 
+      ldbg = .FALSE.
+      IF (PRESENT(lDebug)) ldbg = lDebug
       Ec   = 0
       eNoN = lM%eNoN
       ALLOCATE(eChck(lM%nEl), xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN))
 
-c      WRITE(1000+cm%tF(),'(A)') "=================================="
-c      WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') "Finding trace for xp: "
-c      DO i=1,  nsd
-c         WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xp(i))
-c      END DO
-c      WRITE(1000+cm%tF(),'(A)')
-c      WRITE(1000+cm%tF(),'(A)')
-c      WRITE(1000+cm%tF(),'(A)') "List of elems: <"//STR(ne)//">"
-c      DO e=1, ne
-c         WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(eList(e))
-c      END DO
-c      WRITE(1000+cm%tF(),'(A)')
-c      WRITE(1000+cm%tF(),'(A)') "=================================="
+      IF (ldbg) THEN
+         WRITE(1000+cm%tF(),'(A)') "=================================="
+         WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') "Finding trace for xp: "
+         DO i=1,  nsd
+            WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xp(i))
+         END DO
+         WRITE(1000+cm%tF(),'(A)')
+         WRITE(1000+cm%tF(),'(A)')
+         WRITE(1000+cm%tF(),'(A)') "List of elems: <"//STR(ne)//">"
+         DO e=1, ne
+            WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(eList(e))
+         END DO
+         WRITE(1000+cm%tF(),'(A)')
+         WRITE(1000+cm%tF(),'(A)') "=================================="
+      END IF
 
       eChck = .FALSE.
       DO e=1, ne
@@ -1861,36 +1866,43 @@ c      WRITE(1000+cm%tF(),'(A)') "=================================="
          END DO
          xi(:) = xi(:) / REAL(lM%nG,KIND=8)
 
-c         WRITE(1000+cm%tF(),'(A)') "----------------------------"
-c         WRITE(1000+cm%tF(),'(A)') "Probe el: "//STR(Ec)
-c         DO a=1, eNoN
-c            Ac = lM%IEN(a,Ec)
-c            WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') STR(Ac)
-c            DO i=1, nsd
-c               WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xl(i,a))
-c            END DO
-c            WRITE(1000+cm%tF(),'(A)')
-c         END DO
+         IF (ldbg) THEN
+            WRITE(1000+cm%tF(),'(A)') "----------------------------"
+            WRITE(1000+cm%tF(),'(A)') "Probe el: "//STR(Ec)
+            DO a=1, eNoN
+               Ac = lM%IEN(a,Ec)
+               WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') STR(Ac)
+               DO i=1, nsd
+                  WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//
+     2               STR(xl(i,a))
+               END DO
+               WRITE(1000+cm%tF(),'(A)')
+            END DO
+         END IF
 
          CALL GETXI(lM%eType, eNoN, xl, xp, xi, flag)
 !        If Newton's method fails, continue
          IF (.NOT.flag) CYCLE
 
-c         WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "xi: "
-c         DO i=1, nsd
-c            WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xi(i))
-c         END DO
-c         WRITE(1000+cm%tF(),'(A)')
+         IF (ldbg) THEN
+            WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "xi: "
+            DO i=1, nsd
+               WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xi(i))
+            END DO
+            WRITE(1000+cm%tF(),'(A)')
+         END IF
 
 !        Check for shape function even if the Newton's method returns OK
          CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
 
-c         WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "N: "
-c         DO a=1, eNoN
-c            WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(N(a))
-c         END DO
-c         WRITE(1000+cm%tF(),'(A)')
-c         CALL FLUSH(1000+cm%tF())
+         IF (ldbg) THEN
+            WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "N: "
+            DO a=1, eNoN
+               WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(N(a))
+            END DO
+            WRITE(1000+cm%tF(),'(A)')
+            CALL FLUSH(1000+cm%tF())
+         END IF
 
          i  = 0
          rt = 0.0D0
