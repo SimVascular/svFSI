@@ -108,7 +108,7 @@
          lR(1,a) = lR(1,a) + w*(N(a)*Td
      2      + Nx(1,a)*DTx(1) + Nx(2,a)*DTx(2) + Nx(3,a)*DTx(3))
 
-         DO b=1,eNoN
+         DO b=1, eNoN
             lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd +
      2         Nx(1,a)*DNx(1,b) + Nx(2,a)*DNx(2,b) + Nx(3,a)*DNx(3,b))
          END DO
@@ -116,27 +116,6 @@
 
       RETURN
       END SUBROUTINE CEP3D
-!-----------------------------------------------------------------------
-      PURE SUBROUTINE BCEP (eNoN, w, N, h, lR)
-      USE COMMOD
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), h
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN)
-
-      INTEGER :: a
-      REAL(KIND=8) f
-
-      f = w*h
-
-!     Here the loop is started for constructing left and right hand side
-      DO a=1, eNoN
-         lR(1,a) = lR(1,a) + N(a)*f
-      END DO
-
-      RETURN
-      END SUBROUTINE BCEP
 !-----------------------------------------------------------------------
 !     This is for solving 2D electrophysiology diffusion equation
       PURE SUBROUTINE CEP2D (eNoN, w, N, Nx, al, yl, fNl, lR, lK)
@@ -199,7 +178,7 @@
          lR(1,a) = lR(1,a) + w*(N(a)*Td
      2      + Nx(1,a)*DTx(1) + Nx(2,a)*DTx(2))
 
-         DO b=1,eNoN
+         DO b=1, eNoN
             lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd +
      2         Nx(1,a)*DNx(1,b) + Nx(2,a)*DNx(2,b))
          END DO
@@ -207,6 +186,66 @@
 
       RETURN
       END SUBROUTINE CEP2D
+!-----------------------------------------------------------------------
+!     This is for solving 1D electrophysiology diffusion equation
+!     for Purkinje fibers
+      PURE SUBROUTINE CEP1D (eNoN, insd, w, N, Nx, al, yl, lR, lK)
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: eNoN, insd
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(insd,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+
+      INTEGER a, b, i, iFn
+      REAL(KIND=8) :: T1, amd, wl, Td, Tx, Diso, DNx(eNoN)
+
+      T1   = eq(cEq)%af*eq(cEq)%gam*dt
+      amd  = eq(cEq)%am/T1
+      Diso = eq(cEq)%dmn(cDmn)%cep%Diso
+      i    = eq(cEq)%s
+      wl   = w*T1
+
+      Td = 0D0
+      Tx = 0D0
+      DO a=1, eNoN
+         Td = Td + N(a)*al(i,a)
+         Tx = Tx + Nx(1,a)*yl(i,a)
+         DNx(a) = Diso*Nx(1,a)
+      END DO
+
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) + w*(N(a)*Td + Nx(1,a)*Diso*Tx)
+
+         DO b=1, eNoN
+            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd + Nx(1,a)*DNx(b))
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE CEP1D
+!-----------------------------------------------------------------------
+      PURE SUBROUTINE BCEP (eNoN, w, N, h, lR)
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: eNoN
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), h
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN)
+
+      INTEGER :: a
+      REAL(KIND=8) f
+
+      f = w*h
+
+!     Here the loop is started for constructing left and right hand side
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) + N(a)*f
+      END DO
+
+      RETURN
+      END SUBROUTINE BCEP
 !#######################################################################
       SUBROUTINE CEPION(iEq, iDof)
       USE COMMOD
@@ -216,12 +255,11 @@
       INTEGER, INTENT(IN) :: iEq, iDof
 
       LOGICAL :: IPASS = .TRUE.
-      INTEGER :: iM, iDmn, e, a, Ac, cPhys, nX, nXmax
+      INTEGER :: Ac, iDmn, cPhys, dID, nX, nXmax
 
-      INTEGER, ALLOCATABLE :: incNd(:,:)
       REAL(KIND=8), ALLOCATABLE :: Xl(:), Xion(:,:), sA(:), sF(:,:)
 
-      SAVE IPASS, nXmax, incNd, Xion
+      SAVE IPASS, nXmax, Xion
 
 !     Initialization step
       IF (IPASS) THEN
@@ -236,53 +274,44 @@
             IF (nX .GT. nXmax) nXmax = nX
          END DO
 
-!        Determine nodes of a domain where CEP model is solved
-         ALLOCATE(incNd(eq(iEq)%nDmn,tnNo))
-         incNd = 0
-         DO iM=1, nMsh
-            DO e=1, msh(iM)%nEl
-               iDmn = DOMAIN(msh(iM), iEq, e)
-               cPhys = eq(iEq)%dmn(iDmn)%phys
-               IF (cPhys .NE. phys_CEP) CYCLE
-
-               DO a=1, msh(iM)%eNoN
-                  Ac = msh(iM)%IEN(a,e)
-                  incNd(iDmn, Ac) = 1
-               END DO
-            END DO
-         END DO
-
 !        Initialize CEP model state variables
-         ALLOCATE(sA(tnNo), sF(nXmax,tnNo))
-         sA = 0D0
-         sF = 0D0
-         DO iDmn=1, eq(iEq)%nDmn
-            cPhys = eq(iEq)%dmn(iDmn)%phys
-            IF (cPhys .NE. phys_CEP) CYCLE
-
-            nX = eq(iEq)%dmn(iDmn)%cep%nX
-            ALLOCATE(Xl(nX))
-            CALL CEPINIT(eq(iEq)%dmn(iDmn)%cep, nX, Xl)
-
-            DO Ac=1, tnNo
-               IF (incNd(iDmn,Ac) .EQ. 0) CYCLE
-               sA(Ac) = sA(Ac) + 1.0D0
-               sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
-            END DO
-            DEALLOCATE(Xl)
-         END DO
-
-         CALL COMMU(sA)
-         CALL COMMU(sF)
-
          ALLOCATE(Xion(nxMax,tnNo))
          Xion = 0D0
-         DO Ac=1, tnNo
-            IF (.NOT.ISZERO(sA(Ac))) THEN
-               Xion(:,Ac) = sF(:,Ac)/sA(Ac)
-            END IF
-         END DO
-         DEALLOCATE(sA, sF)
+         IF (ALLOCATED(dmnId)) THEN
+            ALLOCATE(sA(tnNo), sF(nXmax,tnNo))
+            sA = 0D0
+            sF = 0D0
+            DO Ac=1, tnNo
+               DO iDmn=1, eq(iEq)%nDmn
+                  cPhys = eq(iEq)%dmn(iDmn)%phys
+                  dID   = eq(iEq)%dmn(iDmn)%Id
+                  IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(Ac),dID))
+     2                CYCLE
+                  nX = eq(iEq)%dmn(iDmn)%cep%nX
+                  ALLOCATE(Xl(nX))
+                  CALL CEPINIT(eq(iEq)%dmn(iDmn)%cep, nX, Xl)
+                  sA(Ac) = sA(Ac) + 1.0D0
+                  sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
+                  DEALLOCATE(Xl)
+               END DO
+            END DO
+            CALL COMMU(sA)
+            CALL COMMU(sF)
+            DO Ac=1, tnNo
+               IF (.NOT.ISZERO(sA(Ac)))
+     2            Xion(:,Ac) = sF(:,Ac)/sA(Ac)
+            END DO
+            DEALLOCATE(sA, sF)
+         ELSE
+            DO Ac=1, tnNo
+               IF (eq(iEq)%dmn(1)%phys .NE. phys_CEP) CYCLE
+               nX = eq(iEq)%dmn(1)%cep%nX
+               ALLOCATE(Xl(nX))
+               CALL CEPINIT(eq(iEq)%dmn(1)%cep, nX, Xl)
+               Xion(1:nX,Ac) = Xl(:)
+               DEALLOCATE(Xl)
+            END DO
+         END IF
       ELSE
 !        Copy action potential after diffusion as first state variable
          DO Ac=1, tnNo
@@ -290,34 +319,43 @@
          END DO
       END IF
 
-      ALLOCATE(sA(tnNo), sF(nXmax,tnNo))
-      sA = 0D0
-      sF = 0D0
-      DO iDmn=1, eq(iEq)%nDmn
-         cPhys = eq(iEq)%dmn(iDmn)%phys
-         IF (cPhys.NE.phys_CEP) CYCLE
-
-         nX = eq(iEq)%dmn(iDmn)%cep%nX
-         ALLOCATE(Xl(nX))
+      IF (ALLOCATED(dmnId)) THEN
+         ALLOCATE(sA(tnNo), sF(nXmax,tnNo))
+         sA = 0D0
+         sF = 0D0
          DO Ac=1, tnNo
-            IF (incNd(iDmn,Ac) .EQ. 0) CYCLE
+            DO iDmn=1, eq(iEq)%nDmn
+               cPhys = eq(iEq)%dmn(iDmn)%phys
+               dID   = eq(iEq)%dmn(iDmn)%Id
+               IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(Ac),dID))
+     2             CYCLE
+               nX = eq(iEq)%dmn(iDmn)%cep%nX
+               ALLOCATE(Xl(nX))
+               Xl(:) = Xion(1:nX,Ac)
+               CALL CEPINTEG(eq(iEq)%dmn(iDmn)%cep, nX, Xl, time-dt, dt)
+               sA(Ac) = sA(Ac) + 1.0D0
+               sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
+               DEALLOCATE(Xl)
+            END DO
+         END DO
+         CALL COMMU(sA)
+         CALL COMMU(sF)
+         DO Ac=1, tnNo
+            IF (.NOT.ISZERO(sA(Ac)))
+     2         Xion(:,Ac) = sF(:,Ac)/sA(Ac)
+         END DO
+         DEALLOCATE(sA, sF)
+      ELSE
+         DO Ac=1, tnNo
+            IF (eq(iEq)%dmn(1)%phys .NE. phys_CEP) CYCLE
+            nX = eq(iEq)%dmn(1)%cep%nX
+            ALLOCATE(Xl(nX))
             Xl(:) = Xion(1:nX,Ac)
             CALL CEPINTEG(eq(iEq)%dmn(iDmn)%cep, nX, Xl, time-dt, dt)
-            sA(Ac)      = sA(Ac) + 1.0D0
-            sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
+            Xion(1:nX,Ac) = Xl(:)
+            DEALLOCATE(Xl)
          END DO
-         DEALLOCATE(Xl)
-      END DO
-
-      CALL COMMU(sA)
-      CALL COMMU(sF)
-
-      DO Ac=1, tnNo
-         IF (.NOT.ISZERO(sA(Ac))) THEN
-            Xion(:,Ac) = sF(:,Ac)/sA(Ac)
-         END IF
-      END DO
-      DEALLOCATE(sA, sF)
+      END IF
 
       DO Ac=1, tnNo
          Yo(iDof,Ac) = Xion(1,Ac)

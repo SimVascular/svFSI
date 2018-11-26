@@ -79,7 +79,7 @@
       INTEGER, INTENT(IN) :: outGrp, iEq
 
       LOGICAL FSIeq
-      INTEGER a, Ac, e, i, j, eNoN, g
+      INTEGER a, Ac, e, i, j, eNoN, g, insd
       REAL(KIND=8) rho, kappa, w, Jac, ksix(nsd,nsd), lRes(maxnsd),
      2   q(nsd), u(nsd), p, T, ux(nsd,nsd)
       COMPLEX*16 :: eig(nsd)
@@ -112,6 +112,8 @@
       sF   = 0D0
       lRes = 0D0
       eig  = (0D0, 0D0)
+      insd = nsd
+      IF (lM%lFib) insd = 1
       DO e=1, lM%nEl
          cDmn = DOMAIN(lM, iEq, e)
          IF (cDmn .EQ. 0) CYCLE
@@ -131,7 +133,7 @@
 
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-               CALL GNN(eNoN, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+               CALL GNN(eNoN, insd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
             END IF
             w = lM%w(g)*Jac
             N = lM%N(:,g)
@@ -324,7 +326,7 @@
             END DO
             DO g=1, lM%nG
                IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-                  CALL GNN(eNoN, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+                  CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
                END IF
                w = lM%w(g)*Jac
                N = lM%N(:,g)
@@ -404,7 +406,7 @@
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
       INTEGER, INTENT(IN) :: iEq
 
-      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
+      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys, insd
       REAL(KIND=8) w, Jac, detF, ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
      2   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), pSl(:),
@@ -422,8 +424,10 @@
       ALLOCATE (sA(tnNo), sF(nstd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
      2   fNl(nFn*nsd,eNoN), pSl(nstd), Nx(nsd,eNoN), N(eNoN))
 
-      sA = 0D0
-      sF = 0D0
+      sA   = 0D0
+      sF   = 0D0
+      insd = nsd
+      IF (lM%lFib) insd = 1
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
@@ -444,7 +448,7 @@
          stModel = eq(iEq)%dmn(cDmn)%stM
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-               CALL GNN(eNoN, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+               CALL GNN(eNoN, insd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
             END IF
             w = lM%w(g)*Jac
             N = lM%N(:,g)

@@ -48,6 +48,7 @@
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
+      IF (lM%lFib) insd = 1
 
       IF (lM%eType .EQ. eType_NRB) THEN
          ALLOCATE(lM%w(lM%nG), lM%N(lM%eNoN,lM%nG),
@@ -83,7 +84,8 @@
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
          END SELECT
-      ELSE
+
+      ELSE IF (insd .EQ. 2) THEN
          SELECT CASE (lM%eNoN)
          CASE(3)
             lM%eType   = eType_TRI
@@ -102,6 +104,24 @@
             lM%nG      = 9
             lM%vtkType = 28
             lM%nEf     = 4
+            lM%lShpF   = .FALSE.
+         CASE DEFAULT
+            err = "Unable to identify combination of nsd and eNoN"
+         END SELECT
+
+      ELSE IF (insd .EQ. 1) THEN
+         SELECT CASE (lM%eNoN)
+         CASE(2)
+            lM%eType   = eType_LIN
+            lM%nG      = 2
+            lM%vtkType = 3
+            lM%nEf     = 2
+            lM%lShpF   = .TRUE.
+         CASE(3)
+            lM%eType   = eType_QUD
+            lM%nG      = 3
+            lM%vtkType = 3
+            lM%nEf     = 2
             lM%lShpF   = .FALSE.
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
@@ -133,6 +153,7 @@
 
       insd = nsd - 1
       IF (lM%lShl) insd = insd - 1
+      IF (lM%lFib) insd = 0
 
       IF (lM%eType .EQ. eType_NRB) THEN
          lFa%eType = eType_NRB
@@ -171,6 +192,9 @@
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
          END SELECT
+      ELSE IF (insd .EQ. 0) THEN
+         lFa%eType = eType_PNT
+         lFa%nG = 1
       END IF
 
       ALLOCATE(lFa%w(lFa%nG), lFa%xi(insd,lFa%nG),
@@ -276,6 +300,9 @@
          xi(1,1) = -s
          xi(1,2) =  s
          xi(1,3) = 0D0
+!     0D elements
+      CASE(eType_PNT)
+         w = 1D0
       END SELECT
 
       END SUBROUTINE GETGIP
@@ -534,25 +561,41 @@ c         WRITE(1000+cm%tF(),'(8X,A)') "Fail.."
          Nxi(1,1) = -5D-1 + xi(1)
          Nxi(1,2) =  5D-1 + xi(1)
          Nxi(1,3) = -2D0*xi(1)
+
+!     0D elements
+      CASE(eType_PNT)
+         N(1) = 1.0D0
       END SELECT
 
       RETURN
       END SUBROUTINE GETGNN
 !####################################################################
-      PURE SUBROUTINE GNN(eNoN, Nxi, x, Nx, Jac, ks)
+      PURE SUBROUTINE GNN(eNoN, insd, Nxi, x, Nx, Jac, ks)
       USE COMMOD, ONLY: nsd
+      USE UTILMOD
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: Nxi(nsd,eNoN), x(nsd,eNoN)
-      REAL(KIND=8), INTENT(OUT) :: Nx(nsd,eNoN), Jac, ks(nsd,nsd)
+      INTEGER, INTENT(IN) :: eNoN, insd
+      REAL(KIND=8), INTENT(IN) :: Nxi(insd,eNoN), x(nsd,eNoN)
+      REAL(KIND=8), INTENT(OUT) :: Nx(insd,eNoN), Jac, ks(nsd,nsd)
 
       INTEGER a
-      REAL(KIND=8) xXi(nsd,nsd), xiX(nsd,nsd)
+      REAL(KIND=8) xXi(nsd,insd), xiX(insd,nsd)
 
-      Nx  = 0D0
       xXi = 0D0
-      IF (nsd .EQ. 2) THEN
+      Jac = 0D0
+      Nx  = 0D0
+      ks  = 0D0
+      IF (insd .EQ. 1) THEN
+         DO a=1, eNoN
+            xXi(:,1) = xXi(:,1) + x(:,a)*Nxi(1,a)
+         END DO
+
+         Jac = SQRT(NORM(xXi)) + 1D3*eps
+         DO a=1, eNoN
+            Nx(1,a) = Nxi(1,a)/Jac
+         END DO
+      ELSE IF (insd .EQ. 2) THEN
          DO a=1, eNoN
             xXi(:,1) = xXi(:,1) + x(:,a)*Nxi(1,a)
             xXi(:,2) = xXi(:,2) + x(:,a)*Nxi(2,a)
@@ -574,7 +617,7 @@ c         WRITE(1000+cm%tF(),'(8X,A)') "Fail.."
             Nx(1,a) = Nx(1,a)+ Nxi(1,a)*xiX(1,1) + Nxi(2,a)*xiX(2,1)
             Nx(2,a) = Nx(2,a)+ Nxi(1,a)*xiX(1,2) + Nxi(2,a)*xiX(2,2)
          END DO
-      ELSE
+      ELSE IF (insd .EQ. 3) THEN
          DO a=1, eNoN
             xXi(:,1) = xXi(:,1) + x(:,a)*Nxi(1,a)
             xXi(:,2) = xXi(:,2) + x(:,a)*Nxi(2,a)

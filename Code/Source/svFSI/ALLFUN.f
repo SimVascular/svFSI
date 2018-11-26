@@ -232,6 +232,7 @@
          eNoN = msh(iM)%eNoN
          insd = nsd
          IF (msh(iM)%lShl) insd = nsd-1
+         IF (msh(iM)%lFib) insd = 1
 
          ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
      2      sl(eNoN), tmps(nsd,insd))
@@ -257,7 +258,7 @@
             IF (ibl .EQ. eNoN) CYCLE
 
             IF (msh(iM)%iGC(e) .EQ. 1) THEN
-               IF (msh(iM)%lShl) CYCLE
+               IF (msh(iM)%lShl .OR. msh(iM)%lFib) CYCLE
                IF (ib%fcFlag) THEN
                   CALL FC_INIT(fCell, msh(iM), xl)
                   CALL FC_SET(fCell, msh(iM), xl, ib%Uo)
@@ -274,7 +275,7 @@
                      CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
                      Jac = SQRT(NORM(nV))
                   ELSE
-                     CALL GNN(eNoN, Nxi, xl, Nx, Jac, tmp)
+                     CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
                   END IF
                END IF
                IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
@@ -799,7 +800,7 @@
       ELSE
 !     No domain partitioning exists, so single domain is assumed and we
 !     only need to check that
-            IF (eq(iEq)%dmn(1)%phys .EQ. phys) ISDOMAIN = .TRUE.
+         IF (eq(iEq)%dmn(1)%phys .EQ. phys) ISDOMAIN = .TRUE.
       END IF
 
       RETURN
@@ -1926,7 +1927,7 @@
 
       REAL(KIND=8), INTENT(INOUT) :: U(:)
 
-      INTEGER i, a, e, Ac, iM, iFa, nl, ng, ierr, tag, sReq
+      INTEGER i, a, e, Ac, iM, iFa, nl, ng, ierr, tag
 
       INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
@@ -2022,7 +2023,7 @@
 
       REAL(KIND=8), INTENT(INOUT) :: U(:,:)
 
-      INTEGER m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag, sReq
+      INTEGER m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag
 
       INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)

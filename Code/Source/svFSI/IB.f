@@ -4070,7 +4070,7 @@ c     2         "can be applied for Neumann boundaries only"
      2         "Error in computing IB trace shape functions"
 
 !           Compute spatial derivatives of shape functions
-            CALL GNN(eNoN, Nxi, xl, Nx, Jac, Ks)
+            CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
 
 !           Compute the residue and stiffness matrices
             lR = 0D0
@@ -4255,7 +4255,7 @@ c     2         "can be applied for Neumann boundaries only"
      2         "Error in computing IB trace shape functions"
 
 !           Compute spatial derivatives of shape functions
-            CALL GNN(eNoN, Nxi, xl, Nx, Jac, Ks)
+            CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
 
 !           Compute the residue and stiffness matrices
             lR = 0D0
@@ -4761,7 +4761,7 @@ c      CALL IB_SYNC(sA)
                Ac = ib%msh(iM)%IEN(a,e)
                xbl(:,a) = ib%x(:,Ac) + Ub(:,Ac)
             END DO
-            CALL GNN(eNoNb, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac, Ks)
+            CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,Ks)
             IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e
             w = ib%msh(iM)%w(g) * Jac
 
@@ -4903,7 +4903,7 @@ c      CALL IB_SYNC(sA)
             lR = 0D0
             DO g=1, ib%msh(iM)%nG
                IF (g.EQ.1 .OR. .NOT.ib%msh(iM)%lShpF) THEN
-                  CALL GNN(eNoN, ib%msh(iM)%Nx(:,:,g), xl, Nx, Jac,
+                  CALL GNN(eNoN, nsd, ib%msh(iM)%Nx(:,:,g), xl, Nx, Jac,
      2               ksix)
                END IF
                IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e

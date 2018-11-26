@@ -344,10 +344,7 @@
       DO iEq=1, nEq
          DO iDmn=1, eq(iEq)%nDmn
             eq(iEq)%dmn(iDmn)%v = Integ(eq(iEq)%dmn(iDmn)%Id, s, 1, 1)
-            IF (cm%mas()) THEN
-               WRITE(*,'(A,F12.6)') " Volume of domain ",
-     2            eq(iEq)%dmn(iDmn)%v
-            END IF
+            std = " Volume of domain "//STR(eq(iEq)%dmn(iDmn)%v)
             IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "Volume of "//
      2         "domain "//iDmn//" of equation "//iEq//" is zero"
          END DO

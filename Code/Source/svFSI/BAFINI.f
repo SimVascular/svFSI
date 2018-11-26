@@ -49,6 +49,7 @@
       DO iM=1, nMsh
          DO iFa=1, msh(iM)%nFa
             msh(iM)%fa(iFa)%iM = iM
+            IF (msh(iM)%lFib) CYCLE
             CALL FACEINI(msh(iM)%fa(iFa))
          END DO
       END DO

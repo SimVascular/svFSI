@@ -55,6 +55,7 @@
       TYPE(stackType) :: avNds
       TYPE(fileType) :: fTmp
 
+      LOGICAL, ALLOCATABLE :: ichk(:)
       REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), gX(:,:), tmpA(:,:),
      2   tmpY(:,:), tmpD(:,:)
 
@@ -69,6 +70,7 @@
          DO iM=1, nMsh
             lPM => list%get(msh(iM)%name,"Add mesh",iM)
             lPtr => lPM%get(msh(iM)%lShl,"Set mesh as shell")
+            lPtr => lPM%get(msh(iM)%lFib,"Set mesh as fibers")
 
             std  = " Reading mesh <"//CLR(TRIM(msh(iM)%name))//">"
             CALL READSV(lPM, msh(iM))
@@ -148,6 +150,17 @@
                END IF
             END IF
          END DO
+
+!        Checks for fiber mesh
+         DO iM=1, nMsh
+            IF (msh(iM)%lFib) THEN
+               IF (msh(iM)%eType.NE.eType_LIN .AND.
+     2             msh(iM)%eType.NE.eType_QUD) THEN
+                  err = "Fiber elements can be either linear "//
+     2               "or quadratic"
+               END IF
+            END IF
+         END DO
       ELSE
          ALLOCATE(gX(nsd,gtnNo))
          gX = x
@@ -192,18 +205,49 @@
          END DO
       END DO
 
-!     Re-arranging fa and x and finding the size of the entire domain
+!     Re-arranging x and finding the size of the entire domain
+!     First rearrange 2D/3D mesh and then, 1D fiber mesh
+      ALLOCATE(ichk(gtnNo))
+      ichk = .FALSE.
       b = 0
       DO iM=1, nMsh
+         IF (msh(iM)%lFib) THEN
+            b = b + msh(iM)%gnNo
+            CYCLE
+         END IF
          DO a=1, msh(iM)%gnNo
             b  = b + 1
             Ac = msh(iM)%gN(a)
+            ichk(Ac) = .TRUE.
             DO i=1, nsd
                x(i,Ac) = gX(i,b)
                IF (maxX(i) .LT. x(i,Ac)) maxX(i) = x(i,Ac)
                IF (minX(i) .GT. x(i,Ac)) minX(i) = x(i,Ac)
             END DO
          END DO
+      END DO
+
+      b = 0
+      DO iM=1, nMsh
+         IF (.NOT.msh(iM)%lFib) THEN
+            b = b + msh(iM)%gnNo
+            CYCLE
+         END IF
+         DO a=1, msh(iM)%gnNo
+            b  = b + 1
+            Ac = msh(iM)%gN(a)
+            IF (ichk(Ac)) CYCLE
+            DO i=1, nsd
+               x(i,Ac) = gX(i,b)
+               IF (maxX(i) .LT. x(i,Ac)) maxX(i) = x(i,Ac)
+               IF (minX(i) .GT. x(i,Ac)) minX(i) = x(i,Ac)
+            END DO
+         END DO
+      END DO
+      DEALLOCATE(ichk)
+
+!     Rearrange fa
+      DO iM=1, nMsh
          DO iFa=1, msh(iM)%nFa
             DO a=1, msh(iM)%fa(iFa)%nNo
                Ac = msh(iM)%fa(iFa)%gN(a)
@@ -567,6 +611,7 @@
       TYPE(stackType), INTENT(OUT) :: avNds
 
       INTEGER i, j, k, iM, jM, kM, iFa, jFa, ia, ja, nPrj, iPrj, nStk
+      REAL(KIND=8) tol
       CHARACTER(LEN=stdL) ctmpi, ctmpj
       TYPE(stackType) lPrj
       TYPE(listType), POINTER :: lPtr, lPP
@@ -594,7 +639,9 @@
          CALL FINDFACE(ctmpi, iM, iFa)
          lPtr => lPP%get(ctmpj,"Project from face",1)
          CALL FINDFACE(ctmpj, jM, jFa)
-         CALL MATCHFACES(msh(iM)%fa(iFa), msh(jM)%fa(jFa), lPrj)
+         tol = 0.0D0
+         lPtr => lPP%get(tol,"Projection tolerance")
+         CALL MATCHFACES(msh(iM)%fa(iFa), msh(jM)%fa(jFa), lPrj, tol)
          DO
 !     First in, last out
             IF (.NOT.PULLSTACK(lPrj,ja)) EXIT
@@ -650,13 +697,14 @@
 !--------------------------------------------------------------------
 !     This is match isoparameteric faces to each other. Project nodes
 !     from two adjacent meshes to each other based on a L2 norm.
-      SUBROUTINE MATCHFACES(lFa, pFa, lPrj)
+      SUBROUTINE MATCHFACES(lFa, pFa, lPrj, tol)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(INOUT) :: lFa, pFa
       TYPE(stackType), INTENT(OUT) :: lPrj
+      REAL(KIND=8), INTENT(IN) :: tol
 
       TYPE blkType
          INTEGER :: n = 0
@@ -665,14 +713,11 @@
 
       LOGICAL nFlt(nsd)
       INTEGER nBkd, i, a, b, Ac, Bc, iBk, nBk, iM, jM, iSh, jSh
-      REAL(KIND=8) ds, xMin(nsd), xMax(nsd), dx(nsd)
+      REAL(KIND=8) ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
 
       INTEGER, ALLOCATABLE :: nodeBlk(:)
       TYPE(blkType), ALLOCATABLE :: blk(:)
       INTEGER :: cnt
-
-      IF ((lFa%eType .NE. pFa%eType) .OR. (lFa%nNo .NE. pFa%nNo))
-     2   err = "Incompatible faces in MATCHFACES"
 
       iM  = lFa%iM
       jM  = pFa%iM
@@ -735,27 +780,35 @@
       END DO
 
 !     Doing the calculation for every single node on this face
-      cnt = 0
+      cnt  = 0
       DO a=1, lFa%nNo
          Ac  = lFa%gN(a)
          iBk = FINDBLK(x(:,Ac+iSh))
 !     Checking every single node on the other face
+         minS = HUGE(minS)
          DO b=1, blk(iBk)%n
             Bc = blk(iBk)%gN(b)
             IF (iM.EQ.jM .AND. Ac.EQ.Bc) CYCLE
-            ds  = SQRT(SUM( (x(:,BC+jSh) - x(:,Ac+iSh))**2 ))
-            IF (ds .LT. 1D3*EPSILON(ds)) THEN
+            ds  = SQRT(SUM( (x(:,Bc+jSh) - x(:,Ac+iSh))**2 ))
+            IF (ds .LT. minS) THEN
+               minS = ds
+               i = Bc
+            END IF
+         END DO
+         Bc = i
+         IF (ISZERO(tol)) THEN
+            IF (minS .LT. 1D3*eps) THEN
                CALL PUSHSTACK(lPrj, (/Ac,Bc/))
                cnt = cnt + 1
-            END If
-         END DO
+            END IF
+         ELSE IF (tol < 0D0) THEN
+            CALL PUSHSTACK(lPrj, (/Ac,Bc/))
+            cnt = cnt + 1
+         END IF
       END DO
 
-      IF ( (lFa%nNo.EQ.pFa%nNo) .AND. (cnt.NE.lFa%nNo) ) THEN
-         err = " Failed to project faces between <"//TRIM(lFa%name)//
-     2      "> and <"//TRIM(pFa%name)//">. Try changing the tolerance"//
-     3      " of the closest-node-finding algorithm"
-      END IF
+      IF (cnt .NE. lFa%nNo) err = " Failed to project faces between <"//
+     2   TRIM(lFa%name)//"> and <"//TRIM(pFa%name)//">"
 
       IF (lPrj%n .EQ. 0) err = "Unable to find any matching node"//
      2   " between <"//TRIM(lFa%name)//"> and <"//TRIM(pFa%name)//">"

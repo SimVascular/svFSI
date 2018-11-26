@@ -38,11 +38,9 @@
 
 !     This is for reading a single NURBS patch
       SUBROUTINE READNRB(list, lM)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
@@ -56,6 +54,7 @@
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
+      IF (lM%lFib) err = "NURBS cannot be used for fiber mesh"
 
       lPtr => list%get(ftmp,"NURBS data file path")
       IF (.NOT.ASSOCIATED(lPtr)) RETURN
@@ -162,15 +161,12 @@
 
       RETURN
       END SUBROUTINE READNRB
-
-!####################################################################
+!--------------------------------------------------------------------
 !     Inserts a knot into a NURBS. "i" is the direction, "n" is total
 !     number of inserted knots, and "r" is the repetition of each knot
       SUBROUTINE KNOTINS(lM, bs, dir, n, rep)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
@@ -387,15 +383,12 @@
       END SUBROUTINE SETROW
 
       END SUBROUTINE KNOTINS
-
-!####################################################################
+!--------------------------------------------------------------------
 !     This routine constructs a NURBS based on %bs sub-structures
       SUBROUTINE CONSTNRB(lM, insd)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
@@ -602,5 +595,4 @@
 
       RETURN
       END SUBROUTINE CONSTNRB
-
 !####################################################################

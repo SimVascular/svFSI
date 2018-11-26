@@ -369,8 +369,8 @@
       USE vtkXMLMod
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(IN) :: lA(tDof, tnNo), lY(tDof, tnNo),
-     2   lD(tDof, tnNo)
+      REAL(KIND=8), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
+     2   lD(tDof,tnNo)
 
       TYPE(dataType) :: d(nMsh)
       TYPE(vtkXMLType) :: vtu
@@ -637,22 +637,26 @@
 
 !     Write element-based variables
       ne = 1
-      IF (.NOT.savedOnce .OR. mvMsh) THEN
-         savedOnce = .TRUE.
-         ne = ne + 2
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
          ALLOCATE(tmpI(1,nEl))
+         IF (.NOT.savedOnce) THEN
+            savedOnce = .TRUE.
+            ne = ne + 2
 
-!     Write partition data
-         IF (.NOT.cm%seq()) THEN
-            Ec = 0
-            DO iM=1, nMsh
-               DO e=1, d(iM)%nEl
-                  Ec = Ec + 1
-                  tmpI(1,Ec) = d(iM)%xe(e,1)
+!        Write partition data
+            IF (.NOT.cm%seq()) THEN
+               Ec = 0
+               DO iM=1, nMsh
+                  DO e=1, d(iM)%nEl
+                     Ec = Ec + 1
+                     tmpI(1,Ec) = d(iM)%xe(e,2)
+                  END DO
                END DO
-            END DO
-            CALL putVTK_elemData(vtu, 'Proc_ID', tmpI, iStat)
-            IF (iStat .LT. 0) err = "VTU file write error (proc id)"
+               CALL putVTK_elemData(vtu, 'Proc_ID', tmpI, iStat)
+               IF (iStat .LT. 0) err = "VTU file write error (proc id)"
+            END IF
+         ELSE
+            ne = ne + 1
          END IF
 
 !     Write the domain ID
@@ -661,7 +665,7 @@
             DO iM=1, nMsh
                DO e=1, d(iM)%nEl
                   Ec = Ec + 1
-                  tmpI(1,Ec) = d(iM)%xe(e,2)
+                  tmpI(1,Ec) = d(iM)%xe(e,1)
                END DO
             END DO
             CALL putVTK_elemData(vtu, 'Domain_ID', tmpI, iStat)
@@ -746,50 +750,57 @@
       END IF
 
       m = 1
-      IF (.NOT.savedOnce .OR. mvMsh) THEN
-         m = m + 2
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
+         IF (.NOT.savedOnce) THEN
+            m = m + 2
+         ELSE
+            m = m + 1
+         END IF
          ALLOCATE(d%xe(d%nEl,m))
-         IF (cm%mas()) THEN
-            IF (.NOT.cm%seq()) THEN
-               i = 0
-               DO e=1, lM%gnEl
-                  IF (e .GT. lM%eDist(i)) THEN
-                     DO
-                        i = i + 1
-                        IF (e .LE. lM%eDist(i)) EXIT
-                     END DO
-                  END IF
-                  d%xe(e,1) = i
-               END DO
+         IF (ALLOCATED(dmnId)) THEN
+            ALLOCATE(sCount(cm%np()))
+            DO i=1, cm%np()
+               sCount(i) = lM%eDist(i) - lM%eDist(i-1)
+            END DO
+            CALL MPI_GATHERV(lM%eId, lM%nEl, mpint, d%xe(:,1), sCount,
+     2         lM%eDist, mpint, master, cm%com(), ierr)
+
+            IF (cm%mas()) THEN
+               DEALLOCATE(sCount)
                ALLOCATE(sCount(lM%gnEl))
                sCount = d%xe(:,1)
                DO e=1, lM%gnEl
                   Ec = lM%otnIEN(e)
                   d%xe(e,1) = sCount(Ec)
                END DO
-               DEALLOCATE(sCount)
-            END IF
-         END IF
-         IF (ALLOCATED(dmnId)) THEN
-            ALLOCATE(sCount(cm%np()))
-            DO i=1, cm%np()
-               sCount(i) = lM%eDist(i) - lM%eDist(i-1)
-            END DO
-            CALL MPI_GATHERV(lM%eId, lM%nEl, mpint, d%xe(:,2), sCount,
-     2         lM%eDist, mpint, master, cm%com(), ierr)
-
-            IF (cm%mas()) THEN
-               DEALLOCATE(sCount)
-               ALLOCATE(sCount(lM%gnEl))
-               sCount = d%xe(:,2)
-               DO e=1, lM%gnEl
-                  Ec = lM%otnIEN(e)
-                  d%xe(e,2) = sCount(Ec)
-               END DO
             END IF
             DEALLOCATE(sCount)
          ELSE
-            d%xe(:,2) = 1
+            d%xe(:,1) = 1
+         END IF
+
+         IF (.NOT.savedOnce) THEN
+            IF (cm%mas()) THEN
+               IF (.NOT.cm%seq()) THEN
+                  i = 0
+                  DO e=1, lM%gnEl
+                     IF (e .GT. lM%eDist(i)) THEN
+                        DO
+                           i = i + 1
+                           IF (e .LE. lM%eDist(i)) EXIT
+                        END DO
+                     END IF
+                     d%xe(e,2) = i
+                  END DO
+                  ALLOCATE(sCount(lM%gnEl))
+                  sCount = d%xe(:,2)
+                  DO e=1, lM%gnEl
+                     Ec = lM%otnIEN(e)
+                     d%xe(e,2) = sCount(Ec)
+                  END DO
+                  DEALLOCATE(sCount)
+               END IF
+            END IF
          END IF
       END IF
 

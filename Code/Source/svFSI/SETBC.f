@@ -594,7 +594,7 @@
             END IF
 
             IF (g.EQ.1 .OR. .NOT.lM%lShpF)
-     2         CALL GNN(eNoN, Nxi, xl, Nx, Jac, Ks)
+     2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
 
             IF (nsd .EQ. 3) THEN
                CALL BWFLUID3D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)

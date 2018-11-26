@@ -777,7 +777,7 @@
      2         "Error in computing face derivatives (BUSTRUCTNEU)"
 
             IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
-     2         CALL GNN(eNoN, Nxi, xl, Nx, rt, ksix)
+     2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
 
             CALL GNNB(lFa, e, g, nV)
             Jac = SQRT(NORM(nV))
@@ -992,7 +992,7 @@
       REAL(KIND=8), INTENT(IN) :: ADg(nsd,tnNo), Yg(tDof,tnNo)
 
       INTEGER :: i, j, c, s, e
-      REAL(KIND=8) :: ami, afl, KdRd(dof)
+      REAL(KIND=8) :: ami, KdRd(dof)
 
       s = eq(cEq)%s
       e = s + nsd - 1

@@ -867,6 +867,7 @@
 !     Sending data from read by master in READFILES to slaves
       CALL cm%bcast(lM%lShpF)
       CALL cm%bcast(lM%lShl)
+      CALL cm%bcast(lM%lFib)
       CALL cm%bcast(lM%eType)
       CALL cm%bcast(lM%eNoN)
       CALL cm%bcast(lM%nFa)
@@ -877,6 +878,7 @@
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
+      IF (lM%lFib) insd = 1
 
       eNoN = lM%eNoN
       IF (cm%slv()) THEN
@@ -959,6 +961,10 @@
             eNoNb = 2
          CASE(eType_BIQ)
             eNoNb = 3
+         CASE(eType_LIN)
+            eNoNb = 1
+         CASE(eType_QUD)
+            eNoNb = 1
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT

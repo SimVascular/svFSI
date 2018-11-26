@@ -622,7 +622,6 @@
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
-!     STRUCTURAL with nonlinear velocity-based equation solver---------
       CASE DEFAULT
          err = "Equation type "//TRIM(eqName)//" is not defined"
       END SELECT

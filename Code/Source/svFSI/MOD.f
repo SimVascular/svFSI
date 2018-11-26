@@ -92,7 +92,7 @@
       INTEGER, PARAMETER :: eType_NA = 100, eType_LIN = 101,
      2   eType_TRI = 102, eType_TET = 103, eType_BIL = 104,
      3   eType_QUD = 105, eType_BIQ = 106, eType_BRK = 107,
-     4   eType_NRB = 108, eType_WDG = 109
+     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110
 
 !     Types of equations that are included in this solver
 !     Fluid equation (Navier-Stokes), structure (non-linear), heat
@@ -512,6 +512,8 @@
          LOGICAL lShpF
 !        Whether the mesh is shell
          LOGICAL :: lShl = .FALSE.
+!        Whether the mesh is fibers (Purkinje)
+         LOGICAL :: lFib = .FALSE.
 !        Element type
          INTEGER :: eType = eType_NA
 !        Number of nodes (control points) in a single element
@@ -520,7 +522,7 @@
          INTEGER :: gnEl = 0
 !        Global number of nodes (control points)
          INTEGER :: gnNo = 0
-!        Number of element face
+!        Number of element face. Used for reading Gambit mesh files
          INTEGER nEf
 !        Number of elements (knot spanes)
          INTEGER :: nEl = 0

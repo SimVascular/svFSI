@@ -49,7 +49,7 @@
      3   pS0l(nstd,eNoN), bfl(nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
-      INTEGER a, g, Ac, cPhys
+      INTEGER a, g, Ac, cPhys, insd
       REAL(KIND=8) w, Jac, ksix(nsd,nsd), ctime
 
       REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:),
@@ -57,7 +57,10 @@
 
       TYPE(fCellType) :: fCell
 
-      ALLOCATE(lK(dof*dof,eNoN,eNoN), lR(dof,eNoN), Nx(nsd,eNoN),
+      insd = nsd
+      IF (lM%lFib) insd = 1
+
+      ALLOCATE(lK(dof*dof,eNoN,eNoN), lR(dof,eNoN), Nx(insd,eNoN),
      2   N(eNoN), dc(tDof,eNoN), pSl(nstd))
 !     Updating the current domain
       cDmn = DOMAIN(lM, cEq, e)
@@ -88,7 +91,7 @@
 
 !     Finite cell integration for Nitsche formulation
       IF (lM%iGC(e) .EQ. 1) THEN
-         IF (lM%lShl) RETURN
+         IF (lM%lShl .OR. lM%lFib) RETURN
          IF (ib%fcFlag) THEN
             ctime = CPUT()
             CALL FC_INIT(fCell, lM, xl)
@@ -120,7 +123,7 @@
 
       DO g=1, lM%nG
          IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-            CALL GNN(eNoN, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+            CALL GNN(eNoN, insd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
          END IF
          IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
          w = lM%w(g)*Jac
@@ -207,10 +210,14 @@
             END IF
 
          CASE (phys_CEP)
-            IF (nsd .EQ. 3) THEN
+            IF (insd .EQ. 3) THEN
                CALL CEP3D(eNoN, w, N, Nx, al, yl, fNl, lR, lK)
-            ELSE
+
+            ELSE IF (insd .EQ. 2) THEN
                CALL CEP2D(eNoN, w, N, Nx, al, yl, fNl, lR, lK)
+
+            ELSE IF (insd .EQ. 1) THEN
+               CALL CEP1D(eNoN, insd, w, N, Nx, al, yl, lR, lK)
             END IF
 
          CASE DEFAULT

@@ -257,7 +257,7 @@
          DO g=1, lFc%nG
             IF (.NOT.lFc%incG(g)) CYCLE
             CALL GETGNN(nsd, lFc%eType, eNoN, lFc%xiGP(:,g), N, Nxi)
-            CALL GNN(eNoN, Nxi, xe, Nx, Jac, tmp)
+            CALL GNN(eNoN, nsd, Nxi, xe, Nx, Jac, tmp)
             fHat = 0D0
             DO a=1, eNoN
                fHat = fHat + f(a)*N(a)
@@ -295,7 +295,7 @@
          DO g=1, lFc%nG
             IF (.NOT. lFc%incG(g)) CYCLE
             CALL GETGNN(nsd, lFc%eType, eNoN, lFc%xiGP(:,g), N, Nxi)
-            CALL GNN(eNoN, Nxi, xe, Nx, Jac, ksix)
+            CALL GNN(eNoN, nsd, Nxi, xe, Nx, Jac, ksix)
             w = lFc%w(g)*Jac
 
             IF (nsd .EQ. 3) THEN

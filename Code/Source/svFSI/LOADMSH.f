@@ -37,11 +37,9 @@
 
 !     Read mesh vtu/vtp files in SimVascular format
       SUBROUTINE READSV(list, lM)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
@@ -59,28 +57,68 @@
       IF (ichckIEN) CALL CHECKIEN(lM, .FALSE.)
 
       lM%nFa = list%srch("Add face")
+      IF (lM%lFib .AND. lM%nFa.GT.1) err =
+     2   "More than one face is not allowed for 1D fiber-based mesh"
       std = " Number of available faces: "//lM%nFa
 
-      ALLOCATE(lM%fa(lM%nFa))
+      ALLOCATE (lM%fa(lM%nFa))
       DO iFa=1, lM%nFa
          lPBC => list%get(lM%fa(iFa)%name,"Add face",iFa)
-         lPtr => lPBC%get(ftmp,"Face file path (vtp)")
-         IF (.NOT.ASSOCIATED(lPtr)) err = "Face file (vtp) not provided"
-         CALL READVTP(lM%fa(iFa), ftmp%fname)
-         IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
+         IF (.NOT.lM%lFib) THEN
+            lPtr => lPBC%get(ftmp,"Face file path (vtp)")
+            IF (.NOT.ASSOCIATED(lPtr)) err =
+     2         "Face file (vtp) not provided"
+            CALL READVTP(lM%fa(iFa), ftmp%fname)
+            IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
+         ELSE
+            lPtr => lPBC%get(ftmp,"End nodes face file path")
+            IF (.NOT.ASSOCIATED(lPtr)) err =
+     2         "End nodes face file path not provided"
+            CALL READENDNLFF(lM%fa(iFa), ftmp%open())
+         END IF
          CALL SELECTELEB(lM, lM%fa(iFa))
       END DO
 
       RETURN
       END SUBROUTINE READSV
 !####################################################################
+!     Read list of end nodes from a file into face data structure
+      SUBROUTINE READENDNLFF(lFa, fid)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(INOUT) :: lFa
+      INTEGER, INTENT(IN) :: fid
+
+      INTEGER a, Ac
+
+      lFa%nNo = 0
+      DO
+         READ(fid,*,END=145)
+         lFa%nNo = lFa%nNo + 1
+      END DO
+ 145  REWIND(fid)
+
+      ALLOCATE(lFa%gN(lFa%nNo))
+      lFa%gN = 0
+      DO a=1, lFa%nNo
+         READ(fid,*) Ac
+         lFa%gN(a) = Ac
+      END DO
+      CLOSE(fid)
+
+      lFa%nEl  = 0
+      lFa%eNoN = 1
+      ALLOCATE(lFa%IEN(lFa%eNoN,lFa%nEl), lFa%gE(lFa%nEl))
+
+      RETURN
+      END SUBROUTINE READENDNLFF
+!####################################################################
 !     This reads coordinate, connectivity, and ebc/vtk files
       SUBROUTINE READCCNE(list, lM)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
@@ -144,54 +182,61 @@
 !     Reading faces names and setting the required parameters
       lM%nFa = list%srch("Add face")
       std = " Number of available faces: "//lM%nFa
-      ALLOCATE (lM%fa(lM%nFa))
+      IF (lM%lFib .AND. lM%nFa.GT.1) err =
+     2   "More than one face is not allowed for 1D fiber-based mesh"
 
+      ALLOCATE (lM%fa(lM%nFa))
       DO iFa=1, lM%nFa
          lPBC => list%get(lM%fa(iFa)%name,"Add face",iFa)
 
-!     First searching for a vtk file
-         lPtr => lPBC%get(ftmp,"vtk file path")
-         IF (ASSOCIATED(lPtr)) THEN
-            CALL RDBCVTK(lM, lM%fa(iFa), ftmp%open())
-         ELSE
-!     Reading face connectivity file
-            lPtr => lPBC%get(ftmp,"Connectivity file (ebc) path",1)
-            fid = ftmp%open()
-            READ (fid,"(A)",END=110) stmp
-            lM%fa(iFa)%eNoN = CheckNoNumbers(stmp) - 2
-            CALL SELECTELEB(lM, lM%fa(iFa))
-            lM%fa(iFa)%nEl = 1
-            DO
-               READ (fid,*,END=110)
-               lM%fa(iFa)%nEl = lM%fa(iFa)%nEl + 1
-            END DO
- 110        ALLOCATE (lM%fa(iFa)%gE(lM%fa(iFa)%nEl),
-     2         lM%fa(iFa)%IEN(lM%fa(iFa)%eNoN,lM%fa(iFa)%nEl))
-            REWIND(fid)
-            DO e=1, lM%fa(iFa)%nEl
-               READ (fid,*) lM%fa(iFa)%gE(e),i,lM%fa(iFa)%IEN(:,e)
-            END DO
-            CLOSE (fid)
-            CALL CALCNBC(lM, lM%fa(iFa))
-         END IF
+         IF (.NOT.lM%lFib) THEN
+!        First searching for a vtk file
+            lPtr => lPBC%get(ftmp,"vtk file path")
+            IF (ASSOCIATED(lPtr)) THEN
+               CALL RDBCVTK(lM, lM%fa(iFa), ftmp%open())
+            ELSE
+!        Reading face connectivity file
+               lPtr => lPBC%get(ftmp,"Connectivity file (ebc) path",1)
+               fid = ftmp%open()
+               READ (fid,"(A)",END=110) stmp
+               lM%fa(iFa)%eNoN = CheckNoNumbers(stmp) - 2
+               CALL SELECTELEB(lM, lM%fa(iFa))
+               lM%fa(iFa)%nEl = 1
+               DO
+                  READ (fid,*,END=110)
+                  lM%fa(iFa)%nEl = lM%fa(iFa)%nEl + 1
+               END DO
+ 110           ALLOCATE (lM%fa(iFa)%gE(lM%fa(iFa)%nEl),
+     2            lM%fa(iFa)%IEN(lM%fa(iFa)%eNoN,lM%fa(iFa)%nEl))
+               REWIND(fid)
+               DO e=1, lM%fa(iFa)%nEl
+                  READ (fid,*) lM%fa(iFa)%gE(e),i,lM%fa(iFa)%IEN(:,e)
+               END DO
+               CLOSE (fid)
+               CALL CALCNBC(lM, lM%fa(iFa))
+            END IF
 
-         lM%fa(iFa)%gnEl = lM%fa(iFa)%nEl
-         ALLOCATE(lM%fa(iFa)%gebc(1+lM%fa(iFa)%eNoN,lM%fa(iFa)%gnEl))
-         lM%fa(iFa)%gebc(1,:) = lM%fa(iFa)%gE(:)
-         lM%fa(iFa)%gebc(2:1+lM%fa(iFa)%eNoN,:) = lM%fa(iFa)%IEN(:,:)
+            lM%fa(iFa)%gnEl = lM%fa(iFa)%nEl
+            ALLOCATE(lM%fa(iFa)%gebc(1+lM%fa(iFa)%eNoN,lM%fa(iFa)%gnEl))
+            lM%fa(iFa)%gebc(1,:) = lM%fa(iFa)%gE(:)
+            lM%fa(iFa)%gebc(2:1+lM%fa(iFa)%eNoN,:) = lM%fa(iFa)%IEN(:,:)
+         ELSE
+            lPtr => lPBC%get(ftmp,"End nodes face file path")
+            IF (.NOT.ASSOCIATED(lPtr)) err =
+     2         "End nodes face file path not provided"
+            CALL READENDNLFF(lM%fa(iFa), ftmp%open())
+            CALL SELECTELEB(lM, lM%fa(iFa))
+         END IF
       END DO
 
       RETURN
       END SUBROUTINE READCCNE
-
 !####################################################################
 !     This reads msh file produced by Gambit. Works for quad mesh only
       SUBROUTINE READGAMBIT(list, lM)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
@@ -227,6 +272,9 @@
 
       lPtr => list%get(ftmp,"Gambit mesh file path")
       IF (.NOT.ASSOCIATED(lPtr)) RETURN
+      IF (lM%lShl .OR. lM%lFib) err =
+     2   "Gambit format is not allowed for shells and fibers"
+
 !     If that is not the case, we continue with this format of mesh
       dbg = " Reading a Gambit format mesh"
       fid = ftmp%open()
@@ -555,16 +603,14 @@
 
       RETURN
       END SUBROUTINE READGAMBIT
-
-!####################################################################
+!--------------------------------------------------------------------
 !     Adds node "a" between two given nodes "a1" and "a2" in element "e"
       SUBROUTINE ADDBETWEEN(lM, a1, a2, e, flag, Xtmp)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
+
       LOGICAL, INTENT(IN) :: flag
       INTEGER, INTENT(IN) :: a1, a2, e
       REAL(KIND=8), INTENT(INOUT) :: Xtmp(nsd,lM%eNoN*lM%gnEl)
@@ -611,14 +657,11 @@
 
       RETURN
       END SUBROUTINE ADDBETWEEN
-
 !####################################################################
 !     Reading BC (ebc/nbc) from a VTK file
       SUBROUTINE RDBCVTK(lM, lFa, fid)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
@@ -744,5 +787,5 @@
 
       RETURN
       END SUBROUTINE RDBCVTK
-
+!####################################################################
 
