@@ -328,6 +328,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                END DO
             END IF
 #endif
+
 !     Solution is obtained, now updating (Corrector)
             CALL PICC
 
@@ -561,25 +562,28 @@ c      CALL cm%fStop()
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER a, i, Ac, fid, iM, nNo, gnNo
+      INTEGER a, i, Ac, fid, iM, nNo, gnNo, s, e, ldof
       CHARACTER(LEN=stdL) fName
 
       REAL(KIND=8), ALLOCATABLE :: lX(:,:), lA(:,:), lY(:,:), lD(:,:),
      2   lR(:,:), gX(:,:), gA(:,:), gY(:,:), gD(:,:), gR(:,:)
 
       fid = 1889
-      WRITE(fName,'(A)') TRIM(appPath)//"dbgR_"//STR(cTS)//"_"//
-     2   STR(eq(cEq)%itr)
+      WRITE(fName,'(A)') TRIM(appPath)//"dbgR_"//TRIM(eq(cEq)%sym)//
+     2   "_"//STR(cTS)//"_"//STR(eq(cEq)%itr)
       IF (cm%mas()) OPEN(fid,FILE=TRIM(fName))
 
+      s = eq(cEq)%s
+      e = eq(cEq)%e
+      ldof = e-s+1
       DO iM=1, nMsh
          nNo  = msh(iM)%nNo
          gnNo = msh(iM)%gnNo
-         ALLOCATE(lX(nsd,nNo), lA(tDof,nNo), lY(tDof,nNo), lD(tDof,nNo),
+         ALLOCATE(lX(nsd,nNo), lA(lDof,nNo), lY(lDof,nNo), lD(lDof,nNo),
      2      lR(dof,nNo))
          IF (cm%mas()) THEN
-            ALLOCATE(gX(nsd,gnNo), gA(tDof,gnNo), gY(tDof,gnNo),
-     2       gD(tDof,tnNo), gR(dof,gnNo))
+            ALLOCATE(gX(nsd,gnNo), gA(lDof,gnNo), gY(lDof,gnNo),
+     2       gD(lDof,tnNo), gR(dof,gnNo))
          ELSE
             ALLOCATE(gX(0,0), gA(0,0), gY(0,0), gD(0,0), gR(0,0))
          END IF
@@ -591,9 +595,9 @@ c      CALL cm%fStop()
          DO a=1, msh(iM)%nNo
             Ac = msh(iM)%gN(a)
             lX(:,a) = x(:,Ac)
-            lA(:,a) = An(:,Ac)
-            lY(:,a) = Yn(:,Ac)
-            lD(:,a) = Dn(:,Ac)
+            lA(:,a) = An(s:e,Ac)
+            lY(:,a) = Yn(s:e,Ac)
+            lD(:,a) = Dn(s:e,Ac)
             lR(:,a) = R(:,Ac)
          END DO
 
@@ -613,19 +617,19 @@ c      CALL cm%fStop()
                DO i=1, dof
                   WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gR(i,a))
                END DO
-               DO i=1, tDof
+               DO i=1, lDof
                   WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gA(i,a))
                END DO
-               DO i=1, tDof
+               DO i=1, lDof
                   WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gY(i,a))
                END DO
-               DO i=1, tDof
+               DO i=1, lDof
                   WRITE(fid,'(A)',ADVANCE='NO') " "//STR(gD(i,a))
                END DO
                WRITE(fid,'(A)')
             END DO
          END IF
-         DEALLOCATE(lA, lY, lD, lR, gA, gY, gD, gR)
+         DEALLOCATE(lX, lA, lY, lD, lR, gX, gA, gY, gD, gR)
       END DO
 
       IF (cm%mas()) CLOSE(fid)
