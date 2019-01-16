@@ -316,8 +316,6 @@
       IF (cm%slv()) ALLOCATE(ib)
 
       CALL cm%bcast(ib%mthd)
-      CALL cm%bcast(ib%fcFlag)
-      CALL cm%bcast(ib%fbFlag)
 
       CALL cm%bcast(ib%nMsh)
       CALL cm%bcast(ib%tnNo)
@@ -699,7 +697,7 @@
       CALL cm%bcast(lBc%tauF)
       CALL cm%bcast(lBc%fbN)
 
-!     Communicating time-depandant BC data
+!     Communicating time-dependant BC data
       flag = ALLOCATED(lBc%gt)
       CALL cm%bcast(flag)
       IF (flag) THEN

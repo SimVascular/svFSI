@@ -276,7 +276,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             IF (.NOT.useTrilinosAssemAndLS) CALL COMMU(R)
 
 !     Add contribution from IB to residue
-            IF (ibFlag) CALL IB_CONSTRUCT(Yg, Dg)
+            IF (ibFlag) CALL IB_CONSTRUCT()
 
             incL = 0
             IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
@@ -341,14 +341,9 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          END DO
 !     End of inner loop
 
-!     Immersed body treatment
-         IF (ibFlag) THEN
-!        Compute feedback forcing for penalty methods
-            CALL IB_SETFBF()
-
-!        Compute FSI forcing for IFEM formulation
-            CALL IB_GETFFSI(An, Yn, Dn)
-         END IF
+!     Immersed body treatment: project flow variables from fluid mesh
+!     to IB solid mesh
+         IF (ibFlag) CALL IB_PROJFVAR(An, Yn, Do, ib%An, ib%Yn, ib%Un)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
@@ -404,16 +399,16 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   IF (pstEq) THEN
                      WRITE(fid, REC=cm%tF()) stamp, cTS, time,
      2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
-     3                  pS0, Rib, ib%Uo
+     3                  pS0, ib%An, ib%Yn, ib%Un, ib%Fb
                   ELSE
                      WRITE(fid, REC=cm%tF()) stamp, cTS, time,
      2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
-     3                  Rib, ib%Uo
+     3                  ib%An, ib%Yn, ib%Un, ib%Fb
                   END IF
                ELSE
                   WRITE(fid, REC=cm%tF()) stamp, cTS, time,
-     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Rib,
-     3               ib%Uo
+     2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An,
+     3               ib%An, ib%Yn, ib%Un, ib%Fb
                END IF
             END IF
             CLOSE(fid)
@@ -428,7 +423,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          IF (l3 .AND. l4) THEN
             CALL OUTRESULT(timeP, 3, iEqOld)
             CALL WRITEVTUS(An, Yn, Dn)
-            IF (ibFlag) CALL IB_WRITEVTUS(ib%Ao, ib%Yo, ib%Uo)
+            IF (ibFlag) CALL IB_WRITEVTUS(ib%An, ib%Yn, ib%Un)
          ELSE
             CALL OUTRESULT(timeP, 2, iEqOld)
          END IF

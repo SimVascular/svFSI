@@ -722,9 +722,9 @@
       REAL(KIND=8), INTENT(IN) :: hg(tnNo), Dg(tDof,tnNo)
 
       INTEGER :: a, b, e, g, iM, Ac, Ec, eNoN, eNoNb, cPhys
-      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), nV(nsd), ksix(nsd,nsd),
-     2   rt
-      LOGICAL :: flag
+      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
+     2   ksix(nsd,nsd), xiL(2), rt
+      LOGICAL :: l1, l2, l3
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:), Nx(:,:),
@@ -737,6 +737,21 @@
       ALLOCATE(xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN),
      2   ptr(eNoN), dl(tDof,eNoN), hl(eNoN),lR(dof,eNoN),
      3   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
+
+!     Initialize parameteric coordinate for Newton's iterations
+      xi0 = 0D0
+      DO g=1, msh(iM)%nG
+         xi0 = xi0 + msh(iM)%xi(:,g)
+      END DO
+      xi0 = xi0 / REAL(msh(iM)%nG,KIND=8)
+
+!     Set bounds on the parameteric coordinates
+      xiL(1) = -1D0
+      xiL(2) =  1D0
+      IF (msh(iM)%eType .EQ. eType_TRI .OR.
+     2    msh(iM)%eType .EQ. eType_TET) THEN
+         xiL(1) = 0D0
+      END IF
 
       DO e=1, lFa%nEl
          Ec    = lFa%gE(e)
@@ -762,18 +777,25 @@
                xp = xp + x(:,Ac)*lFa%N(a,g)
             END DO
 
-            xi = msh(iM)%xi(:,1)
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge. "//
-     2         "(BUSTRUCTNEU)"
+            xi = xi0
+            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, l1)
+!           Check if parameteric coordinate is within bounds
+            a = 0
+            DO b=1, nsd
+               IF (xi(b).GE.xiL(1) .AND. xi(b).LE.xiL(2)) a = a + 1
+            END DO
+            l2 = a .EQ. nsd
 
             CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-            a = 0
-            DO b=1, eNoN
-               IF (N(b).GT.-1E-4 .AND. N(b).LT.1.0001D0) a = a + 1
+
+!           Check if sum of shape functions is unity
+            rt = 0D0
+            DO a=1, eNoN
+               rt = rt + N(a)
             END DO
-            IF (a .NE. eNoN) err =
+            l3 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+            l1 = l1 .AND. l2 .AND. l3
+            IF (.NOT.l1) err =
      2         "Error in computing face derivatives (BUSTRUCTNEU)"
 
             IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)

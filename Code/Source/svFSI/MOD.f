@@ -188,7 +188,7 @@
 
 !     IB treatment
       INTEGER, PARAMETER :: ibMthd_NA = 850, ibMthd_SSM = 851,
-     2   ibMthd_Penalty = 852, ibMthd_Nitsche = 853, ibMthd_IFEM = 854
+     2   ibMthd_IFEM = 852
 
 !--------------------------------------------------------------------
 !     Here comes subTypes definitions later used in other derived types
@@ -567,6 +567,8 @@
          REAL(KIND=8), ALLOCATABLE :: nW(:)
 !        Gauss weights
          REAL(KIND=8), ALLOCATABLE :: w(:)
+!        Bounds on parameteric coordinates
+         REAL(KIND=8), ALLOCATABLE :: xiL(:)
 !        Gauss integration points in parametric space
          REAL(KIND=8), ALLOCATABLE :: xi(:,:)
 !        Position coordinates
@@ -730,10 +732,6 @@
       TYPE ibType
 !        Whether any file being saved
          LOGICAL :: savedOnce = .FALSE.
-!        Whether to use finite cell integration
-         LOGICAL :: fcFlag = .FALSE.
-!        Whether to apply a feedback spring force
-         LOGICAL :: fbFlag = .FALSE.
 !        IB formulation
          INTEGER :: mthd = ibMthd_NA
 !        Current IB domain ID
@@ -772,8 +770,10 @@
          REAL(KIND=8), ALLOCATABLE :: Un(:,:)
 !        Displacement (old)
          REAL(KIND=8), ALLOCATABLE :: Uo(:,:)
-!        FSI force (IFEM method) or feedback forcing (Penalty method)
+!        FSI force (IFEM method)
          REAL(KIND=8), ALLOCATABLE :: R(:,:)
+!        Feedback force
+         REAL(KIND=8), ALLOCATABLE :: Fb(:,:)
 
 !        DERIVED TYPE VARIABLES
 !        IB meshes
@@ -783,32 +783,6 @@
 !        IB communicator
          TYPE(ibCommType) :: cm
       END TYPE ibType
-
-!     Finite cell type
-      TYPE fCellType
-!        Element type
-         INTEGER :: eType = eType_NA
-!        Number of nodes (control points) in a single element
-         INTEGER :: eNoN
-!        Number of Gauss points for integration
-         INTEGER :: nG
-!        Level of the finite subcell
-         INTEGER :: ilev = 0
-!        No of subcell divisions
-         INTEGER :: nSub = 0
-!        Whether Gauss point is included for integration or not
-         LOGICAL, ALLOCATABLE :: incG(:)
-!        Gauss weights
-         REAL(KIND=8), ALLOCATABLE :: w(:)
-!        Position coordinates
-         REAL(KIND=8), ALLOCATABLE :: x(:,:)
-!        Position coordinates in parametric space
-         REAL(KIND=8), ALLOCATABLE :: xi(:,:)
-!        Gauss points in parameteric space
-         REAL(KIND=8), ALLOCATABLE :: xiGP(:,:)
-!        Subcell (recursion is used for subdivision)
-         TYPE(fCellType), POINTER :: sub(:)
-      END TYPE fCellType
 
 !--------------------------------------------------------------------
 !     All the types are defined, time to use them

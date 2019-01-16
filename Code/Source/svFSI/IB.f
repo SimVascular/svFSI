@@ -281,64 +281,25 @@
 
       TYPE(listType), INTENT(INOUT) :: list
 
-      LOGICAL lShl
-      INTEGER iM
       CHARACTER(LEN=stdL) :: ctmp
       TYPE(listType), POINTER :: lIBs, lPtr
 
       lIBs => list%get(ctmp, "IB settings")
       IF (.NOT.ASSOCIATED(lIBs)) err = "IB settings not provided"
 
-      lShl = .FALSE.
-      DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl) THEN
-            lShl = .TRUE.
-            EXIT
-         END IF
-      END DO
-
       lPtr => lIBs%get(ctmp, "Method")
       IF (ASSOCIATED(lPtr)) THEN
          SELECT CASE (ctmp)
          CASE ("SSM")
             ib%mthd = ibMthd_SSM
-         CASE ("Penalty")
-            ib%mthd = ibMthd_Penalty
-         CASE ("Nitsche")
-            ib%mthd = ibMthd_Nitsche
          CASE ("IFEM")
             ib%mthd = ibMthd_IFEM
          CASE DEFAULT
             err = " Invalid IB method"
          END SELECT
       ELSE
-         std = " Choosing default IB method "//CLR("SSM")
-         ib%mthd = ibMthd_SSM
-      END IF
-
-      lPtr => lIBs%get(ib%fbFlag, "Use feedback forcing")
-      IF (.NOT.ASSOCIATED(lPtr)) THEN
-         IF (ib%mthd .EQ. ibMthd_Penalty) ib%fbFlag = .TRUE.
-      END IF
-
-      lPtr => lIBs%get(ib%fcFlag, "Use finite cell integration")
-      IF (.NOT.ASSOCIATED(lPtr)) THEN
-         IF (ib%mthd .EQ. ibMthd_Penalty .OR.
-     2       ib%mthd .EQ. ibMthd_Nitsche) ib%fcFlag = .TRUE.
-      END IF
-
-      IF (lShl) THEN
-         IF (ib%mthd .NE. ibMthd_Penalty) err = "Immersed shells "//
-     2      "are treated using penalty formulation only"
-         IF (.NOT.ib%fbFlag) err = "Feedback forcing should be "//
-     2      "applied for immersed shells"
-         IF (ib%fcFlag) err = "Finite cell method is not applicable "//
-     2      "for immersed shells"
-      END IF
-
-      IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-         ib%fbFlag = .FALSE.
-         ib%fcFlag = .FALSE.
+         std = " Choosing default IB method "//CLR("IFEM")
+         ib%mthd = ibMthd_IFEM
       END IF
 
       RETURN
@@ -424,12 +385,11 @@
             propL(5) = f_y
             IF (nsd .EQ. 3) propL(6) = f_z
 
-            nDOP = (/5,1,0,0/)
+            nDOP = (/4,1,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_velocity
             outPuts(3) = out_pressure
-            outPuts(4) = out_strainInv
-            outPuts(5) = out_acceleration
+            outPuts(4) = out_acceleration
 
          CASE DEFAULT
             err = TRIM(lPD%ping("Equation (IB)",lPtr))//
@@ -607,13 +567,8 @@
             lEq%outIB(iOut)%o    = 0
             lEq%outIB(iOut)%l    = nsd
             lEq%outIB(iOut)%name = "Displacement"
-         CASE (out_strainInv)
-            lEq%outIB(iOut)%grp  = outGrp_stInv
-            lEq%outIB(iOut)%o    = 0
-            lEq%outIB(iOut)%l    = nsd
-            lEq%outIB(iOut)%name = "Strain_invariants"
          CASE DEFAULT
-            err = "Internal output undefined"
+            err = "IB output undefined"
          END SELECT
       END DO
 
@@ -663,6 +618,7 @@
       iFa = 0
       MY_LOOP : DO iM=1, ib%nMsh
          IF (ib%msh(iM)%lShl) THEN
+!        If the BC is applied on the shell itself
             IF (ib%msh(iM)%name .EQ. faName) THEN
                iFa = 0
                EXIT
@@ -701,9 +657,9 @@
       iM  = lBc%iM
       iFa = lBc%iFa
       IF (iFa .NE. 0) THEN
-         nNo = msh(iM)%fa(iFa)%nNo
+         nNo = ib%msh(iM)%fa(iFa)%nNo
       ELSE
-         nNo = msh(iM)%gnNo
+         nNo = ib%msh(iM)%nNo
       END IF
 
 !     Reading the type: Dir/Neu
@@ -720,35 +676,20 @@
 !     Weak Dirichlet BC for fluid/FSI equations
       lBc%weakDir = .FALSE.
       IF (BTEST(lBc%bType,bType_Dir)) THEN
-         IF (ib%mthd .EQ. ibMthd_Nitsche) lBc%weakDir = .TRUE.
-         lPtr => list%get(ltmp, "Weakly applied")
-         IF (ASSOCIATED(lPtr)) lBc%weakDir = ltmp
-
-         IF (lBc%weakDir .AND. ib%mthd.NE.ibMthd_Nitsche) err =
-     2      "Dir BC can be applied weakly with only Nitsche method"
-
 !        Read penalty values
-         lPtr => list%get(rtmp, "Penalty constant")
+         lPtr => list%get(rtmp, "Penalty parameter")
          IF (ASSOCIATED(lPtr)) lBc%tauB(:) = rtmp
-         lPtr => list%get(rtmp, "Penalty constant (tangential)")
+         lPtr => list%get(rtmp, "Penalty parameter (tangential)")
          IF (ASSOCIATED(lPtr)) lBc%tauB(1) = rtmp
-         lPtr => list%get(rtmp, "Penalty constant (normal)")
+         lPtr => list%get(rtmp, "Penalty parameter (normal)")
          IF (ASSOCIATED(lPtr)) lBc%tauB(2) = rtmp
 
 !        Read feedback parameter
          lPtr => list%get(rtmp, "Feedback force constant")
-         IF (ASSOCIATED(lPtr)) THEN
-            IF (.NOT.ib%fbFlag) wrn = "Feedback forcing option is "//
-     2         "turned off"
-            lBc%tauF = rtmp
-            lPtr => list%get(lBc%fbN, "Feedback along normal direction")
-         END IF
+         IF (ASSOCIATED(lPtr)) lBc%tauF = rtmp
+         lPtr => list%get(lBc%fbN, "Feedback along normal direction")
 
          IF (ib%msh(iM)%lShl .AND. iFa.EQ.0) THEN
-            IF (lBc%weakDir) err = "Dir cannot be weakly applied "//
-     2         "on immersed shells"
-            IF (.NOT.ib%fbFlag) err = "Feedback forcing should be "//
-     2         "applied for immersed shells"
             IF (.NOT.lBc%fbN) err = "Feedback forcing should be "//
      2         "applied along normal direction for immersed shells"
          END IF
@@ -845,7 +786,7 @@ c     2         "can be applied for Neumann boundaries only"
      2      " is violated in "//fTmp%fname
 
          ALLOCATE(lBc%gm)
-         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(ib%msh(iM)%gnNo))
+         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(ib%msh(iM)%nNo))
 !     I am seting all the nodes to zero just in case a node is not set
          lBc%gm%d   = 0D0
          lBc%gm%dof = i
@@ -853,7 +794,7 @@ c     2         "can be applied for Neumann boundaries only"
          ptr        = 0
 !     Preparing the pointer array
          IF (iFa .NE. 0) THEN
-            DO a=1, ib%msh(iM)%fa(iFa)%nNo
+            DO a=1, nNo
                Ac = ib%msh(iM)%fa(iFa)%gN(a)
                Ac = ib%msh(iM)%lN(Ac)
                IF (Ac .EQ. 0) err = "Incorrect global node number "//
@@ -864,7 +805,7 @@ c     2         "can be applied for Neumann boundaries only"
                ptr(Ac) = a
             END DO
          ELSE
-            DO a=1, ib%msh(iM)%gnNo
+            DO a=1, nNo
                ptr(a) = a
             END DO
          END IF
@@ -886,7 +827,7 @@ c     2         "can be applied for Neumann boundaries only"
          lBc%gm%period = lBc%gm%t(j)
          DO b=1, nNo
             READ (fid,*) Ac
-            IF (Ac.GT.ib%msh(iM)%gnNo .OR. Ac.LE.0) THEN
+            IF (Ac.GT.ib%msh(iM)%nNo .OR. Ac.LE.0) THEN
                err = "Entry "//b//" is out of bound in "//ftmp%fname
             END IF
             a = ptr(Ac)
@@ -932,12 +873,12 @@ c     2         "can be applied for Neumann boundaries only"
          lBc%bType = IBSET(lBc%bType,bType_ud)
          lPtr => list%get(fTmp,"Spatial profile file path",1)
          fid = fTmp%open()
-         ALLOCATE(lBc%gx(ib%msh(iM)%fa(iFa)%nNo), ptr(ib%msh(iM)%gnNo))
+         ALLOCATE(lBc%gx(nNo), ptr(ib%msh(iM)%nNo))
 !     I am seting all the nodes to zero just in case a node is not set
          ptr = 0
 !     Preparing the pointer array
          IF (iFa .NE. 0) THEN
-            DO a=1, ib%msh(iM)%fa(iFa)%nNo
+            DO a=1, nNo
                lBc%gx(a) = 0D0
                Ac = ib%msh(iM)%fa(iFa)%gN(a)
                Ac = ib%msh(iM)%lN(Ac)
@@ -949,7 +890,7 @@ c     2         "can be applied for Neumann boundaries only"
                ptr(Ac) = a
             END DO
          ELSE
-            DO a=1, ib%msh(iM)%gnNo
+            DO a=1, nNo
                lBc%gx(a) = 0D0
                ptr(a) = a
             END DO
@@ -957,7 +898,7 @@ c     2         "can be applied for Neumann boundaries only"
 
          DO b=1, nNo
             READ (fid,*) Ac, rtmp
-            IF (Ac.GT.ib%msh(iM)%gnNo .OR. Ac.LE.0) THEN
+            IF (Ac.GT.ib%msh(iM)%nNo .OR. Ac.LE.0) THEN
                err = "Entry "//b//" is out of bound in "//fTmp%fname
             END IF
             a = ptr(Ac)
@@ -975,6 +916,24 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE IB_READBC
 !####################################################################
+!     Allocates memory for IB data structures
+      SUBROUTINE IB_MEMALLOC()
+      USE COMMOD
+      IMPLICIT NONE
+
+      ALLOCATE(Rib(nsd,tnNo))
+      ALLOCATE(ib%R(nsd,ib%tnNo))
+      ALLOCATE(ib%Fb(nsd,ib%tnNo))
+      ALLOCATE(ib%Ao(nsd,ib%tnNo))
+      ALLOCATE(ib%An(nsd,ib%tnNo))
+      ALLOCATE(ib%Yo(nsd+1,ib%tnNo))
+      ALLOCATE(ib%Yn(nsd+1,ib%tnNo))
+      ALLOCATE(ib%Uo(nsd,ib%tnNo))
+      ALLOCATE(ib%Un(nsd,ib%tnNo))
+
+      RETURN
+      END SUBROUTINE IB_MEMALLOC
+!####################################################################
 !     This routine initializes IB solution and FSILS data structures
       SUBROUTINE IB_INIT(Dg)
       USE COMMOD
@@ -983,16 +942,23 @@ c     2         "can be applied for Neumann boundaries only"
 
       REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
 
-      INTEGER a, iM, iFa, iEq, iDmn, iBc, nnz
+      INTEGER a, iM, iFa, iEq, iBc, nnz
       REAL(KIND=8) lD(nsd,tnNo)
       CHARACTER(LEN=stdL) sOut
-      TYPE(FSILS_commuType) lsCom
 
       ib%callD = 0D0
       ib%callD(1) = CPUT()
 
       std = " ================================="
       std = " Initializing IB data structures.."
+
+      ib%cEq = 0
+      DO iEq=1, nEq
+         IF (eq(iEq)%phys .EQ. phys_fluid) THEN
+            ib%cEq = iEq
+            EXIT
+         END IF
+      END DO
 
       lD = 0D0
       IF (mvMsh) THEN
@@ -1036,6 +1002,9 @@ c     2         "can be applied for Neumann boundaries only"
       CALL IB_LHSA(nnz)
       std = "    Non-zeros in LHS matrix (IB): "//nnz
 
+!     Set IB Dirichlet BCs
+      CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
+
 !     To compute IB traces, calculate node/element adjacency for
 !     background lumen mesh
       DO iM=1, nMsh
@@ -1074,9 +1043,6 @@ c     2         "can be applied for Neumann boundaries only"
       WRITE(sOut,'(A)') "    Immersed boundary setting time: "//
      2   TRIM(sOut)//" sec"
       std = TRIM(sOut)
-
-!     Set Dirichlet BCs
-      CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
 
       std = " IB initialization complete.."
       std = " ================================="
@@ -1765,7 +1731,7 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(mshType), INTENT(INOUT) :: lM
       REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
 
-      INTEGER e, g, i, j, Ec, iM, iFa
+      INTEGER iFa
 
       INTEGER, ALLOCATABLE :: incEl(:), ePtr(:,:,:)
 
@@ -2000,7 +1966,7 @@ c     2         "can be applied for Neumann boundaries only"
          DO e=1, lFa%nEl
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
-               xl(:,Ac) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             END DO
 
             DO g=1, lFa%nG
@@ -3225,7 +3191,7 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER i, a, e, n, Ac, iM, iFa, ierr, tag, sReq
+      INTEGER i, a, e, n, Ac, iM, iFa, ierr, tag
 
       INTEGER, ALLOCATABLE :: incNd(:), ptr(:), rA(:,:), rReq(:)
 
@@ -3632,87 +3598,85 @@ c     2         "can be applied for Neumann boundaries only"
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: nV(:,:), tmpA(:,:), tmpY(:,:)
 
-      DO iEq=1, nEq
-         IF (eq(iEq)%phys .NE. phys_fluid .AND.
-     2       eq(iEq)%phys .NE. phys_FSI) CYCLE
-         DO iBc=1, eq(iEq)%nBcIB
-            IF (.NOT.BTEST(eq(iEq)%bcIB(iBc)%bType,bType_Dir)) CYCLE
-            eDir = .FALSE.
-            lDof = 0
-            DO i=1, nsd
-               IF (eq(iEq)%bcIB(iBc)%eDrn(i) .NE. 0) THEN
-                  eDir(i) = .TRUE.
-                  lDof = lDof + 1
+      iEq = ib%cEq
+      IF (iEq .EQ. 0) RETURN
+
+      DO iBc=1, eq(iEq)%nBcIB
+         IF (.NOT.BTEST(eq(iEq)%bcIB(iBc)%bType,bType_Dir)) CYCLE
+         eDir = .FALSE.
+         lDof = 0
+         DO i=1, nsd
+            IF (eq(iEq)%bcIB(iBc)%eDrn(i) .NE. 0) THEN
+               eDir(i) = .TRUE.
+               lDof = lDof + 1
+            END IF
+         END DO
+         IF (lDof .EQ. 0) lDof = nsd
+
+         iFa = eq(iEq)%bcIB(iBc)%iFa
+         iM  = eq(iEq)%bcIB(iBc)%iM
+
+!     Prepare a pointer list and normals for a face or a shell
+         IF (iFa .EQ. 0) THEN
+            IF (.NOT.ib%msh(iM)%lShl) err = "Trying to apply Dir "//
+     2         "BC on a non-shell mesh surface"
+            nNo = ib%msh(iM)%nNo
+            ALLOCATE(ptr(nNo), nV(nsd,nNo))
+            ptr = 0
+            DO a=1, nNo
+               ptr(a)  = ib%msh(iM)%gN(a)
+               nV(:,a) = ib%msh(iM)%nV(:,a)
+            END DO
+         ELSE
+            nNo = ib%msh(iM)%fa(iFa)%nNo
+            ALLOCATE(ptr(nNo), nV(nsd,nNo))
+            ptr = 0
+            DO a=1, nNo
+               ptr(a)  = ib%msh(iM)%fa(iFa)%gN(a)
+               nV(:,a) = ib%msh(iM)%fa(iFa)%nV(:,a)
+            END DO
+         END IF
+
+         ALLOCATE(tmpA(lDof,nNo), tmpY(lDof,nNo))
+         CALL IB_SETBCDIRL(eq(iEq)%bcIB(iBc), nNo, lDof, nV, tmpA, tmpY)
+
+         IF (ANY(eDir)) THEN
+            DO a=1, nNo
+               Ac = ptr(a)
+               IF (BTEST(eq(iEq)%bcIB(iBc)%bType,bType_impD)) THEN
+                  DO i=1, nsd
+                     lDof = 0
+                     IF (eDir(i)) THEN
+                        lDof = lDof + 1
+                        Yb(i,Ac) = tmpA(lDof,a)
+                        Ub(i,Ac) = tmpY(lDof,a)
+                     END IF
+                  END DO
+               ELSE
+                  DO i=1, nsd
+                     lDof = 0
+                     IF (eDir(i)) THEN
+                        lDof = lDof + 1
+                        Ab(i,Ac) = tmpA(lDof,a)
+                        Yb(i,Ac) = tmpY(lDof,a)
+                     END IF
+                  END DO
                END IF
             END DO
-            IF (lDof .EQ. 0) lDof = nsd
+         ELSE
+            DO a=1, nNo
+               Ac = ptr(a)
+               IF (BTEST(eq(iEq)%bcIB(iBc)%bType,bType_impD)) THEN
+                  Yb(1:nsd,Ac) = tmpA(:,a)
+                  Ub(1:nsd,Ac) = tmpY(:,a)
+               ELSE
+                  Ab(1:nsd,Ac) = tmpA(:,a)
+                  Yb(1:nsd,Ac) = tmpY(:,a)
+               END IF
+            END DO
+         END IF
 
-            iFa = eq(iEq)%bcIB(iBc)%iFa
-            iM  = eq(iEq)%bcIB(iBc)%iM
-
-!        Prepare a pointer list and normals for a face or a shell
-            IF (iFa .EQ. 0) THEN
-               IF (.NOT.ib%msh(iM)%lShl) err = "Trying to apply Dir "//
-     2            "BC on a non-shell mesh surface"
-               nNo = ib%msh(iM)%nNo
-               ALLOCATE(ptr(nNo), nV(nsd,nNo))
-               ptr = 0
-               DO a=1, nNo
-                  ptr(a)  = ib%msh(iM)%gN(a)
-                  nV(:,a) = ib%msh(iM)%nV(:,a)
-               END DO
-            ELSE
-               nNo = ib%msh(iM)%fa(iFa)%nNo
-               ALLOCATE(ptr(nNo), nV(nsd,nNo))
-               ptr = 0
-               DO a=1, nNo
-                  ptr(a)  = ib%msh(iM)%fa(iFa)%gN(a)
-                  nV(:,a) = ib%msh(iM)%fa(iFa)%nV(:,a)
-               END DO
-            END IF
-
-            ALLOCATE(tmpA(lDof,nNo), tmpY(lDof,nNo))
-            CALL IB_SETBCDIRL(eq(iEq)%bcIB(iBc), nNo, lDof, nV, tmpA,
-     2         tmpY)
-
-            IF (ANY(eDir)) THEN
-               DO a=1, nNo
-                  Ac = ptr(a)
-                  IF (BTEST(eq(iEq)%bcIB(iBc)%bType,bType_impD)) THEN
-                     DO i=1, nsd
-                        lDof = 0
-                        IF (eDir(i)) THEN
-                           lDof = lDof + 1
-                           Yb(i,Ac) = tmpA(lDof,a)
-                           Ub(i,Ac) = tmpY(lDof,a)
-                        END IF
-                     END DO
-                  ELSE
-                     DO i=1, nsd
-                        lDof = 0
-                        IF (eDir(i)) THEN
-                           lDof = lDof + 1
-                           Ab(i,Ac) = tmpA(lDof,a)
-                           Yb(i,Ac) = tmpY(lDof,a)
-                        END IF
-                     END DO
-                  END IF
-               END DO
-            ELSE
-               DO a=1, nNo
-                  Ac = ptr(a)
-                  IF (BTEST(eq(iEq)%bcIB(iBc)%bType,bType_impD)) THEN
-                     Yb(1:nsd,Ac) = tmpA(:,a)
-                     Ub(1:nsd,Ac) = tmpY(:,a)
-                  ELSE
-                     Ab(1:nsd,Ac) = tmpA(:,a)
-                     Yb(1:nsd,Ac) = tmpY(:,a)
-                  END IF
-               END DO
-            END IF
-
-            DEALLOCATE(ptr, nV, tmpA, tmpY)
-         END DO
+         DEALLOCATE(ptr, nV, tmpA, tmpY)
       END DO
 
       RETURN
@@ -3762,1109 +3726,20 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE IB_SETBCDIRL
 !####################################################################
-!     Project velocity from IB to ghost/finite cells using distance-
-!     weighted interpolation. This type of projection is used for SSM
-!     method only.
-      SUBROUTINE IB_PRJCTU(Yg, Dg, Yb)
+!     Compute FSI force on the immersed bodies using Immersed Finite
+!     Element Method (IFEM)
+      SUBROUTINE IB_CALCFFSI()
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(INOUT) :: Yg(tDof,tnNo)
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo), Yb(nsd+1,ib%tnNo)
+      INTEGER :: a, e, g, Ac, iM, eNoN, cPhys
+      REAL(KIND=8) :: w, Jac, ksix(nsd,nsd)
 
-      INTEGER a, b, i, g, e, s, Ac, Bc, Ec, iM, jM, iFa, iEq, eNoN
-      REAL(KIND=8) :: w, xe(nsd), xp(nsd), yp(nsd), ctime
+      REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), al(:,:), yl(:,:),
+     2   ul(:,:), xl(:,:), fNl(:,:), lR(:,:)
 
-      REAL(KIND=8), ALLOCATABLE :: sA(:), sV(:,:), xl(:,:), yl(:,:),
-     2   N(:)
-
-      ctime = CPUT()
-
-!     SSM (stair-step method): interpolate velocities on background mesh
-!     node based on the traces of IB. We apply an inverse-distance
-!     weighted interpolation operator on the ghost nodes.
-      ALLOCATE(sA(tnNo), sV(nsd,tnNo))
-      sV = 0D0
-      sA = 0D0
-      DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl) THEN
-            eNoN = ib%msh(iM)%eNoN
-            ALLOCATE(xl(nsd,eNoN), yl(nsd,eNoN), N(eNoN))
-            DO i=1, ib%msh(iM)%trc%n
-               e = ib%msh(iM)%trc%gE(1,i)
-               g = ib%msh(iM)%trc%gE(2,i)
-               DO a=1, eNoN
-                  Ac = ib%msh(iM)%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-                  yl(:,a) = Yb(1:nsd,Ac)
-                  N(a)    = ib%msh(iM)%N(a,g)
-               END DO
-
-               xp = 0D0
-               yp = 0D0
-               DO a=1, eNoN
-                  xp = xp + N(a)*xl(:,a)
-                  yp = yp + N(a)*yl(:,a)
-               END DO
-
-               Ec = ib%msh(iM)%trc%ptr(1,i)
-               jM = ib%msh(iM)%trc%ptr(2,i)
-               DO b=1, msh(jM)%eNoN
-                  Bc = msh(jM)%IEN(b,Ec)
-                  IF (ighost(Bc) .EQ. 1) THEN
-                     xe = x(:,Bc)
-                     IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
-                     w = SQRT(SUM( (xe - xp)**2 ))
-                     IF (ISZERO(w)) w = eps
-                     w = 1D0/w
-                     sA(Bc) = sA(Bc) + w
-                     sV(:,Bc) = sV(:,Bc) + w*yp(:)
-                  END IF
-               END DO
-            END DO
-            DEALLOCATE(xl, yl, N)
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               eNoN = ib%msh(iM)%fa(iFa)%eNoN
-               ALLOCATE(xl(nsd,eNoN), yl(nsd,eNoN), N(eNoN))
-               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
-                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
-                  g = ib%msh(iM)%fa(iFa)%trc%gE(2,i)
-                  DO a=1, eNoN
-                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                     xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-                     yl(:,a) = Yb(1:nsd,Ac)
-                     N(a)    = ib%msh(iM)%fa(iFa)%N(a,g)
-                  END DO
-
-                  xp = 0D0
-                  yp = 0D0
-                  DO a=1, eNoN
-                     xp = xp + N(a)*xl(:,a)
-                     yp = yp + N(a)*yl(:,a)
-                  END DO
-
-                  Ec = ib%msh(iM)%fa(iFa)%trc%ptr(1,i)
-                  jM = ib%msh(iM)%fa(iFa)%trc%ptr(2,i)
-                  DO b=1, msh(jM)%eNoN
-                     Bc = msh(jM)%IEN(b,Ec)
-                     IF (ighost(Bc) .EQ. 1) THEN
-                        xe = x(:,Bc)
-                        IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
-                        w = SQRT(SUM( (xe - xp)**2 ))
-                        IF (ISZERO(w)) w = eps
-                        w = 1D0/w
-                        sA(Bc) = sA(Bc) + w
-                        sV(:,Bc) = sV(:,Bc) + w*yp(:)
-                     END IF
-                  END DO
-               END DO
-               DEALLOCATE(xl, yl, N)
-            END DO
-         END IF
-      END DO
-
-      CALL COMMU(sA)
-      CALL COMMU(sV)
-
-      DO iEq=1, nEq
-         IF (eq(iEq)%phys .EQ. phys_fluid .OR.
-     2       eq(iEq)%phys .EQ. phys_FSI) EXIT
-      END DO
-
-      s = eq(iEq)%s
-      e = eq(iEq)%e
-      IF (eq(iEq)%dof .EQ. nsd+1) e = e - 1
-      DO a=1, tnNo
-         IF (.NOT.ISZERO(sA(a)) .AND. ighost(a).EQ.1) THEN
-            Yg(s:e,a) = sV(:,a)/sA(a)
-         END IF
-      END DO
-      DEALLOCATE(sA, sV)
-
-      ib%callD(1) = CPUT() - ctime
-
-      RETURN
-      END SUBROUTINE IB_PRJCTU
-!####################################################################
-!     Add contribution from IB to the residue (RHS)
-      SUBROUTINE IB_CONSTRUCT(Yg, Dg)
-      USE COMMOD
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-
-      INTEGER a
-
-      IF (eq(cEq)%phys .NE. phys_fluid .AND.
-     2    eq(cEq)%phys .NE. phys_FSI) RETURN
-
-      IF (ib%mthd .EQ. ibMthd_Penalty .OR.
-     2    ib%mthd .EQ. ibMthd_Nitsche) THEN
-         CALL IB_SETBCDIRA(Yg, Dg)
-
-      ELSE IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-         IF (.NOT.ALLOCATED(Rib)) err =
-     2      "Correction needed IFEM construct"
-         DO a=1, tnNo
-            R(1:nsd,a) = R(1:nsd,a) - Rib(:,a)
-         END DO
-      END IF
-
-      RETURN
-      END SUBROUTINE IB_CONSTRUCT
-!####################################################################
-!     Treat IB with Dir BCs using augmented Lagrange multiplier method
-!     (extended Nitsche), or using pure Penalty method w-/wo- feedback
-      SUBROUTINE IB_SETBCDIRA(Yg, Dg)
-      USE COMMOD
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-
-      INTEGER :: iBc, iFa, iM
-      REAL(KIND=8) ctime
-
-      ctime = CPUT()
-      DO iBc=1, eq(cEq)%nBcIB
-         IF (.NOT.BTEST(eq(cEq)%bcIB(iBc)%bType, bType_Dir)) CYCLE
-         iM  = eq(cEq)%bcIB(iBc)%iM
-         iFa = eq(cEq)%bcIB(iBc)%iFa
-         IF (iFa .NE. 0) THEN
-            CALL IB_SETBCDIRAL(eq(cEq)%bcIB(iBc), ib%msh(iM)%fa(iFa),
-     2         Yg, Dg)
-         ELSE
-            CALL IB_SETBCDIRASL(eq(cEq)%bcIB(iBc), ib%msh(iM), Yg, Dg)
-         END IF
-      END DO
-      ib%callD(1) = CPUT() - ctime
-
-      RETURN
-      END SUBROUTINE IB_SETBCDIRA
-!--------------------------------------------------------------------
-      SUBROUTINE IB_SETBCDIRAL(lBc, lFa, Yg, Dg)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      TYPE(bcType), INTENT(IN) :: lBc
-      TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-
-      LOGICAL :: flag
-      INTEGER :: a, e, g, i, Ac, Ec, nNo, nEl, nG, eNoN, eNoNb, cPhys,
-     2   iM, nGP
-      REAL(KIND=8) :: w, Jac, fb(nsd), xp(nsd), xi(nsd), nV(nsd),
-     2   ub(nsd), tauB(2), Ks(nsd,nsd)
-
-      INTEGER, ALLOCATABLE :: ePtr(:,:,:), ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: lD(:,:), N(:), Nb(:), Nxi(:,:),
-     2   Nx(:,:), xl(:,:), xbl(:,:), yl(:,:), ubl(:,:), fbl(:,:),
-     3   lR(:,:), lK(:,:,:)
-
-      nNo   = lFa%nNo
-      nEl   = lFa%nEl
-      nG    = lFa%nG
-      eNoNb = lFa%eNoN
-
-!     Get penalty constants
-      tauB  = lBc%tauB
-
-!     Project IB face nodal values with Dirichlet BCs to global array
-      ALLOCATE(lD(nsd,tnNo))
-      lD = 0D0
-      DO a=1, tnNo
-         IF (mvMsh) lD(:,a) = Dg(nsd+2:2*nsd+1,a)
-      END DO
-
-!     Load all the ghost cell pointers into a global array
-      ALLOCATE(ePtr(2,nG,nEl))
-      ePtr = 0
-      DO i=1, lFa%trc%n
-         e = lFa%trc%gE(1,i)
-         g = lFa%trc%gE(2,i)
-         ePtr(:,g,e) = lFa%trc%ptr(:,i)
-      END DO
-
-      ALLOCATE(Nb(eNoNb), xbl(nsd,eNoNb), ubl(nsd,eNoNb),fbl(nsd,eNoNb))
-
-!     Loop over all the elements and assemble to the residue
-      nGP = 0
-      DO e=1, nEl
-         DO a=1, eNoNb
-            Ac = lFa%IEN(a,e)
-            xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-            ubl(:,a) = ib%Yo(1:nsd,Ac)
-            fbl(:,a) = ib%R(:,Ac)
-         END DO
-
-         DO g=1, nG
-            Ec = ePtr(1,g,e)
-            iM = ePtr(2,g,e)
-            IF (Ec .EQ. 0) CYCLE
-
-!           Keep track of the total trace count
-            nGP = nGP + 1
-
-            CALL GNNIB(lFa, e, g, nV)
-            Jac = SQRT(NORM(nV))
-!           Normal pointing outwards from solid to fluid
-            nV = nV / Jac
-            w  = lFa%w(g)*Jac
-            Nb = lFa%N(:,g)
-
-!           Coordinates, IB velocity and feedback forcing at the
-!           integration point
-            xp  = 0D0
-            ub  = 0D0
-            fb  = 0D0
-            DO a=1, eNoNb
-               xp = xp + Nb(a)*xbl(:,a)
-               ub = ub + Nb(a)*ubl(:,a)
-               fb = fb + Nb(a)*fbl(:,a)
-            END DO
-
-            cDmn  = DOMAIN(msh(iM), cEq, Ec)
-            cPhys = eq(cEq)%dmn(cDmn)%phys
-!           Domain physics has to be fluid
-            IF (cPhys .NE. phys_fluid) err = "IB formulation is for "//
-     2         "fluid phys only"
-
-            eNoN = msh(iM)%eNoN
-            ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
-     2         yl(tDof,eNoN), ptr(eNoN), lR(dof,eNoN),
-     3         lK(dof*dof,eNoN,eNoN))
-
-!           Transfer to local arrays
-            DO a=1, eNoN
-               Ac = msh(iM)%IEN(a,Ec)
-               ptr(a) = Ac
-               xl(:,a) = x(:,Ac) + lD(:,Ac)
-               yl(:,a) = Yg(:,Ac)
-            END DO
-
-!           Get the parametric coordinates and shape functions of the
-!           trace w.r.t. background mesh
-            xi = 0D0
-            DO i=1, msh(iM)%nG
-               xi = xi + msh(iM)%xi(:,i)
-            END DO
-            xi(:) = xi(:) / REAL(msh(iM)%nG,KIND=8)
-
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge. "//
-     2         "Invalid trace pointer"
-
-!           Get the shape functions and their derivatives at the
-!           integration point, as a function of the basis defined on the
-!           background mesh
-            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-!           Check if the shape functions are correct
-            i = 0
-            DO a=1, eNoN
-               IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
-            END DO
-            IF (i .NE. eNoN) err =
-     2         "Error in computing IB trace shape functions"
-
-!           Compute spatial derivatives of shape functions
-            CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
-
-!           Compute the residue and stiffness matrices
-            lR = 0D0
-            lK = 0D0
-            IF (nsd .EQ. 3) THEN
-               IF (ib%mthd .EQ. ibMthd_Penalty) THEN
-                  CALL BPFLUID3D(eNoN, w, N, yl, ub, fb, nV, tauB,
-     2               lBc%fbN, lR, lK)
-               ELSE IF (ib%mthd .EQ. ibMthd_Nitsche) THEN
-!                 Flip the normal to point away from fluid
-                  nV = -nV
-                  CALL BWFLUID3D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR,
-     2               lK)
-               END IF
-
-            ELSE
-               IF (ib%mthd .EQ. ibMthd_Penalty) THEN
-                  CALL BPFLUID2D(eNoN, w, N, yl, ub, fb, nV, tauB,
-     2               lBc%fbN, lR, lK)
-               ELSE IF (ib%mthd .EQ. ibMthd_Nitsche) THEN
-!                 Flip the normal to point away from fluid domain
-                  nV = -nV
-                  CALL BWFLUID2D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR,
-     2               lK)
-               END IF
-            END IF
-
-!           Assemble
-#ifdef WITH_TRILINOS
-            IF (useTrilinosAssemAndLS) THEN
-               CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-            ELSE
-#endif
-               CALL DOASSEM(eNoN, ptr, lK, lR)
-#ifdef WITH_TRILINOS
-      END IF
-#endif
-            DEALLOCATE(N, Nxi, Nx, xl, yl, ptr, lR, lK)
-         END DO
-      END DO
-
-      nGP = cm%reduce(nGP)
-      i   = nEl*nG
-      IF (nGP .NE. i) THEN
-         err = " Error: found only "//STR(nGP)//" integration point "//
-     2      "traces out of "//STR(i)
-      END IF
-      DEALLOCATE(lD, ePtr, Nb, xbl, ubl, fbl)
-
-      RETURN
-      END SUBROUTINE IB_SETBCDIRAL
-!--------------------------------------------------------------------
-!     Treat shells here
-      SUBROUTINE IB_SETBCDIRASL(lBc, lM, Yg, Dg)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      TYPE(bcType), INTENT(IN) :: lBc
-      TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-
-      LOGICAL :: flag
-      INTEGER :: a, e, g, i, Ac, Ec, nNo, nEl, nG, eNoN, eNoNb, cPhys,
-     2   iM, nGP
-      REAL(KIND=8) :: w, Jac, fb(nsd), xp(nsd), xi(nsd), nV(nsd),
-     2   ub(nsd), tauB(2), Ks(nsd,nsd), gC(nsd,nsd-1)
-
-      INTEGER, ALLOCATABLE :: ePtr(:,:,:), ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: lD(:,:), N(:), Nb(:), Nxi(:,:),
-     2   Nx(:,:), xl(:,:), xbl(:,:), yl(:,:), ubl(:,:), fbl(:,:),
-     3   lR(:,:), lK(:,:,:)
-
-      IF (ib%mthd .NE. ibMthd_Penalty) err = "Only penalty method "//
-     2   "is allowed for immersed shells"
-
-      nNo   = lM%nNo
-      nEl   = lM%nEl
-      nG    = lM%nG
-      eNoNb = lM%eNoN
-
-!     Get penalty and feedback constants
-      tauB  = lBc%tauB
-
-!     Project IB face nodal values with Dirichlet BCs to global array
-      ALLOCATE(lD(nsd,tnNo))
-      lD = 0D0
-      DO a=1, tnNo
-         IF (mvMsh) lD(:,a) = Dg(nsd+2:2*nsd+1,a)
-      END DO
-
-!     Load all the ghost cell pointers into a global array
-      ALLOCATE(ePtr(2,nG,nEl))
-      ePtr = 0
-      DO i=1, lM%trc%n
-         e = lM%trc%gE(1,i)
-         g = lM%trc%gE(2,i)
-         ePtr(:,g,e) = lM%trc%ptr(:,i)
-      END DO
-
-      ALLOCATE(Nb(eNoNb), xbl(nsd,eNoNb), ubl(nsd,eNoNb),fbl(nsd,eNoNb))
-
-!     Loop over all the elements and assemble to the residue
-      nGP = 0
-      DO e=1, nEl
-         DO a=1, eNoNb
-            Ac = lM%IEN(a,e)
-            xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-            ubl(:,a) = ib%Yo(1:nsd,Ac)
-            fbl(:,a) = ib%R(:,Ac)
-         END DO
-
-         DO g=1, nG
-            Ec = ePtr(1,g,e)
-            iM = ePtr(2,g,e)
-            IF (Ec .EQ. 0) CYCLE
-
-!           Keep track of the total trace count
-            nGP = nGP + 1
-
-!           IB shell normal
-            CALL GNNS(eNoNb, lM%Nx(:,:,g), xbl, nV, gC, gC)
-            Jac = SQRT(NORM(nV))
-!           Normal pointing outwards from solid to fluid
-            nV  = nV/Jac
-            w   = lM%w(g) * Jac
-            Nb  = lM%N(:,g)
-
-!           Coordinates, IB velocity and feedback forcing at the
-!           integration point
-            xp  = 0D0
-            ub  = 0D0
-            fb  = 0D0
-            DO a=1, eNoNb
-               xp = xp + Nb(a)*xbl(:,a)
-               ub = ub + Nb(a)*ubl(:,a)
-               fb = fb + Nb(a)*fbl(:,a)
-            END DO
-
-            cDmn  = DOMAIN(msh(iM), cEq, Ec)
-            cPhys = eq(cEq)%dmn(cDmn)%phys
-!           Domain physics has to be fluid
-            IF (cPhys .NE. phys_fluid) err = "IB formulation is for "//
-     2         "fluid phys only"
-
-            eNoN = msh(iM)%eNoN
-            ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
-     2         yl(tDof,eNoN), ptr(eNoN), lR(dof,eNoN),
-     3         lK(dof*dof,eNoN,eNoN))
-
-!           Transfer to local arrays
-            DO a=1, eNoN
-               Ac = msh(iM)%IEN(a,Ec)
-               ptr(a) = Ac
-               xl(:,a) = x(:,Ac) + lD(:,Ac)
-               yl(:,a) = Yg(:,Ac)
-            END DO
-
-!           Get the parametric coordinates and shape functions of the
-!           trace w.r.t. background mesh
-            xi = 0D0
-            DO i=1, msh(iM)%nG
-               xi = xi + msh(iM)%xi(:,i)
-            END DO
-            xi(:) = xi(:) / REAL(msh(iM)%nG,KIND=8)
-
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge. "//
-     2         "Invalid trace pointer"
-
-!           Get the shape functions and their derivatives at the
-!           integration point, as a function of the basis defined on the
-!           background mesh
-            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-!           Check if the shape functions are correct
-            i = 0
-            DO a=1, eNoN
-               IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
-            END DO
-            IF (i .NE. eNoN) err =
-     2         "Error in computing IB trace shape functions"
-
-!           Compute spatial derivatives of shape functions
-            CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
-
-!           Compute the residue and stiffness matrices
-            lR = 0D0
-            lK = 0D0
-            IF (nsd .EQ. 3) THEN
-               IF (ib%mthd .EQ. ibMthd_Penalty) THEN
-                  CALL BPFLUID3D(eNoN, w, N, yl, ub, fb, nV, tauB,
-     2               lBc%fbN, lR, lK)
-               ELSE IF (ib%mthd .EQ. ibMthd_Nitsche) THEN
-!                 Flip the normal to point away from fluid
-                  nV = -nV
-                  CALL BWFLUID3D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR,
-     2               lK)
-               END IF
-
-            ELSE
-               IF (ib%mthd .EQ. ibMthd_Penalty) THEN
-                  CALL BPFLUID2D(eNoN, w, N, yl, ub, fb, nV, tauB,
-     2               lBc%fbN, lR, lK)
-               ELSE IF (ib%mthd .EQ. ibMthd_Nitsche) THEN
-!                 Flip the normal to point away from fluid domain
-                  nV = -nV
-                  CALL BWFLUID2D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR,
-     2               lK)
-               END IF
-            END IF
-
-!           Assemble
-#ifdef WITH_TRILINOS
-            IF (useTrilinosAssemAndLS) THEN
-               CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-            ELSE
-#endif
-               CALL DOASSEM(eNoN, ptr, lK, lR)
-#ifdef WITH_TRILINOS
-      END IF
-#endif
-            DEALLOCATE(N, Nxi, Nx, xl, yl, ptr, lR, lK)
-         END DO
-      END DO
-
-      nGP = cm%reduce(nGP)
-      i   = nEl*nG
-      IF (nGP .NE. i) THEN
-         err = " Error: found only "//STR(nGP)//" integration point "//
-     2      "traces out of "//STR(i)
-      END IF
-      DEALLOCATE(lD, ePtr, Nb, xbl, ubl, fbl)
-
-      RETURN
-      END SUBROUTINE IB_SETBCDIRASL
-!####################################################################
-!     Computes the feedback forcing term for IBs with Dirichlet BCs
-!     treated using Penalty method
-      SUBROUTINE IB_SETFBF()
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      INTEGER iEq, iBc, iM, iFa, a, i
-      REAL(KIND=8) ctime
-
-      REAL(KIND=8), ALLOCATABLE :: sA(:), sF(:,:)
-
-      IF (.NOT.ib%fbFlag) RETURN
-
-      ctime = CPUT()
-      ALLOCATE(sA(ib%tnNo), sF(nsd,ib%tnNo))
-      sA = 0D0
-      sF = 0D0
-      DO iEq=1, nEq
-         IF (eq(iEq)%phys .NE. phys_fluid .AND.
-     2       eq(iEq)%phys .NE. phys_FSI) CYCLE
-         DO iBc=1, eq(iEq)%nBcIB
-            IF (.NOT.BTEST(eq(iEq)%bcIB(iBc)%bType, bType_Dir)) CYCLE
-            iM  = eq(iEq)%bcIB(iBc)%iM
-            iFa = eq(iEq)%bcIB(iBc)%iFa
-            IF (iFa .NE. 0) THEN
-               CALL IB_SETFBFL(eq(iEq)%bcIB(iBc), ib%msh(iM)%fa(iFa),
-     2            Yn, Dn, sF, sA)
-            ELSE
-               CALL IB_SETFBFSL(eq(iEq)%bcIB(iBc), ib%msh(iM), Yn, Dn,
-     2            sF, sA)
-            END IF
-         END DO
-      END DO
-
-!     Synchronize ib%R across all the processes
-c      CALL IB_SYNC(sF)
-c      CALL IB_SYNC(sA)
-
-      DO a=1, ib%tnNo
-         IF (.NOT.ISZERO(sA(a))) THEN
-            DO i=1, nsd
-               ib%R(i,a) = ib%R(i,a) + (sF(i,a)/sA(a))
-            END DO
-         END IF
-      END DO
-
-      DEALLOCATE(sA, sF)
-
-      ib%callD(1) = ib%callD(1) + CPUT() - ctime
-
-      RETURN
-      END SUBROUTINE IB_SETFBF
-!--------------------------------------------------------------------
-      SUBROUTINE IB_SETFBFL(lBc, lFa, Yg, Dg, sF, sA)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      TYPE(bcType), INTENT(IN) :: lBc
-      TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-      REAL(KIND=8), INTENT(INOUT) :: sA(tnNo), sF(nsd,tnNo)
-
-      LOGICAL :: flag
-      INTEGER :: a, e, i, g, Ac, Ec, nNo, nEl, nG, eNoN, eNoNb, iM, nGP
-      REAL(KIND=8) :: w, Jac, fb(nsd), xp(nsd), xi(nsd), nV(nsd),u(nsd),
-     2   ub(nsd), tauF
-
-      INTEGER, ALLOCATABLE :: ePtr(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: lD(:,:), N(:), Nb(:), Nxi(:,:),
-     2   xl(:,:), xbl(:,:), ul(:,:), ubl(:,:)
-
-      nNo   = lFa%nNo
-      nEl   = lFa%nEl
-      nG    = lFa%nG
-      eNoNb = lFa%eNoN
-
-!     Get penalty constants
-      tauF  = lBc%tauF
-
-      ALLOCATE(lD(nsd,tnNo))
-      lD = 0D0
-      DO a=1, tnNo
-         IF (mvMsh) lD(:,a) = Dg(nsd+2:2*nsd+1,a)
-      END DO
-
-!     Load all the ghost cell pointers into a global array
-      ALLOCATE(ePtr(2,nG,nEl))
-      ePtr = 0
-      DO i=1, lFa%trc%n
-         e = lFa%trc%gE(1,i)
-         g = lFa%trc%gE(2,i)
-         ePtr(:,g,e) = lFa%trc%ptr(:,i)
-      END DO
-
-      ALLOCATE(Nb(eNoNb), xbl(nsd,eNoNb), ubl(nsd,eNoNb))
-
-!     Loop over all the elements and assemble to the residue
-      nGP = 0
-      DO e=1, nEl
-         DO a=1, eNoNb
-            Ac = lFa%IEN(a,e)
-            xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-            ubl(:,a) = ib%Yo(1:nsd,Ac)
-         END DO
-
-         DO g=1, nG
-            Ec = ePtr(1,g,e)
-            iM = ePtr(2,g,e)
-            IF (Ec .EQ. 0) CYCLE
-
-!           Keep track of the total trace count
-            nGP = nGP + 1
-
-            CALL GNNIB(lFa, e, g, nV)
-            Jac = SQRT(NORM(nV))
-!           Normal pointing outwards from solid to fluid
-            nV = nV / Jac
-            w  = lFa%w(g)*Jac
-            Nb = lFa%N(:,g)
-
-!           Coordinates, IB velocity and feedback forcing at the
-!           integration point
-            xp  = 0D0
-            ub  = 0D0
-            DO a=1, eNoNb
-               xp = xp + Nb(a)*xbl(:,a)
-               ub = ub + Nb(a)*ubl(:,a)
-            END DO
-
-            cDmn = DOMAIN(msh(iM), cEq, Ec)
-            eNoN = msh(iM)%eNoN
-            ALLOCATE(N(eNoN), Nxi(nsd,eNoN), xl(nsd,eNoN), ul(nsd,eNoN))
-
-!           Transfer to local arrays
-            DO a=1, eNoN
-               Ac = msh(iM)%IEN(a,Ec)
-               xl(:,a) = x(:,Ac) + lD(:,Ac)
-               ul(:,a) = Yg(1:nsd,Ac)
-            END DO
-
-!           Get the parametric coordinates and shape functions of the
-!           trace w.r.t. background mesh
-            xi = 0D0
-            DO i=1, msh(iM)%nG
-               xi = xi + msh(iM)%xi(:,i)
-            END DO
-            xi(:) = xi(:) / REAL(msh(iM)%nG,KIND=8)
-
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge. "//
-     2         "Invalid trace pointer"
-
-!           Get the shape functions and their derivatives at the
-!           integration point, as a function of the basis defined on the
-!           background mesh
-            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-!           Check if the shape functions are correct
-            i = 0
-            DO a=1, eNoN
-               IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
-            END DO
-            IF (i .NE. eNoN) err =
-     2         "Error in computing IB trace shape functions"
-
-!           Get the fluid velocity at the integration point
-            u = 0D0
-            DO a=1, eNoN
-               u(:) = u(:) + N(a)*ul(:,a)
-            END DO
-
-!           Compute the feedback forcing with penalty forces along
-!           normal direction
-            IF (lBc%fbN) THEN
-               fb(:) = tauF * NORM(u-ub, nV)
-            ELSE
-               fb(:) = tauF * (u(:)-ub(:))
-            END IF
-
-!           Transfer back to global vector
-            DO a=1, eNoNb
-               Ac = lFa%IEN(a,e)
-               sF(:,Ac) = sF(:,Ac) + w*Nb(a)*fb(:)
-               sA(Ac) = sA(Ac) + w*Nb(a)
-            END DO
-
-            DEALLOCATE(N, Nxi, xl, ul)
-         END DO
-      END DO
-
-      nGP = cm%reduce(nGP)
-      i   = nEl*nG
-      IF (nGP .NE. i) THEN
-         err = " Error: found only "//STR(nGP)//" integration point "//
-     2      "traces out of "//STR(i)
-      END IF
-      DEALLOCATE(ePtr, lD, Nb, xbl, ubl)
-
-      RETURN
-      END SUBROUTINE IB_SETFBFL
-!--------------------------------------------------------------------
-      SUBROUTINE IB_SETFBFSL(lBc, lM, Yg, Dg, sF, sA)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      TYPE(bcType), INTENT(IN) :: lBc
-      TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-      REAL(KIND=8), INTENT(INOUT) :: sA(tnNo), sF(nsd,tnNo)
-
-      LOGICAL :: flag
-      INTEGER :: a, e, i, g, Ac, Ec, nNo, nEl, nG, eNoN, eNoNb, iM, nGP
-      REAL(KIND=8) :: w, Jac, fb(nsd), xp(nsd), xi(nsd), nV(nsd),u(nsd),
-     2   ub(nsd), tauF, gC(nsd,nsd-1)
-
-      INTEGER, ALLOCATABLE :: ePtr(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: lD(:,:), N(:), Nb(:), Nxi(:,:),
-     2   xl(:,:), xbl(:,:), ul(:,:), ubl(:,:)
-
-      nNo   = lM%nNo
-      nEl   = lM%nEl
-      nG    = lM%nG
-      eNoNb = lM%eNoN
-
-!     Get penalty constants
-      tauF  = lBc%tauF
-
-      ALLOCATE(lD(nsd,tnNo))
-      lD = 0D0
-      DO a=1, tnNo
-         IF (mvMsh) lD(:,a) = Dg(nsd+2:2*nsd+1,a)
-      END DO
-
-!     Load all the ghost cell pointers into a global array
-      ALLOCATE(ePtr(2,nG,nEl))
-      ePtr = 0
-      DO i=1, lM%trc%n
-         e = lM%trc%gE(1,i)
-         g = lM%trc%gE(2,i)
-         ePtr(:,g,e) = lM%trc%ptr(:,i)
-      END DO
-
-      ALLOCATE(Nb(eNoNb), xbl(nsd,eNoNb), ubl(nsd,eNoNb))
-
-!     Loop over all the elements and assemble to the residue
-      nGP = 0
-      DO e=1, nEl
-         DO a=1, eNoNb
-            Ac = lM%IEN(a,e)
-            xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-            ubl(:,a) = ib%Yo(1:nsd,Ac)
-         END DO
-
-         DO g=1, nG
-            Ec = ePtr(1,g,e)
-            iM = ePtr(2,g,e)
-            IF (Ec .EQ. 0) CYCLE
-
-!           Keep track of the total trace count
-            nGP = nGP + 1
-
-!           IB shell normal
-            CALL GNNS(eNoNb, lM%Nx(:,:,g), xbl, nV, gC, gC)
-            Jac = SQRT(NORM(nV))
-!           Normal direction outwards from solid to fluid
-            nV  = nV/Jac
-            w   = lM%w(g) * Jac
-            Nb  = lM%N(:,g)
-
-!           Coordinates and IB velocity at the integration point
-            xp = 0D0
-            ub = 0D0
-            DO a=1, eNoNb
-               xp(:) = xp(:) + xbl(:,a)*Nb(a)
-               ub(:) = ub(:) + ubl(:,a)*Nb(a)
-            END DO
-
-            cDmn = DOMAIN(msh(iM), cEq, Ec)
-            eNoN = msh(iM)%eNoN
-            ALLOCATE(N(eNoN), Nxi(nsd,eNoN), xl(nsd,eNoN), ul(nsd,eNoN))
-
-!           Transfer to local arrays
-            DO a=1, eNoN
-               Ac = msh(iM)%IEN(a,Ec)
-               xl(:,a) = x(:,Ac) + lD(:,Ac)
-               ul(:,a) = Yg(1:nsd,Ac)
-            END DO
-
-!           Get the parametric coordinates and shape functions of the
-!           trace w.r.t. background mesh
-            xi = 0D0
-            DO i=1, msh(iM)%nG
-               xi = xi + msh(iM)%xi(:,i)
-            END DO
-            xi(:) = xi(:) / REAL(msh(iM)%nG,KIND=8)
-
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge. "//
-     2         "Invalid trace pointer"
-
-!           Get the shape functions and their derivatives at the
-!           integration point, as a function of the basis defined on the
-!           background mesh
-            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-!           Check if the shape functions are correct
-            i = 0
-            DO a=1, eNoN
-               IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
-            END DO
-            IF (i .NE. eNoN) err =
-     2         "Error in computing IB trace shape functions"
-
-!           Get the fluid velocity at the integration point
-            u = 0D0
-            DO a=1, eNoN
-               u(:) = u(:) + N(a)*ul(:,a)
-            END DO
-
-!           Compute the feedback forcing with penalty forces along
-!           normal direction
-            IF (lBc%fbN) THEN
-               fb(:) = tauF * NORM(u-ub, nV)
-            ELSE
-               fb(:) = tauF * (u(:)-ub(:))
-            END IF
-
-!           Transfer back to global vector
-            DO a=1, eNoNb
-               Ac = lM%IEN(a,e)
-               sF(:,Ac) = sF(:,Ac) + w*Nb(a)*fb(:)
-               sA(Ac) = sA(Ac) + w*Nb(a)
-            END DO
-
-            DEALLOCATE(N, Nxi, xl, ul)
-         END DO
-      END DO
-
-      nGP = cm%reduce(nGP)
-      i   = nEl*nG
-      IF (nGP .NE. i) THEN
-         err = " Error: found only "//STR(nGP)//" integration point "//
-     2      "traces out of "//STR(i)
-      END IF
-      DEALLOCATE(ePtr, lD, Nb, xbl, ubl)
-
-      RETURN
-      END SUBROUTINE IB_SETFBFSL
-!####################################################################
-!     Immersed Finite Element Method (IFEM):
-!     Two step projection: (a) Project acceleration and velocity from
-!     the fluid mesh to the immersed bodies. (b) Compute FSI force on
-!     the immersed bodies and project it to the background fluid mesh
-      SUBROUTINE IB_GETFFSI(Ag, Yg, Dg)
-      USE COMMOD
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo)
-
-      REAL(KIND=8), ALLOCATABLE :: Ub(:,:)
-
-      INTEGER a, i, iEq
-
-      ib%cEq = 0
-      DO iEq=1, nEq
-         IF (eq(iEq)%phys .EQ. phys_fluid) THEN
-            ib%cEq = iEq
-            EXIT
-         END IF
-      END DO
       IF (ib%cEq.EQ.0 .OR. ib%mthd.NE.ibMthd_IFEM) RETURN
-
-      ib%callD(1) = CPUT()
-!     First, project fluid variables (velocity, pressure, acceleration)
-!     at previous time step from fluid mesh to IB solid mesh
-      CALL IB_PROJFVAR(Ag, Yg, Dg, ib%Ao, ib%Yo, ib%Uo, ib%callD(2))
-
-!     Update IB solid displacement from the projected solid velocity
-      ALLOCATE(Ub(nsd,ib%tnNo))
-      Ub = 0D0
-      DO a=1, ib%tnNo
-         DO i=1, nsd
-            Ub(i,a) = ib%Uo(i,a) + ib%Yo(i,a)*dt
-         END DO
-      END DO
-
-!     Compute FSI force on IB and project it to the fluid mesh
-      CALL IB_PROJFFSI(Ub, Dg)
-
-!     Use new displacement field data to update tracer pointers
-      ib%Uo = Ub
-      ib%callD(3) = CPUT()
-      CALL IB_UPDATE(Dg)
-      ib%callD(3) = CPUT() - ib%callD(3)
-      DEALLOCATE(Ub)
-
-      ib%callD(1) = CPUT() - ib%callD(1)
-
-      RETURN
-      END SUBROUTINE IB_GETFFSI
-!--------------------------------------------------------------------
-!     Poject fluid velocity, pressure and acceleration onto IB
-      SUBROUTINE IB_PROJFVAR(Ag, Yg, Dg, Ab, Yb, Ub, cmtime)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo), Ub(nsd,ib%tnNo)
-      REAL(KIND=8), INTENT(OUT) :: Ab(nsd,ib%tnNo), Yb(nsd+1,ib%tnNo),
-     2   cmtime
-
-      LOGICAL :: flag
-      INTEGER :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM, eNoN, eNoNb
-      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), ap(nsd), yp(nsd+1),
-     2   Ks(nsd,nsd)
-
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
-     2   xl(:,:), xbl(:,:), al(:,:), yl(:,:), sA(:)
-
-!     Note that the equation physics is either Fluid or FSI
-      is = eq(ib%cEq)%s
-      ie = eq(ib%cEq)%e
-      IF (ie .EQ. nsd+1) ie = ie - 1
-
-!     Use L2 projection with mass lumping to project flow variables from
-!     background fluid mesh to IB
-      ALLOCATE(sA(ib%tnNo))
-      sA = 0D0
-      Ab = 0D0
-      Yb = 0D0
-!     Loop over each IB mesh
-      DO iM=1, ib%nMsh
-         eNoNb = ib%msh(iM)%eNoN
-         ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), xbl(nsd,eNoNb))
-!     Loop over each trace, as we need to first interpolate flow var at
-!     the IB integration points based on its trace
-         DO i=1, ib%msh(iM)%trc%n
-            e  = ib%msh(iM)%trc%gE(1,i)
-            g  = ib%msh(iM)%trc%gE(2,i)
-            Ec = ib%msh(iM)%trc%ptr(1,i)
-            jM = ib%msh(iM)%trc%ptr(2,i)
-
-!        Transfer to local arrays: IB mesh variables
-            Nb  = ib%msh(iM)%N(:,g)
-            DO a=1, eNoNb
-               Ac = ib%msh(iM)%IEN(a,e)
-               xbl(:,a) = ib%x(:,Ac) + Ub(:,Ac)
-            END DO
-            CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,Ks)
-            IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e
-            w = ib%msh(iM)%w(g) * Jac
-
-!        Coordinates of the integration point
-            xp = 0D0
-            DO a=1, eNoNb
-               xp = xp + Nb(a)*xbl(:,a)
-            END DO
-
-!        Transfer to local arrays: background mesh variables
-            eNoN = msh(jM)%eNoN
-            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN), al(nsd,eNoN),
-     2         yl(nsd+1,eNoN))
-            al = 0D0
-            yl = 0D0
-            DO b=1, eNoN
-               Bc = msh(jM)%IEN(b,Ec)
-               al(:,b) = Ag(is:ie,Bc)
-               yl(:,b) = Yg(is:ie+1,Bc)
-               xl(:,b) = x(:,Bc)
-               IF (mvMsh) xl(:,b) = xl(:,b) + Dg(ie+2:ie+nsd+1,Bc)
-            END DO
-
-!        Initialize parameteric coordinate for Newton's iterations
-            xi = 0D0
-            DO a=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,a)
-            END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=8)
-
-            CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge "//
-     2         "Invalid trace pointer"
-
-            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
-!        Make sure that the node lies within the element
-            a = 0
-            DO b=1, eNoN
-               IF (N(b).GT.-1E-4 .AND. N(b).LT.1.0001D0) a = a + 1
-            END DO
-            IF (a .NE. eNoN) err =" IB tracer pointing to incorrect "//
-     2         "fluid element (PROJFVAR)"
-
-!        Use the computed shape functions to interpolate flow var at the
-!        IB integration point
-            ap = 0D0
-            yp = 0D0
-            DO b=1, eNoN
-               Bc = msh(jM)%IEN(b,Ec)
-               ap = ap + N(b)*al(:,b)
-               yp = yp + N(b)*yl(:,b)
-            END DO
-
-!        Project flow variables to IB nodes
-            DO a=1, eNoNb
-               Ac = ib%msh(iM)%IEN(a,e)
-               Ab(:,Ac) = Ab(:,Ac) + w*Nb(a)*ap(:)
-               Yb(:,Ac) = Yb(:,Ac) + w*Nb(a)*yp(:)
-               sA(Ac)   = sA(Ac)   + w*Nb(a)
-            END DO
-            DEALLOCATE(N, Nx, xl, al, yl)
-         END DO
-         DEALLOCATE(Nb, Nbx, xbl)
-      END DO
-
-!     Synchronize Ab, Yb across all the processes
-      cmtime = CPUT()
-      CALL IB_SYNC(Ab)
-      CALL IB_SYNC(Yb)
-      CALL IB_SYNC(sA)
-      cmtime = CPUT() - cmtime
-
-      DO a=1, ib%tnNo
-         IF (.NOT.ISZERO(sA(a))) THEN
-            Ab(:,a) = Ab(:,a) / sA(a)
-            Yb(:,a) = Yb(:,a) / sA(a)
-         END IF
-      END DO
-
-      DEALLOCATE(sA)
-
-      RETURN
-      END SUBROUTINE IB_PROJFVAR
-!--------------------------------------------------------------------
-!     Compute FSI force on the IB and project it to the background mesh.
-!     Note that here we compute solid stresses using updated displacement
-!     field. But for projection, we still use old displacement to
-!     identify traces to satisfy adjoint property and conserve KE
-      SUBROUTINE IB_PROJFFSI(Ub, Dg)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Ub(nsd,ib%tnNo), Dg(tDof,tnNo)
-
-      LOGICAL :: flag
-      INTEGER :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN, eNoNb, cPhys
-      REAL(KIND=8) :: w, Jac, ksix(nsd,nsd), xp(nsd), xi(nsd), fp(nsd)
-
-      INTEGER, ALLOCATABLE :: incNd(:)
-      REAL(KIND=8), ALLOCATABLE :: sA(:), N(:), Nb(:), Nx(:,:), al(:,:),
-     2   yl(:,:), ul(:,:), xl(:,:), fNl(:,:), lR(:,:), gR(:,:)
 
 !     TODO: This is temporary. Later we get domain based on each IB node
 !     and communicate across IB process boundaries
@@ -4873,7 +3748,6 @@ c      CALL IB_SYNC(sA)
 !     We assemble the fluid and structure contribution on the IB nodes.
 !     Later we compute the FSI force at the IB integration point and
 !     project it to background mesh
-      ib%R = 0D0
       DO iM=1, ib%nMsh
          eNoN = ib%msh(iM)%eNoN
          ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN), al(nsd,eNoN),
@@ -4882,9 +3756,9 @@ c      CALL IB_SYNC(sA)
          DO e=1, ib%msh(iM)%nEl
             DO a=1, eNoN
                Ac = ib%msh(iM)%IEN(a,e)
-               al(:,a)  = ib%Ao(:,Ac)
-               yl(:,a)  = ib%Yo(:,Ac)
-               ul(:,a)  = Ub(:,Ac)
+               al(:,a)  = ib%An(:,Ac)
+               yl(:,a)  = ib%Yn(:,Ac)
+               ul(:,a)  = ib%Un(:,Ac)
                xl(:,a)  = ib%x(:,Ac)
                IF (ALLOCATED(ib%fN)) fNl(:,a) = ib%fN(:,Ac)
             END DO
@@ -4927,85 +3801,8 @@ c      CALL IB_SYNC(sA)
          DEALLOCATE(N, Nx, xl, al, yl, ul, fNl, lR)
       END DO ! iM
 
-!     Project ib%R to background fluid mesh using the same domain of
-!     influence that was used to project flow variables.
-      ALLOCATE(sA(tnNo), incNd(tnNo))
-      sA  = 0D0
-      Rib = 0D0
-      incNd = 0
-      DO iM=1, ib%nMsh
-         eNoNb = ib%msh(iM)%eNoN
-         ALLOCATE(Nb(eNoNb))
-         DO i=1, ib%msh(iM)%trc%n
-            e  = ib%msh(iM)%trc%gE(1,i)
-            g  = ib%msh(iM)%trc%gE(2,i)
-            Ec = ib%msh(iM)%trc%ptr(1,i)
-            jM = ib%msh(iM)%trc%ptr(2,i)
-
-            xp = 0D0
-            fp = 0D0
-            Nb = ib%msh(iM)%N(:,g)
-            DO a=1, eNoNb
-               Ac = ib%msh(iM)%IEN(a,e)
-               xp = xp + Nb(a)*(ib%x(:,Ac) + ib%Uo(:,Ac))
-               fp = fp + Nb(a)*ib%R(:,Ac)
-            END DO
-
-            eNoN  = msh(jM)%eNoN
-            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN))
-            DO b=1, eNoN
-               Bc = msh(jM)%IEN(b,Ec)
-               xl(:,b) = x(:,Bc)
-               IF (mvMsh) xl(:,b) = xl(:,b) + Dg(nsd+2:2*nsd+1,Bc)
-            END DO
-
-            xi = 0D0
-            DO g=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,g)
-            END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=8)
-
-            CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, flag)
-!           If Newton's method fails
-            IF (.NOT.flag) err = "Newton method failed to converge "//
-     2         "Invalid trace pointer"
-
-            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
-!        Make sure that the node lies within the element
-            a = 0
-            DO b=1, eNoN
-               IF (N(b).GT.-1E-4 .AND. N(b).LT.1.0001D0) a = a + 1
-            END DO
-            IF (a .NE. eNoN) err =" IB tracer pointing to incorrect "//
-     2         "fluid element (PROJFFSI)"
-
-            DO b=1, eNoN
-               Bc = msh(jM)%IEN(b,Ec)
-               incNd(Bc) = 1
-               sA(Bc) = sA(Bc) + N(b)
-               Rib(:,Bc) = Rib(:,Bc) + N(b)*fp(:)
-            END DO
-            DEALLOCATE(N, Nx, xl)
-         END DO
-         DEALLOCATE(Nb)
-      END DO
-
-!     Synchronize Rib across process interfaces
-      CALL COMMU(Rib)
-      CALL COMMU(sA)
-
-      DO a=1, tnNo
-         IF (.NOT.ISZERO(sA(a))) THEN
-            Rib(:,a) = Rib(:,a) / sA(a)
-            incNd(a) = 1
-         END IF
-      END DO
-      DEALLOCATE(sA)
-
-c      CALL DEBUGIBR(incNd)
-
       RETURN
-      END SUBROUTINE IB_PROJFFSI
+      END SUBROUTINE IB_CALCFFSI
 !--------------------------------------------------------------------
 !     Compute the 3D FSI force due to IB in reference configuration
       SUBROUTINE IB_FFSI3D(eNoN, w, N, Nx, al, yl, ul, fNl, lR)
@@ -5293,6 +4090,599 @@ c      CALL DEBUGIBR(incNd)
       RETURN
       END SUBROUTINE IB_FFSI2D
 !####################################################################
+!     Computes the penalty forcing for IBs with Dirichlet BCs.
+!     Feedback force contribution is optionally computed.
+      SUBROUTINE IB_SETBCPEN()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER iEq, iBc, iM, iFa, a, i
+
+      REAL(KIND=8), ALLOCATABLE :: sF(:,:)
+
+!     Return if fluid phys is not solved
+      IF (ib%cEq .EQ. 0) RETURN
+
+!     Enforce Dirichlet BCs on IB. sF is used as a dummy array to set
+!     Dir BC as we are only interested in the velocity field (Yo)
+      ALLOCATE(sF(nsd,ib%tnNo))
+      CALL IB_SETBCDIR(ib%Ao, ib%Yo, sF)
+!     Reset sF to 0
+      sF = 0D0
+
+!     Compute penalty forces due to mismatch in velocity at IB
+      iEq = ib%cEq
+      DO iBc=1, eq(iEq)%nBcIB
+         IF (.NOT.BTEST(eq(iEq)%bcIB(iBc)%bType, bType_Dir)) CYCLE
+         iM  = eq(iEq)%bcIB(iBc)%iM
+         iFa = eq(iEq)%bcIB(iBc)%iFa
+         IF (iFa .NE. 0) THEN
+            CALL IB_SETBCPENL(eq(iEq)%bcIB(iBc), ib%msh(iM)%fa(iFa), sF)
+         ELSE
+            CALL IB_SETBCPENSL(eq(iEq)%bcIB(iBc), ib%msh(iM), sF)
+         END IF
+      END DO
+
+      DO a=1, ib%tnNo
+         DO i=1, nsd
+            ib%Fb(i,a) = ib%Fb(i,a) + sF(i,a)
+            ib%R(i,a)  = ib%R(i,a)  + ib%Fb(i,a)
+         END DO
+      END DO
+
+      DEALLOCATE(sF)
+
+      RETURN
+      END SUBROUTINE IB_SETBCPEN
+!--------------------------------------------------------------------
+      SUBROUTINE IB_SETBCPENL(lBc, lFa, sF)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(faceType), INTENT(IN) :: lFa
+      REAL(KIND=8), INTENT(INOUT) :: sF(nsd,ib%tnNo)
+
+      INTEGER :: a, e, g, Ac, eNoN
+      REAL(KIND=8) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd), fb(nsd)
+
+      REAL(KIND=8), ALLOCATABLE :: N(:), ul(:,:), ubl(:,:)
+
+!     Get penalty constants
+      tauF = lBc%tauF
+
+      eNoN = lFa%eNoN
+      ALLOCATE(N(eNoN), ul(nsd,eNoN), ubl(nsd,eNoN))
+
+!     Loop over all the face elements and assemble to the residue
+      DO e=1, lFa%nEl
+         DO a=1, eNoN
+            Ac = lFa%IEN(a,e)
+!        Get the projected local fluid velocity
+            ul(:,a)  = ib%Yn(1:nsd,Ac)
+!        Get the velocity imposed due to Dir BC
+            ubl(:,a) = ib%Yo(1:nsd,Ac)
+         END DO
+
+         DO g=1, lFa%nG
+            CALL GNNIB(lFa, e, g, nV)
+            Jac = SQRT(NORM(nV))
+
+!           Normal pointing outwards from solid to fluid
+            nV = nV / Jac
+            w  = lFa%w(g)*Jac
+            N  = lFa%N(:,g)
+
+            u  = 0D0
+            ub = 0D0
+            DO a=1, eNoN
+               u  = u  + N(a)*ul(:,a)
+               ub = ub + N(a)*ubl(:,a)
+            END DO
+
+!           Compute the feedback forcing with penalty forces along
+!           normal direction
+            IF (lBc%fbN) THEN
+               fb(:) = tauF * NORM(u-ub, nV) * nV(:)
+            ELSE
+               fb(:) = tauF * (u(:)-ub(:))
+            END IF
+
+!           Transfer back to global vector
+            DO a=1, eNoN
+               Ac = lFa%IEN(a,e)
+               sF(:,Ac) = sF(:,Ac) + w*N(a)*fb(:)
+            END DO
+         END DO
+      END DO
+
+      DEALLOCATE(N, ul, ubl)
+
+      RETURN
+      END SUBROUTINE IB_SETBCPENL
+!--------------------------------------------------------------------
+      SUBROUTINE IB_SETBCPENSL(lBc, lM, sF)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=8), INTENT(INOUT) :: sF(nsd,tnNo)
+
+      INTEGER :: a, e, g, Ac, eNoN
+      REAL(KIND=8) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd), fb(nsd),
+     2   gC(nsd,nsd-1)
+
+      REAL(KIND=8), ALLOCATABLE :: N(:), xl(:,:), ul(:,:), ubl(:,:)
+
+!     Get penalty constants
+      tauF  = lBc%tauF
+
+      eNoN = lM%eNoN
+      ALLOCATE(N(eNoN), xl(nsd,eNoN), ul(nsd,eNoN), ubl(nsd,eNoN))
+
+!     Loop over all the elements and assemble to the residue
+      DO e=1, lM%nEl
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            xl(:,a)  = ib%x(:,Ac) + ib%Uo(:,Ac)
+!        Get the projected local fluid velocity
+            ul(:,a)  = ib%Yn(1:nsd,Ac)
+!        Get the velocity imposed due to Dir BC
+            ubl(:,a) = ib%Yo(1:nsd,Ac)
+         END DO
+
+         DO g=1, lM%nG
+            CALL GNNS(eNoN, lM%Nx(:,:,g), xl, nV, gC, gC)
+            Jac = SQRT(NORM(nV))
+!           Normal direction outwards from solid to fluid
+            nV  = nV/Jac
+            w   = lM%w(g) * Jac
+            N   = lM%N(:,g)
+
+            u  = 0D0
+            ub = 0D0
+            DO a=1, eNoN
+               u(:)  = u(:)  + N(a)*ul(:,a)
+               ub(:) = ub(:) + N(a)*ubl(:,a)
+            END DO
+
+!           Compute the feedback forcing with penalty forces along
+!           normal direction
+            IF (lBc%fbN) THEN
+               fb(:) = tauF * NORM(u-ub, nV) * nV(:)
+            ELSE
+               fb(:) = tauF * (u(:)-ub(:))
+            END IF
+
+!           Transfer back to global vector
+            DO a=1, eNoN
+               Ac = lM%IEN(a,e)
+               sF(:,Ac) = sF(:,Ac) + w*N(a)*fb(:)
+            END DO
+         END DO
+      END DO
+
+      DEALLOCATE(N, xl, ul, ubl)
+
+      RETURN
+      END SUBROUTINE IB_SETBCPENSL
+!####################################################################
+!     Project computed IB force to the background mesh. For projection,
+!     we still use old displacement to identify traces to satisfy
+!     adjoint property and conserve KE
+      SUBROUTINE IB_PROJECTF(Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
+
+      LOGICAL :: flag
+      INTEGER :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN, eNoNb
+      REAL(KIND=8) :: xp(nsd), xi(nsd), fp(nsd), xiL(2), rt
+
+      INTEGER, ALLOCATABLE :: incNd(:)
+      REAL(KIND=8), ALLOCATABLE :: sA(:), N(:), Nb(:), Nx(:,:), xl(:,:)
+
+      IF (ib%mthd .NE. ibMthd_IFEM) RETURN
+
+!     Project ib%R to background fluid mesh using the same domain of
+!     influence that was used to project flow variables.
+      ALLOCATE(sA(tnNo), incNd(tnNo))
+      sA  = 0D0
+      incNd = 0
+
+      DO iM=1, ib%nMsh
+         eNoNb = ib%msh(iM)%eNoN
+
+         ALLOCATE(Nb(eNoNb))
+         DO i=1, ib%msh(iM)%trc%n
+            e  = ib%msh(iM)%trc%gE(1,i)
+            g  = ib%msh(iM)%trc%gE(2,i)
+            Ec = ib%msh(iM)%trc%ptr(1,i)
+            jM = ib%msh(iM)%trc%ptr(2,i)
+
+            xp = 0D0
+            fp = 0D0
+            Nb = ib%msh(iM)%N(:,g)
+            DO a=1, eNoNb
+               Ac = ib%msh(iM)%IEN(a,e)
+               xp = xp + Nb(a)*(ib%x(:,Ac) + ib%Uo(:,Ac))
+               fp = fp + Nb(a)*ib%R(:,Ac)
+            END DO
+
+            eNoN = msh(jM)%eNoN
+            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN))
+            DO b=1, eNoN
+               Bc = msh(jM)%IEN(b,Ec)
+               xl(:,b) = x(:,Bc)
+               IF (mvMsh) xl(:,b) = xl(:,b) + Dg(nsd+2:2*nsd+1,Bc)
+            END DO
+
+!        Initialize parameteric coordinate for Newton's iterations
+            xi = 0D0
+            DO g=1, msh(jM)%nG
+               xi = xi + msh(jM)%xi(:,g)
+            END DO
+            xi = xi / REAL(msh(jM)%nG, KIND=8)
+
+!        Set bounds on the parameteric coordinates
+            xiL(1) = -1D0
+            xiL(2) =  1D0
+            IF (msh(jM)%eType .EQ. eType_TRI .OR.
+     2          msh(jM)%eType .EQ. eType_TET) THEN
+               xiL(1) = 0D0
+            END IF
+
+            CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, flag)
+!           Check if parameteric coordinate is within bounds
+            a = 0
+            DO b=1, nsd
+               IF (xi(b).GE.xiL(1) .AND. xi(b).LE.xiL(2)) a = a + 1
+            END DO
+
+!           If Newton's method fails or if parameteric coordinates is
+!           out of bounds
+            IF (.NOT.flag .OR. a.NE.nsd) err =
+     2         "Newton method failed to converge. Invalid trace pointer"
+
+            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
+
+!           Make sure that shape functions sum to unity
+            rt = 0D0
+            DO b=1, eNoN
+               rt = rt + N(b)
+            END DO
+            flag = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+            IF (.NOT.flag) err =" IB tracer pointing to wrong "//
+     2         "fluid element (PROJFFSI)"
+
+            DO b=1, eNoN
+               Bc = msh(jM)%IEN(b,Ec)
+               incNd(Bc) = 1
+               sA(Bc) = sA(Bc) + N(b)
+               Rib(:,Bc) = Rib(:,Bc) + N(b)*fp(:)
+            END DO
+            DEALLOCATE(N, Nx, xl)
+         END DO
+         DEALLOCATE(Nb)
+      END DO
+
+!     Synchronize Rib across process interfaces
+      CALL COMMU(Rib)
+      CALL COMMU(sA)
+
+      DO a=1, tnNo
+         IF (.NOT.ISZERO(sA(a))) THEN
+            Rib(:,a) = Rib(:,a) / sA(a)
+            incNd(a) = 1
+         END IF
+      END DO
+
+c      CALL DEBUGIBR(incNd)
+
+      DEALLOCATE(sA, incNd)
+
+      RETURN
+      END SUBROUTINE IB_PROJECTF
+!####################################################################
+!     Project velocity from IB to ghost/finite cells using distance-
+!     weighted interpolation. This type of projection is used for SSM
+!     method only.
+      SUBROUTINE IB_SSMPRJCTU(Yg, Dg, Yb)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(INOUT) :: Yg(tDof,tnNo)
+      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo), Yb(nsd+1,ib%tnNo)
+
+      INTEGER a, b, i, g, e, s, Ac, Bc, Ec, iM, jM, iFa, iEq, eNoN
+      REAL(KIND=8) :: w, xe(nsd), xp(nsd), yp(nsd)
+
+      REAL(KIND=8), ALLOCATABLE :: sA(:), sV(:,:), xl(:,:), yl(:,:),
+     2   N(:)
+
+      iEq = ib%cEq
+      IF (iEq .EQ. 0) RETURN
+
+!     SSM (stair-step method): interpolate velocities on background mesh
+!     node based on the traces of IB. We apply an inverse-distance
+!     weighted interpolation operator on the ghost nodes.
+      ib%callD(1) = CPUT()
+      ALLOCATE(sA(tnNo), sV(nsd,tnNo))
+      sV = 0D0
+      sA = 0D0
+      DO iM=1, ib%nMsh
+         IF (ib%msh(iM)%lShl) THEN
+            eNoN = ib%msh(iM)%eNoN
+            ALLOCATE(xl(nsd,eNoN), yl(nsd,eNoN), N(eNoN))
+            DO i=1, ib%msh(iM)%trc%n
+               e = ib%msh(iM)%trc%gE(1,i)
+               g = ib%msh(iM)%trc%gE(2,i)
+               DO a=1, eNoN
+                  Ac = ib%msh(iM)%IEN(a,e)
+                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                  yl(:,a) = Yb(1:nsd,Ac)
+                  N(a)    = ib%msh(iM)%N(a,g)
+               END DO
+
+               xp = 0D0
+               yp = 0D0
+               DO a=1, eNoN
+                  xp = xp + N(a)*xl(:,a)
+                  yp = yp + N(a)*yl(:,a)
+               END DO
+
+               Ec = ib%msh(iM)%trc%ptr(1,i)
+               jM = ib%msh(iM)%trc%ptr(2,i)
+               DO b=1, msh(jM)%eNoN
+                  Bc = msh(jM)%IEN(b,Ec)
+                  IF (ighost(Bc) .EQ. 1) THEN
+                     xe = x(:,Bc)
+                     IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
+                     w = SQRT(SUM( (xe - xp)**2 ))
+                     IF (ISZERO(w)) w = eps
+                     w = 1D0/w
+                     sA(Bc) = sA(Bc) + w
+                     sV(:,Bc) = sV(:,Bc) + w*yp(:)
+                  END IF
+               END DO
+            END DO
+            DEALLOCATE(xl, yl, N)
+         ELSE
+            DO iFa=1, ib%msh(iM)%nFa
+               eNoN = ib%msh(iM)%fa(iFa)%eNoN
+               ALLOCATE(xl(nsd,eNoN), yl(nsd,eNoN), N(eNoN))
+               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
+                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
+                  g = ib%msh(iM)%fa(iFa)%trc%gE(2,i)
+                  DO a=1, eNoN
+                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
+                     xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                     yl(:,a) = Yb(1:nsd,Ac)
+                     N(a)    = ib%msh(iM)%fa(iFa)%N(a,g)
+                  END DO
+
+                  xp = 0D0
+                  yp = 0D0
+                  DO a=1, eNoN
+                     xp = xp + N(a)*xl(:,a)
+                     yp = yp + N(a)*yl(:,a)
+                  END DO
+
+                  Ec = ib%msh(iM)%fa(iFa)%trc%ptr(1,i)
+                  jM = ib%msh(iM)%fa(iFa)%trc%ptr(2,i)
+                  DO b=1, msh(jM)%eNoN
+                     Bc = msh(jM)%IEN(b,Ec)
+                     IF (ighost(Bc) .EQ. 1) THEN
+                        xe = x(:,Bc)
+                        IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
+                        w = SQRT(SUM( (xe - xp)**2 ))
+                        IF (ISZERO(w)) w = eps
+                        w = 1D0/w
+                        sA(Bc) = sA(Bc) + w
+                        sV(:,Bc) = sV(:,Bc) + w*yp(:)
+                     END IF
+                  END DO
+               END DO
+               DEALLOCATE(xl, yl, N)
+            END DO
+         END IF
+      END DO
+
+      CALL COMMU(sA)
+      CALL COMMU(sV)
+
+      s = eq(iEq)%s
+      e = eq(iEq)%e
+      IF (e .EQ. nsd+1) e = e - 1
+      DO a=1, tnNo
+         IF (.NOT.ISZERO(sA(a)) .AND. ighost(a).EQ.1) THEN
+            Yg(s:e,a) = sV(:,a)/sA(a)
+         END IF
+      END DO
+      DEALLOCATE(sA, sV)
+
+      ib%callD(1) = CPUT() - ib%callD(1)
+
+      RETURN
+      END SUBROUTINE IB_SSMPRJCTU
+!####################################################################
+!     Add contribution from IB to the residue (RHS)
+      SUBROUTINE IB_CONSTRUCT()
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER a
+
+      DO a=1, tnNo
+         R(1:nsd,a) = R(1:nsd,a) - Rib(:,a)
+      END DO
+
+      RETURN
+      END SUBROUTINE IB_CONSTRUCT
+!####################################################################
+!     Poject fluid velocity, pressure and acceleration onto IB
+      SUBROUTINE IB_PROJFVAR(Ag, Yg, Dg, Ab, Yb, Ub)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+      REAL(KIND=8), INTENT(OUT) :: Ab(nsd,ib%tnNo), Yb(nsd+1,ib%tnNo),
+     2   Ub(nsd,ib%tnNo)
+
+      LOGICAL :: flag
+      INTEGER :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM, eNoN, eNoNb
+      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), ap(nsd), yp(nsd+1),
+     2   Ks(nsd,nsd), xiL(2), rt
+
+      REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
+     2   xl(:,:), xbl(:,:), al(:,:), yl(:,:), sA(:)
+
+      Ab = 0D0
+      Yb = 0D0
+      Ub = 0D0
+      IF (ib%cEq.EQ.0 .OR. ib%mthd.NE.ibMthd_IFEM) RETURN
+
+      is = eq(ib%cEq)%s
+      ie = eq(ib%cEq)%e
+      IF (ie .EQ. nsd+1) ie = ie - 1
+
+!     Use L2 projection with mass lumping to project flow variables from
+!     background fluid mesh to IB
+      ALLOCATE(sA(ib%tnNo))
+      sA = 0D0
+!     Loop over each IB mesh
+      DO iM=1, ib%nMsh
+         eNoNb = ib%msh(iM)%eNoN
+         ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), xbl(nsd,eNoNb))
+!     Loop over each trace, as we need to first interpolate flow var at
+!     the IB integration points based on its trace
+         DO i=1, ib%msh(iM)%trc%n
+            e  = ib%msh(iM)%trc%gE(1,i)
+            g  = ib%msh(iM)%trc%gE(2,i)
+            Ec = ib%msh(iM)%trc%ptr(1,i)
+            jM = ib%msh(iM)%trc%ptr(2,i)
+
+!        Transfer to local arrays: IB mesh variables
+            Nb = ib%msh(iM)%N(:,g)
+            DO a=1, eNoNb
+               Ac = ib%msh(iM)%IEN(a,e)
+               xbl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+            END DO
+            CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,Ks)
+            IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e
+            w = ib%msh(iM)%w(g) * Jac
+
+!        Coordinates of the integration point
+            xp = 0D0
+            DO a=1, eNoNb
+               xp = xp + Nb(a)*xbl(:,a)
+            END DO
+
+!        Transfer to local arrays: background mesh variables
+            eNoN = msh(jM)%eNoN
+            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN), al(nsd,eNoN),
+     2         yl(nsd+1,eNoN))
+            al = 0D0
+            yl = 0D0
+            DO b=1, eNoN
+               Bc = msh(jM)%IEN(b,Ec)
+               al(:,b) = Ag(is:ie,Bc)
+               yl(:,b) = Yg(is:ie+1,Bc)
+               xl(:,b) = x(:,Bc)
+               IF (mvMsh) xl(:,b) = xl(:,b) + Dg(ie+2:ie+nsd+1,Bc)
+            END DO
+
+!        Initialize parameteric coordinate for Newton's iterations
+            xi = 0D0
+            DO a=1, msh(jM)%nG
+               xi = xi + msh(jM)%xi(:,a)
+            END DO
+            xi = xi / REAL(msh(jM)%nG, KIND=8)
+
+!        Set bounds on the parameteric coordinates
+            xiL(1) = -1D0
+            xiL(2) =  1D0
+            IF (msh(jM)%eType .EQ. eType_TRI .OR.
+     2          msh(jM)%eType .EQ. eType_TET) THEN
+               xiL(1) = 0D0
+            END IF
+
+            CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, flag)
+!           Check if parameteric coordinate is within bounds
+            a = 0
+            DO b=1, nsd
+               IF (xi(b).GE.xiL(1) .AND. xi(b).LE.xiL(2)) a = a + 1
+            END DO
+
+!           If Newton's method fails or if parameteric coordinates is
+!           out of bounds
+            IF (.NOT.flag .OR. a.NE.nsd) err =
+     2         "Newton method failed to converge. Invalid trace pointer"
+
+            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
+
+!           Make sure that shape functions sum to unity
+            rt = 0D0
+            DO b=1, eNoN
+               rt = rt + N(b)
+            END DO
+            flag = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+            IF (.NOT.flag) err =" IB tracer pointing to wrong "//
+     2         "fluid element (PROJFVAR)"
+
+!        Use the computed shape functions to interpolate flow var at the
+!        IB integration point
+            ap = 0D0
+            yp = 0D0
+            DO b=1, eNoN
+               Bc = msh(jM)%IEN(b,Ec)
+               ap = ap + N(b)*al(:,b)
+               yp = yp + N(b)*yl(:,b)
+            END DO
+
+!        Project flow variables to IB nodes
+            DO a=1, eNoNb
+               Ac = ib%msh(iM)%IEN(a,e)
+               Ab(:,Ac) = Ab(:,Ac) + w*Nb(a)*ap(:)
+               Yb(:,Ac) = Yb(:,Ac) + w*Nb(a)*yp(:)
+               sA(Ac)   = sA(Ac)   + w*Nb(a)
+            END DO
+            DEALLOCATE(N, Nx, xl, al, yl)
+         END DO
+         DEALLOCATE(Nb, Nbx, xbl)
+      END DO
+
+!     Synchronize Ab, Yb across all the processes
+      ib%callD(3) = CPUT()
+      CALL IB_SYNC(Ab)
+      CALL IB_SYNC(Yb)
+      CALL IB_SYNC(sA)
+      ib%callD(3) = CPUT() - ib%callD(3)
+
+      DO a=1, ib%tnNo
+         IF (.NOT.ISZERO(sA(a))) THEN
+            Ab(:,a) = Ab(:,a) / sA(a)
+            Yb(:,a) = Yb(:,a) / sA(a)
+         END IF
+         DO i=1, nsd
+            Ub(i,a) = ib%Uo(i,a) + Yb(i,a)*dt
+         END DO
+      END DO
+
+      DEALLOCATE(sA)
+
+      RETURN
+      END SUBROUTINE IB_PROJFVAR
+!####################################################################
 !     Write IB call duration
       SUBROUTINE IB_OUTR()
       USE COMMOD
@@ -5303,10 +4693,12 @@ c      CALL DEBUGIBR(incNd)
       std = REPEAT("-",55)
       WRITE(sOut,'(F6.2)') ib%callD(1)
       WRITE(sOut,'(A)') " IB call duration: "//TRIM(sOut)//' sec'
-      WRITE(sOut,'(A)') TRIM(sOut)//" (comm."//
-     2   STR(NINT(1D2*ib%callD(2)/ib%callD(1)),3)//"%)"
-      WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
-     2   STR(NINT(1D2*ib%callD(3)/ib%callD(1)),3)//"%)"
+      IF (ib%mthd .NE. ibMthd_SSM) THEN
+         WRITE(sOut,'(A)') TRIM(sOut)//" (comm."//
+     2      STR(NINT(1D2*ib%callD(3)/ib%callD(1)),3)//"%)"
+         WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
+     2      STR(NINT(1D2*ib%callD(2)/ib%callD(1)),3)//"%)"
+      END IF
       std = sOut
       std = REPEAT("-",55)
 
@@ -5321,7 +4713,7 @@ c      CALL DEBUGIBR(incNd)
 
       INTEGER, INTENT(IN) :: incNd(ib%tnNo)
 
-      INTEGER :: a, i, Ac, iM, fid, ierr
+      INTEGER :: a, i, Ac, iM, fid
       REAL(KIND=8) :: s, lo, hi, av
       CHARACTER(LEN=stdL) :: fName
 

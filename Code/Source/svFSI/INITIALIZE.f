@@ -158,7 +158,7 @@
       IF (dFlag .AND. .NOT.cmmEq) i = 3
       IF (pstEq) i = i + nstd
       i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
-      IF (ibFlag) i = i + 8*nsd*(tnNo + ib%tnNo)
+      IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
       IF (cm%seq()) THEN
          recLn = i
       ELSE
@@ -196,13 +196,7 @@
 !     Variable allocation and initialization
       ALLOCATE(Ao(tDof,tnNo), An(tDof,tnNo), Yo(tDof,tnNo),
      2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo))
-      IF (ibFlag) THEN
-         ALLOCATE(Rib(nsd,tnNo), ib%Uo(nsd,ib%tnNo), ib%Ao(nsd,ib%tnNo),
-     2      ib%Yo(nsd+1,ib%tnNo), ib%R(nsd,ib%tnNo))
-         ib%Ao = 0D0
-         ib%Yo = 0D0
-         ib%R  = 0D0
-      END IF
+      IF (ibFlag) CALL IB_MEMALLOC()
 
 !     Additional physics dependent variables
 !     USTRUCT phys
@@ -276,7 +270,7 @@
             i = 3
             IF (pstEq) i = i + nstd
             i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
-            IF (ibFlag) i = i + 8*nsd*(tnNo + ib%tnNo)
+            IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
             IF (cm%seq()) THEN
                recLn = i
             ELSE
@@ -396,7 +390,14 @@
 
       IF (ibFlag) THEN
          Rib   = 0D0
+         ib%R  = 0D0
+         ib%Fb = 0D0
+         ib%Ao = 0D0
+         ib%An = 0D0
+         ib%Yo = 0D0
+         ib%Yn = 0D0
          ib%Uo = 0D0
+         ib%Un = 0D0
       END IF
 
       RETURN
@@ -449,7 +450,7 @@
 
       INTEGER, PARAMETER :: fid = 1
 
-      INTEGER tStamp(SIZE(stamp))
+      INTEGER tStamp(SIZE(stamp)), a, i
 
       std = " Initializing from "//fName
       OPEN(fid, FILE=fName, ACCESS='DIRECT', RECL=recLn)
@@ -470,15 +471,24 @@
          IF (dFlag .AND. .NOT.cmmEq) THEN
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Rib, ib%Uo
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
+     3            ib%Un, ib%Fb
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, Rib, ib%Uo
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%An, ib%Yn, ib%Un,
+     3            ib%Fb
             END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, Rib, ib%Uo
+     2         cplBC%xo, Yo, Ao, ib%An, ib%Yn, ib%Un, ib%Fb
          END IF
+
+!        Compute ib%Uo
+         DO a=1, ib%tnNo
+            DO i=1, nsd
+               ib%Uo(i,a) = ib%Un(i,a) - dt*ib%Yn(i,a)
+            END DO
+         END DO
       END IF
       CLOSE(fid)
 
@@ -659,13 +669,13 @@
       IF (ALLOCATED(Vinit))    DEALLOCATE(Vinit)
       IF (ALLOCATED(Pinit))    DEALLOCATE(Pinit)
       IF (ALLOCATED(Dinit))    DEALLOCATE(Dinit)
-      IF (ALLOCATED(Rib))      DEALLOCATE(Rib)
 
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
 
 !     IB structures
+      IF (ALLOCATED(Rib))      DEALLOCATE(Rib)
       IF (ibFlag) THEN
          IF (ALLOCATED(ib%dmnId))  DEALLOCATE(ib%dmnId)
          IF (ALLOCATED(ib%rowPtr)) DEALLOCATE(ib%rowPtr)

@@ -198,7 +198,7 @@
      2   al(tDof,eNoN), yl(tDof,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER a, b, i, iFn
+      INTEGER a, b, i
       REAL(KIND=8) :: T1, amd, wl, Td, Tx, Diso, DNx(eNoN)
 
       T1   = eq(cEq)%af*eq(cEq)%gam*dt

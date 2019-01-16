@@ -330,6 +330,11 @@
       itr = 0
       xiK = xi
 c      WRITE(1000+cm%tF(),'(8X,A)') "Newton iterations.."
+c      WRITE(1000+cm%tF(),'(10X,A)',ADVANCE='NO') "Initial xi: "
+c      DO i=1, nsd
+c         WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xi(i))
+c      END DO
+c      WRITE(1000+cm%tF(),'(A)')
       DO
          itr = itr + 1
 
@@ -351,8 +356,8 @@ c      WRITE(1000+cm%tF(),'(8X,A)') "Newton iterations.."
          rmsA = SQRT(rmsA/REAL(nsd,KIND=8))
          rmsR = SQRT(rmsR/REAL(nsd,KIND=8))
 
-c         WRITE(1000+cm%tF(),'(8X,A)') STR(itr)//" "//STR(rmsA)//" "//
-c     2      STR(rmsR)
+c         WRITE(1000+cm%tF(),'(10X,A)') "Iter: "//STR(itr)//" "//
+c     2      STR(rmsA)//" "//STR(rmsR)
 
          l1 = itr .GT. MAXITR
          l2 = rmsA .LE. ATOL
@@ -375,11 +380,11 @@ c     2      STR(rmsR)
       IF (l2 .OR. l3) THEN
 !     Newton's method converges
          flag = .TRUE.
-c         WRITE(1000+cm%tF(),'(8X,A)') "Success.."
+c         WRITE(1000+cm%tF(),'(10X,A)') "Success.."
       ELSE
 !     Newton's method failed to converge
          flag = .FALSE.
-c         WRITE(1000+cm%tF(),'(8X,A)') "Fail.."
+c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
       END IF
 
       xi(:) = xiK(:)

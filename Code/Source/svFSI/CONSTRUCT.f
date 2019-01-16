@@ -50,12 +50,10 @@
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys, insd
-      REAL(KIND=8) w, Jac, ksix(nsd,nsd), ctime
+      REAL(KIND=8) w, Jac, ksix(nsd,nsd)
 
       REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:),
      2   dc(:,:), pSl(:), lKd(:,:,:)
-
-      TYPE(fCellType) :: fCell
 
       insd = nsd
       IF (lM%lFib) insd = 1
@@ -86,20 +84,6 @@
          ELSE IF (cPhys .NE. phys_struct) THEN
 !     Otherwise we use the most recent configuration
             xl = xl + dl(nsd+2:2*nsd+1,:)
-         END IF
-      END IF
-
-!     Finite cell integration for Nitsche formulation
-      IF (lM%iGC(e) .EQ. 1) THEN
-         IF (lM%lShl .OR. lM%lFib) RETURN
-         IF (ib%fcFlag) THEN
-            ctime = CPUT()
-            CALL FC_INIT(fCell, lM, xl)
-            CALL FC_SET(fCell, lM, xl, ib%Uo)
-            CALL FC_CONSTRUCT(fCell, al, yl, xl, lR, lK)
-            CALL DOASSEM(eNoN, ptr, lK, lR)
-            ib%callD(1) = ib%callD(1) + CPUT() - ctime
-            RETURN
          END IF
       END IF
 
@@ -331,18 +315,18 @@
 !     This subroutines actually calculates the LHS and RHS
 !     contributions and adds their contributions for the Coupled
 !     Momentum Method (CMM)
-      SUBROUTINE CMM_CONSTRUCT(lFa, al, yl, dl, xl, pS0l, ptr, e)
+      SUBROUTINE CMM_CONSTRUCT(lFa, al, dl, xl, pS0l, ptr, e)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(IN) :: lFa
       INTEGER, INTENT(IN) :: ptr(lFa%eNon), e
-      REAL(KIND=8), INTENT(IN) :: al(tDof,lFa%eNoN),yl(tDof,lFa%eNoN),
+      REAL(KIND=8), INTENT(IN) :: al(tDof,lFa%eNoN),
      2   dl(tDof,lFa%eNoN), xl(nsd,lFa%eNoN), pS0l(nstd,lFa%eNoN)
 
       INTEGER g, cPhys, eNoN, iM, a, b
-      REAL(KIND=8) w, nV(nsd), Jac, phi(nsd*nsd,nsd*nsd), S0(nstd)
+      REAL(KIND=8) w, nV(nsd), Jac, S0(nstd)
 
       REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:)
 
@@ -371,7 +355,7 @@
 
 !     Finding the local basis vectors for the element, and the local
 !     versions of the acceleration, velocity, and displacement
-      CALL CMM_STIFFNESS(lFa, e, xl, dl, S0, lR, lK)
+      CALL CMM_STIFFNESS(lFa, xl, dl, S0, lR, lK)
 
 !     Add in the mass matrix contribution
       DO g=1, lFa%nG
@@ -380,7 +364,7 @@
          nV  = nV/Jac
          w   = lFa%w(g)*Jac
          N   = lFa%N(:,g)
-         CALL CMM_MASS(eNoN, w, N, Nx, phi, al, yl, dl, nV, lR, lK)
+         CALL CMM_MASS(eNoN, w, N, al, lR, lK)
       END DO
 
 !     Now doing the assembly part

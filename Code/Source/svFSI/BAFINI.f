@@ -117,19 +117,6 @@
                END IF
             END DO
 
-         CASE (ibMthd_Penalty, ibMthd_Nitsche)
-            i = SUM(iblank(:))
-            i = i - SUM(ighost(:))
-            ALLOCATE(gNodes(i))
-            i = 0
-            DO a=1, tnNo
-               IF (ighost(a) .EQ. 1) CYCLE
-               IF (iblank(a) .EQ. 1) THEN
-                  i = i + 1
-                  gNodes(i) = a
-               END IF
-            END DO
-
          CASE DEFAULT
             err = " Invalid IB method (BAFINI)"
          END SELECT

@@ -71,7 +71,7 @@
       INTERFACE DESTROY
          MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYEQ,
      2      DESTROYBS, DESTROYMB, DESTROYDATA, DESTROYADJ, DESTROYSTACK,
-     3      DESTROYQUEUE, DESTROYTRACE, DESTROYFCELL, DESTROYIBCM
+     3      DESTROYQUEUE, DESTROYTRACE, DESTROYIBCM
       END INTERFACE DESTROY
 
       INTERFACE GETNADJCNCY
@@ -222,8 +222,6 @@
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), sl(:), Nxi(:,:), Nx(:,:),
      2   tmps(:,:)
 
-      TYPE(fCellType) :: fCell
-
       IF (SIZE(s,2) .NE. tnNo)
      2   err = "Incompatible vector size in Integ"
 
@@ -256,17 +254,6 @@
                ibl = ibl + iblank(Ac)
             END DO
             IF (ibl .EQ. eNoN) CYCLE
-
-            IF (msh(iM)%iGC(e) .EQ. 1) THEN
-               IF (msh(iM)%lShl .OR. msh(iM)%lFib) CYCLE
-               IF (ib%fcFlag) THEN
-                  CALL FC_INIT(fCell, msh(iM), xl)
-                  CALL FC_SET(fCell, msh(iM), xl, ib%Uo)
-                  CALL FC_vInteg(fCell, xl, sl, vInteg)
-                  CALL DESTROY(fCell)
-                  CYCLE
-               END IF
-            END IF
 
             DO g=1, msh(iM)%nG
                Nxi(:,:) = msh(iM)%Nx(:,:,g)
@@ -1136,31 +1123,6 @@
       RETURN
       END SUBROUTINE DESTROYTRACE
 !--------------------------------------------------------------------
-      RECURSIVE SUBROUTINE DESTROYFCELL(lFc)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(fCellType), INTENT(OUT) :: lFc
-      INTEGER :: i
-
-      IF (lFc%nsub .GT. 0) THEN
-         DO i=1, lFc%nSub
-            CALL DESTROY(lFc%sub(i))
-         END DO
-         NULLIFY(lFc%sub)
-      END IF
-
-      lFc%eType = eType_NA
-      lFc%ilev  = 0
-      lFc%nsub  = 0
-      IF (ALLOCATED(lFc%w))    DEALLOCATE(lFc%w)
-      IF (ALLOCATED(lFc%x))    DEALLOCATE(lFc%x)
-      IF (ALLOCATED(lFc%xi))   DEALLOCATE(lFc%xi)
-      IF (ALLOCATED(lFc%xiGP)) DEALLOCATE(lFc%xiGP)
-      IF (ALLOCATED(lFc%incG)) DEALLOCATE(lFc%incG)
-
-      RETURN
-      END SUBROUTINE DESTROYFCELL
-!--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYIBCM(ibCm)
       USE COMMOD
       IMPLICIT NONE
@@ -1819,7 +1781,7 @@
 
       LOGICAL :: flag, ldbg
       INTEGER :: a, e, i, Ac, eNoN
-      REAL(KIND=8) :: rt
+      REAL(KIND=8) :: rt, xiL(2), xi0(nsd)
 
       LOGICAL, ALLOCATABLE :: eChck(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:)
@@ -1831,6 +1793,20 @@
       Ec   = 0
       eNoN = lM%eNoN
       ALLOCATE(eChck(lM%nEl), xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN))
+
+!     Initialize parameteric coordinate for Newton's iterations
+      xi0 = 0D0
+      DO i=1, lM%nG
+         xi0 = xi0 + lM%xi(:,i)
+      END DO
+      xi0 = xi0 / REAL(lM%nG,KIND=8)
+
+!     Set bounds on the parameteric coordinates
+      xiL(1) = -1D0
+      xiL(2) =  1D0
+      IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
+         xiL(1) = 0D0
+      END IF
 
       IF (ldbg) THEN
          WRITE(1000+cm%tF(),'(A)') "=================================="
@@ -1861,12 +1837,6 @@
             xl(:,a) = xg(:,Ac) + Dg(:,Ac)
          END DO
 
-         xi = 0D0
-         DO i=1, lM%nG
-            xi = xi + lM%xi(:,i)
-         END DO
-         xi(:) = xi(:) / REAL(lM%nG,KIND=8)
-
          IF (ldbg) THEN
             WRITE(1000+cm%tF(),'(A)') "----------------------------"
             WRITE(1000+cm%tF(),'(A)') "Probe el: "//STR(Ec)
@@ -1881,9 +1851,16 @@
             END DO
          END IF
 
+         xi = xi0
          CALL GETXI(lM%eType, eNoN, xl, xp, xi, flag)
+!        Check if parameteric coordinate is within bounds
+         a = 0
+         DO i=1, nsd
+            IF (xi(i).GE.xiL(1) .AND. xi(i).LE.xiL(2)) a = a + 1
+         END DO
+
 !        If Newton's method fails, continue
-         IF (.NOT.flag) CYCLE
+         IF (.NOT.flag .OR. a.NE.nsd) CYCLE
 
          IF (ldbg) THEN
             WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "xi: "
@@ -1905,14 +1882,13 @@
             CALL FLUSH(1000+cm%tF())
          END IF
 
-         i  = 0
+!        Check if sum of shape functions is unity
          rt = 0.0D0
          DO a=1, eNoN
             rt = rt + N(a)
-            IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
          END DO
          flag = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
-         IF (i.EQ.eNoN .AND. flag) RETURN
+         IF (flag) RETURN
       END DO
 
       Ec = 0

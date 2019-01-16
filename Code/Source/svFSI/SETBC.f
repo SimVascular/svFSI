@@ -190,17 +190,14 @@
                END IF
             END IF
          END DO ! iBc
-
-         IF (ibFlag) THEN
-            CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
-            IF (ib%mthd .EQ. ibMthd_SSM) THEN
-               IF (eq(iEq)%phys .EQ. phys_fluid .OR.
-     2             eq(iEq)%phys .EQ. phys_FSI) THEN
-                  CALL IB_PRJCTU(lY, lD, ib%Yo)
-               END IF
-            END IF
-         END IF
       END DO ! iEq
+
+      IF (ibFlag) THEN
+         IF (ib%mthd .EQ. ibMthd_SSM) THEN
+            CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
+            CALL IB_SSMPRJCTU(lY, lD, ib%Yo)
+         END IF
+      END IF
 
       RETURN
       END SUBROUTINE SETBCDIR
@@ -307,6 +304,8 @@
       END IF
 
       ALLOCATE(hg(tnNo), yl(tDof,eNoN), hl(eNoN), ptr(eNoN))
+      hg(:) = 0D0
+
 !     Transforming it to a unified format
       IF (BTEST(lBc%bType,bType_gen)) THEN
          DO a=1, nNo
@@ -474,11 +473,11 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      LOGICAL :: flag, eDir(maxnsd)
+      LOGICAL :: eDir(maxnsd), l1, l2, l3
       INTEGER :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl, nG, eNoN,
      2   eNoNb, cPhys
       REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ub(nsd), tauB(2), Ks(nsd,nsd)
+     2   ub(nsd), tauB(2), Ks(nsd,nsd), xiL(2), rt
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
@@ -536,11 +535,19 @@
       ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
      2   yl(tDof,eNoN), ptr(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
+!     Initialize parameteric coordinate for Newton's iterations
       xi0 = 0D0
       DO g=1, lM%nG
          xi0 = xi0 + lM%xi(:,g)
       END DO
       xi0 = xi0 / REAL(lM%nG,KIND=8)
+
+!     Set bounds on the parameteric coordinates
+      xiL(1) = -1D0
+      xiL(2) =  1D0
+      IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
+         xiL(1) = 0D0
+      END IF
 
       DO e=1, nEl
          Ec = lFa%gE(e)
@@ -582,16 +589,25 @@
             END DO
 
             xi = xi0
-            CALL GETXI(lM%eType, eNoN, xl, xp, xi, flag)
+            CALL GETXI(lM%eType, eNoN, xl, xp, xi, l1)
+!           Check if parameteric coordinate is within bounds
+            a = 0
+            DO i=1, nsd
+               IF (xi(i).GE.xiL(1) .AND. xi(i).LE.xiL(2)) a = a + 1
+            END DO
+            l2 = a .EQ. nsd
+
             CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
 
-            i = 0
+!           Check if sum of shape functions is unity
+            rt = 0
             DO a=1, eNoN
-               IF (N(a).GT.-1E-4 .AND. N(a).LT.1.0001D0) i = i + 1
+               rt = rt + N(a)
             END DO
-            IF (.NOT.flag .OR. i.NE.eNoN) THEN
-               err = " Error in computing face shape function"
-            END IF
+            l3 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+
+            l1 = l1 .AND. l2 .AND. l3
+            IF (.NOT.l1) err = " Error in computing face shape function"
 
             IF (g.EQ.1 .OR. .NOT.lM%lShpF)
      2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)

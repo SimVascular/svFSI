@@ -120,7 +120,6 @@ set(FSRCS UTIL.f
          CONSTRUCT.f
          CONTACT.f
          DISTRIBUTE.f
-         FC.f
          FFT.f
          FLUID.f
          HEAT.f

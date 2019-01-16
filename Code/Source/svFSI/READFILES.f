@@ -1704,7 +1704,7 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Default penalty parameter is equal to bulk modulus
       lDmn%stM%Kpen = kap
-      lPtr => lPD%get(rtmp, "Penalty value")
+      lPtr => lPD%get(rtmp, "Penalty parameter")
       IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
 
       RETURN

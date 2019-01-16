@@ -42,7 +42,7 @@
       IMPLICIT NONE
 
       INTEGER iEq, s, e
-      REAL(KIND=8) coef
+      REAL(KIND=8) coef, ctime
 
 !     Prestress initialization
       DO iEq=1, nEq
@@ -55,6 +55,34 @@
             Do = 0D0
          END IF
       END DO
+
+!     Immersed body treatment (explicit)
+      IF (ibFlag) THEN
+         ib%callD(1) = CPUT()
+
+!        Set IB forces to zero, except for feedback force
+         Rib   = 0D0
+         ib%R  = 0D0
+
+!        Compute FSI forcing (ib%R) for immersed bodies (IFEM)
+         CALL IB_CALCFFSI()
+
+!        Treat IB dirichlet boundaries using penalty forces
+         CALL IB_SETBCPEN()
+
+!        Project IB force terms to fluid mesh (ib%R -> Rib)
+         CALL IB_PROJECTF(Do)
+
+!        Update IB location and tracers
+         ib%Ao = ib%An
+         ib%Yo = ib%Yn
+         ib%Uo = ib%Un
+         ib%callD(2) = CPUT()
+         CALL IB_UPDATE(Do)
+         ctime = CPUT()
+         ib%callD(2) = ctime - ib%callD(2)
+         ib%callD(1) = ctime - ib%callD(1)
+      END IF
 
       DO iEq=1, nEq
          s = eq(iEq)%s

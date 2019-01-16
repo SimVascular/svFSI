@@ -344,7 +344,7 @@
                msh(iM)%x = 0D0
                DO i=1, j
                   lPtr => lPM%get(cTmp,
-     2               "Fiber direction file path (vtu)", i)
+     2               "Fiber direction file path", i)
                   IF (ASSOCIATED(lPtr))
      2               CALL READVTUPDATA(msh(iM), cTmp, "FIB_DIR", nsd, i)
                END DO
