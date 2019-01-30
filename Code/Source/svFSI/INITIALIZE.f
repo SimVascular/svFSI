@@ -389,15 +389,14 @@
       END IF
 
       IF (ibFlag) THEN
-         Rib   = 0D0
-         ib%R  = 0D0
-         ib%Fb = 0D0
-         ib%Ao = 0D0
-         ib%An = 0D0
-         ib%Yo = 0D0
-         ib%Yn = 0D0
-         ib%Uo = 0D0
-         ib%Un = 0D0
+         ib%R   = 0D0
+         ib%Rfb = 0D0
+         ib%Ao  = 0D0
+         ib%An  = 0D0
+         ib%Yo  = 0D0
+         ib%Yn  = 0D0
+         ib%Uo  = 0D0
+         ib%Un  = 0D0
       END IF
 
       RETURN
@@ -472,15 +471,15 @@
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
-     3            ib%Un, ib%Fb
+     3            ib%Un, ib%Rfb
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%An, ib%Yn, ib%Un,
-     3            ib%Fb
+     3            ib%Rfb
             END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, ib%An, ib%Yn, ib%Un, ib%Fb
+     2         cplBC%xo, Yo, Ao, ib%An, ib%Yn, ib%Un, ib%Rfb
          END IF
 
 !        Compute ib%Uo
@@ -675,7 +674,6 @@
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
 
 !     IB structures
-      IF (ALLOCATED(Rib))      DEALLOCATE(Rib)
       IF (ibFlag) THEN
          IF (ALLOCATED(ib%dmnId))  DEALLOCATE(ib%dmnId)
          IF (ALLOCATED(ib%rowPtr)) DEALLOCATE(ib%rowPtr)
@@ -689,6 +687,7 @@
          IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
          IF (ALLOCATED(ib%Uo))     DEALLOCATE(ib%Uo)
          IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
+         IF (ALLOCATED(ib%Rfb))    DEALLOCATE(ib%Rfb)
          IF (ALLOCATED(ib%cm%n))   DEALLOCATE(ib%cm%n)
          IF (ALLOCATED(ib%cm%gE))  DEALLOCATE(ib%cm%gE)
 

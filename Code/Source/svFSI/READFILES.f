@@ -284,7 +284,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 11
+      INTEGER, PARAMETER :: maxOutput = 12
       INTEGER fid, iBc, phys(2), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       LOGICAL flag
@@ -407,10 +407,11 @@
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/3,1,0,0/)
+         nDOP = (/4,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_velocity
          outPuts(3) = out_acceleration
+         outPuts(4) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
 !     STRUCTURAL with nonlinear displacement equation solver---------
@@ -426,13 +427,14 @@
          IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/6,1,0,0/)
+         nDOP = (/7,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_fibDir
          outPuts(3) = out_stress
          outputs(4) = out_strainInv
          outPuts(5) = out_velocity
          outPuts(6) = out_acceleration
+         outPuts(7) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -448,13 +450,14 @@
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/6,1,0,0/)
+         nDOP = (/7,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_velocity
          outPuts(3) = out_pressure
          outPuts(4) = out_stress
          outPuts(5) = out_fibDir
-         outputs(6) = out_strainInv
+         outPuts(6) = out_strainInv
+         outPuts(7) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
          ustRd = .TRUE.
@@ -495,9 +498,10 @@
          propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/2,1,0,0/)
+         nDOP = (/3,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_velocity
+         outPuts(3) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -556,7 +560,7 @@
          phys(2) = phys_struct
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/11,2,4,0/)
+         nDOP = (/12,2,4,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_energyFlux
@@ -568,6 +572,7 @@
          outPuts(9)  = out_displacement
          outPuts(10) = out_strainInv
          outPuts(11) = out_traction
+         outPuts(12) = out_integ
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -946,11 +951,11 @@
 
 !     Read penalty values for weakly applied Dir BC
       IF (lBc%weakDir) THEN
-         lPtr => list%get(rtmp, "Penalty value")
+         lPtr => list%get(rtmp, "Penalty parameter")
          IF (ASSOCIATED(lPtr)) lBc%tauB = rtmp
-         lPtr => list%get(rtmp, "Penalty value (tangential)")
+         lPtr => list%get(rtmp, "Penalty parameter (tangential)")
          IF (ASSOCIATED(lPtr)) lBc%tauB(1) = rtmp
-         lPtr => list%get(rtmp, "Penalty value (normal)")
+         lPtr => list%get(rtmp, "Penalty parameter (normal)")
          IF (ASSOCIATED(lPtr)) lBc%tauB(2) = rtmp
       END IF
 
@@ -1003,6 +1008,9 @@ c     2         "can be applied for Neumann boundaries only"
          ALLOCATE(lBc%gt)
          lPtr => list%get(fTmp,"Temporal values file path")
          IF (ASSOCIATED(lPtr)) THEN
+            ltmp = .FALSE.
+            lPtr => list%get(ltmp,"Ramp function")
+            lBc%gt%lrmp = ltmp
             fid = fTmp%open()
             READ(fid,*) i, j
             IF (i .LT. 2) THEN
@@ -1010,12 +1018,16 @@ c     2         "can be applied for Neumann boundaries only"
                err = "Wrong format in: "//fTmp%fname
             END IF
             lBc%gt%n = j
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
+            IF (lBc%gt%lrmp) lBc%gt%n = 1
+            ALLOCATE(lBc%gt%r(lBc%gt%n))
+            ALLOCATE(lBc%gt%i(lBc%gt%n))
             CALL FFT(fid, i, lBc%gt)
             CLOSE(fid)
          ELSE
             lPtr => list%get(fTmp,"Fourier coefficients file path",1)
+            IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
+     2         "unsteady type BC"
+            lBc%gt%lrmp = .FALSE.
             fid = fTmp%open()
             READ (fid,*) lBc%gt%ti
             READ (fid,*) lBc%gt%T
@@ -1030,6 +1042,7 @@ c     2         "can be applied for Neumann boundaries only"
             END DO
             CLOSE(fid)
          END IF
+
       CASE ('Coupled')
          lBc%bType = IBSET(lBc%bType,bType_cpl)
          cplBC%nFa = cplBC%nFa + 1
@@ -1235,21 +1248,20 @@ c     2         "can be applied for Neumann boundaries only"
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = maxnsd
             lEq%output(iOut)%name = "WSS"
-         CASE (out_traction)
-            lEq%output(iOut)%grp  = outGrp_trac
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nsd
-            lEq%output(iOut)%name = "Traction"
-         CASE (out_stress)
-            lEq%output(iOut)%grp  = outGrp_stress
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nstd
-            lEq%output(iOut)%name = "Prestress"
          CASE (out_vorticity)
             lEq%output(iOut)%grp  = outGrp_vort
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = maxnsd
             lEq%output(iOut)%name = "Vorticity"
+         CASE (out_integ)
+            lEq%output(iOut)%grp  = outGrp_I
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            IF (nsd .EQ. 2) THEN
+               lEq%output(iOut)%name = "Area"
+            ELSE
+               lEq%output(iOut)%name = "Volume"
+            END IF
          CASE (out_energyFlux)
             lEq%output(iOut)%grp  = outGrp_eFlx
             lEq%output(iOut)%o    = 0
@@ -1260,31 +1272,41 @@ c     2         "can be applied for Neumann boundaries only"
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Heat_flux"
-         CASE (out_absVelocity)
-            lEq%output(iOut)%grp  = outGrp_absV
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nsd
-            lEq%output(iOut)%name = "Absolute_velocity"
          CASE (out_strainInv)
             lEq%output(iOut)%grp  = outGrp_stInv
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Strain_invariants"
+         CASE (out_absVelocity)
+            lEq%output(iOut)%grp  = outGrp_absV
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Absolute_velocity"
          CASE (out_vortex)
             lEq%output(iOut)%grp  = outGrp_vortex
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Vortex"
-         CASE (out_actionPotential)
-            lEq%output(iOut)%grp  = outGrp_Y
+         CASE (out_traction)
+            lEq%output(iOut)%grp  = outGrp_trac
             lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = 1
-            lEq%output(iOut)%name = "Action_potential"
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Traction"
+         CASE (out_stress)
+            lEq%output(iOut)%grp  = outGrp_stress
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%name = "Prestress"
          CASE (out_fibDir)
             lEq%output(iOut)%grp  = outGrp_fN
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Fiber"
+         CASE (out_actionPotential)
+            lEq%output(iOut)%grp  = outGrp_Y
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Action_potential"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT
@@ -1644,15 +1666,22 @@ c     2         "can be applied for Neumann boundaries only"
       END IF
 
       SELECT CASE (TRIM(ctmp))
+      CASE ("lin", "linear")
+         lDmn%stM%isoType = stIso_lin
+         lDmn%stM%C10 = mu
+         RETURN
+
       CASE ("stVK", "stVenantKirchhoff")
          lDmn%stM%isoType = stIso_stVK
          lDmn%stM%C10 = lam
          lDmn%stM%C01 = mu
+         RETURN
 
       CASE ("m-stVK", "modified-stVK",  "modified-stVenantKirchhoff")
          lDmn%stM%isoType = stIso_mStVK
          lDmn%stM%C10 = kap
          lDmn%stM%C01 = mu
+         RETURN
 
       CASE ("nHK", "nHK91", "neoHookean", "neoHookeanSimo91")
          lDmn%stM%isoType = stIso_nHook
@@ -1680,9 +1709,6 @@ c     2         "can be applied for Neumann boundaries only"
       END SELECT
 
       IF (incompFlag) RETURN
-
-      IF (lDmn%stM%isoType.EQ.stIso_stVK .OR.
-     2    lDmn%stM%isoType.EQ.stIso_mStVK) RETURN
 
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")

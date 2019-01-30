@@ -37,9 +37,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FFT(fid, np, gt)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: fid, np
@@ -95,9 +93,7 @@
 !--------------------------------------------------------------------
 !     This is to calculate flow rate and flow acceleration (IFFT)
       PURE SUBROUTINE IFFT(gt, Y, dY)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       TYPE(fcType), INTENT(IN) :: gt
@@ -106,27 +102,35 @@
       INTEGER i
       REAL(KIND=8) t, tmp, K, dk
 
-      t    = DMOD(time - gt%ti, gt%T)
-      tmp  = 2D0*pi/gt%T
-      Y    = gt%qi + t*gt%qs
-      dY   = gt%qs
-      DO i=1, gt%n
-         dk = tmp*REAL(i-1,8)
-         K  = t*dk
-         Y  =  Y +  gt%r(i)*COS(K) - gt%i(i)*SIN(K)
-         dY = dY - (gt%r(i)*SIN(K) + gt%i(i)*COS(K))*dk
-      END DO
+      IF (gt%lrmp) THEN
+         t = time - gt%ti
+         IF (t .LE. 0D0) THEN
+            t = MAX(t, 0D0)
+         ELSE
+            t = MIN(t, gt%T)
+         END IF
+         Y    = gt%qi + t*gt%qs
+         dY   = gt%qs
+      ELSE
+         t    = DMOD(time - gt%ti, gt%T)
+         tmp  = 2D0*pi/gt%T
+         Y    = gt%qi + t*gt%qs
+         dY   = gt%qs
+         DO i=1, gt%n
+            dk = tmp*REAL(i-1,8)
+            K  = t*dk
+            Y  =  Y +  gt%r(i)*COS(K) - gt%i(i)*SIN(K)
+            dY = dY - (gt%r(i)*SIN(K) + gt%i(i)*COS(K))*dk
+         END DO
+      END IF
 
       RETURN
       END SUBROUTINE IFFT
-
-!--------------------------------------------------------------------
+!####################################################################
 !     This routine is for calculating values by the inverse of general
 !     BC
       PURE SUBROUTINE IGBC(gm, Y, dY)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       TYPE(MBType), INTENT(IN) :: gm
@@ -153,3 +157,4 @@
 
       RETURN
       END SUBROUTINE IGBC
+!####################################################################

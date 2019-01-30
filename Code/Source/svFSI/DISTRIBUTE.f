@@ -587,6 +587,7 @@
       CALL cm%bcast(flag)
       IF (flag) THEN
          IF (cm%slv()) ALLOCATE(lBc%gt)
+         CALL cm%bcast(lBc%gt%lrmp)
          CALL cm%bcast(lBc%gt%qi)
          CALL cm%bcast(lBc%gt%qs)
          CALL cm%bcast(lBc%gt%ti)

@@ -887,6 +887,26 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
                IF (Bc .EQ. Ac) EXIT
             END IF
          END DO
+         IF (b .GT. eNoN) THEN
+            WRITE(*,'(A)')
+            WRITE(*,'(A)') "========================================="
+            WRITE(*,'(A)') " ERROR: could not find matching face nodes"
+            WRITE(*,'(A)',ADVANCE='NO') "    Face "//TRIM(lFa%name)//
+     2         " e: "//STR(e)
+            DO b=1, lFa%eNoN
+               WRITE(*,'(A)',ADVANCE='NO') " "//STR(lFa%IEN(b,e))
+            END DO
+            WRITE(*,'(A)')
+            WRITE(*,'(A)',ADVANCE='NO') "    Mesh "//
+     2         TRIM(msh(iM)%name)//" Ec: "//STR(Ec)
+            DO b=1, eNoN
+               WRITE(*,'(A)',ADVANCE='NO') " "//STR(msh(iM)%IEN(b,Ec))
+            END DO
+            WRITE(*,'(A)')
+            WRITE(*,'(A)') "========================================="
+            WRITE(*,'(A)')
+            CALL STOPSIM()
+         END IF
          ptr(a)   = b
          setIt(b) = .FALSE.
       END DO

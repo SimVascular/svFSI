@@ -96,19 +96,44 @@
       REAL(KIND=8), INTENT(IN) :: s(:)
       REAL(KIND=8) IntegS
 
+      LOGICAL isIB
       INTEGER a, e, g, Ac, nNo
       REAL(KIND=8) sHat, Jac, n(nsd)
 
-      nNo  = SIZE(s)
-      IF (nNo .NE. tnNo) err = "Incompatible vector size in Integ"
+      nNo = SIZE(s)
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in Integ"
+         ELSE
+            err = "Incompatible vector size in vInteg"
+         END IF
+      END IF
+
+      isIB = .FALSE.
+      IF (ibFlag) THEN
+         IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
+      END IF
 
       IntegS = 0D0
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(lFa%iM), lFa, e)
+         IF (lFa%eType .EQ. eType_NRB) THEN
+            IF (.NOT.isIB) THEN
+               CALL NRBNNXB(msh(lFa%iM), lFa, e)
+            ELSE
+               CALL NRBNNXB(ib%msh(lFa%iM), lFa, e)
+            END IF
+         END IF
+
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, n)
+            IF (.NOT.isIB) THEN
+               CALL GNNB(lFa, e, g, n)
+            ELSE
+               CALL GNNIB(lFa, e, g, n)
+            END IF
             Jac = SQRT(NORM(n))
+
 !     Calculating the function value
             sHat = 0D0
             DO a=1, lFa%eNoN
@@ -119,6 +144,8 @@
             IntegS = IntegS + Jac*lFa%w(g)*sHat
          END DO
       END DO
+
+      IF (cm%seq() .OR. isIB) RETURN
       IntegS = cm%reduce(IntegS)
 
       RETURN
@@ -132,19 +159,45 @@
       REAL(KIND=8), INTENT(IN) :: s(:,:)
       REAL(KIND=8) IntegV
 
-      INTEGER a, i, e, Ac, g, ierr, nNo
+      LOGICAL isIB
+      INTEGER a, i, e, Ac, g, nNo
       REAL(KIND=8) sHat, n(nsd)
 
+      IF (SIZE(s,1) .NE. nsd) err = "Incompatible vector size in IntegV"
+
       nNo = SIZE(s,2)
-      IF (SIZE(s,1).NE.nsd .OR. nNo.NE.tnNo)
-     2   err = "Incompatible vector size in IntegV"
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in IntegV"
+         ELSE
+            err = "Incompatible vector size in IntegV"
+         END IF
+      END IF
+
+      isIB = .FALSE.
+      IF (ibFlag) THEN
+         IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
+      END IF
 
       IntegV = 0D0
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(lFa%iM), lFa, e)
+         IF (lFa%eType .EQ. eType_NRB) THEN
+            IF (.NOT.isIB) THEN
+               CALL NRBNNXB(msh(lFa%iM), lFa, e)
+            ELSE
+               CALL NRBNNXB(ib%msh(lFa%iM), lFa, e)
+            END IF
+         END IF
+
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, n)
+            IF (.NOT.isIB) THEN
+               CALL GNNB(lFa, e, g, n)
+            ELSE
+               CALL GNNIB(lFa, e, g, n)
+            END IF
+
 !     Calculating the function value
             sHat = 0D0
             DO a=1, lFa%eNoN
@@ -158,10 +211,8 @@
          END DO
       END DO
 
-      IF (cm%seq()) RETURN
-      CALL MPI_ALLREDUCE(IntegV, sHat, 1, mpreal, MPI_SUM, cm%com(),
-     2   ierr)
-      IntegV = sHat
+      IF (cm%seq() .OR . isIB) RETURN
+      IntegV = cm%reduce(IntegV)
 
       RETURN
       END FUNCTION IntegV
@@ -183,19 +234,25 @@
       IF (PRESENT(uo)) u = uo
 
       nNo = SIZE(s,2)
-      IF (nNo .NE. tnNo)
-     2   err = "Incompatible vector size in Integ"
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in IntegG"
+         ELSE
+            err = "Incompatible vector size in IntegG"
+         END  IF
+      END IF
 
       IntegG = 0D0
       IF (u-l+1 .EQ. nsd) THEN
-         ALLOCATE (vec(nsd,tnNo))
-         DO a=1, tnNo
+         ALLOCATE (vec(nsd,nNo))
+         DO a=1, nNo
             vec(:,a) = s(l:u,a)
          END DO
          IntegG = IntegV(lFa,vec)
       ELSE IF (l .EQ. u) THEN
-         ALLOCATE (sclr(tnNo))
-         DO a=1, tnNo
+         ALLOCATE (sclr(nNo))
+         DO a=1, nNo
             sclr(a) = s(l,a)
          END DO
          IntegG = IntegS(lFa,sclr)
@@ -216,72 +273,137 @@
       INTEGER, INTENT(IN) :: u
       REAL(KIND=8) vInteg
 
-      INTEGER a, e, g, Ac, iM, eNoN, insd, ibl
+      LOGICAL isIB
+      INTEGER a, e, g, Ac, iM, eNoN, insd, ibl, nNo
       REAL(KIND=8) Jac, nV(nsd), sHat, tmp(nsd,nsd)
 
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), sl(:), Nxi(:,:), Nx(:,:),
      2   tmps(:,:)
 
-      IF (SIZE(s,2) .NE. tnNo)
-     2   err = "Incompatible vector size in Integ"
+      nNo = SIZE(s,2)
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in vInteg"
+         ELSE
+            err = "Incompatible vector size in vInteg"
+         END IF
+      END IF
+
+      isIB = .FALSE.
+      IF (ibFlag) THEN
+         IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
+      END IF
 
       vInteg = 0D0
-      DO iM=1, nMsh
-         eNoN = msh(iM)%eNoN
-         insd = nsd
-         IF (msh(iM)%lShl) insd = nsd-1
-         IF (msh(iM)%lFib) insd = 1
+      IF (.NOT.isIB) THEN
+         DO iM=1, nMsh
+            eNoN = msh(iM)%eNoN
+            insd = nsd
+            IF (msh(iM)%lShl) insd = nsd-1
+            IF (msh(iM)%lFib) insd = 1
 
-         ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
-     2      sl(eNoN), tmps(nsd,insd))
+            ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
+     2         sl(eNoN), tmps(nsd,insd))
 
-         DO e=1, msh(iM)%nEl
-            IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
-               IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
-            END IF
-!     Updating the shape functions, if this is a NURB
-            IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), e)
-            ibl = 0
-            DO a=1, eNoN
-               Ac      = msh(iM)%IEN(a,e)
-               xl(:,a) = x(:,Ac)
-               IF (mvMsh) xl(:,a) = xl(:,a) + Do(nsd+2:2*nsd+1,Ac)
-               IF (l .EQ. u) THEN
-                  sl(a) = s(l,Ac)
-               ELSE
-                  sl(a) = SQRT(NORM(s(l:u,Ac)))
+            DO e=1, msh(iM)%nEl
+               IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
+                  IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
                END IF
-               ibl = ibl + iblank(Ac)
-            END DO
-            IF (ibl .EQ. eNoN) CYCLE
-
-            DO g=1, msh(iM)%nG
-               Nxi(:,:) = msh(iM)%Nx(:,:,g)
-               IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF) THEN
-                  IF (msh(iM)%lShl) THEN
-                     CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
-                     Jac = SQRT(NORM(nV))
-                  ELSE
-                     CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
-                  END IF
-               END IF
-               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
-
-               sHat = 0D0
+!           Updating the shape functions, if this is a NURB
+               IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), e)
+               ibl = 0
                DO a=1, eNoN
-                  Ac = msh(iM)%IEN(a,e)
-                  sHat = sHat + sl(a)*msh(iM)%N(a,g)
+                  Ac      = msh(iM)%IEN(a,e)
+                  xl(:,a) = x(:,Ac)
+                  IF (mvMsh) xl(:,a) = xl(:,a) + Do(nsd+2:2*nsd+1,Ac)
+                  IF (l .EQ. u) THEN
+                     sl(a) = s(l,Ac)
+                   ELSE
+                     sl(a) = SQRT(NORM(s(l:u,Ac)))
+                  END IF
+                  ibl = ibl + iblank(Ac)
                END DO
-               vInteg = vInteg + msh(iM)%w(g)*Jac*sHat
+               IF (ibl .EQ. eNoN) CYCLE
+
+               DO g=1, msh(iM)%nG
+                  Nxi(:,:) = msh(iM)%Nx(:,:,g)
+                  IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF) THEN
+                     IF (msh(iM)%lShl) THEN
+                        CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
+                        Jac = SQRT(NORM(nV))
+                     ELSE
+                        CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
+                     END IF
+                  END IF
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+
+                  sHat = 0D0
+                  DO a=1, eNoN
+                     Ac = msh(iM)%IEN(a,e)
+                     sHat = sHat + sl(a)*msh(iM)%N(a,g)
+                  END DO
+                  vInteg = vInteg + msh(iM)%w(g)*Jac*sHat
+               END DO
             END DO
+
+            DEALLOCATE(xl, Nxi, Nx, sl, tmps)
          END DO
+      ELSE
+         DO iM=1, ib%nMsh
+            eNoN = ib%msh(iM)%eNoN
+            insd = nsd
+            IF (ib%msh(iM)%lShl) insd = nsd-1
+            IF (ib%msh(iM)%lFib) insd = 1
 
-         DEALLOCATE(xl, Nxi, Nx, sl, tmps)
-      END DO
+            ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
+     2         sl(eNoN), tmps(nsd,insd))
 
-      IF (cm%seq()) RETURN
-      CALL MPI_ALLREDUCE(vInteg, sHat, 1, mpreal, MPI_SUM, cm%com(), g)
-      vInteg = sHat
+            DO e=1, ib%msh(iM)%nEl
+               IF (dId.GT.0 .AND. ALLOCATED(ib%msh(iM)%eId)) THEN
+                  IF (.NOT.BTEST(ib%msh(iM)%eId(e),dId)) CYCLE
+               END IF
+
+!           Updating the shape functions, if this is a NURB
+               IF (ib%msh(iM)%eType .EQ. eType_NRB)
+     2            CALL NRBNNX(ib%msh(iM), e)
+               DO a=1, eNoN
+                  Ac      = ib%msh(iM)%IEN(a,e)
+                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                  IF (l .EQ. u) THEN
+                     sl(a) = s(l,Ac)
+                   ELSE
+                     sl(a) = SQRT(NORM(s(l:u,Ac)))
+                  END IF
+               END DO
+
+               DO g=1, ib%msh(iM)%nG
+                  Nxi(:,:) = ib%msh(iM)%Nx(:,:,g)
+                  IF (g.EQ.1 .OR. .NOT.ib%msh(iM)%lShpF) THEN
+                     IF (ib%msh(iM)%lShl) THEN
+                        CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
+                        Jac = SQRT(NORM(nV))
+                     ELSE
+                        CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
+                     END IF
+                  END IF
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+
+                  sHat = 0D0
+                  DO a=1, eNoN
+                     Ac = ib%msh(iM)%IEN(a,e)
+                     sHat = sHat + sl(a)*ib%msh(iM)%N(a,g)
+                  END DO
+                  vInteg = vInteg + ib%msh(iM)%w(g)*Jac*sHat
+               END DO
+            END DO
+
+            DEALLOCATE(xl, Nxi, Nx, sl, tmps)
+         END DO
+      END IF
+
+      IF (cm%seq() .OR. isIB) RETURN
+      vInteg = cm%reduce(vInteg)
 
       RETURN
       END FUNCTION vInteg
@@ -1779,9 +1901,9 @@
       REAL(KIND=8), INTENT(OUT) :: xi(nsd)
       LOGICAL, INTENT(IN), OPTIONAL :: lDebug
 
-      LOGICAL :: flag, ldbg
+      LOGICAL :: ldbg, l1, l2, l3, l4
       INTEGER :: a, e, i, Ac, eNoN
-      REAL(KIND=8) :: rt, xiL(2), xi0(nsd)
+      REAL(KIND=8) :: rt, xi0(nsd), xib(2), Nb(2)
 
       LOGICAL, ALLOCATABLE :: eChck(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:)
@@ -1802,10 +1924,18 @@
       xi0 = xi0 / REAL(lM%nG,KIND=8)
 
 !     Set bounds on the parameteric coordinates
-      xiL(1) = -1D0
-      xiL(2) =  1D0
+      xib(1) = -1.0001D0
+      xib(2) =  1.0001D0
       IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
-         xiL(1) = 0D0
+         xib(1) = -0.0001D0
+      END IF
+
+!     Set bounds on shape functions
+      Nb(1) = -0.0001D0
+      Nb(2) =  1.0001d0
+      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
+         Nb(1) = -0.1251D0
+         Nb(2) =  1.0001D0
       END IF
 
       IF (ldbg) THEN
@@ -1852,15 +1982,7 @@
          END IF
 
          xi = xi0
-         CALL GETXI(lM%eType, eNoN, xl, xp, xi, flag)
-!        Check if parameteric coordinate is within bounds
-         a = 0
-         DO i=1, nsd
-            IF (xi(i).GE.xiL(1) .AND. xi(i).LE.xiL(2)) a = a + 1
-         END DO
-
-!        If Newton's method fails, continue
-         IF (.NOT.flag .OR. a.NE.nsd) CYCLE
+         CALL GETXI(lM%eType, eNoN, xl, xp, xi, l1)
 
          IF (ldbg) THEN
             WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "xi: "
@@ -1869,6 +1991,13 @@
             END DO
             WRITE(1000+cm%tF(),'(A)')
          END IF
+
+!        Check if parameteric coordinate is within bounds
+         a = 0
+         DO i=1, nsd
+            IF (xi(i).GE.xib(1) .AND. xi(i).LE.xib(2)) a = a + 1
+         END DO
+         l2 = a .EQ. nsd
 
 !        Check for shape function even if the Newton's method returns OK
          CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
@@ -1882,13 +2011,18 @@
             CALL FLUSH(1000+cm%tF())
          END IF
 
-!        Check if sum of shape functions is unity
-         rt = 0.0D0
+!        Check if shape functions are within bounds and sum to unity
+         i  = 0
+         rt = 0D0
          DO a=1, eNoN
             rt = rt + N(a)
+            IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) i = i + 1
          END DO
-         flag = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
-         IF (flag) RETURN
+         l3 = i .EQ. eNoN
+         l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+
+         l1 = ALL((/l1, l2, l3, l4/))
+         IF (l1) RETURN
       END DO
 
       Ec = 0

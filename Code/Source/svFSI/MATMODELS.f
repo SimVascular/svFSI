@@ -90,6 +90,11 @@
 
 !     Now, compute isochoric and total stress, elasticity tensors
       SELECT CASE (stM%isoType)
+      CASE (stIso_lin)
+         g1 = stM%C10            ! mu
+         S  = g1*Idm
+         RETURN
+
 !     St.Venant-Kirchhoff
       CASE (stIso_stVK)
          g1 = stM%C10            ! lambda

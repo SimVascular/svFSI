@@ -61,17 +61,13 @@
          ib%callD(1) = CPUT()
 
 !        Set IB forces to zero, except for feedback force
-         Rib   = 0D0
-         ib%R  = 0D0
+         ib%R = 0D0
 
 !        Compute FSI forcing (ib%R) for immersed bodies (IFEM)
-         CALL IB_CALCFFSI()
+         CALL IB_CALCFFSI(Do)
 
 !        Treat IB dirichlet boundaries using penalty forces
-         CALL IB_SETBCPEN()
-
-!        Project IB force terms to fluid mesh (ib%R -> Rib)
-         CALL IB_PROJECTF(Do)
+c         CALL IB_SETBCPEN()
 
 !        Update IB location and tracers
          ib%Ao = ib%An

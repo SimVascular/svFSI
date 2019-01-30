@@ -342,8 +342,11 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     End of inner loop
 
 !     Immersed body treatment: project flow variables from fluid mesh
-!     to IB solid mesh
-         IF (ibFlag) CALL IB_PROJFVAR(An, Yn, Do, ib%An, ib%Yn, ib%Un)
+!     to IB solid mesh and enforce Dirichlet BCs
+         IF (ibFlag) THEN
+            CALL IB_PROJFVAR(An, Yn, Do, ib%An, ib%Yn, ib%Un)
+            CALL IB_SETBCDIR(ib%An, ib%Yn, ib%Un)
+         END IF
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
@@ -399,16 +402,16 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   IF (pstEq) THEN
                      WRITE(fid, REC=cm%tF()) stamp, cTS, time,
      2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
-     3                  pS0, ib%An, ib%Yn, ib%Un, ib%Fb
+     3                  pS0, ib%An, ib%Yn, ib%Un, ib%Rfb
                   ELSE
                      WRITE(fid, REC=cm%tF()) stamp, cTS, time,
      2                  CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An, Dn,
-     3                  ib%An, ib%Yn, ib%Un, ib%Fb
+     3                  ib%An, ib%Yn, ib%Un, ib%Rfb
                   END IF
                ELSE
                   WRITE(fid, REC=cm%tF()) stamp, cTS, time,
      2               CPUT()-timeP(1), eq%iNorm, cplBC%xn, Yn, An,
-     3               ib%An, ib%Yn, ib%Un, ib%Fb
+     3               ib%An, ib%Yn, ib%Un, ib%Rfb
                END IF
             END IF
             CLOSE(fid)
