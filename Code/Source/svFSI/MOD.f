@@ -77,14 +77,15 @@
 !     Density of fluid, viscosity of fluid, density of solid, elsticity
 !     modulus, Poisson's ratio, conductivity, internal force(X,Y,Z),
 !     particles diameter, particle density, stabilization coefficient
-!     for backflow divergence, shell thickness
+!     for backflow divergence, shell thickness, stabilization parameters
+!     for USTRUCT (ctauM, ctauC), CMM initialization pressure
       INTEGER, PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   viscosity = 2, solid_density = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
      4   particle_diameter = 10, particle_density = 11,
      5   permeability = 12, backflow_stab = 13, source_term = 14,
-     6   damping = 15, shell_thickness = 16,
-     7   initialization_pressure = 17
+     6   damping = 15, shell_thickness = 16, ctau_M = 17, ctau_C = 18,
+     7   initialization_pressure = 19
 
 !     Types of accepted elements
 !     Linear (1D), triangle (2D), tetrahedral (3D), bilinear (2D), quad
@@ -816,8 +817,6 @@
       LOGICAL pstEq
 !     Whether CMM equation is solved
       LOGICAL cmmEq
-!     USTRUCT: consistent update of displacement residue
-      LOGICAL ustRd
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required
@@ -926,10 +925,8 @@
 
 !     Additional arrays for velocity-based formulation of nonlinear
 !     solid mechanics
-!     Old time derivative of displacement
-      REAL(KIND=8), ALLOCATABLE :: ADo(:,:)
-!     New time derivative of displacement
-      REAL(KIND=8), ALLOCATABLE :: ADn(:,:)
+!     Time derivative of displacement
+      REAL(KIND=8), ALLOCATABLE :: Ad(:,:)
 !     Residue of the displacement equation
       REAL(KIND=8), ALLOCATABLE :: Rd(:,:)
 !     LHS matrix for displacement equation

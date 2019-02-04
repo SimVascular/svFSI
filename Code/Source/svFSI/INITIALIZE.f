@@ -201,10 +201,10 @@
 !     Additional physics dependent variables
 !     USTRUCT phys
       IF (flag) THEN
-         ALLOCATE(Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
-         IF (ustRd) THEN
-            ALLOCATE(ADo(nsd,tnNo), ADn(nsd,tnNo))
-         END IF
+         ALLOCATE(Ad(nsd,tnNo), Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
+         Ad = 0D0
+         Rd = 0D0
+         Kd = 0D0
       END IF
 
 !     PRESTRESS phys
@@ -380,7 +380,6 @@
       Ao = 0D0
       Yo = 0D0
       Do = 0D0
-      IF (ALLOCATED(ADo)) ADo = 0D0
 
       IF (rmsh%isReqd) THEN
          rmsh%A0 = 0D0
@@ -408,7 +407,6 @@
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       INTEGER l
-
       REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:)
 
       l = LEN(TRIM(fName))
@@ -448,7 +446,6 @@
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       INTEGER, PARAMETER :: fid = 1
-
       INTEGER tStamp(SIZE(stamp)), a, i
 
       std = " Initializing from "//fName
@@ -656,8 +653,7 @@
       IF (ALLOCATED(R))        DEALLOCATE(R)
       IF (ALLOCATED(fN))       DEALLOCATE(fN)
 
-      IF (ALLOCATED(ADo))      DEALLOCATE(ADo)
-      IF (ALLOCATED(ADn))      DEALLOCATE(ADn)
+      IF (ALLOCATED(Ad))       DEALLOCATE(Ad)
       IF (ALLOCATED(Rd))       DEALLOCATE(Rd)
       IF (ALLOCATED(Kd))       DEALLOCATE(Kd)
 

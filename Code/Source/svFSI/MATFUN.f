@@ -42,6 +42,8 @@
 
       INTEGER, ALLOCATABLE :: t_ind(:,:)
 
+      PRIVATE :: ISZERO
+
       CONTAINS
 !--------------------------------------------------------------------
 !     Create a second order identity matrix of rank nd
@@ -190,7 +192,7 @@
 
       IF (nd .EQ. 2) THEN
          d = MAT_DET(A, nd)
-         IF (ABS(d) .LT. 1D2*epsil) iok = -1
+         IF (ISZERO(ABS(d))) iok = -1
 
          Ainv(1,1) =  A(2,2)/d
          Ainv(1,2) = -A(1,2)/d
@@ -200,7 +202,7 @@
 
       ELSE IF (nd .EQ. 3) THEN
          d = MAT_DET(A, nd)
-         IF (ABS(d) .LT. 1D2*epsil) iok = -1
+         IF (ISZERO(ABS(d))) iok = -1
 
          Ainv(1,1) = (A(2,2)*A(3,3)-A(2,3)*A(3,2)) / d
          Ainv(1,2) = (A(1,3)*A(3,2)-A(1,2)*A(3,3)) / d
@@ -216,7 +218,7 @@
 
       ELSE IF (nd.GT.3 .AND. nd.LT.10) THEN
          d = MAT_DET(A, nd)
-         IF (ABS(d) .LT. 1D2*epsil) iok = -1
+         IF (ISZERO(ABS(d))) iok = -1
          Ainv = MAT_INV_GE(A, nd)
 
       ELSE
@@ -510,6 +512,24 @@
 
       RETURN
       END FUNCTION TEN_DDOT
+!--------------------------------------------------------------------
+      FUNCTION ISZERO(ia)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(IN) :: ia
+      LOGICAL ISZERO
+
+      REAL(KIND=8), PARAMETER :: epsil = EPSILON(epsil)
+      REAL(KIND=8) a, b, nrm
+
+      a   = ABS(ia)
+      b   = 0D0
+      nrm = MAX(a,epsil)
+
+      ISZERO = .FALSE.
+      IF ((a-b)/nrm .LT. 1D1*epsil) ISZERO = .TRUE.
+
+      RETURN
+      END FUNCTION ISZERO
 !--------------------------------------------------------------------
       END MODULE MATFUN
 !####################################################################

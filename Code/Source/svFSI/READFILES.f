@@ -89,7 +89,6 @@
          ichckIEN     = .TRUE.
          zeroAve      = .FALSE.
          ibFlag       = .FALSE.
-         ustRd        = .FALSE.
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
 
@@ -445,24 +444,24 @@
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
          propL(3,1) = poisson_ratio
-         propL(4,1) = f_x
-         propL(5,1) = f_y
-         IF (nsd .EQ. 3) propL(6,1) = f_z
+         propL(4,1) = ctau_M
+         propL(5,1) = ctau_C
+         propL(6,1) = f_x
+         propL(7,1) = f_y
+         IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/7,1,0,0/)
+         nDOP = (/8,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_velocity
          outPuts(3) = out_pressure
-         outPuts(4) = out_stress
-         outPuts(5) = out_fibDir
-         outPuts(6) = out_strainInv
-         outPuts(7) = out_integ
+         outPuts(4) = out_acceleration
+         outPuts(5) = out_stress
+         outPuts(6) = out_fibDir
+         outPuts(7) = out_strainInv
+         outPuts(8) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
-         ustRd = .TRUE.
-         lPtr => list%get(flag,"Consistent residue update")
-         IF (ASSOCIATED(lPtr)) ustRd = flag
 
 !     PRESTRESS equation solver---------------------
       CASE ('prestress')
@@ -759,8 +758,6 @@
                ELSE
                   lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ub=5D-1)
                END IF
-            CASE (initialization_pressure)
-               lPtr => lPD%get(rtmp,"Initialization Pressure",1,lb=0D0)
             CASE (conductivity)
                lPtr => lPD%get(rtmp,"Conductivity",1,ll=0D0)
             CASE (f_x)
@@ -786,6 +783,16 @@
                lPtr => lPD%get(rtmp,"Mass damping")
             CASE (shell_thickness)
                lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0D0)
+            CASE (ctau_M)
+               lPtr => lPD%get(rtmp,
+     2            "Momentum stabilization coefficient")
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.01D0
+            CASE (ctau_C)
+               lPtr => lPD%get(rtmp,
+     2            "Continuity stabilization coefficient")
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.01D0
+            CASE (initialization_pressure)
+               lPtr => lPD%get(rtmp,"Initialization Pressure",1,lb=0D0)
             CASE DEFAULT
                err = "Undefined properties"
             END SELECT
@@ -1296,7 +1303,7 @@ c     2         "can be applied for Neumann boundaries only"
             lEq%output(iOut)%grp  = outGrp_stress
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nstd
-            lEq%output(iOut)%name = "Prestress"
+            lEq%output(iOut)%name = "Stress"
          CASE (out_fibDir)
             lEq%output(iOut)%grp  = outGrp_fN
             lEq%output(iOut)%o    = 0

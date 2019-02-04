@@ -1020,58 +1020,79 @@
       RETURN
       END SUBROUTINE USTRUCT_DOASSEM
 !--------------------------------------------------------------------
-      SUBROUTINE USTRUCTR(ADg, Yg)
+      SUBROUTINE USTRUCTR(Yg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(IN) :: ADg(nsd,tnNo), Yg(tDof,tnNo)
+      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
 
-      INTEGER :: i, j, c, s, e
-      REAL(KIND=8) :: ami, KdRd(dof)
+      INTEGER :: i, j, c, s
+      REAL(KIND=8) :: amg, ami
 
-      s = eq(cEq)%s
-      e = s + nsd - 1
+      REAL(KIND=8), ALLOCATABLE :: KU(:,:)
+
+      s   = eq(cEq)%s
+      amg = (eq(cEq)%gam-eq(cEq)%am) / (eq(cEq)%gam-1D0)
       ami = 1D0/eq(cEq)%am
 
+      IF (eq(cEq)%itr .GT. 1) THEN
+         Rd = 0D0
+         RETURN
+      END IF
+
       DO i=1, tnNo
-         Rd(1:nsd,i) = ADg(1:nsd,i) - Yg(s:e,i)
+         DO j=1, nsd
+            Rd(j,i) = amg*Ad(j,i) - Yg(s+j-1,i)
+         END DO
       END DO
 
       IF (nsd .EQ. 3) THEN
-!        Update RHS
+         ALLOCATE(KU(4,tnNo))
+         KU = 0D0
          DO i=1, tnNo
-            KdRd = 0D0
             DO j=rowPtr(i), rowPtr(i+1)-1
                c = colPtr(j)
-               KdRd(1) = KdRd(1) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
+               KU(1,i) = KU(1,i) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
      2                           + Kd(3 ,j)*Rd(3,c)
-               KdRd(2) = KdRd(2) + Kd(4 ,j)*Rd(1,c) + Kd(5 ,j)*Rd(2,c)
+               KU(2,i) = KU(2,i) + Kd(4 ,j)*Rd(1,c) + Kd(5 ,j)*Rd(2,c)
      2                           + Kd(6 ,j)*Rd(3,c)
-               KdRd(3) = KdRd(3) + Kd(7 ,j)*Rd(1,c) + Kd(8 ,j)*Rd(2,c)
+               KU(3,i) = KU(3,i) + Kd(7 ,j)*Rd(1,c) + Kd(8 ,j)*Rd(2,c)
      2                           + Kd(9 ,j)*Rd(3,c)
-               KdRd(4) = KdRd(4) + Kd(10,j)*Rd(1,c) + Kd(11,j)*Rd(2,c)
+               KU(4,i) = KU(4,i) + Kd(10,j)*Rd(1,c) + Kd(11,j)*Rd(2,c)
      2                           + Kd(12,j)*Rd(3,c)
             END DO
-            R(1,i) = R(1,i) - ami*KdRd(1)
-            R(2,i) = R(2,i) - ami*KdRd(2)
-            R(3,i) = R(3,i) - ami*KdRd(3)
-            R(4,i) = R(4,i) - ami*KdRd(4)
          END DO
-      ELSE
-!        Update RHS
+
+         CALL COMMU(KU)
+
          DO i=1, tnNo
-            KdRd = 0D0
+            R(1,i) = R(1,i) - ami*KU(1,i)
+            R(2,i) = R(2,i) - ami*KU(2,i)
+            R(3,i) = R(3,i) - ami*KU(3,i)
+            R(4,i) = R(4,i) - ami*KU(4,i)
+         END DO
+         DEALLOCATE(KU)
+      ELSE
+         ALLOCATE(KU(3,tnNo))
+         KU = 0D0
+         DO i=1, tnNo
             DO j=rowPtr(i), rowPtr(i+1)-1
                c = colPtr(j)
-               KdRd(1) = KdRd(1) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
-               KdRd(2) = KdRd(2) + Kd(3 ,j)*Rd(1,c) + Kd(4 ,j)*Rd(2,c)
-               KdRd(3) = KdRd(3) + Kd(5 ,j)*Rd(1,c) + Kd(6 ,j)*Rd(2,c)
+               KU(1,i) = KU(1,i) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
+               KU(2,i) = KU(2,i) + Kd(3 ,j)*Rd(1,c) + Kd(4 ,j)*Rd(2,c)
+               KU(3,i) = KU(3,i) + Kd(5 ,j)*Rd(1,c) + Kd(6 ,j)*Rd(2,c)
             END DO
-            R(1,i) = R(1,i) - ami*KdRd(1)
-            R(2,i) = R(2,i) - ami*KdRd(2)
-            R(3,i) = R(3,i) - ami*KdRd(3)
          END DO
+
+         CALL COMMU(KU)
+
+         DO i=1, tnNo
+            R(1,i) = R(1,i) - ami*KU(1,i)
+            R(2,i) = R(2,i) - ami*KU(2,i)
+            R(3,i) = R(3,i) - ami*KU(3,i)
+         END DO
+         DEALLOCATE(KU)
       END IF
 
       RETURN

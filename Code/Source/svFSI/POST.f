@@ -413,8 +413,6 @@
      2   Nx(:,:), N(:), sA(:), sF(:,:), fl(:,:)
       TYPE(stModelType) :: stModel
 
-      IF (.NOT.ALLOCATED(pS0)) err = " Unexpected behavior in TPOST"
-
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
       i    = eq(iEq)%s
@@ -454,7 +452,7 @@
             N = lM%N(:,g)
 
             ALLOCATE(fl(nsd,nFn))
-            F  = 0D0
+            F  = MAT_ID(nsd)
             fl = 0D0
             DO a=1, eNoN
                IF (nsd .EQ. 3) THEN
@@ -493,6 +491,7 @@
                CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
                sigma = S
             END IF
+            DEALLOCATE(fl)
 
             IF (nsd .EQ. 3) THEN
                pSl(1) = sigma(1,1)

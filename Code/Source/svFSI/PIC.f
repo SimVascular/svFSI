@@ -95,13 +95,12 @@ c         CALL IB_SETBCPEN()
 
 !        struct, lElas, mesh, ustruct
          IF (dFlag) THEN
-            IF (eq(iEq)%phys .NE. phys_ustruct) THEN
-               coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
-     2            /(eq(iEq)%gam - 1D0)
-               Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
-            ELSE
+            coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
+     2         /(eq(iEq)%gam - 1D0)
+            Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
+            IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
                coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
-               IF (ustRd) ADn(1:nsd,:) = ADo(1:nsd,:)*coef
+               Ad(:,:)   = Ad(:,:)*coef
                Dn(s:e,:) = Do(s:e,:)
             END IF
          ELSE
@@ -113,12 +112,12 @@ c         CALL IB_SETBCPEN()
       END SUBROUTINE PICP
 !====================================================================
 !     This is the initiator
-      SUBROUTINE PICI(Ag, Yg, Dg, ADg)
+      SUBROUTINE PICI(Ag, Yg, Dg)
       USE COMMOD
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(INOUT) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo), ADg(nsd,tnNo)
+     2   Dg(tDof,tnNo)
 
       INTEGER s, e, i, a
       REAL(KIND=8) coef(4)
@@ -126,7 +125,6 @@ c         CALL IB_SETBCPEN()
       dof         = eq(cEq)%dof
       eq(cEq)%itr = eq(cEq)%itr + 1
 
-      ADg(:,:) = 0D0
       DO i=1, nEq
          s       = eq(i)%s
          e       = eq(i)%e
@@ -150,12 +148,6 @@ c         CALL IB_SETBCPEN()
             END DO
          END IF
 
-         IF (ustRd) THEN
-            DO a=1, tnNo
-               ADg(:,a) = ADo(:,a)*coef(1) + ADn(:,a)*coef(2)
-            END DO
-         END IF
-
          IF (eq(i)%phys .EQ. phys_preSt) pSn(:,:) = 0D0
       END DO
 
@@ -170,7 +162,7 @@ c         CALL IB_SETBCPEN()
 
       LOGICAL :: l1, l2, l3, l4
       INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(5), rtmp, ADl(nsd)
+      REAL(KIND=8) :: coef(5), rtmp, dUl(nsd)
       CHARACTER(LEN=stdL) :: sCmd
 
       s       = eq(cEq)%s
@@ -194,9 +186,9 @@ c         CALL IB_SETBCPEN()
          DO a=1, tnNo
             An(s:e,a)   = An(s:e,a)   - R(:,a)
             Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
-            ADl(:)      = Rd(:,a)*coef(4) + R(1:dof-1,a)*coef(5)
-            Dn(s:e-1,a) = Dn(s:e-1,a) - ADl(:)*coef(1)
-            IF (ustRd) ADn(:,a) = ADn(:,a) - ADl(:)
+            dUl(:)      = Rd(:,a)*coef(4) + R(1:dof-1,a)*coef(5)
+            Ad(:,a)     = Ad(:,a)     - dUl(:)
+            Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
          END DO
       ELSE
          DO a=1, tnNo

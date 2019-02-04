@@ -165,7 +165,6 @@
          CALL cm%bcast(useTrilinosLS)
          CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
-         CALL cm%bcast(ustRd)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)

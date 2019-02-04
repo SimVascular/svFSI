@@ -75,16 +75,16 @@
       pl = 0D0
       SELECT CASE (stM%volType)
       CASE (stVol_Quad)
-         p  = 2D0*Kp*(J-1D0)
-         pl = 2D0*Kp*(2D0*J-1D0)
+         p  = Kp*(J-1D0)
+         pl = Kp*(2D0*J-1D0)
 
       CASE (stVol_ST91)
-         p  = Kp*(J-1D0/J)
-         pl = 2D0*Kp*J
+         p  = 5D-1*Kp*(J-1D0/J)
+         pl = Kp*J
 
       CASE (stVol_M94)
-         p  = 2D0*Kp*(1D0-1D0/J)
-         pl = 2D0*Kp
+         p  = Kp*(1D0-1D0/J)
+         pl = Kp
 
       END SELECT
 
@@ -387,13 +387,14 @@
       REAL(KIND=8), INTENT(IN) :: Je
       REAL(KIND=8), INTENT(OUT) :: tauM, tauC
 
-      REAL(KIND=8), PARAMETER :: ctM = 1D-1, ctC = 1D-1
-      REAL(KIND=8) :: he, rho, Em, nu, mu, lam, c
+      REAL(KIND=8) :: ctM, ctC, he, rho, Em, nu, mu, lam, c
 
       he  = 5D-1 * Je**(1D0/REAL(nsd,KIND=8))
       rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
       Em  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
       nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
+      ctM = eq(cEq)%dmn(cDmn)%prop(ctau_M)
+      ctC = eq(cEq)%dmn(cDmn)%prop(ctau_C)
 
       mu  = 5D-1*Em / (1.0D0 + nu)
       IF (ISZERO(nu-0.5D0)) THEN

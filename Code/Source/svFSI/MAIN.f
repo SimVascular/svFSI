@@ -52,8 +52,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       INTEGER, ALLOCATABLE :: ptr(:), incL(:), ltgReordered(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), Ag(:,:), al(:,:), Yg(:,:),
      2   yl(:,:), Dg(:,:), dl(:,:), dol(:,:), fNl(:,:), res(:),
-     3   pS0l(:,:), RTrilinos(:,:), dirW(:,:), bfg(:,:), bfl(:,:),
-     4   ADg(:,:)
+     3   pS0l(:,:), RTrilinos(:,:), dirW(:,:), bfg(:,:), bfl(:,:)
 
 !--------------------------------------------------------------------
       l1 = .FALSE.
@@ -93,7 +92,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
       dbg = 'Allocating intermediate variables'
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo),
-     2   res(nFacesLS), incL(nFacesLS), ADg(nsd,tnNo))
+     2   res(nFacesLS), incL(nFacesLS))
 
 !--------------------------------------------------------------------
 !     Outer loop for marching in time. When entring this loop, all old
@@ -152,7 +151,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             END IF
 
 !     Initiator step (quantities at n+am, n+af)
-            CALL PICI(Ag, Yg, Dg, ADg)
+            CALL PICI(Ag, Yg, Dg)
             IF (ALLOCATED(Rd)) THEN
                Rd = 0D0
                Kd = 0D0
@@ -266,14 +265,14 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     Apply contact model and add its contribution to residue
             IF (iCntct) CALL CONTACTFORCES(Dg)
 
-!     Consistently update residue for displacement equation
-            IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
-               IF (ustRd) CALL USTRUCTR(ADg, Yg)
-            END IF
-
 !     Synchronize R across processes. Note: that it is important to
 !     synchronize residue, R before treating immersed boundaries
             IF (.NOT.useTrilinosAssemAndLS) CALL COMMU(R)
+
+!     Update residue in displacement equation for USTRUCT physics. This
+!     is done only first iteration. The residue will be 0 for subsequent
+!     iterations
+            IF (eq(cEq)%phys .EQ. phys_ustruct) CALL USTRUCTR(Yg)
 
 !     Add contribution from IB to residue
             IF (ibFlag) CALL IB_CONSTRUCT()
@@ -440,14 +439,13 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          Ao = An
          Yo = Yn
          IF (dFlag) Do = Dn
-         IF (ALLOCATED(ADo)) ADo = ADn
          cplBC%xo = cplBC%xn
       END DO
 !     End of outer loop
 
       IF (resetSim) THEN
          CALL REMESHRESTART(timeP)
-         DEALLOCATE(Ag, Yg, Dg, ADg, incL, res)
+         DEALLOCATE(Ag, Yg, Dg, incL, res)
          IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
             DEALLOCATE(ltgReordered, dirW, RTrilinos)
          END IF
@@ -463,7 +461,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          DEALLOCATE(ltgReordered, dirW, RTrilinos)
       END IF
 #endif
-      DEALLOCATE(Ag, Yg, Dg, ADg, incL, res)
+      DEALLOCATE(Ag, Yg, Dg, incL, res)
 
       CALL MPI_FINALIZE(ierr)
 

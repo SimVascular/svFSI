@@ -45,7 +45,7 @@
 
       LOGICAL :: eDir(maxnsd)
       INTEGER iFa, a, Ac, iEq, iBc, s, e, iM, nNo, lDof, i, j
-      REAL(KIND=8) :: c1, c2
+      REAL(KIND=8) :: c1, c1i, c2
 
       REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:)
 
@@ -131,8 +131,9 @@
             END IF
 
             IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
-               c1 = eq(iEq)%gam * dt
-               c2 = (1.0D0 - eq(iEq)%gam)*dt
+               c1  = eq(iEq)%gam * dt
+               c1i = 1.0D0 / c1
+               c2  = (eq(iEq)%gam - 1.0D0)*dt
                IF (ANY(eDir)) THEN
                   IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
                      DO a=1, msh(iM)%fa(iFa)%nNo
@@ -140,12 +141,10 @@
                         DO i=1, nsd
                            IF (eDir(i)) THEN
                               j = s + i - 1
-                              lA(j,Ac)  = (1.0D0/c1) *
-     2                           (lY(j,Ac) - Yo(j,Ac) - c2*Ao(j,Ac))
-                              IF (ustRd) THEN
-                                 ADn(i,Ac) = (1.0D0/c1) *
-     2                              (lD(j,Ac) - Do(j,Ac) - c2*ADo(i,Ac))
-                              END IF
+                              lA(j,Ac) = c1i*(lY(j,Ac) - Yo(j,Ac) +
+     2                                    c2*Ao(j,Ac))
+                              Ad(i,Ac) = c1i*(lD(j,Ac) - Do(j,Ac) +
+     2                                    c2*Ad(i,Ac))
                            END IF
                         END DO
                      END DO
@@ -155,12 +154,9 @@
                         DO i=1, nsd
                            IF (eDir(i)) THEN
                               j = s + i - 1
-                              lD(j,Ac) = Do(j,Ac) + c1*lY(j,Ac) +
-     2                           c2*Yo(j,Ac)
-                              IF (ustRd) THEN
-                                 ADn(i,Ac) = (1.0D0/c1) *
-     2                              (lD(j,Ac) - Do(j,Ac) - c2*ADo(i,Ac))
-                              END IF
+                              lD(j,Ac) = c1*lY(j,Ac) - c2*Ad(i,Ac) +
+     2                                   Do(j,Ac)
+                              Ad(i,Ac) = lY(j,Ac)
                            END IF
                         END DO
                      END DO
@@ -169,22 +165,17 @@
                   IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
                      DO a=1, msh(iM)%fa(iFa)%nNo
                         Ac = msh(iM)%fa(iFa)%gN(a)
-                        lA(s:e,Ac) = (1.0d0/c1) *
-     2                     (lY(s:e,Ac) - Yo(s:e,Ac) - c2*Ao(s:e,Ac))
-                        IF (ustRd) THEN
-                           ADn(1:nsd,Ac) = (1.0D0/c1) * (lD(s:e,Ac)  -
-     2                        Do(s:e,Ac) - c2*ADo(1:nsd,Ac))
-                        END IF
+                        lA(s:e,Ac) = c1i*(lY(s:e,Ac) - Yo(s:e,Ac) +
+     2                                c2*Ao(s:e,Ac))
+                        Ad(:,Ac)   = c1i*(lD(s:e,Ac) - Do(s:e,Ac) +
+     2                                c2*Ad(:,Ac))
                      END DO
                   ELSE
                      DO a=1, msh(iM)%fa(iFa)%nNo
                         Ac = msh(iM)%fa(iFa)%gN(a)
-                        lD(s:e,Ac) = Do(s:e,Ac) + c1*lY(s:e,Ac) +
-     2                     c2*Yo(s:e,Ac)
-                        IF (ustRd) THEN
-                           ADn(1:nsd,Ac) = (1.0D0/c1) * (lD(s:e,Ac) -
-     2                        Do(s:e,Ac) - c2*ADo(1:nsd,Ac))
-                        END IF
+                        lD(s:e,Ac) = c1*lY(s:e,Ac) - c2*Ad(:,Ac) +
+     2                               Do(s:e,Ac)
+                        Ad(:,Ac)   = lY(s:e,Ac)
                      END DO
                   END IF
                END IF
