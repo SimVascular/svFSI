@@ -35,12 +35,38 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE GETBF(lM, bfg)
+      SUBROUTINE GETBF()
+      USE COMMOD
+      IMPLICIT NONE
+
+      LOGICAL flag
+      INTEGER iM
+
+      flag = .FALSE.
+      DO iM=1, nMsh
+         IF (ALLOCATED(msh(iM)%bf)) THEN
+            flag = .TRUE.
+            EXIT
+         END IF
+      END DO
+      IF (flag) THEN
+         IF (ALLOCATED(Bfg)) DEALLOCATE(Bfg)
+         ALLOCATE(Bfg(nsd,tnNo))
+         Bfg = 0D0
+         DO iM=1, nMsh
+            IF (ALLOCATED(msh(iM)%bf)) CALL GETBFL(msh(iM), Bfg)
+         END DO
+      END IF
+
+      RETURN
+      END SUBROUTINE GETBF
+!--------------------------------------------------------------------
+      SUBROUTINE GETBFL(lM, lBf)
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(INOUT) :: bfg(nsd,tnNo)
+      REAL(KIND=8), INTENT(INOUT) :: lBf(nsd,tnNo)
 
       INTEGER :: a, Ac
       REAL(KIND=8), ALLOCATABLE :: tmpY(:,:), tmpA(:,:)
@@ -50,11 +76,11 @@
 
       DO a=1, lM%nNo
          Ac = lM%gN(a)
-         bfg(:,Ac) = tmpY(:,a)
+         lBf(:,Ac) = tmpY(:,a)
       END DO
 
       DEALLOCATE(tmpY, tmpA)
 
       RETURN
-      END SUBROUTINE GETBF
+      END SUBROUTINE GETBFL
 !####################################################################

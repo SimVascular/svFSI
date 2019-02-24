@@ -52,7 +52,7 @@
      2   Inv6
       REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
-     3   Eff, Ess, kap, Hff(nsd,nsd), Hss(nsd,nsd)
+     3   Eff, Ess, kap, Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6)
       REAL(KIND=8) :: r1, r2, g1, g2, g3
 
 !     Some preliminaries
@@ -73,20 +73,7 @@
 !     Contribution of dilational penalty terms to S and CC
       p  = 0D0
       pl = 0D0
-      SELECT CASE (stM%volType)
-      CASE (stVol_Quad)
-         p  = Kp*(J-1D0)
-         pl = Kp*(2D0*J-1D0)
-
-      CASE (stVol_ST91)
-         p  = 5D-1*Kp*(J-1D0/J)
-         pl = Kp*J
-
-      CASE (stVol_M94)
-         p  = Kp*(1D0-1D0/J)
-         pl = Kp
-
-      END SELECT
+      IF (.NOT.ISZERO(Kp)) CALL GETSVOLP(stM, J, p, pl)
 
 !     Now, compute isochoric and total stress, elasticity tensors
       SELECT CASE (stM%isoType)
@@ -153,7 +140,7 @@
      2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
          RETURN
 
-!     HGO (Holzapfel-Gasser-Ogden) model without additive splitting of
+!     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
 !     the anisotropic fiber-based strain-energy terms
       CASE (stIso_HGO)
 
@@ -170,12 +157,12 @@
          Hss  = kap*IDm + (1.0D0-3.0D0*kap)*Hss
 
          g1   = stM%C10
-         g2   = stM%aff * Eff * EXP(stM%bff*Eff**2)
-         g3   = stM%ass * Ess * EXP(stM%bss*Ess**2)
+         g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+         g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2D0*(g1*IDm + g2*Hff + g3*Hss)
 
-         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff**2)*EXP(stM%bff*Eff**2)
-         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess**2)*EXP(stM%bss*Ess**2)
+         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
+         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
          g1   = 4D0*J2d*J2d * g1
          g2   = 4D0*J2d*J2d * g2
 
@@ -197,12 +184,106 @@
      2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
          RETURN
 
+!     Guccione (1995) transversely isotropic model
+      CASE (stIso_Gucci)
+!        Compute isochoric component of E
+         E = 5D-1 * (J2d*C - Idm)
+
+!        Transform into local orthogonal coordinate system
+         Hff(1,:) = fl(:,1)
+         Hff(2,:) = fl(:,2)
+         Hff(3,:) = CROSS(fl)
+
+!        Project E to local orthogocal coordinate system
+         E = MATMUL(E, TRANSPOSE(Hff))
+         E = MATMUL(Hff, E)
+
+         g1 = stM%bff
+         g2 = stM%bss
+         g3 = stM%bfs
+
+!        Fiber stiffness contribution to Siso := (dE*_MN / dE_IJ)
+!        - Voigt notation
+         Sfs(:,:,:) = 0D0
+         Sfs(:,:,1) = MAT_DYADPROD(Hff(1,:), Hff(1,:), nsd)
+         Sfs(:,:,2) = MAT_DYADPROD(Hff(2,:), Hff(2,:), nsd)
+         Sfs(:,:,3) = MAT_DYADPROD(Hff(3,:), Hff(3,:), nsd)
+         Sfs(:,:,4) = MAT_SYMMPROD(Hff(1,:), Hff(2,:), nsd)
+         Sfs(:,:,5) = MAT_SYMMPROD(Hff(1,:), Hff(3,:), nsd)
+         Sfs(:,:,6) = MAT_SYMMPROD(Hff(2,:), Hff(3,:), nsd)
+
+         Eff = g1* E(1,1)*E(1,1) +
+     2         g2*(E(2,2)*E(2,2) + E(3,3)*E(3,3)  +
+     3             E(2,3)*E(2,3) + E(3,2)*E(3,2)) +
+     4         g3*(E(1,2)*E(1,2) + E(2,1)*E(2,1)  +
+     5             E(1,3)*E(1,3) + E(3,1)*E(3,1))
+
+         Hss = g1*E(1,1)*Sfs(:,:,1)
+         Hss = Hss + g2*(E(2,2)*Sfs(:,:,2) + E(3,3)*Sfs(:,:,3) +
+     2      (E(2,3) + E(3,2))*Sfs(:,:,6))
+         Hss = Hss + g3*( (E(1,2) + E(2,1))*Sfs(:,:,4) +
+     2                    (E(1,3) + E(3,1))*Sfs(:,:,5) )
+
+         r2  = stM%C10 * EXP(Eff)
+         Sb  = r2 * Hss
+
+         r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
+         S   = J2d*Sb - r1*Ci
+
+         r2  = r2*J2d*J2d
+         CCb = r2 * ( 2D0*TEN_DYADPROD(Hss, Hss, nsd) +
+     2      g1* TEN_DYADPROD(Sfs(:,:,1), Sfs(:,:,1), nsd)  +
+     3      g2*(TEN_DYADPROD(Sfs(:,:,2), Sfs(:,:,2), nsd)  +
+     4          TEN_DYADPROD(Sfs(:,:,3), Sfs(:,:,3), nsd)  +
+     5      2D0*TEN_DYADPROD(Sfs(:,:,6), Sfs(:,:,6), nsd)) + 2D0*
+     6      g3*(TEN_DYADPROD(Sfs(:,:,4), Sfs(:,:,4), nsd)  +
+     7          TEN_DYADPROD(Sfs(:,:,5), Sfs(:,:,5), nsd)) )
+
+         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         CC  = TEN_DDOT(CCb, PP, nsd)
+         CC  = TEN_TRANSPOSE(CC, nsd)
+         CC  = TEN_DDOT(PP, CC, nsd)
+         CC  = CC - (2D0/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
+     2                           TEN_DYADPROD(S, Ci, nsd) )
+
+         S   = S + p*J*Ci
+         CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+
       CASE DEFAULT
          err = "Undefined material constitutive model"
       END SELECT
 
       RETURN
       END SUBROUTINE GETPK2CC
+!====================================================================
+      SUBROUTINE GETSVOLP(stM, J, p, pl)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(stModelType), INTENT(IN) :: stM
+      REAL(KIND=8), INTENT(IN) :: J
+      REAL(KIND=8), INTENT(INOUT) :: p, pl
+
+      REAL(KIND=8) Kp
+
+      Kp = stM%Kpen
+      SELECT CASE (stM%volType)
+      CASE (stVol_Quad)
+         p  = Kp*(J-1D0)
+         pl = Kp*(2D0*J-1D0)
+
+      CASE (stVol_ST91)
+         p  = 5D-1*Kp*(J-1D0/J)
+         pl = Kp*J
+
+      CASE (stVol_M94)
+         p  = Kp*(1D0-1D0/J)
+         pl = Kp
+
+      END SELECT
+
+      END SUBROUTINE GETSVOLP
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
@@ -219,7 +300,7 @@
       REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6,
      2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
      3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd), kap, Eff, Ess,
-     4   Hff(nsd,nsd), Hss(nsd,nsd)
+     4   Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6)
       REAL(KIND=8) :: r1, r2, g1, g2, g3
 
 !     Some preliminaries
@@ -273,7 +354,7 @@
      4                         TEN_DYADPROD(S, Ci, nsd) )
          RETURN
 
-!     HGO (Holzapfel-Gasser-Ogden) model without additive splitting of
+!     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
 !     the anisotropic fiber-based strain-energy terms
       CASE (stIso_HGO)
 
@@ -290,12 +371,12 @@
          Hss  = kap*IDm + (1.0D0-3.0D0*kap)*Hss
 
          g1   = stM%C10
-         g2   = stM%aff * Eff * EXP(stM%bff*Eff**2)
-         g3   = stM%ass * Ess * EXP(stM%bss*Ess**2)
+         g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+         g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2D0*(g1*IDm + g2*Hff + g3*Hss)
 
-         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff**2)*EXP(stM%bff*Eff**2)
-         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess**2)*EXP(stM%bss*Ess**2)
+         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
+         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
          g1   = 4D0*J2d*J2d * g1
          g2   = 4D0*J2d*J2d * g2
 
@@ -315,13 +396,77 @@
      4                         TEN_DYADPROD(S, Ci, nsd) )
          RETURN
 
+!     Guccione (1995) transversely isotropic model
+      CASE (stIso_Gucci)
+!        Compute isochoric component of E
+         E = 5D-1 * (J2d*C - Idm)
+
+!        Transform into local orthogonal coordinate system
+         Hff(1,:) = fl(:,1)
+         Hff(2,:) = fl(:,2)
+         Hff(3,:) = CROSS(fl)
+
+!        Project E to local orthogocal coordinate system
+         E = MATMUL(E, TRANSPOSE(Hff))
+         E = MATMUL(Hff, E)
+
+         g1 = stM%bff
+         g2 = stM%bss
+         g3 = stM%bfs
+
+!        Fiber stiffness contribution to Siso := (dE*_MN / dE_IJ)
+!        - Voigt notation
+         Sfs(:,:,:) = 0D0
+         Sfs(:,:,1) = MAT_DYADPROD(Hff(1,:), Hff(1,:), nsd)
+         Sfs(:,:,2) = MAT_DYADPROD(Hff(2,:), Hff(2,:), nsd)
+         Sfs(:,:,3) = MAT_DYADPROD(Hff(3,:), Hff(3,:), nsd)
+         Sfs(:,:,4) = MAT_SYMMPROD(Hff(1,:), Hff(2,:), nsd)
+         Sfs(:,:,5) = MAT_SYMMPROD(Hff(1,:), Hff(3,:), nsd)
+         Sfs(:,:,6) = MAT_SYMMPROD(Hff(2,:), Hff(3,:), nsd)
+
+         Eff = g1* E(1,1)*E(1,1) +
+     2         g2*(E(2,2)*E(2,2) + E(3,3)*E(3,3)  +
+     3             E(2,3)*E(2,3) + E(3,2)*E(3,2)) +
+     4         g3*(E(1,2)*E(1,2) + E(2,1)*E(2,1)  +
+     5             E(1,3)*E(1,3) + E(3,1)*E(3,1))
+
+         Hss = g1*E(1,1)*Sfs(:,:,1)
+         Hss = Hss + g2*(E(2,2)*Sfs(:,:,2) + E(3,3)*Sfs(:,:,3) +
+     2      (E(2,3) + E(3,2))*Sfs(:,:,6))
+         Hss = Hss + g3*( (E(1,2) + E(2,1))*Sfs(:,:,4) +
+     2                    (E(1,3) + E(3,1))*Sfs(:,:,5) )
+
+         r2  = stM%C10 * EXP(Eff)
+         Sb  = r2 * Hss
+
+         r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
+         S   = J2d*Sb - r1*Ci
+
+         r2  = r2*J2d*J2d
+         CCb = r2 * ( 2D0*TEN_DYADPROD(Hss, Hss, nsd) +
+     2      g1* TEN_DYADPROD(Sfs(:,:,1), Sfs(:,:,1), nsd)  +
+     3      g2*(TEN_DYADPROD(Sfs(:,:,2), Sfs(:,:,2), nsd)  +
+     4          TEN_DYADPROD(Sfs(:,:,3), Sfs(:,:,3), nsd)  +
+     5      2D0*TEN_DYADPROD(Sfs(:,:,6), Sfs(:,:,6), nsd)) + 2D0*
+     6      g3*(TEN_DYADPROD(Sfs(:,:,4), Sfs(:,:,4), nsd)  +
+     7          TEN_DYADPROD(Sfs(:,:,5), Sfs(:,:,5), nsd)) )
+
+         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         CC  = TEN_DDOT(CCb, PP, nsd)
+         CC  = TEN_TRANSPOSE(CC, nsd)
+         CC  = TEN_DDOT(PP, CC, nsd)
+         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+     4                         TEN_DYADPROD(S, Ci, nsd) )
+
       CASE DEFAULT
          err = "Undefined isochoric material constitutive model"
       END SELECT
 
       RETURN
       END SUBROUTINE GETPK2CCdev
-!####################################################################
+!====================================================================
 !     Compute rho and beta depending on the Gibb's free-energy based
 !     volumetric penalty model
       SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt)
@@ -354,12 +499,12 @@
 
       CASE (stVol_ST91)
          r1  = ro/Kp
-         r2  = SQRT(p**2.0D0 + Kp**2.0D0)
+         r2  = SQRT(p*p + Kp*Kp)
 
          ro  = r1*(p + r2)
          bt  = 1D0/r2
          dro = ro*bt
-         dbt = -bt*p/(p**2 + Kp**2)
+         dbt = -bt*p/(p*p + Kp*Kp)
 
       CASE (stVol_M94)
          r1  = ro/Kp
@@ -368,7 +513,7 @@
          ro  = r1*r2
          bt  = 1D0/r2
          dro = r1
-         dbt = -bt/r2
+         dbt = -bt*bt
 
       CASE DEFAULT
          err = "Undefined volumetric material constitutive model"
@@ -376,14 +521,13 @@
 
       RETURN
       END SUBROUTINE GVOLPEN
-!####################################################################
+!====================================================================
 !     Compute stabilization parameters tauM and tauC
-      SUBROUTINE GETTAU(stM, Je, tauM, tauC)
+      SUBROUTINE GETTAU(Je, tauM, tauC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
-      TYPE(stModelType), INTENT(IN) :: stM
       REAL(KIND=8), INTENT(IN) :: Je
       REAL(KIND=8), INTENT(OUT) :: tauM, tauC
 

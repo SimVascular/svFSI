@@ -286,7 +286,6 @@
       INTEGER, PARAMETER :: maxOutput = 12
       INTEGER fid, iBc, phys(2), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
-      LOGICAL flag
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) fTmp
@@ -426,20 +425,23 @@
          IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/7,1,0,0/)
-         outPuts(1) = out_displacement
-         outPuts(2) = out_fibDir
-         outPuts(3) = out_stress
-         outputs(4) = out_strainInv
-         outPuts(5) = out_velocity
-         outPuts(6) = out_acceleration
-         outPuts(7) = out_integ
+         nDOP = (/10,1,0,0/)
+         outPuts(1)  = out_displacement
+         outPuts(2)  = out_velocity
+         outPuts(3)  = out_acceleration
+         outPuts(4)  = out_stress
+         outPuts(5)  = out_fibDir
+         outPuts(6)  = out_fibAlign
+         outputs(7)  = out_strainInv
+         outPuts(8)  = out_integ
+         outPuts(9)  = out_jacobian
+         outPuts(10) = out_defGrad
 
          CALL READLS(lSolver_CG, lEq, list)
 
-!     Velocity-Pressure based nonlinear STRUCTURAL mechanics solver ---
-      CASE ('ustruct')
-         lEq%phys = phys_ustruct
+!     VMS-stabilized nonlinear STRUCTURAL mechanics solver ---
+      CASE ('vms_struct')
+         lEq%phys = phys_vms_struct
 
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
@@ -451,15 +453,18 @@
          IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/8,1,0,0/)
-         outPuts(1) = out_displacement
-         outPuts(2) = out_velocity
-         outPuts(3) = out_pressure
-         outPuts(4) = out_acceleration
-         outPuts(5) = out_stress
-         outPuts(6) = out_fibDir
-         outPuts(7) = out_strainInv
-         outPuts(8) = out_integ
+         nDOP = (/11,1,0,0/)
+         outPuts(1)  = out_displacement
+         outPuts(2)  = out_velocity
+         outPuts(3)  = out_pressure
+         outPuts(4)  = out_acceleration
+         outPuts(5)  = out_stress
+         outPuts(6)  = out_fibDir
+         outPuts(7)  = out_fibAlign
+         outPuts(8)  = out_strainInv
+         outPuts(9)  = out_integ
+         outPuts(10) = out_jacobian
+         outPuts(11) = out_defGrad
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -712,15 +717,15 @@
                lEq%dmn(iDmn)%phys = phys_fluid
             CASE("struct")
                lEq%dmn(iDmn)%phys = phys_struct
-            CASE("ustruct")
-               lEq%dmn(iDmn)%phys = phys_ustruct
+            CASE("vms_struct")
+               lEq%dmn(iDmn)%phys = phys_vms_struct
             CASE("lElas")
                lEq%dmn(iDmn)%phys = phys_lElas
             CASE("CMM")
                lEq%dmn(iDmn)%phys = phys_CMM
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/ustruct/lElas/CMM"
+     2            "Equation must be fluid/struct/vms_struct/lElas/CMM"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys
@@ -753,11 +758,7 @@
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
             CASE (poisson_ratio)
-               IF (lEq%dmn(iDmn)%phys .EQ. phys_ustruct) THEN
-                  lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0)
-               ELSE
-                  lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ub=5D-1)
-               END IF
+               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ul=5D-1)
             CASE (conductivity)
                lPtr => lPD%get(rtmp,"Conductivity",1,ll=0D0)
             CASE (f_x)
@@ -804,7 +805,7 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct .OR.
+     2       lEq%dmn(iDmn)%phys.EQ.phys_vms_struct .OR.
      3       lEq%dmn(iDmn)%phys.EQ.phys_preSt) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
@@ -1199,6 +1200,68 @@ c     2         "can be applied for Neumann boundaries only"
          err = TRIM(list%ping("Profile",lPtr))//" Unexpected profile"
       END SELECT
 
+!     If a Neumann BC face is undeforming
+      lBc%masN = 0
+      IF (BTEST(lBc%bType,bType_Neu)) THEN
+         ltmp = .FALSE.
+         lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
+         lPtr => list%get(ltmp, "Undeforming Neu face")
+         IF (ltmp) THEN
+            IF (phys .NE. phys_vms_struct) err = "Undeforming Neu "//
+     2         "face is currently formulated for VMS_STRUCT only"
+
+            IF (BTEST(lBc%bType,bType_cpl) .OR.
+     2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//
+     2         "BC cannot be used with resistance or couple BC yet"
+
+!           Clear any BC profile
+            lBc%bType = IBCLR(lBc%bType,bType_flat)
+            lBc%bType = IBCLR(lBc%bType,bType_para)
+            lBc%bType = IBCLR(lBc%bType,bType_ddep)
+            IF (BTEST(lBc%bType,bType_ud) .OR.
+     2          BTEST(lBc%bType,bType_gen)) THEN
+               err = "General BC or user defined spatial profile "//
+     2            "cannot be imposed on an undeforming Neu face"
+            END IF
+
+!           Clear zero perimeter flag
+            lBc%bType = IBCLR(lBc%bType,bType_zp)
+
+!           Reset profile to flat and set undeforming Neumann BC flag
+            lBc%bType = IBSET(lBc%bType,bType_flat)
+            lBc%bType = IBSET(lBc%bType,bType_undefNeu)
+
+!           Set master-slave node parameters. Set a master node that
+!           is not part of any other face (not on perimeter)
+            iM  = lBc%iM
+            iFa = lBc%iFa
+            IF (ALLOCATED(ptr)) DEALLOCATE(ptr)
+            ALLOCATE(ptr(gtnNo))
+            ptr = 0
+            DO a=1, msh(iM)%fa(iFa)%nNo
+               Ac = msh(iM)%fa(iFa)%gN(a)
+               ptr(Ac) = 1
+            END DO
+
+            DO j=1, msh(iM)%nFa
+               IF (j .EQ. iFa) CYCLE
+               DO a=1, msh(iM)%fa(j)%nNo
+                  Ac = msh(iM)%fa(j)%gN(a)
+                  ptr(Ac) = 0
+               END DO
+            END DO
+
+            DO a=1, msh(iM)%fa(iFa)%nNo
+               Ac = msh(iM)%fa(iFa)%gN(a)
+               IF (ptr(Ac) .EQ. 1) THEN
+                  lBc%masN = Ac
+                  EXIT
+               END IF
+            END DO
+            DEALLOCATE(ptr)
+         END IF
+      END IF
+
       RETURN
       END SUBROUTINE READBC
 !--------------------------------------------------------------------
@@ -1309,11 +1372,26 @@ c     2         "can be applied for Neumann boundaries only"
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Fiber"
+         CASE (out_fibAlign)
+            lEq%output(iOut)%grp  = outGrp_fA
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Fiber_alignment"
          CASE (out_actionPotential)
             lEq%output(iOut)%grp  = outGrp_Y
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Action_potential"
+         CASE (out_jacobian)
+            lEq%output(iOut)%grp  = outGrp_J
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Jacobian"
+         CASE (out_defGrad)
+            lEq%output(iOut)%grp  = outGrp_F
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd*nsd
+            lEq%output(iOut)%name = "Deformation_gradient"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT
@@ -1679,12 +1757,16 @@ c     2         "can be applied for Neumann boundaries only"
          RETURN
 
       CASE ("stVK", "stVenantKirchhoff")
+         IF (incompFlag) err = "Cannot choose stVK model for Poisson "//
+     2      "ratio 0.5"
          lDmn%stM%isoType = stIso_stVK
          lDmn%stM%C10 = lam
          lDmn%stM%C01 = mu
          RETURN
 
       CASE ("m-stVK", "modified-stVK",  "modified-stVenantKirchhoff")
+         IF (incompFlag) err = "Cannot choose stVK model for Poisson "//
+     2      "ratio 0.5"
          lDmn%stM%isoType = stIso_mStVK
          lDmn%stM%C10 = kap
          lDmn%stM%C01 = mu
@@ -1710,6 +1792,17 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%kap, "kappa")
          IF (nFn .NE. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
+
+      CASE ("Guccione", "Gucci")
+         lDmn%stM%isoType = stIso_Gucci
+         lPtr => lSt%get(lDmn%stM%C10, "C")
+         lPtr => lSt%get(lDmn%stM%bff, "bf")
+         lPtr => lSt%get(lDmn%stM%bss, "bt")
+         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
+         IF (nFn.NE.2 .OR. nsd.NE.3) THEN
+            err = "Guccione material model is used for 3D problems "//
+     2         "with 2 family of directions"
+         END IF
 
       CASE DEFAULT
          err = "Undefined constitutive model used"

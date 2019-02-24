@@ -395,16 +395,16 @@
       END SUBROUTINE BPOST
 !####################################################################
 !     Routine for post processing stress tensor
-      SUBROUTINE TPOST(lM, res, lD, iEq)
+      SUBROUTINE TPOST(lM, m, res, lD, iEq, outGrp)
       USE COMMOD
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(INOUT) :: res(nstd,lM%nNo)
+      REAL(KIND=8), INTENT(INOUT) :: res(m,lM%nNo)
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: iEq
+      INTEGER, INTENT(IN) :: m, iEq, outGrp
 
       INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys, insd
       REAL(KIND=8) w, Jac, detF, ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
@@ -419,8 +419,8 @@
       j    = i + 1
       k    = j + 1
 
-      ALLOCATE (sA(tnNo), sF(nstd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fNl(nFn*nsd,eNoN), pSl(nstd), Nx(nsd,eNoN), N(eNoN))
+      ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
+     2   fNl(nFn*nsd,eNoN), pSl(m), Nx(nsd,eNoN), N(eNoN), fl(nsd,nFn))
 
       sA   = 0D0
       sF   = 0D0
@@ -431,7 +431,7 @@
          cPhys = eq(iEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_struct .AND.
      2       cPhys .NE. phys_preSt  .AND.
-     3       cPhys .NE. phys_ustruct) CYCLE
+     3       cPhys .NE. phys_vms_struct) CYCLE
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
@@ -451,7 +451,6 @@
             w = lM%w(g)*Jac
             N = lM%N(:,g)
 
-            ALLOCATE(fl(nsd,nFn))
             F  = MAT_ID(nsd)
             fl = 0D0
             DO a=1, eNoN
@@ -481,36 +480,71 @@
             END DO
             detF = MAT_DET(F, nsd)
 
+            IF (outGrp .EQ. outGrp_J) THEN
+!           Jacobian := determinant of deformation gradient tensor
+               DO a=1, eNoN
+                  Ac       = lM%IEN(a,e)
+                  sA(Ac)   = sA(Ac)   + w*N(a)
+                  sF(1,Ac) = sF(1,Ac) + w*N(a)*detF
+               END DO
+
+            ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
-            IF (cPhys .EQ. phys_ustruct) THEN
-               CALL GETPK2CCdev(stModel, F, nFn, fl, S, CC)
-               P = MATMUL(F, S)
-               sigma = MATMUL(P, TRANSPOSE(F))
-               IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
-            ELSE
-               CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
-               sigma = S
-            END IF
-            DEALLOCATE(fl)
+               IF (cPhys .EQ. phys_vms_struct) THEN
+                  CALL GETPK2CCdev(stModel, F, nFn, fl, S, CC)
+                  P = MATMUL(F, S)
+                  sigma = MATMUL(P, TRANSPOSE(F))
+                  IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
+               ELSE
+                  CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
+                  sigma = S
+               END IF
 
-            IF (nsd .EQ. 3) THEN
-               pSl(1) = sigma(1,1)
-               pSl(2) = sigma(2,2)
-               pSl(3) = sigma(3,3)
-               pSl(4) = sigma(1,2)
-               pSl(5) = sigma(1,3)
-               pSl(6) = sigma(2,3)
-            ELSE
-               pSl(1) = sigma(1,1)
-               pSl(2) = sigma(2,2)
-               pSl(3) = sigma(1,2)
-            END IF
+               IF (nsd .EQ. 3) THEN
+                  pSl(1) = sigma(1,1)
+                  pSl(2) = sigma(2,2)
+                  pSl(3) = sigma(3,3)
+                  pSl(4) = sigma(1,2)
+                  pSl(5) = sigma(1,3)
+                  pSl(6) = sigma(2,3)
+               ELSE
+                  pSl(1) = sigma(1,1)
+                  pSl(2) = sigma(2,2)
+                  pSl(3) = sigma(1,2)
+               END IF
 
-            DO a=1, eNoN
-               Ac       = lM%IEN(a,e)
-               sA(Ac)   = sA(Ac)   + w*N(a)
-               sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
-            END DO
+               DO a=1, eNoN
+                  Ac       = lM%IEN(a,e)
+                  sA(Ac)   = sA(Ac)   + w*N(a)
+                  sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
+               END DO
+
+            ELSE IF (outGrp .EQ. outGrp_F) THEN
+!           Deformation gradient tensor (F)
+               ! pSl is used to remap F
+               IF (nsd .EQ. 3) THEN
+                  pSl(1) = F(1,1)
+                  pSl(2) = F(1,2)
+                  pSl(3) = F(1,3)
+                  pSl(4) = F(2,1)
+                  pSl(5) = F(2,2)
+                  pSl(6) = F(2,3)
+                  pSl(7) = F(3,1)
+                  pSl(8) = F(3,2)
+                  pSl(9) = F(3,3)
+               ELSE
+                  pSl(1) = F(1,1)
+                  pSl(2) = F(1,2)
+                  pSl(3) = F(2,1)
+                  pSl(4) = F(2,2)
+               END IF
+
+               DO a=1, eNoN
+                  Ac       = lM%IEN(a,e)
+                  sA(Ac)   = sA(Ac)   + w*N(a)
+                  sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
+               END DO
+            END IF
          END DO
       END DO
 
@@ -524,8 +558,222 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, fNl, pSl, N, Nx)
+      DEALLOCATE (sA, sF, xl, dl, fNl, fl, pSl, N, Nx)
 
       RETURN
       END SUBROUTINE TPOST
+!####################################################################
+!     Routine for post processing fiber directions
+      SUBROUTINE FIBDIRPOST(lM, res, lD, iEq)
+      USE COMMOD
+      USE ALLFUN
+      USE MATFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+      REAL(KIND=8), INTENT(INOUT) :: res(nFn*nsd,lM%nNo)
+      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
+      INTEGER, INTENT(IN) :: iEq
+
+      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
+      REAL(KIND=8) w, Jac, F(nsd,nsd)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), fl(:,:),
+     2   Nx(:,:), N(:), sA(:), sF(:,:)
+
+      eNoN = lM%eNoN
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
+
+      ALLOCATE (sA(tnNo), sF(nFn*nsd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
+     2   fNl(nFn*nsd,eNoN), fl(nsd,nFn), Nx(nsd,eNoN), N(eNoN))
+
+      sA = 0D0
+      sF = 0D0
+      DO e=1, lM%nEl
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+         DO a=1, eNoN
+            Ac       = lM%IEN(a,e)
+            xl(:,a)  = x(:,Ac)
+            dl(:,a)  = lD(:,Ac)
+            fNl(:,a) = fN(:,Ac)
+         END DO
+
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, F)
+            END IF
+            w = lM%w(g)*Jac
+            N = lM%N(:,g)
+
+            F  = MAT_ID(nsd)
+            fl = 0D0
+            DO a=1, eNoN
+               IF (nsd .EQ. 3) THEN
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                  F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                  F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                  F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+               ELSE
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+               END IF
+
+               DO iFn=1, nFn
+                  b = (iFn-1)*nsd
+                  DO l=1, nsd
+                     fl(l,iFn) = fl(l,iFn) + N(a)*fNl(b+l,a)
+                  END DO
+               END DO
+            END DO
+
+            DO iFn=1, nFn
+               fl(:,iFn) = MATMUL(F, fl(:,iFn))
+               fl(:,iFn) = fl(:,iFn)/SQRT(NORM(fl(:,iFn)))
+            END DO
+
+            DO a=1, eNoN
+               Ac     = lM%IEN(a,e)
+               sA(Ac) = sA(Ac) + w*N(a)
+               DO iFn=1, nFn
+                  b = (iFn-1)*nsd
+                  DO l=1, nsd
+                     sF(b+l,Ac) = sF(b+l,Ac) + w*N(a)*fl(l,iFn)
+                  END DO
+               END DO
+            END DO
+         END DO
+      END DO
+
+      CALL COMMU(sF)
+      CALL COMMU(sA)
+
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         IF (.NOT.ISZERO(sA(Ac))) THEN
+            res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
+         ENDIF
+      END DO
+
+      DEALLOCATE (sA, sF, xl, dl, fNl, fl, N, Nx)
+
+      RETURN
+      END SUBROUTINE FIBDIRPOST
+!--------------------------------------------------------------------
+!     Routine for post processing fiber alignment
+      SUBROUTINE FIBALGNPOST(lM, res, lD, iEq)
+      USE COMMOD
+      USE ALLFUN
+      USE MATFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+      REAL(KIND=8), INTENT(INOUT) :: res(1,lM%nNo)
+      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
+      INTEGER, INTENT(IN) :: iEq
+
+      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
+      REAL(KIND=8) w, Jac, sHat, F(nsd,nsd)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), fl(:,:),
+     2   Nx(:,:), N(:), sA(:), sF(:)
+
+      eNoN = lM%eNoN
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
+
+      ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
+     2   fNl(nFn*nsd,eNoN), fl(nsd,nFn), Nx(nsd,eNoN), N(eNoN))
+
+      sA = 0D0
+      sF = 0D0
+      DO e=1, lM%nEl
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_struct .AND.
+     2       cPhys .NE. phys_vms_struct) CYCLE
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+         DO a=1, eNoN
+            Ac       = lM%IEN(a,e)
+            xl(:,a)  = x(:,Ac)
+            dl(:,a)  = lD(:,Ac)
+            fNl(:,a) = fN(:,Ac)
+         END DO
+
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, F)
+            END IF
+            w = lM%w(g)*Jac
+            N = lM%N(:,g)
+
+            F  = MAT_ID(nsd)
+            fl = 0D0
+            DO a=1, eNoN
+               IF (nsd .EQ. 3) THEN
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                  F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                  F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                  F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+               ELSE
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+               END IF
+
+               DO iFn=1, nFn
+                  b = (iFn-1)*nsd
+                  DO l=1, nsd
+                     fl(l,iFn) = fl(l,iFn) + N(a)*fNl(b+l,a)
+                  END DO
+               END DO
+            END DO
+
+            DO iFn=1, nFn
+               fl(:,iFn) = MATMUL(F, fl(:,iFn))
+               fl(:,iFn) = fl(:,iFn)/SQRT(NORM(fl(:,iFn)))
+            END DO
+            sHat = NORM(fl(:,1), fl(:,2))
+
+            DO a=1, eNoN
+               Ac     = lM%IEN(a,e)
+               sA(Ac) = sA(Ac) + w*N(a)
+               sF(Ac) = sF(Ac) + w*N(a)*sHat
+            END DO
+         END DO
+      END DO
+
+      CALL COMMU(sF)
+      CALL COMMU(sA)
+
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         IF (.NOT.ISZERO(sA(Ac))) THEN
+           res(1,a) = res(1,a) + sF(Ac)/sA(Ac)
+         ENDIF
+      END DO
+
+      DEALLOCATE (sA, sF, xl, dl, fNl, fl, N, Nx)
+
+      RETURN
+      END SUBROUTINE FIBALGNPOST
 !####################################################################

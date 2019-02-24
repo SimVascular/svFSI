@@ -97,6 +97,24 @@
       RETURN
       END FUNCTION MAT_DYADPROD
 !--------------------------------------------------------------------
+!     Create a matrix from symmetric product of two vectors
+      FUNCTION MAT_SYMMPROD(u, v, nd) RESULT(A)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: u(nd), v(nd)
+      REAL(KIND=8) :: A(nd,nd)
+
+      INTEGER :: i, j
+
+      DO j=1, nd
+         DO i=1, nd
+            A(i,j) = 5D-1*(u(i)*v(j) + u(j)*v(i))
+         END DO
+      END DO
+
+      RETURN
+      END FUNCTION MAT_SYMMPROD
+!--------------------------------------------------------------------
 !     Double dot product of 2 square matrices
       FUNCTION MAT_DDOT(A, B, nd) RESULT(s)
       IMPLICIT NONE

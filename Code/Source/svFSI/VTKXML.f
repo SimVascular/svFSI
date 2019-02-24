@@ -486,7 +486,7 @@
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nstd,msh(iM)%nNo))
                   IF (eq(iEq)%phys .EQ. phys_struct .OR.
-     2                eq(iEq)%phys .EQ. phys_ustruct) THEN
+     2                eq(iEq)%phys .EQ. phys_vms_struct) THEN
                      tmpV = 0D0
                   ELSE IF (eq(iEq)%phys .EQ. phys_preSt) THEN
                      DO a=1, msh(iM)%nNo
@@ -494,7 +494,7 @@
                         tmpV(:,a) = pS0(:,Ac)
                      END DO
                   END IF
-                  CALL TPOST(msh(iM), tmpV, lD, iEq)
+                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO
@@ -512,6 +512,10 @@
                   END DO
                CASE (outGrp_fN)
                   cOut = cOut - 1
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(nFn*nsd,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL FIBDIRPOST(msh(iM), tmpV, lD, iEq)
                   DO iFn=1, nFn
                      cOut = cOut + 1
                      is   = outS(cOut)
@@ -520,10 +524,35 @@
                      outNames(cOut) = eq(iEq)%sym//"_"//
      2                  TRIM(eq(iEq)%output(iOut)%name)//STR(iFn)
                      DO a=1, msh(iM)%nNo
-                        Ac = msh(iM)%gN(a)
                         d(iM)%x(is:ie,a) =
-     2                     fN((iFn-1)*nsd+s:(iFn-1)*nsd+e,Ac)
+     2                     tmpV((iFn-1)*nsd+s:(iFn-1)*nsd+e,a)
                      END DO
+                  END DO
+               CASE (outGrp_fA)
+                  IF (nFn .NE. 2) err = "Fiber alignment is computed "//
+     2               "for 2 family for fibers only"
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(1,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
+                  END DO
+               CASE (outGrp_J)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(1,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is:ie,a) = tmpV(1,a)
+                  END DO
+               CASE (outGrp_F)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(nsd*nsd,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO
                CASE DEFAULT
                   err = "Undefined output"

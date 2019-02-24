@@ -506,7 +506,7 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys .EQ. phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_ustruct .OR.
+     2       lEq%dmn(iDmn)%phys .EQ. phys_vms_struct .OR.
      3       lEq%dmn(iDmn)%phys .EQ. phys_preSt) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
@@ -565,8 +565,9 @@
       TYPE(mshType), INTENT(IN) :: tMs(nMsh)
 
       LOGICAL flag
-      INTEGER i, j, iDof, nTp, nNo, a, b, Ac
+      INTEGER i, j, iDof, nTp, nNo, a, b, Ac, iM, iFa
 
+      INTEGER, ALLOCATABLE :: tmpI(:)
       REAL(KIND=8), ALLOCATABLE :: tmp(:)
 
       CALL cm%bcast(lBc%cplBCptr)
@@ -581,7 +582,7 @@
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
 
-!     Communicating time-depandant BC data
+!     Communicating time-dependent BC data
       flag = ALLOCATED(lBc%gt)
       CALL cm%bcast(flag)
       IF (flag) THEN
@@ -667,6 +668,56 @@
                lBc%gx(b) = tmp(a)
             END IF
          END DO
+         DEALLOCATE(tmp)
+      END IF
+
+!     Communicating and reordering master node data for undeforming
+!     Neumann BC faces
+      IF (BTEST(lBc%bType,bType_undefNeu)) THEN
+         CALL cm%bcast(lBc%masN)
+         iM   = lBc%iM
+         iFa  = lBc%iFa
+         nNo  = msh(iM)%fa(iFa)%nNo
+         flag = nNo .NE. 0
+!        Action performed only on the processes that share the face
+         IF (flag) THEN
+            Ac = lBc%masN
+            a  = gmtl(Ac)
+!        The process that owns the node is set to be master. For other
+!        processes that share the face but do not own the node, we add
+!        this node as a ghost master node. ltg pointer is reset.
+            IF (a .NE. 0) THEN
+               lBc%masN = a
+            ELSE
+               nNo  = tnNo
+               tnNo = tnNo + 1
+!              Remap ltg
+               IF (ALLOCATED(tmpI)) DEALLOCATE(tmpI)
+               ALLOCATE(tmpI(nNo))
+               tmpI = ltg
+               DEALLOCATE(ltg)
+               ALLOCATE(ltg(tnNo))
+               ltg(1:nNo) = tmpI(:)
+               DEALLOCATE(tmpI)
+               ltg(tnNo) = Ac
+               lBc%masN  = tnNo
+
+!              Add the ghost master node to the face data structure
+               nNo = msh(iM)%fa(iFa)%nNo
+               msh(iM)%fa(iFa)%nNo = nNo + 1
+               ALLOCATE(tmpI(nNo))
+               tmpI(:) = msh(iM)%fa(iFa)%gN(:)
+               DEALLOCATE(msh(iM)%fa(iFa)%gN)
+               ALLOCATE(msh(iM)%fa(iFa)%gN(msh(iM)%fa(iFa)%nNo))
+               msh(iM)%fa(iFa)%gN(1:nNo) = tmpI(:)
+               msh(iM)%fa(iFa)%gN(nNo+1) = tnNo
+            END IF
+         ELSE
+!        Zero out master node if not part of the face
+            lBc%masN = 0
+         END IF
+      ELSE
+         lBc%masN = 0
       END IF
 
       RETURN

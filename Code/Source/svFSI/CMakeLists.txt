@@ -119,6 +119,7 @@ set(FSRCS UTIL.f
          CMM.f
          CONSTRUCT.f
          CONTACT.f
+         DEBUG.f
          DISTRIBUTE.f
          FFT.f
          FLUID.f
@@ -127,6 +128,7 @@ set(FSRCS UTIL.f
          INITIALIZE.f
          LELAS.f
          LHSA.f
+         LS.f
          LOADMSH.f
          LOADNRB.f
          MAIN.f
@@ -143,7 +145,7 @@ set(FSRCS UTIL.f
          SHELLS.f
          STRUCT.f
          TXT.f
-         USTRUCT.f
+         VMS_STRUCT.f
          VTKXML.f)
 
 set(F90SRCS vtkComMod.f90

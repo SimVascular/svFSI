@@ -87,7 +87,6 @@ c      END DO
 
       RETURN
       END SUBROUTINE EXCEPTIONS
-
 !####################################################################
 !     Prepares the output of svFSI to the standard output.
       SUBROUTINE OUTRESULT(timeP, co, iEq)
@@ -174,4 +173,82 @@ c      END DO
       RETURN
       END SUBROUTINE OUTRESULT
 !####################################################################
+      SUBROUTINE WRITERESTART(timeP)
+      USE COMMOD
+      IMPLICIT NONE
 
+      REAL(KIND=8), INTENT(IN) :: timeP(3)
+
+      INTEGER fid, myID
+      CHARACTER(LEN=stdL) fName, tmpS
+
+      fid  = 27
+      myID = cm%tf()
+
+      fName = TRIM(stFileName)//"_last.bin"
+      tmpS  = fName
+      IF (.NOT.stFileRepl) THEN
+         WRITE(fName,'(I3.3)') cTS
+         IF (cTS .GE. 1000) fName = STR(cTS)
+         fName = TRIM(stFileName)//"_"//TRIM(fName)//".bin"
+      END IF
+      IF (cm%mas()) THEN
+         OPEN(fid, FILE=TRIM(fName))
+         CLOSE(fid, STATUS='DELETE')
+      END IF
+
+!     This call is to block all processors
+      CALL cm%bcast(fid)
+
+      OPEN(fid, FILE=TRIM(fName), ACCESS='DIRECT', RECL=recLn)
+      IF (.NOT.ibFlag) THEN
+         IF (dFlag) THEN
+!           VMS_STRUCT
+            IF (ALLOCATED(Ad)) THEN
+!              Prestress
+               IF (pstEq) THEN
+                  WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, Ad
+               ELSE
+                  WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ad
+               END IF
+            ELSE
+!              Prestress
+               IF (pstEq) THEN
+                  WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, pS0
+               ELSE
+                  WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn
+               END IF
+            END IF
+         ELSE
+            WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2         eq%iNorm, cplBC%xn, Yn, An
+         END IF
+      ELSE
+         IF (dFlag) THEN
+            IF (pstEq) THEN
+               WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2          eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%An, ib%Yn,
+     3          ib%Un, ib%Rfb
+            ELSE
+               WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, ib%An, ib%Yn, ib%Un,
+     3            ib%Rfb
+            END IF
+         ELSE
+            WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2         eq%iNorm, cplBC%xn, Yn, An, ib%An, ib%Yn, ib%Un, ib%Rfb
+         END IF
+      END IF
+      CLOSE(fid)
+
+      IF (.NOT.stFileRepl .AND. cm%mas()) THEN
+         CALL SYSTEM("ln -f "//TRIM(fName)//" "//TRIM(tmpS))
+      END IF
+
+      RETURN
+      END SUBROUTINE WRITERESTART
+!####################################################################

@@ -36,13 +36,85 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE CONSTRUCT(lM, e, eNoN, al, yl, dl, dol, xl, fNl, pS0l,
+      SUBROUTINE GLOBALEQASSEM(lM, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER a, b, e, i, j, Ac, ibl, eNoN
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:), dl(:,:),
+     2   dol(:,:), fNl(:,:), pS0l(:,:), bfl(:,:)
+
+!     For shells, consider extended patch around an element
+      IF (lM%lShl .AND. (lM%eType.EQ.eType_TRI))THEN
+         eNoN = 2*lM%eNoN
+      ELSE
+         eNoN = lM%eNoN
+      END IF
+
+      ALLOCATE(xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),dl(tDof,eNoN),
+     2   dol(nsd,eNoN), fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN),
+     3   bfl(nsd,eNoN), ptr(eNoN))
+
+      i = nsd + 2
+      j = 2*nsd + 1
+      DO e=1, lM%nEl
+         xl   = 0D0
+         al   = 0D0
+         yl   = 0D0
+         dl   = 0D0
+         dol  = 0D0
+         fNl  = 0D0
+         pS0l = 0D0
+         bfl  = 0D0
+         ibl  = 0
+         DO a=1, eNoN
+            IF (a .LE. lM%eNoN) THEN
+               Ac     = lM%IEN(a,e)
+               ptr(a) = Ac
+               ibl    = ibl + iblank(Ac)
+            ELSE
+               b      = a - lM%eNoN
+               Ac     = lM%eIEN(b,e)
+               ptr(a) = Ac
+               IF (Ac .EQ. 0) CYCLE
+            END IF
+            xl(:,a) = x (:,Ac)
+            al(:,a) = Ag(:,Ac)
+            yl(:,a) = Yg(:,Ac)
+            dl(:,a) = Dg(:,Ac)
+            IF (mvMsh) dol(:,a) = Do(i:j,Ac)
+            IF (ALLOCATED(fN))  fNl(:,a)  = fN(:,Ac)
+            IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+            IF (ALLOCATED(Bfg)) bfl(:,a)  = bfg(:,Ac)
+         END DO
+         IF (ibl .EQ. lM%eNoN) THEN
+            IF (ib%mthd .NE. ibMthd_IFEM) CYCLE
+         END IF
+
+!     Add contribution of current equation to the LHS/RHS
+         CALL CONSTRUCT(lM, e, eNoN, xl, al, yl, dl, dol, fNl, ps0l,
+     2      bfl, ptr)
+      END DO
+
+      DEALLOCATE(xl, al, yl, dl, dol, fNl, pS0l, bfl, ptr)
+
+      RETURN
+      END SUBROUTINE GLOBALEQASSEM
+!====================================================================
+      SUBROUTINE CONSTRUCT(lM, e, eNoN, xl, al, yl, dl, dol, fNl, pS0l,
      2   bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      TYPE(mshType), INTENT(INOUT) :: lM
+      TYPE(mshType), INTENT(IN) :: lM
       INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), dol(nsd,eNoN), fNl(nFn*nsd,eNoN),
@@ -60,17 +132,20 @@
 
       ALLOCATE(lK(dof*dof,eNoN,eNoN), lR(dof,eNoN), Nx(insd,eNoN),
      2   N(eNoN), dc(tDof,eNoN), pSl(nstd))
+
 !     Updating the current domain
       cDmn = DOMAIN(lM, cEq, e)
+
 !     Updating the shape functions, if neccessary
       IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
 !     Setting intial values
       lK    = 0D0
       lR    = 0D0
       pSl   = 0D0
       cPhys = eq(cEq)%dmn(cDmn)%phys
 
-      IF (cPhys .EQ. phys_ustruct) THEN
+      IF (cPhys .EQ. phys_vms_struct) THEN
          ALLOCATE(lKd(dof*nsd,eNoN,eNoN))
          lKd = 0D0
       END IF
@@ -167,13 +242,13 @@
                END DO
             END IF
 
-         CASE (phys_ustruct)
+         CASE (phys_vms_struct)
             IF (nsd .EQ. 3) THEN
-               CALL USTRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl, fNl,
-     2            lR, lK, lKd)
+               CALL VMS_STRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl,
+     2            fNl, lR, lK, lKd)
             ELSE
-               CALL USTRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl, fNl,
-     2            lR, lK, lKd)
+               CALL VMS_STRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl,
+     2            fNl, lR, lK, lKd)
             END IF
 
          CASE (phys_mesh)
@@ -209,24 +284,26 @@
          END SELECT
       END DO
 
-      IF (cPhys .EQ. phys_ustruct) THEN
-         CALL USTRUCT_DOASSEM(eNoN, ptr, lKd)
-      END IF
-
 !     Now doing the assembly part
 #ifdef WITH_TRILINOS
       IF (useTrilinosAssemAndLS) THEN
+         IF (cPhys .EQ. phys_vms_struct) err = " VMS_STRUCT cannot be"//
+     2      " assembled using Trilinos yet. Use local assembly."
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
       ELSE
 #endif
-         CALL DOASSEM(eNoN, ptr, lK, lR)
+         IF (cPhys .EQ. phys_vms_struct) THEN
+            CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+         ELSE
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+         END IF
 #ifdef WITH_TRILINOS
       END IF
 #endif
 
       RETURN
       END SUBROUTINE CONSTRUCT
-!####################################################################
+!====================================================================
       SUBROUTINE BCONSTRUCT(lFa, yl, hl, ptr, e)
       USE COMMOD
       USE ALLFUN
@@ -311,7 +388,7 @@
 
       RETURN
       END SUBROUTINE BCONSTRUCT
-!####################################################################
+!====================================================================
 !     This subroutines actually calculates the LHS and RHS
 !     contributions and adds their contributions for the Coupled
 !     Momentum Method (CMM)

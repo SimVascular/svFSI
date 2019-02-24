@@ -459,6 +459,8 @@
          err = "Unxpected bType in FSILSINI"
       END IF
 
+      DEALLOCATE(sVl, sV, gNodes)
+
       RETURN
       END SUBROUTINE FSILSINI
 !####################################################################

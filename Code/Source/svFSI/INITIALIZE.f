@@ -42,7 +42,7 @@
 
       REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
-      LOGICAL :: flag
+      LOGICAL :: flag, sstEq
       INTEGER :: i, iEq, iDmn, iM, ierr, nnz, gnnz
       CHARACTER(LEN=stdL) :: fTmp, sTmp
       REAL(KIND=8) :: am
@@ -51,8 +51,8 @@
       REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: s
 
       tDof     = 0
-      flag     = .FALSE.
       dFlag    = .FALSE.
+      sstEq    = .FALSE.
       pstEq    = .FALSE.
       cmmEq    = .FALSE.
       nFacesLS = SUM(eq%nBc)
@@ -96,9 +96,9 @@
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'ST'
-         CASE (phys_ustruct)
+         CASE (phys_vms_struct)
             dFlag = .TRUE.
-            flag  = .TRUE.
+            sstEq = .TRUE.
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'ST'
          CASE (phys_preSt)
@@ -154,10 +154,12 @@
       stamp = (/cm%np(), nEq, nMsh, tnNo, i, tDof, ierr, version/)
 
 !     Calculating the record length
-      i = 2
-      IF (dFlag .AND. .NOT.cmmEq) i = 3
+      i = 2*tDof
+      IF (dFlag .AND. .NOT.cmmEq) i = 3*tDof
       IF (pstEq) i = i + nstd
-      i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
+      IF (sstEq) i = i + nsd
+      i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tnNo)
+
       IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
       IF (cm%seq()) THEN
          recLn = i
@@ -199,8 +201,8 @@
       IF (ibFlag) CALL IB_MEMALLOC()
 
 !     Additional physics dependent variables
-!     USTRUCT phys
-      IF (flag) THEN
+!     VMS_STRUCT phys
+      IF (sstEq) THEN
          ALLOCATE(Ad(nsd,tnNo), Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
          Ad = 0D0
          Rd = 0D0
@@ -452,12 +454,22 @@
       OPEN(fid, FILE=fName, ACCESS='DIRECT', RECL=recLn)
       IF (.NOT.ibFlag) THEN
          IF (dFlag .AND. .NOT.cmmEq) THEN
-            IF (pstEq) THEN
-               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
+            IF (sstEq) THEN
+               IF (pstEq) THEN
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Ad
+               ELSE
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad
+               END IF
             ELSE
-               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do
+               IF (pstEq) THEN
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
+               ELSE
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do
+               END IF
             END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
@@ -643,6 +655,7 @@
       IF (ALLOCATED(rowPtr))   DEALLOCATE(rowPtr)
       IF (ALLOCATED(iblank))   DEALLOCATE(iblank)
       IF (ALLOCATED(ighost))   DEALLOCATE(ighost)
+      IF (ALLOCATED(idMap))   DEALLOCATE(idMap)
 
       IF (ALLOCATED(Ao))       DEALLOCATE(Ao)
       IF (ALLOCATED(An))       DEALLOCATE(An)
@@ -652,6 +665,7 @@
       IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
       IF (ALLOCATED(R))        DEALLOCATE(R)
       IF (ALLOCATED(fN))       DEALLOCATE(fN)
+      IF (ALLOCATED(Bfg))      DEALLOCATE(Bfg)
 
       IF (ALLOCATED(Ad))       DEALLOCATE(Ad)
       IF (ALLOCATED(Rd))       DEALLOCATE(Rd)

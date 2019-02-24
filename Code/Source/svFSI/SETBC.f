@@ -130,7 +130,7 @@
                END IF
             END IF
 
-            IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
+            IF (eq(iEq)%phys .EQ. phys_vms_struct) THEN
                c1  = eq(iEq)%gam * dt
                c1i = 1.0D0 / c1
                c2  = (eq(iEq)%gam - 1.0D0)*dt
@@ -326,8 +326,8 @@
       END IF
 
 !     Constructing LHS/RHS contribution and assembling them
-      IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
-         CALL BUSTRUCTNEU(lFa, hg, Dg)
+      IF (eq(cEq)%phys .EQ. phys_vms_struct) THEN
+         CALL B_VMS_STRUCTNEU(lFa, hg, Dg)
       ELSE
          DO e=1, lFa%nEl
             DO a=1, eNoN
@@ -432,6 +432,87 @@
 
       RETURN
       END SUBROUTINE SETBCTRACL
+!####################################################################
+!     Treat Neumann boundaries that are not deforming.
+!     Leave the row corresponding to the master node of the owner
+!     process in the LHS matrix and the residue vector untouched. For
+!     all the other nodes of the face, set the residue to be 0 for
+!     velocity dofs. Zero out all the elements of corresponding rows of
+!     the LHS matrix. Make the diagonal elements of the LHS matrix equal
+!     to 1 and the column entry corresponding to the master node, -1
+      SUBROUTINE SETBCUNDEFNEU
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER iFa, iBc, iM
+
+      DO iBc=1, eq(cEq)%nBc
+         iFa = eq(cEq)%bc(iBc)%iFa
+         iM  = eq(cEq)%bc(iBc)%iM
+         IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_undefNeu)) THEN
+            CALL SETBCUNDEFNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
+         END IF
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBCUNDEFNEU
+!--------------------------------------------------------------------
+      SUBROUTINE SETBCUNDEFNEUL(lBc, lFa)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER a, i, masN, rowN, colN
+
+      masN = lBc%masN
+      IF (lFa%nNo.EQ.0 .OR. masN.EQ.0) RETURN
+
+      IF (nsd .EQ. 2) THEN
+         DO a=1, lFa%nNo
+            rowN = lFa%gN(a)
+            IF (rowN .EQ. masN) CYCLE
+            R (1:2,rowN) = 0D0
+
+!           Diagonalize the stiffness matrix (A)
+            DO i=rowPtr(rowN), rowPtr(rowN+1)-1
+               colN = colPtr(i)
+               IF (colN .EQ. rowN) THEN
+                  Val(1,i) = 1D0
+                  Val(5,i) = 1D0
+               ELSE IF (colN .EQ. masN) THEN
+                  Val(1,i) = -1D0
+                  Val(5,i) = -1D0
+               END IF
+            END DO
+         END DO
+
+      ELSE IF (nsd .EQ. 3) THEN
+         DO a=1, lFa%nNo
+            rowN = lFa%gN(a)
+            IF (rowN .EQ. masN) CYCLE
+            R (1:3,rowN) = 0D0
+
+!           Diagonalize the stiffness matrix (A)
+            DO i=rowPtr(rowN), rowPtr(rowN+1)-1
+               colN = colPtr(i)
+               IF (colN .EQ. rowN) THEN
+                  Val(1, i) = 1D0
+                  Val(6, i) = 1D0
+                  Val(11,i) = 1D0
+               ELSE IF (colN .EQ. masN) THEN
+                  Val(1, i) = -1D0
+                  Val(6, i) = -1D0
+                  Val(11,i) = -1D0
+               END IF
+            END DO
+         END DO
+      END IF
+
+      RETURN
+      END SUBROUTINE SETBCUNDEFNEUL
 !####################################################################
 !     Weak treatment of Dirichlet boundary conditions
       SUBROUTINE SETBCDIRW(Yg, Dg)

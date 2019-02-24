@@ -93,12 +93,12 @@ c         CALL IB_SETBCPEN()
 
          Yn(s:e,:) = Yo(s:e,:)
 
-!        struct, lElas, mesh, ustruct
+!        struct, lElas, mesh, vms_struct
          IF (dFlag) THEN
             coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
      2         /(eq(iEq)%gam - 1D0)
             Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
-            IF (eq(iEq)%phys .EQ. phys_ustruct) THEN
+            IF (eq(iEq)%phys .EQ. phys_vms_struct) THEN
                coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
                Ad(:,:)   = Ad(:,:)*coef
                Dn(s:e,:) = Do(s:e,:)
@@ -182,7 +182,7 @@ c         CALL IB_SETBCPEN()
             Yn(e,a)     = Yn(e,a)     - R(dof,a)*coef(2)
             Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
          END DO
-      ELSE IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
+      ELSE IF (eq(cEq)%phys .EQ. phys_vms_struct) THEN
          DO a=1, tnNo
             An(s:e,a)   = An(s:e,a)   - R(:,a)
             Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)

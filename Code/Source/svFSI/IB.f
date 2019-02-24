@@ -411,7 +411,7 @@
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
             CASE (poisson_ratio)
-               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ub=5D-1)
+               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ul=5D-1)
             CASE (viscosity)
                lPtr => lPD%get(rtmp,"Viscosity",ll=0D0)
             CASE (f_x)
@@ -936,7 +936,7 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       IMPLICIT NONE
 
-      ALLOCATE(ib%R(nsd,tnNo))
+      ALLOCATE(ib%R(nsd+1,tnNo))
       ALLOCATE(ib%Rfb(nsd,ib%tnNo))
       ALLOCATE(ib%Ao(nsd,ib%tnNo))
       ALLOCATE(ib%An(nsd,ib%tnNo))
@@ -3978,7 +3978,7 @@ c     2         "can be applied for Neumann boundaries only"
 
             eNoN = msh(jM)%eNoN
             ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
-     2         lR(nsd,eNoN))
+     2         lR(nsd+1,eNoN))
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
                xl(:,a) = x(:,Ac)
@@ -4041,6 +4041,7 @@ c     2         "can be applied for Neumann boundaries only"
             CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
 
 !           Compute the local residue due to IB-FSI forcing
+            lR = 0D0
             IF (nsd .EQ. 3) THEN
                CALL IB_FFSI3D(eNoNb, eNoN, w, Nb, Nbx, N, Nx, abl, ybl,
      2            ubl, fNl, lR)
@@ -4073,17 +4074,18 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
+      LOGICAL :: incompFlag
       INTEGER, INTENT(IN) :: eNoNb, eNoN
       REAL(KIND=8), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb), N(eNoN),
      2   Nx(3,eNoN), al(3,eNoNb), yl(4,eNoNb), ul(3,eNoNb),
      3   fNl(3*ib%nFn,eNoNb)
-      REAL(KIND=8), INTENT(OUT) :: lR(3,eNoN)
+      REAL(KIND=8), INTENT(OUT) :: lR(4,eNoN)
 
       INTEGER :: a, b, iEq, iDmn, iFn
       REAL(KIND=8) :: Jac, rho_s, rho_f, eM_s, nu_s, mu_f, mu_s, bf(3),
      2   vd(3), v(3), rM(3), vx(3,3), F(3,3), Fi(3,3), S(3,3), P(3,3),
      3   PFt(3,3), VxFi(3,3), vVx(3), VxNx(3), NxP(3), CC(3,3,3,3),
-     4   fl(3,ib%nFn)
+     4   fl(3,ib%nFn), pf, ps, divV, rtmp
       TYPE(stModelType) :: stModel
 
 !     Define IB struct parameters
@@ -4094,6 +4096,9 @@ c     2         "can be applied for Neumann boundaries only"
       eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
       nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
       mu_s    = eq(iEq)%dmnIB(iDmn)%prop(viscosity)
+
+      incompFlag = .FALSE.
+      IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
 
 !     Define fluid parameters
       rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
@@ -4108,6 +4113,7 @@ c     2         "can be applied for Neumann boundaries only"
       vd      = -bf
       v       = 0D0
       vx      = 0D0
+      pf      = 0D0
       fl      = 0D0
       F       = 0D0
       F(1,1)  = 1D0
@@ -4123,6 +4129,9 @@ c     2         "can be applied for Neumann boundaries only"
          v(1) = v(1) + yl(1,b)*Nb(b)
          v(2) = v(2) + yl(2,b)*Nb(b)
          v(3) = v(3) + yl(3,b)*Nb(b)
+
+!        Pressure, pf
+         pf   = pf   + yl(4,b)*Nb(b)
 
 !        Grad v (v_i,I) w.r.t. reference coordinates
          vx(1,1) = vx(1,1) + yl(1,b)*Nbx(1,b)
@@ -4162,6 +4171,9 @@ c     2         "can be applied for Neumann boundaries only"
       Fi  = MAT_INV(F, nsd)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
+!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
+!     For compressible solids, Svol = J*p*Cinv and the fluid pressure
+!     contribution in the solid domain should be removed.
       CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
 
 !     1st Piola-Kirchhoff tensor (P)
@@ -4201,11 +4213,15 @@ c     2         "can be applied for Neumann boundaries only"
       VxFi(3,2) = vx(3,1)*Fi(1,2) + vx(3,2)*Fi(2,2) + vx(3,3)*Fi(3,2)
       VxFi(3,3) = vx(3,1)*Fi(1,3) + vx(3,2)*Fi(2,3) + vx(3,3)*Fi(3,3)
 
+!     Divergence of velocity
+      divV = VxFi(1,1) + VxFi(2,2) + VxFi(3,3)
+
 !     V. grad V
       vVx(1) = v(1)*VxFi(1,1) + v(2)*VxFi(1,2) + v(3)*VxFi(1,3)
       vVx(2) = v(1)*VxFi(2,1) + v(2)*VxFi(2,2) + v(3)*VxFi(2,3)
       vVx(3) = v(1)*VxFi(3,1) + v(2)*VxFi(3,2) + v(3)*VxFi(3,3)
 
+!     Fully incompressible case
       DO a=1, eNoN
 !        Viscous stress = grad N_A . (grad v + grad v^T)
          VxNx(1) = Nx(1,a)*(VxFi(1,1) + VxFi(1,1)) +
@@ -4237,6 +4253,22 @@ c     2         "can be applied for Neumann boundaries only"
          lR(3,a) = w*rM(3)
       END DO
 
+      IF (incompFlag) RETURN
+
+!     For compressible solids, remove fluid pressure from solid domain.
+!     Also remove divergence term from continuity equation and add
+!     pressure difference between solid and fluid with Lagrange
+!     multiplier to weakly enforce their equality. Note that the solid
+!     pressure returned is the one defined in Holzapfel book.
+      ps = 0D0
+      CALL GETSVOLP(stModel, Jac, ps, rtmp)
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - w*pf*Nx(1,a)
+         lR(2,a) = lR(2,a) - w*pf*Nx(2,a)
+         lR(3,a) = lR(3,a) - w*pf*Nx(3,a)
+         lR(4,a) = w*Jac*N(a)*(divV + (-ps) - pf)
+      END DO
+
       RETURN
       END SUBROUTINE IB_FFSI3D
 !--------------------------------------------------------------------
@@ -4251,13 +4283,14 @@ c     2         "can be applied for Neumann boundaries only"
       REAL(KIND=8), INTENT(IN) :: w, Nb(eNoNb), Nbx(2,eNoNb), N(eNoN),
      2   Nx(2,eNoN), al(2,eNoNb), yl(3,eNoNb), ul(2,eNoNb),
      3   fNl(2*ib%nFn,eNoNb)
-      REAL(KIND=8), INTENT(OUT) :: lR(2,eNoN)
+      REAL(KIND=8), INTENT(OUT) :: lR(3,eNoN)
 
+      LOGICAL :: incompFlag
       INTEGER :: a, b, iEq, iDmn, iFn
       REAL(KIND=8) :: Jac, rho_s, rho_f, eM_s, nu_s, mu_f, mu_s, bf(2),
      2   vd(2), v(2), rM(2), vx(2,2), F(2,2), Fi(2,2), S(2,2), P(2,2),
      3   PFt(2,2), VxFi(2,2), vVx(2), VxNx(2), NxP(2), CC(2,2,2,2),
-     4   fl(2,ib%nFn)
+     4   fl(2,ib%nFn), pf, ps, divV, rtmp
       TYPE(stModelType) :: stModel
 
 !     Define IB struct parameters
@@ -4268,6 +4301,9 @@ c     2         "can be applied for Neumann boundaries only"
       eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
       nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
       mu_s    = eq(iEq)%dmnIB(iDmn)%prop(viscosity)
+
+      incompFlag = .FALSE.
+      IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
 
 !     Define fluid parameters
       rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
@@ -4280,6 +4316,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Inertia, body force and deformation tensor (F)
       vd      = -bf
       v       = 0D0
+      pf      = 0D0
       vx      = 0D0
       fl      = 0D0
       F       = 0D0
@@ -4293,6 +4330,9 @@ c     2         "can be applied for Neumann boundaries only"
 !        Velocity, v
          v(1) = v(1) + yl(1,b)*Nb(b)
          v(2) = v(2) + yl(2,b)*Nb(b)
+
+!        Pressure, pf
+         pf   = pf   + yl(3,b)*Nb(b)
 
 !        Grad v (v_i,I) w.r.t. reference coordinates
          vx(1,1) = vx(1,1) + yl(1,b)*Nbx(1,b)
@@ -4317,6 +4357,9 @@ c     2         "can be applied for Neumann boundaries only"
       Fi  = MAT_INV(F, nsd)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
+!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
+!     For compressible solids, Svol = J*p*Cinv and the fluid pressure
+!     contribution in the solid domain should be removed.
       CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
 
 !     1st Piola-Kirchhoff tensor, P = F_iJ * S_JI
@@ -4337,10 +4380,14 @@ c     2         "can be applied for Neumann boundaries only"
       VxFi(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1)
       VxFi(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2)
 
+!     Divergence of velocity
+      divV = VxFi(1,1) + VxFi(2,2)
+
 !     V. grad V
       vVx(1) = v(1)*VxFi(1,1) + v(2)*VxFi(1,2)
       vVx(2) = v(1)*VxFi(2,1) + v(2)*VxFi(2,2)
 
+!     Fully incompressible case
       DO a=1, eNoN
 !        Viscous stress = grad N_A . (grad v + grad v^T)
          VxNx(1) = Nx(1,a)*(VxFi(1,1) + VxFi(1,1)) +
@@ -4360,6 +4407,21 @@ c     2         "can be applied for Neumann boundaries only"
 
          lR(1,a) = w*rM(1)
          lR(2,a) = w*rM(2)
+      END DO
+
+      IF (incompFlag) RETURN
+
+!     For compressible solids, remove fluid pressure from solid domain.
+!     Also remove divergence term from continuity equation and add
+!     pressure difference between solid and fluid with Lagrange
+!     multiplier to weakly enforce their equality. Note that the solid
+!     pressure returned is the one defined in Holzapfel book.
+      ps = 0D0
+      CALL GETSVOLP(stModel, Jac, ps, rtmp)
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - w*pf*Nx(1,a)
+         lR(2,a) = lR(2,a) - w*pf*Nx(2,a)
+         lR(3,a) = w*Jac*N(a)*(divV + (-ps) - pf)
       END DO
 
       RETURN
@@ -4677,7 +4739,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       INTEGER a
 
       DO a=1, tnNo
-         R(1:nsd,a) = R(1:nsd,a) - ib%R(:,a)
+         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
       END DO
 
       RETURN
@@ -4900,9 +4962,9 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       END IF
 
       DO iM=1, nMsh
-         ALLOCATE(lR(nsd,msh(iM)%nNo), lI(msh(iM)%nNo))
+         ALLOCATE(lR(nsd+1,msh(iM)%nNo), lI(msh(iM)%nNo))
          IF (cm%mas()) THEN
-            ALLOCATE(gR(nsd,msh(iM)%gnNo), gI(msh(iM)%gnNo))
+            ALLOCATE(gR(nsd+1,msh(iM)%gnNo), gI(msh(iM)%gnNo))
          ELSE
             ALLOCATE(gR(0,0), gI(0))
          END IF
@@ -4918,6 +4980,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
          DEALLOCATE(lR, lI)
 
          IF (cm%mas()) THEN
+!           first, momentum residue
             av = 0D0
             lo = 10000000.0D0
             hi = -9999999.0D0
@@ -4928,6 +4991,20 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                   s = s + gR(i,a)**2
                END DO
                s = SQRT(s)
+               av = av + s
+               IF (s .LT. lo) lo = s
+               IF (s .GT. hi) hi = s
+            END DO
+            av = av / REAL(SUM(gI(:)), KIND=8)
+            WRITE(fid,'(A)',ADVANCE='NO') " "//STR(av)//" "//STR(hi-lo)
+
+!           Pressure/continuity
+            av = 0D0
+            lo = 10000000.0D0
+            hi = -9999999.0D0
+            DO a=1, msh(iM)%gnNo
+               IF (gI(a) .EQ. 0) CYCLE
+               s = gR(nsd+1,a)
                av = av + s
                IF (s .LT. lo) lo = s
                IF (s .GT. hi) hi = s

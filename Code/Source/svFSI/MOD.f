@@ -78,7 +78,7 @@
 !     modulus, Poisson's ratio, conductivity, internal force(X,Y,Z),
 !     particles diameter, particle density, stabilization coefficient
 !     for backflow divergence, shell thickness, stabilization parameters
-!     for USTRUCT (ctauM, ctauC), CMM initialization pressure
+!     for VMS_STRUCT (ctauM, ctauC), CMM initialization pressure
       INTEGER, PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   viscosity = 2, solid_density = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
@@ -100,12 +100,12 @@
 !     equation, linear elasticity, heat in a fluid
 !     (advection-diffusion), fluid-structure-interaction, elector
 !     magnetic, mesh motion, Basset-Boussinesq Oseen equation,
-!     Electro-Physiology, Unified-structure (velocity-based)
+!     Electro-Physiology, VMS-stabilized-structure
       INTEGER, PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_elcMag = 207,
      4   phys_mesh = 208, phys_BBO = 209, phys_preSt = 210,
-     5   phys_shell = 211, phys_CEP = 212, phys_ustruct = 213,
+     5   phys_shell = 211, phys_CEP = 212, phys_vms_struct = 213,
      6   phys_CMM = 214
 
 !     Differenty type of coupling for cplBC
@@ -129,14 +129,14 @@
 !     stabilization, impose BC on the integral of state variable or D
 !     (instead of Y), diplacement dependent,
 !     fixed (shells), hinged (shells), free (shells), symmetric (shells),
-!     coupled momentum method (CMM)
+!     coupled momentum method (CMM), undeforming Neumann
       INTEGER, PARAMETER :: bType_Dir = 0, bType_Neu = 1,
      2   bType_per = 2, bType_std = 3, bType_ustd = 4, bType_cpl = 5,
      3   bType_gen = 6, bType_res = 7, bType_flx = 8, bType_flat = 9,
      4   bType_para = 10, bType_ud = 11, bType_zp = 12, bType_bfs = 13,
      5   bType_impD = 14, bType_ddep = 15, bType_trac = 16,
      6   bType_fix = 17, bType_hing = 18, bType_free = 19,
-     7   bType_symm = 20, bType_CMM = 21
+     7   bType_symm = 20, bType_CMM = 21, bType_undefNeu = 22
 
 !     Possible senarios for the output, followed by the possible outputs
 !     Undefined output, extract it from A, extract it from Y, extract it
@@ -147,14 +147,15 @@
      3   outGrp_WSS = 505, outGrp_vort = 506, outGrp_eFlx = 507,
      4   outGrp_hFlx = 508, outGrp_absV = 509, outGrp_stInv = 510,
      5   outGrp_vortex = 511, outGrp_trac = 512, outGrp_stress = 513,
-     6   outGrp_fN = 514
+     6   outGrp_fN = 514, outGrp_fA = 515, outGrp_J = 516, outGrp_F=517
 
       INTEGER, PARAMETER :: out_velocity = 599, out_pressure = 598,
      2   out_acceleration = 597, out_temperature = 596, out_WSS = 595,
      3   out_vorticity = 594, out_displacement = 593, out_integ = 592,
      4   out_energyFlux = 591, out_heatFlux = 590, out_strainInv = 589,
      5   out_absVelocity = 588, out_vortex = 587, out_traction = 586,
-     6   out_stress = 585, out_fibDir = 584, out_actionPotential = 583
+     6   out_stress = 585, out_fibDir = 584, out_fibAlign = 583,
+     7   out_actionPotential = 582, out_jacobian = 581, out_defGrad=580
 
 !     Mesher choice for remeshing for moving wall problems
       INTEGER, PARAMETER :: RMSH_TETGEN = 1, RMSH_MESHSIM = 2
@@ -162,10 +163,10 @@
 !     Type of constitutive model (isochoric) for structure equation:
 !     St.Venant-Kirchhoff, modified St.Venant-Kirchhoff, NeoHookean,
 !     Mooney-Rivlin, modified Holzapfel-Gasser-Ogden with dispersion,
-!     Linear model (S = mu*I)
+!     Linear model (S = mu*I), Guccione (1995)
       INTEGER, PARAMETER :: stIso_NA = 600, stIso_StVK = 601,
      2   stIso_mStVK = 602, stIso_nHook = 603, stIso_MR = 604,
-     4   stIso_HGO = 605, stIso_lin = 606
+     4   stIso_HGO = 605, stIso_lin = 606, stIso_Gucci = 607
 
 !     Type of constitutive model (volumetric) for structure eqn:
 !     Quadratic, Simo-Taylor91, Miehe94
@@ -424,6 +425,8 @@
          INTEGER iM
 !        Pointer to FSILS%bc
          INTEGER lsPtr
+!        Undeforming Neu BC master-slave node parameters.
+         INTEGER masN
 !        Defined steady value
          REAL(KIND=8) :: g = 0D0
 !        Neu: defined resistance
@@ -789,6 +792,15 @@
          TYPE(ibCommType) :: cm
       END TYPE ibType
 
+!     Data type for Trilinos Linear Solver related arrays
+      TYPE tlsType
+!        Local to global mapping
+         INTEGER, ALLOCATABLE :: ltg(:)
+!        Factor for Dirichlet BCs
+         REAL(KIND=8), ALLOCATABLE :: W(:,:)
+!        Residue
+         REAL(KIND=8), ALLOCATABLE :: R(:,:)
+      END TYPE tlsType
 !--------------------------------------------------------------------
 !     All the types are defined, time to use them
 
@@ -820,7 +832,7 @@
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required
-      LOGICAL :: ibFlag
+      LOGICAL ibFlag
 !     Use C++ Trilinos framework for the linear solvers
       LOGICAL useTrilinosLS
 !     Use C++ Trilinos framework for assembly and for linear solvers
@@ -901,6 +913,8 @@
       INTEGER, ALLOCATABLE :: iblank(:)
 !     IB: Solid nodes with iblank=1, and are part of ghost cells
       INTEGER, ALLOCATABLE :: ighost(:)
+!     Array that maps global node id to rowN in the matrix
+      INTEGER, ALLOCATABLE :: idMap(:)
 
 !     Old time derivative of variables (acceleration)
       REAL(KIND=8), ALLOCATABLE :: Ao(:,:)
@@ -922,6 +936,8 @@
       REAL(KIND=8), ALLOCATABLE :: Yn(:,:)
 !     Fiber direction (for electrophysiology / structure mechanics)
       REAL(KIND=8), ALLOCATABLE :: fN(:,:)
+!     Body force
+      REAL(KIND=8), ALLOCATABLE :: Bfg(:,:)
 
 !     Additional arrays for velocity-based formulation of nonlinear
 !     solid mechanics
@@ -963,5 +979,7 @@
       TYPE(cntctModelType) cntctM
 !     IB: Immersed boundary data structure
       TYPE(ibType), ALLOCATABLE :: ib
+!     Trilinos Linear Solver data type
+      TYPE(tlsType), ALLOCATABLE :: tls
 
       END MODULE COMMOD

@@ -31,13 +31,14 @@
 !
 !-----------------------------------------------------------------------
 !
-!     This routines is for solving nonlinear structural problem using
-!     velocity based formulation.
+!     These routines are for solving the nonlinear structural dynamics
+!     problem using velocity and pressure as the unknown degrees of
+!     freedom and stabilized using variational multiscale methods.
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE USTRUCT3D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl, lR,
-     2   lK, lKd)
+      SUBROUTINE VMS_STRUCT3D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl,
+     2   lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -140,7 +141,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
 
 !     Compute stabilization parameters
-      CALL GETTAU(stModel, Je, tauM, tauC)
+      CALL GETTAU(Je, tauM, tauC)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
@@ -444,10 +445,10 @@
       END DO
 
       RETURN
-      END SUBROUTINE USTRUCT3D
+      END SUBROUTINE VMS_STRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE USTRUCT2D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl, lR,
-     2   lK, lKd)
+      SUBROUTINE VMS_STRUCT2D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl,
+     2   lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -533,7 +534,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
 
 !     Compute stabilization parameters
-      CALL GETTAU(stModel, Je, tauM, tauC)
+      CALL GETTAU(Je, tauM, tauC)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
@@ -670,6 +671,7 @@
             Ku   = w*af*(T1 + T2 + BtDB + NxSNx)
             lKd(4,a,b) = lKd(4,a,b) + Ku
 
+            T1   = am*Jac*rho*N(a)*N(b)
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(2,b) + T1
             lK(5,a,b) = lK(5,a,b) + w*T2 + afm*Ku
 
@@ -711,9 +713,9 @@
       END DO
 
       RETURN
-      END SUBROUTINE USTRUCT2D
+      END SUBROUTINE VMS_STRUCT2D
 !####################################################################
-      SUBROUTINE BUSTRUCTNEU(lFa, hg, Dg)
+      SUBROUTINE B_VMS_STRUCTNEU(lFa, hg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -766,7 +768,7 @@
          Ec    = lFa%gE(e)
          cDmn  = DOMAIN(msh(iM), cEq, Ec)
          cPhys = eq(cEq)%dmn(cDmn)%phys
-         IF (cPhys .NE. phys_ustruct) CYCLE
+         IF (cPhys .NE. phys_vms_struct) CYCLE
 
          DO a=1, eNoN
             Ac      = msh(iM)%IEN(a,Ec)
@@ -810,7 +812,7 @@
 
             l1 = ALL((/l1, l2, l3, l4/))
             IF (.NOT.l1) err =
-     2         "Error in computing face derivatives (BUSTRUCTNEU)"
+     2         "Error in computing face derivatives (B_VMS_STRUCTNEU)"
 
             IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
      2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
@@ -821,29 +823,23 @@
             w   = lFa%w(g)*Jac
 
             IF (nsd .EQ. 3) THEN
-               CALL BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+               CALL B_VMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK,
+     2            lKd)
             ELSE
-               CALL BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+               CALL B_VMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK,
+     2            lKd)
             END IF
          END DO
 
-         CALL USTRUCT_DOASSEM(eNoN, ptr, lKd)
-
-#ifdef WITH_TRILINOS
-         IF (useTrilinosAssemAndLS) THEN
-            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-         ELSE
-#endif
-            CALL DOASSEM(eNoN, ptr, lK, lR)
-#ifdef WITH_TRILINOS
-         END IF
-#endif
+         CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
       END DO
 
+      DEALLOCATE(xl, N, Nxi, Nx, ptr, dl, hl, lR, lK, lKd)
+
       RETURN
-      END SUBROUTINE BUSTRUCTNEU
+      END SUBROUTINE B_VMS_STRUCTNEU
 !--------------------------------------------------------------------
-      SUBROUTINE BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+      SUBROUTINE B_VMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -926,9 +922,9 @@
       END DO
 
       RETURN
-      END SUBROUTINE BUSTRUCT3D
+      END SUBROUTINE B_VMS_STRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+      SUBROUTINE B_VMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -987,47 +983,154 @@
       END DO
 
       RETURN
-      END SUBROUTINE BUSTRUCT2D
+      END SUBROUTINE B_VMS_STRUCT2D
 !####################################################################
-      SUBROUTINE USTRUCT_DOASSEM(d, eqN, lKd)
-      USE COMMOD, ONLY: dof, nsd, rowPtr, colPtr, Kd
+      SUBROUTINE VMS_STRUCT_DOASSEM(d, eqN, lKd, lK, lR)
+      USE COMMOD, ONLY: dof, nsd, rowPtr, colPtr, idMap, Kd, Val, R
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: d, eqN(d)
-      REAL(KIND=8), INTENT(IN) :: lKd(dof*nsd,d,d)
+      REAL(KIND=8), INTENT(IN) :: lKd(dof*nsd,d,d), lK(dof*dof,d,d),
+     2   lR(dof,d)
 
-      INTEGER a, b, ptr, rowN, colN, left, right
+      INTEGER a, b, ptr, rowN, colN
 
       DO a=1, d
-         rowN = eqN(a)
-         DO b=1, d
-            colN  = eqN(b)
-            left  = rowPtr(rowN)
-            right = rowPtr(rowN+1)
-            ptr   = (right + left)/2
-            DO WHILE (colN .NE. colPtr(ptr))
-               IF (colN .GT. colPtr(ptr)) THEN
-                  left  = ptr
-               ELSE
-                  right = ptr
-               END IF
-               ptr = (right + left)/2
-            END DO
-            Kd(:,ptr) = Kd(:,ptr) + lKd(:,a,b)
-         END DO
+!        Momentum equation residue is assembled at mapped rows
+         rowN = idMap(eqn(a))
+         R(1:nsd,rowN) = R(1:nsd,rowN) + lR(1:nsd,a)
+
+!        Continuity equation residue is assembled at unmapped rows
+         rowN = eqn(a)
+         R(nsd+1,rowN) = R(nsd+1,rowN) + lR(nsd+1,a)
       END DO
 
+      IF (nsd .EQ. 3) THEN
+!        Stiffness matrix (A) is assembled using mapped rows and columns
+!        Gradient matrix (B) is assembled using mapped row but unmapped
+!        column
+         DO a=1, d
+            rowN = idMap(eqN(a))
+!           A - matrix
+            DO b=1, d
+               colN = idMap(eqN(b))
+               CALL GETCOLPTR()
+               Kd (1 :9 ,ptr) = Kd (1 :9 ,ptr) + lKd(1 :9 ,a,b)
+               Val(1 :3 ,ptr) = Val(1 :3 ,ptr) + lK (1 :3 ,a,b)
+               Val(5 :7 ,ptr) = Val(5 :7 ,ptr) + lK (5 :7 ,a,b)
+               Val(9 :11,ptr) = Val(9 :11,ptr) + lK (9 :11,a,b)
+            END DO
+
+!           B - matrix
+            DO b=1, d
+               colN = eqN(b)
+               CALL GETCOLPTR()
+               Val(4 ,ptr) = Val(4 ,ptr) + lK(4 ,a,b)
+               Val(8 ,ptr) = Val(8 ,ptr) + lK(8 ,a,b)
+               Val(12,ptr) = Val(12,ptr) + lK(12,a,b)
+            END DO
+         END DO
+
+!        Divergence matrix (C) is assembled using unmapped rows but
+!        mapped columns. Mass matrix (D) is assembled using unmapped
+!        rows and columns
+         DO a=1, d
+            rowN = eqN(a)
+!           C - matrix
+            DO b=1, d
+               colN = idMap(eqN(b))
+               CALL GETCOLPTR()
+               Kd (10:12,ptr) = Kd (10:12,ptr) + lKd(10:12,a,b)
+               Val(13:15,ptr) = Val(13:15,ptr) + lK (13:15,a,b)
+            END DO
+
+!           D - matrix
+            DO b=1, d
+               colN = eqN(b)
+               CALL GETCOLPTR()
+               Val(16,ptr) = Val(16,ptr) + lK(16,a,b)
+            END DO
+         END DO
+
+      ELSE
+!        Stiffness matrix (A) is assembled using mapped rows and columns
+!        Gradient matrix (B) is assembled using mapped row but unmapped
+!        column
+         DO a=1, d
+            rowN = idMap(eqN(a))
+!           A - matrix
+            DO b=1, d
+               colN = idMap(eqN(b))
+               CALL GETCOLPTR()
+               Kd (1 :4 ,ptr) = Kd (1 :4 ,ptr) + lKd(1 :4 ,a,b)
+               Val(1 :2 ,ptr) = Val(1 :2 ,ptr) + lK (1 :2 ,a,b)
+               Val(4 :5 ,ptr) = Val(4 :5 ,ptr) + lK (4 :5 ,a,b)
+            END DO
+
+!           B - matrix
+            DO b=1, d
+               colN = eqN(b)
+               CALL GETCOLPTR()
+               Val(3,ptr) = Val(3,ptr) + lK(3,a,b)
+               Val(6,ptr) = Val(6,ptr) + lK(6,a,b)
+            END DO
+         END DO
+
+!        Divergence matrix (C) is assembled using unmapped rows but
+!        mapped columns. Mass matrix (D) is assembled using unmapped
+!        rows and columns
+         DO a=1, d
+            rowN = eqN(a)
+!           C - matrix
+            DO b=1, d
+               colN = idMap(eqN(b))
+               CALL GETCOLPTR()
+               Kd (5:6,ptr) = Kd (5:6,ptr) + lKd(5:6,a,b)
+               Val(7:8,ptr) = Val(7:8,ptr) + lK (7:8,a,b)
+            END DO
+
+!           D - matrix
+            DO b=1, d
+               colN = eqN(b)
+               CALL GETCOLPTR()
+               Val(9,ptr) = Val(9,ptr) + lK(9,a,b)
+            END DO
+         END DO
+      END IF
+
       RETURN
-      END SUBROUTINE USTRUCT_DOASSEM
+      CONTAINS
 !--------------------------------------------------------------------
-      SUBROUTINE USTRUCTR(Yg)
+         SUBROUTINE GETCOLPTR()
+         IMPLICIT NONE
+
+         INTEGER left, right
+
+         left  = rowPtr(rowN)
+         right = rowPtr(rowN+1)
+         ptr   = (right + left)/2
+         DO WHILE (colN .NE. colPtr(ptr))
+            IF (colN .GT. colPtr(ptr)) THEN
+               left  = ptr
+            ELSE
+               right = ptr
+            END IF
+            ptr = (right + left)/2
+         END DO
+
+         RETURN
+         END SUBROUTINE GETCOLPTR
+!--------------------------------------------------------------------
+      END SUBROUTINE VMS_STRUCT_DOASSEM
+!####################################################################
+      SUBROUTINE VMS_STRUCTR(Yg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
 
-      INTEGER :: i, j, c, s
+      INTEGER :: a, i, c, s
       REAL(KIND=8) :: amg, ami
 
       REAL(KIND=8), ALLOCATABLE :: KU(:,:)
@@ -1041,60 +1144,60 @@
          RETURN
       END IF
 
-      DO i=1, tnNo
-         DO j=1, nsd
-            Rd(j,i) = amg*Ad(j,i) - Yg(s+j-1,i)
+      DO a=1, tnNo
+         DO i=1, nsd
+            Rd(i,a) = amg*Ad(i,a) - Yg(s+i-1,a)
          END DO
       END DO
 
       IF (nsd .EQ. 3) THEN
          ALLOCATE(KU(4,tnNo))
          KU = 0D0
-         DO i=1, tnNo
-            DO j=rowPtr(i), rowPtr(i+1)-1
-               c = colPtr(j)
-               KU(1,i) = KU(1,i) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
-     2                           + Kd(3 ,j)*Rd(3,c)
-               KU(2,i) = KU(2,i) + Kd(4 ,j)*Rd(1,c) + Kd(5 ,j)*Rd(2,c)
-     2                           + Kd(6 ,j)*Rd(3,c)
-               KU(3,i) = KU(3,i) + Kd(7 ,j)*Rd(1,c) + Kd(8 ,j)*Rd(2,c)
-     2                           + Kd(9 ,j)*Rd(3,c)
-               KU(4,i) = KU(4,i) + Kd(10,j)*Rd(1,c) + Kd(11,j)*Rd(2,c)
-     2                           + Kd(12,j)*Rd(3,c)
+         DO a=1, tnNo
+            DO i=rowPtr(a), rowPtr(a+1)-1
+               c = colPtr(i)
+               KU(1,a) = KU(1,a) + Kd(1 ,i)*Rd(1,c) + Kd(2 ,i)*Rd(2,c) +
+     2                             Kd(3 ,i)*Rd(3,c)
+               KU(2,a) = KU(2,a) + Kd(4 ,i)*Rd(1,c) + Kd(5 ,i)*Rd(2,c) +
+     2                             Kd(6 ,i)*Rd(3,c)
+               KU(3,a) = KU(3,a) + Kd(7 ,i)*Rd(1,c) + Kd(8 ,i)*Rd(2,c) +
+     2                             Kd(9 ,i)*Rd(3,c)
+               KU(4,a) = KU(4,a) + Kd(10,i)*Rd(1,c) + Kd(11,i)*Rd(2,c) +
+     2                             Kd(12,i)*Rd(3,c)
             END DO
          END DO
 
          CALL COMMU(KU)
 
-         DO i=1, tnNo
-            R(1,i) = R(1,i) - ami*KU(1,i)
-            R(2,i) = R(2,i) - ami*KU(2,i)
-            R(3,i) = R(3,i) - ami*KU(3,i)
-            R(4,i) = R(4,i) - ami*KU(4,i)
+         DO a=1, tnNo
+            R(1,a) = R(1,a) - ami*KU(1,a)
+            R(2,a) = R(2,a) - ami*KU(2,a)
+            R(3,a) = R(3,a) - ami*KU(3,a)
+            R(4,a) = R(4,a) - ami*KU(4,a)
          END DO
          DEALLOCATE(KU)
       ELSE
          ALLOCATE(KU(3,tnNo))
          KU = 0D0
-         DO i=1, tnNo
-            DO j=rowPtr(i), rowPtr(i+1)-1
-               c = colPtr(j)
-               KU(1,i) = KU(1,i) + Kd(1 ,j)*Rd(1,c) + Kd(2 ,j)*Rd(2,c)
-               KU(2,i) = KU(2,i) + Kd(3 ,j)*Rd(1,c) + Kd(4 ,j)*Rd(2,c)
-               KU(3,i) = KU(3,i) + Kd(5 ,j)*Rd(1,c) + Kd(6 ,j)*Rd(2,c)
+         DO a=1, tnNo
+            DO i=rowPtr(a), rowPtr(a+1)-1
+               c = colPtr(i)
+               KU(1,a) = KU(1,a) + Kd(1,i)*Rd(1,c) + Kd(2,i)*Rd(2,c)
+               KU(2,a) = KU(2,a) + Kd(3,i)*Rd(1,c) + Kd(4,i)*Rd(2,c)
+               KU(3,a) = KU(3,a) + Kd(5,i)*Rd(1,c) + Kd(6,i)*Rd(2,c)
             END DO
          END DO
 
          CALL COMMU(KU)
 
-         DO i=1, tnNo
-            R(1,i) = R(1,i) - ami*KU(1,i)
-            R(2,i) = R(2,i) - ami*KU(2,i)
-            R(3,i) = R(3,i) - ami*KU(3,i)
+         DO a=1, tnNo
+            R(1,a) = R(1,a) - ami*KU(1,a)
+            R(2,a) = R(2,a) - ami*KU(2,a)
+            R(3,a) = R(3,a) - ami*KU(3,a)
          END DO
          DEALLOCATE(KU)
       END IF
 
       RETURN
-      END SUBROUTINE USTRUCTR
+      END SUBROUTINE VMS_STRUCTR
 !####################################################################
