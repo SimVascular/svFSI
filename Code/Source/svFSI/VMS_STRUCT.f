@@ -141,7 +141,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
 
 !     Compute stabilization parameters
-      CALL GETTAU(Je, tauM, tauC)
+      CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
@@ -534,7 +534,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
 
 !     Compute stabilization parameters
-      CALL GETTAU(Je, tauM, tauC)
+      CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)

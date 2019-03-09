@@ -523,22 +523,23 @@
       END SUBROUTINE GVOLPEN
 !====================================================================
 !     Compute stabilization parameters tauM and tauC
-      SUBROUTINE GETTAU(Je, tauM, tauC)
+      SUBROUTINE GETTAU(lDmn, Je, tauM, tauC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(IN) :: Je
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      REAL(KIND=8), INTENT(IN)  :: Je
       REAL(KIND=8), INTENT(OUT) :: tauM, tauC
 
       REAL(KIND=8) :: ctM, ctC, he, rho, Em, nu, mu, lam, c
 
       he  = 5D-1 * Je**(1D0/REAL(nsd,KIND=8))
-      rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      Em  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
-      nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
-      ctM = eq(cEq)%dmn(cDmn)%prop(ctau_M)
-      ctC = eq(cEq)%dmn(cDmn)%prop(ctau_C)
+      rho = lDmn%prop(solid_density)
+      Em  = lDmn%prop(elasticity_modulus)
+      nu  = lDmn%prop(poisson_ratio)
+      ctM = lDmn%prop(ctau_M)
+      ctC = lDmn%prop(ctau_C)
 
       mu  = 5D-1*Em / (1.0D0 + nu)
       IF (ISZERO(nu-0.5D0)) THEN

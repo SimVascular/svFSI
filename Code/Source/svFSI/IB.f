@@ -383,9 +383,11 @@
             propL(2) = elasticity_modulus
             propL(3) = poisson_ratio
             propL(4) = viscosity
-            propL(5) = f_x
-            propL(6) = f_y
-            IF (nsd .EQ. 3) propL(7) = f_z
+            propL(5) = ctau_M
+            propL(6) = ctau_C
+            propL(7) = f_x
+            propL(8) = f_y
+            IF (nsd .EQ. 3) propL(9) = f_z
 
             nDOP = (/5,1,0,0/)
             outPuts(1) = out_displacement
@@ -426,6 +428,14 @@
                lPtr => lPD%get(rtmp,"Mass damping")
             CASE (shell_thickness)
                lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0D0)
+            CASE (ctau_M)
+               lPtr => lPD%get(rtmp,
+     2            "Momentum stabilization coefficient")
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.001D0
+            CASE (ctau_C)
+               lPtr => lPD%get(rtmp,
+     2            "Continuity stabilization coefficient")
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.0D0
             CASE DEFAULT
                err = "Undefined properties (IB)"
             END SELECT
@@ -3903,7 +3913,7 @@ c     2         "can be applied for Neumann boundaries only"
       LOGICAL l1, l2, l3, l4
       INTEGER a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM, eNoNb, eNoN
       REAL(KIND=8) w, Jac, rt, xp(nsd), xi(nsd), xiL(2), Nl(2),
-     2   ksix(nsd,nsd)
+     2   Gmat(nsd,nsd)
 
       REAL(KIND=8), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
      2   Nx(:,:), xbl(:,:), xl(:,:), abl(:,:), ybl(:,:), ubl(:,:),
@@ -3959,7 +3969,7 @@ c     2         "can be applied for Neumann boundaries only"
 !           shapefunction gradients will be used to compute deformation
 !           gradient tensor
             CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,
-     2         ksix)
+     2         Gmat)
             IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
 !           Scaled Gauss weight
@@ -4038,17 +4048,17 @@ c     2         "can be applied for Neumann boundaries only"
      2         "element"
 
 !           Get the shapefunction derivatives in physical space
-            CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
+            CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Gmat)
 
 !           Compute the local residue due to IB-FSI forcing
             lR = 0D0
             IF (nsd .EQ. 3) THEN
-               CALL IB_FFSI3D(eNoNb, eNoN, w, Nb, Nbx, N, Nx, abl, ybl,
-     2            ubl, fNl, lR)
+               CALL IB_FFSI3D(eNoNb, eNoN, w, Jac, Nb, Nbx, N, Nx, Gmat,
+     2            abl, ybl, ubl, fNl, lR)
 
             ELSE IF (nsd .EQ. 2) THEN
-               CALL IB_FFSI2D(eNoNb, eNoN, w, Nb, Nbx, N, Nx, abl, ybl,
-     2            ubl, fNl, lR)
+               CALL IB_FFSI2D(eNoNb, eNoN, w, Jac, Nb, Nbx, N, Nx, Gmat,
+     2            abl, ybl, ubl, fNl, lR)
             END IF
 
 !           Assemble to global residue
@@ -4068,25 +4078,34 @@ c     2         "can be applied for Neumann boundaries only"
       END SUBROUTINE IB_CALCFFSI
 !--------------------------------------------------------------------
 !     Compute the 3D FSI force due to IB in reference configuration
-      SUBROUTINE IB_FFSI3D(eNoNb, eNoN, w, Nb, Nbx, N, Nx, al, yl, ul,
-     2   fNl, lR)
+      SUBROUTINE IB_FFSI3D(eNoNb, eNoN, w, Je, Nb, Nbx, N, Nx, Gm, al,
+     2   yl, ul, fNl, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL :: incompFlag
       INTEGER, INTENT(IN) :: eNoNb, eNoN
-      REAL(KIND=8), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb), N(eNoN),
-     2   Nx(3,eNoN), al(3,eNoNb), yl(4,eNoNb), ul(3,eNoNb),
-     3   fNl(3*ib%nFn,eNoNb)
-      REAL(KIND=8), INTENT(OUT) :: lR(4,eNoN)
+      REAL(KIND=8), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(3,eNoNb),
+     2   N(eNoN), Nx(3,eNoN), Gm(3,3), al(3,eNoNb), yl(4,eNoNb),
+     3   ul(3,eNoNb), fNl(3*ib%nFn,eNoNb)
+      REAL(KIND=8), INTENT(OUT) :: lR(3,eNoN)
 
+      REAL(KIND=8), PARAMETER :: ct_f(2) = (/1D0, 3D0/), ct_p = 1D0
+
+      LOGICAL :: incompFlag
       INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: Jac, rho_s, rho_f, eM_s, nu_s, mu_f, mu_s, bf(3),
-     2   vd(3), v(3), rM(3), vx(3,3), F(3,3), Fi(3,3), S(3,3), P(3,3),
-     3   PFt(3,3), VxFi(3,3), vVx(3), VxNx(3), NxP(3), CC(3,3,3,3),
-     4   fl(3,ib%nFn), pf, ps, divV, rtmp
+      REAL(KIND=8) :: bf(3), vd(3), v(3), p, px(3), vx(3,3), divV,
+     2   vVx(3), rt, rV(3), rM(3,3)
+
+!     Solid domain parameters
+      REAL(KIND=8) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(3,3), Fi(3,3),
+     2   S(3,3), PFt(3,3), CC(3,3,3,3), fl(3,ib%nFn), tauM_s, tauC_s,
+     3   vp_s(2)
       TYPE(stModelType) :: stModel
+
+!     Fluid domain parameters
+      REAL(KIND=8) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f, tauB,
+     2   vp_f(3), va_f(3)
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4101,24 +4120,26 @@ c     2         "can be applied for Neumann boundaries only"
       IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
 
 !     Define fluid parameters
-      rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      mu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity)
+      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
+      mu_f   = eq(iEq)%dmn(cDmn)%prop(viscosity)
+      nu_f   = mu_f/rho_f
 
 !     Body force
-      bf(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-      bf(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-      bf(3)   = eq(iEq)%dmnIB(iDmn)%prop(f_z)
+      bf(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      bf(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+      bf(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
 
 !     Inertia, body force and deformation tensor (F)
-      vd      = -bf
-      v       = 0D0
-      vx      = 0D0
-      pf      = 0D0
-      fl      = 0D0
-      F       = 0D0
-      F(1,1)  = 1D0
-      F(2,2)  = 1D0
-      F(3,3)  = 1D0
+      vd     = -bf
+      v      = 0D0
+      p      = 0D0
+      px     = 0D0
+      vx     = 0D0
+      fl     = 0D0
+      F      = 0D0
+      F(1,1) = 1D0
+      F(2,2) = 1D0
+      F(3,3) = 1D0
       DO b=1, eNoNb
 !        Acceleration (dv_i/dt)
          vd(1) = vd(1) + al(1,b)*Nb(b)
@@ -4130,8 +4151,13 @@ c     2         "can be applied for Neumann boundaries only"
          v(2) = v(2) + yl(2,b)*Nb(b)
          v(3) = v(3) + yl(3,b)*Nb(b)
 
-!        Pressure, pf
-         pf   = pf   + yl(4,b)*Nb(b)
+!        Pressure, p
+         p = p + yl(4,b)*Nb(b)
+
+!        Grad p in reference coordinates
+         px(1) = px(1) + yl(4,b)*Nbx(1,b)
+         px(2) = px(2) + yl(4,b)*Nbx(2,b)
+         px(3) = px(3) + yl(4,b)*Nbx(3,b)
 
 !        Grad v (v_i,I) w.r.t. reference coordinates
          vx(1,1) = vx(1,1) + yl(1,b)*Nbx(1,b)
@@ -4155,20 +4181,90 @@ c     2         "can be applied for Neumann boundaries only"
 
 !        Deformation tensor, F_{iI}. Here the shape function derivatives
 !        are w.r.t. the reference coordinates
-         F(1,1)  = F(1,1)  + ul(1,b)*Nbx(1,b)
-         F(1,2)  = F(1,2)  + ul(1,b)*Nbx(2,b)
-         F(1,3)  = F(1,3)  + ul(1,b)*Nbx(3,b)
+         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
+         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
+         F(1,3) = F(1,3) + ul(1,b)*Nbx(3,b)
 
-         F(2,1)  = F(2,1)  + ul(2,b)*Nbx(1,b)
-         F(2,2)  = F(2,2)  + ul(2,b)*Nbx(2,b)
-         F(2,3)  = F(2,3)  + ul(2,b)*Nbx(3,b)
+         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
+         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
+         F(2,3) = F(2,3) + ul(2,b)*Nbx(3,b)
 
-         F(3,1)  = F(3,1)  + ul(3,b)*Nbx(1,b)
-         F(3,2)  = F(3,2)  + ul(3,b)*Nbx(2,b)
-         F(3,3)  = F(3,3)  + ul(3,b)*Nbx(3,b)
+         F(3,1) = F(3,1) + ul(3,b)*Nbx(1,b)
+         F(3,2) = F(3,2) + ul(3,b)*Nbx(2,b)
+         F(3,3) = F(3,3) + ul(3,b)*Nbx(3,b)
       END DO
       Jac = MAT_DET(F, nsd)
       Fi  = MAT_INV(F, nsd)
+
+!     Update the derivatives in the physical coordinates
+!     grad v (v_i,j) in spatial coordintes
+      rM(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1) + vx(1,3)*Fi(3,1)
+      rM(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2) + vx(1,3)*Fi(3,2)
+      rM(1,3) = vx(1,1)*Fi(1,3) + vx(1,2)*Fi(2,3) + vx(1,3)*Fi(3,3)
+
+      rM(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1) + vx(2,3)*Fi(3,1)
+      rM(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2) + vx(2,3)*Fi(3,2)
+      rM(2,3) = vx(2,1)*Fi(1,3) + vx(2,2)*Fi(2,3) + vx(2,3)*Fi(3,3)
+
+      rM(3,1) = vx(3,1)*Fi(1,1) + vx(3,2)*Fi(2,1) + vx(3,3)*Fi(3,1)
+      rM(3,2) = vx(3,1)*Fi(1,2) + vx(3,2)*Fi(2,2) + vx(3,3)*Fi(3,2)
+      rM(3,3) = vx(3,1)*Fi(1,3) + vx(3,2)*Fi(2,3) + vx(3,3)*Fi(3,3)
+      vx(:,:) = rM(:,:)
+
+!     grad p (p,i) in spatial coordinates
+      rV(1) = px(1)*Fi(1,1) + px(2)*Fi(2,1) + px(3)*Fi(3,1)
+      rV(2) = px(1)*Fi(1,2) + px(2)*Fi(2,2) + px(3)*Fi(3,2)
+      rV(3) = px(1)*Fi(1,3) + px(2)*Fi(2,3) + px(3)*Fi(3,3)
+      px(:) = rV(:)
+
+!     Divergence of velocity
+      divV = vx(1,1) + vx(2,2) + vx(3,3)
+
+!     V. grad V
+      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
+      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
+      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
+
+!     First compute all fluid contribution including stabilization
+      kU = v(1)*v(1)*Gm(1,1) + v(1)*v(2)*Gm(1,2) + v(1)*v(3)*Gm(1,3)
+     2   + v(2)*v(1)*Gm(2,1) + v(2)*v(2)*Gm(2,2) + v(2)*v(3)*Gm(2,3)
+     3   + v(3)*v(1)*Gm(3,1) + v(3)*v(2)*Gm(3,2) + v(3)*v(3)*Gm(3,3)
+
+      kS = Gm(1,1)*Gm(1,1) + Gm(1,2)*Gm(1,2) + Gm(1,3)*Gm(1,3)
+     2   + Gm(2,1)*Gm(2,1) + Gm(2,2)*Gm(2,2) + Gm(2,3)*Gm(2,3)
+     3   + Gm(3,1)*Gm(3,1) + Gm(3,2)*Gm(3,2) + Gm(3,3)*Gm(3,3)
+
+      rt = 2D0*ct_f(1)/dt
+      tauM_f = 1D0/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
+
+      vp_f(1) = -tauM_f * (vd(1) + vVx(1) + px(1)/rho_f)
+      vp_f(2) = -tauM_f * (vd(2) + vVx(2) + px(2)/rho_f)
+      vp_f(3) = -tauM_f * (vd(3) + vVx(3) + px(3)/rho_f)
+
+      va_f(1) = v(1) + vp_f(1)
+      va_f(2) = v(2) + vp_f(2)
+      va_f(3) = v(3) + vp_f(3)
+
+      rt = Gm(1,1) + Gm(2,2) + Gm(3,3)
+      rt = 16.0D0*rt*tauM_f
+      tauC_f = 1D0/(rt)
+
+      tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
+     2     + vp_f(1)*vp_f(3)*Gm(1,3)
+     3     + vp_f(2)*vp_f(1)*Gm(2,1) + vp_f(2)*vp_f(2)*Gm(2,2)
+     4     + vp_f(2)*vp_f(3)*Gm(2,3)
+     5     + vp_f(3)*vp_f(1)*Gm(3,1) + vp_f(3)*vp_f(2)*Gm(3,2)
+     6     + vp_f(3)*vp_f(3)*Gm(3,3)
+
+      IF (ISZERO(tauB)) tauB = eps
+      tauB = 1D0/SQRT(tauB)
+
+!     Solid stabilization parameters
+      CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
+
+      vp_s(1) = -tauM_s * (vd(1) + vVx(1) + px(1)/rho_s)
+      vp_s(2) = -tauM_s * (vd(2) + vVx(2) + px(2)/rho_s)
+      vp_s(3) = -tauM_s * (vd(3) + vVx(3) + px(3)/rho_s)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
 !     Note that S = Siso + Svol. For incompressible solids, Svol = 0
@@ -4176,84 +4272,84 @@ c     2         "can be applied for Neumann boundaries only"
 !     contribution in the solid domain should be removed.
       CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
 
-!     1st Piola-Kirchhoff tensor (P)
-      P(1,1) = F(1,1)*S(1,1) + F(1,2)*S(2,1) + F(1,3)*S(3,1)
-      P(1,2) = F(1,1)*S(1,2) + F(1,2)*S(2,2) + F(1,3)*S(3,2)
-      P(1,3) = F(1,1)*S(1,3) + F(1,2)*S(2,3) + F(1,3)*S(3,3)
-      P(2,1) = F(2,1)*S(1,1) + F(2,2)*S(2,1) + F(2,3)*S(3,1)
-      P(2,2) = F(2,1)*S(1,2) + F(2,2)*S(2,2) + F(2,3)*S(3,2)
-      P(2,3) = F(2,1)*S(1,3) + F(2,2)*S(2,3) + F(2,3)*S(3,3)
-      P(3,1) = F(3,1)*S(1,1) + F(3,2)*S(2,1) + F(3,3)*S(3,1)
-      P(3,2) = F(3,1)*S(1,2) + F(3,2)*S(2,2) + F(3,3)*S(3,2)
-      P(3,3) = F(3,1)*S(1,3) + F(3,2)*S(2,3) + F(3,3)*S(3,3)
+!     F * S * F_t
+      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
+      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
+      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
 
-!     P*Ft = P_iI * F_jI
-      PFt(1,1) = P(1,1)*F(1,1) + P(1,2)*F(1,2) + P(1,3)*F(1,3)
-      PFt(1,2) = P(1,1)*F(2,1) + P(1,2)*F(2,2) + P(1,3)*F(2,3)
-      PFt(1,3) = P(1,1)*F(3,1) + P(1,2)*F(3,2) + P(1,3)*F(3,3)
+      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
+      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
+      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
 
-      PFt(2,1) = P(2,1)*F(1,1) + P(2,2)*F(1,2) + P(2,3)*F(1,3)
-      PFt(2,2) = P(2,1)*F(2,1) + P(2,2)*F(2,2) + P(2,3)*F(2,3)
-      PFt(2,3) = P(2,1)*F(3,1) + P(2,2)*F(3,2) + P(2,3)*F(3,3)
+      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
+      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
+      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
 
-      PFt(3,1) = P(3,1)*F(1,1) + P(3,2)*F(1,2) + P(3,3)*F(1,3)
-      PFt(3,2) = P(3,1)*F(2,1) + P(3,2)*F(2,2) + P(3,3)*F(2,3)
-      PFt(3,3) = P(3,1)*F(3,1) + P(3,2)*F(3,2) + P(3,3)*F(3,3)
+      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
+      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
+      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
 
-!     grad v (v_i,j)
-      VxFi(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1) + vx(1,3)*Fi(3,1)
-      VxFi(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2) + vx(1,3)*Fi(3,2)
-      VxFi(1,3) = vx(1,1)*Fi(1,3) + vx(1,2)*Fi(2,3) + vx(1,3)*Fi(3,3)
+      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
+      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
+      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
 
-      VxFi(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1) + vx(2,3)*Fi(3,1)
-      VxFi(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2) + vx(2,3)*Fi(3,2)
-      VxFi(2,3) = vx(2,1)*Fi(1,3) + vx(2,2)*Fi(2,3) + vx(2,3)*Fi(3,3)
+      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
+      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
+      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
 
-      VxFi(3,1) = vx(3,1)*Fi(1,1) + vx(3,2)*Fi(2,1) + vx(3,3)*Fi(3,1)
-      VxFi(3,2) = vx(3,1)*Fi(1,2) + vx(3,2)*Fi(2,2) + vx(3,3)*Fi(3,2)
-      VxFi(3,3) = vx(3,1)*Fi(1,3) + vx(3,2)*Fi(2,3) + vx(3,3)*Fi(3,3)
+      rV(1) = tauB*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2) + vp_f(3)*vx(1,3))
+      rV(2) = tauB*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2) + vp_f(3)*vx(2,3))
+      rV(3) = tauB*(vp_f(1)*vx(3,1) + vp_f(2)*vx(3,2) + vp_f(3)*vx(3,3))
 
-!     Divergence of velocity
-      divV = VxFi(1,1) + VxFi(2,2) + VxFi(3,3)
+      rM(1,1) = (mu_f-mu_s)*Jac*(vx(1,1) + vx(1,1)) - PFt(1,1) +
+     2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
+      rM(1,2) = (mu_f-mu_s)*Jac*(vx(1,2) + vx(2,1)) - PFt(1,2) +
+     2   rho_f*Jac*(rV(1)*vp_f(2) - vp_f(1)*va_f(2))
+      rM(1,3) = (mu_f-mu_s)*Jac*(vx(1,3) + vx(3,1)) - PFt(1,3) +
+     2   rho_f*Jac*(rV(1)*vp_f(3) - vp_f(1)*va_f(3))
 
-!     V. grad V
-      vVx(1) = v(1)*VxFi(1,1) + v(2)*VxFi(1,2) + v(3)*VxFi(1,3)
-      vVx(2) = v(1)*VxFi(2,1) + v(2)*VxFi(2,2) + v(3)*VxFi(2,3)
-      vVx(3) = v(1)*VxFi(3,1) + v(2)*VxFi(3,2) + v(3)*VxFi(3,3)
+      rM(2,1) = (mu_f-mu_s)*Jac*(vx(2,1) + vx(1,2)) - PFt(2,1) +
+     2   rho_f*Jac*(rV(2)*vp_f(1) - vp_f(2)*va_f(1))
+      rM(2,2) = (mu_f-mu_s)*Jac*(vx(2,2) + vx(2,2)) - PFt(2,2) +
+     2   rho_f*Jac*(rV(2)*vp_f(2) - vp_f(2)*va_f(2) + tauC_f*divV)
+      rM(2,3) = (mu_f-mu_s)*Jac*(vx(2,3) + vx(3,2)) - PFt(2,3) +
+     2   rho_f*Jac*(rV(2)*vp_f(3) - vp_f(2)*va_f(3))
+
+      rM(3,1) = (mu_f-mu_s)*Jac*(vx(3,1) + vx(1,3)) - PFt(3,1) +
+     2   rho_f*Jac*(rV(3)*vp_f(1) - vp_f(3)*va_f(1))
+      rM(3,2) = (mu_f-mu_s)*Jac*(vx(3,2) + vx(2,3)) - PFt(3,2) +
+     2   rho_f*Jac*(rV(3)*vp_f(2) - vp_f(3)*va_f(2))
+      rM(3,3) = (mu_f-mu_s)*Jac*(vx(3,3) + vx(3,3)) - PFt(3,3) +
+     2   rho_f*Jac*(rV(3)*vp_f(3) - vp_f(3)*va_f(3) + tauC_f*divV)
+
+      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1)) +
+     2   rho_f*Jac*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2) + vp_f(3)*vx(1,3))
+
+      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2)) +
+     2   rho_f*Jac*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2) + vp_f(3)*vx(2,3))
+
+      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3)) +
+     2   rho_f*Jac*(vp_f(1)*vx(3,1) + vp_f(2)*vx(3,2) + vp_f(3)*vx(3,3))
 
 !     Fully incompressible case
       DO a=1, eNoN
-!        Viscous stress = grad N_A . (grad v + grad v^T)
-         VxNx(1) = Nx(1,a)*(VxFi(1,1) + VxFi(1,1)) +
-     2             Nx(2,a)*(VxFi(1,2) + VxFi(2,1)) +
-     3             Nx(3,a)*(VxFi(1,3) + VxFi(3,1))
-
-         VxNx(2) = Nx(1,a)*(VxFi(2,1) + VxFi(1,2)) +
-     2             Nx(2,a)*(VxFi(2,2) + VxFi(2,2)) +
-     3             Nx(3,a)*(VxFi(2,3) + VxFi(3,2))
-
-         VxNx(3) = Nx(1,a)*(VxFi(3,1) + VxFi(1,3)) +
-     2             Nx(2,a)*(VxFi(3,2) + VxFi(2,3)) +
-     3             Nx(3,a)*(VxFi(3,3) + VxFi(3,3))
-
-!        Sress on structure: NxPFt
-         NxP(1)  = Nx(1,a)*PFt(1,1) + Nx(2,a)*PFt(1,2) +Nx(3,a)*PFt(1,3)
-         NxP(2)  = Nx(1,a)*PFt(2,1) + Nx(2,a)*PFt(2,2) +Nx(3,a)*PFt(2,3)
-         NxP(3)  = Nx(1,a)*PFt(3,1) + Nx(2,a)*PFt(3,2) +Nx(3,a)*PFt(3,3)
-
-         rM(1)   = N(a)*(rho_f*Jac - rho_s)*(vd(1) + vVx(1)) +
-     2             (mu_f-mu_s)*Jac*VxNx(1) - NxP(1)
-         rM(2)   = N(a)*(rho_f*Jac - rho_s)*(vd(2) + vVx(2)) +
-     2             (mu_f-mu_s)*Jac*VxNx(2) - NxP(2)
-         rM(3)   = N(a)*(rho_f*Jac - rho_s)*(vd(3) + vVx(3)) +
-     2             (mu_f-mu_s)*Jac*VxNx(3) - NxP(3)
-
-         lR(1,a) = w*rM(1)
-         lR(2,a) = w*rM(2)
-         lR(3,a) = w*rM(3)
+         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
+     2      + Nx(3,a)*rM(1,3))
+         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
+     2      + Nx(3,a)*rM(2,3))
+         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
+     2      + Nx(3,a)*rM(3,3))
+         lR(4,a) = -w*Jac*(Nx(1,a)*vp_f(1) + Nx(2,a)*vp_f(2)
+     2      + Nx(3,a)*vp_f(3))
       END DO
 
-      IF (incompFlag) RETURN
+      IF (incompFlag) THEN
+         DO a=1, eNoN
+            lR(4,a) = lR(4,a) + w*Jac*(Nx(1,a)*vp_s(1) + Nx(2,a)*vp_s(2)
+     2         + Nx(3,a)*vp_s(3))
+         END DO
+         RETURN
+      END IF
 
 !     For compressible solids, remove fluid pressure from solid domain.
 !     Also remove divergence term from continuity equation and add
@@ -4261,37 +4357,46 @@ c     2         "can be applied for Neumann boundaries only"
 !     multiplier to weakly enforce their equality. Note that the solid
 !     pressure returned is the one defined in Holzapfel book.
       ps = 0D0
-      CALL GETSVOLP(stModel, Jac, ps, rtmp)
+      CALL GETSVOLP(stModel, Jac, ps, rt)
       DO a=1, eNoN
-         lR(1,a) = lR(1,a) - w*pf*Nx(1,a)
-         lR(2,a) = lR(2,a) - w*pf*Nx(2,a)
-         lR(3,a) = lR(3,a) - w*pf*Nx(3,a)
-         lR(4,a) = w*Jac*N(a)*(divV + (-ps) - pf)
+         lR(1,a) = lR(1,a) - w*p*Nx(1,a)*Jac
+         lR(2,a) = lR(2,a) - w*p*Nx(2,a)*Jac
+         lR(3,a) = lR(3,a) - w*p*Nx(3,a)*Jac
+         lR(4,a) = w*Jac*N(a)*(divV + ct_p*(-ps-p))
       END DO
 
       RETURN
       END SUBROUTINE IB_FFSI3D
 !--------------------------------------------------------------------
 !     Compute the 2D FSI force due to IB in reference configuration
-      SUBROUTINE IB_FFSI2D(eNoNb, eNoN, w, Nb, Nbx, N, Nx, al, yl, ul,
-     2   fNl, lR)
+      SUBROUTINE IB_FFSI2D(eNoNb, eNoN, w, Je, Nb, Nbx, N, Nx, Gm, al,
+     2   yl, ul, fNl, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoNb, eNoN
-      REAL(KIND=8), INTENT(IN) :: w, Nb(eNoNb), Nbx(2,eNoNb), N(eNoN),
-     2   Nx(2,eNoN), al(2,eNoNb), yl(3,eNoNb), ul(2,eNoNb),
-     3   fNl(2*ib%nFn,eNoNb)
+      REAL(KIND=8), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(2,eNoNb),
+     2   N(eNoN), Nx(2,eNoN), Gm(2,2), al(2,eNoNb), yl(3,eNoNb),
+     3   ul(2,eNoNb), fNl(2*ib%nFn,eNoNb)
       REAL(KIND=8), INTENT(OUT) :: lR(3,eNoN)
+
+      REAL(KIND=8), PARAMETER :: ct_f(2) = (/1D0, 3D0/), ct_p = 1D0
 
       LOGICAL :: incompFlag
       INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: Jac, rho_s, rho_f, eM_s, nu_s, mu_f, mu_s, bf(2),
-     2   vd(2), v(2), rM(2), vx(2,2), F(2,2), Fi(2,2), S(2,2), P(2,2),
-     3   PFt(2,2), VxFi(2,2), vVx(2), VxNx(2), NxP(2), CC(2,2,2,2),
-     4   fl(2,ib%nFn), pf, ps, divV, rtmp
+      REAL(KIND=8) :: bf(2), vd(2), v(2), p, px(2), vx(2,2), divV,
+     2   vVx(2), rt, rV(2), rM(2,2)
+
+!     Solid domain parameters
+      REAL(KIND=8) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(2,2), Fi(2,2),
+     2   S(2,2), PFt(2,2), CC(2,2,2,2), fl(2,ib%nFn), tauM_s, tauC_s,
+     3   vp_s(2)
       TYPE(stModelType) :: stModel
+
+!     Fluid domain parameters
+      REAL(KIND=8) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f, tauB,
+     2   vp_f(2), va_f(2)
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4306,22 +4411,24 @@ c     2         "can be applied for Neumann boundaries only"
       IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
 
 !     Define fluid parameters
-      rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      mu_f    = eq(iEq)%dmn(cDmn)%prop(viscosity)
+      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
+      mu_f   = eq(iEq)%dmn(cDmn)%prop(viscosity)
+      nu_f   = mu_f/rho_f
 
 !     Body force
-      bf(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-      bf(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+      bf(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      bf(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
 
 !     Inertia, body force and deformation tensor (F)
-      vd      = -bf
-      v       = 0D0
-      pf      = 0D0
-      vx      = 0D0
-      fl      = 0D0
-      F       = 0D0
-      F(1,1)  = 1D0
-      F(2,2)  = 1D0
+      vd     = -bf
+      v      = 0D0
+      p      = 0D0
+      px     = 0D0
+      vx     = 0D0
+      fl     = 0D0
+      F      = 0D0
+      F(1,1) = 1D0
+      F(2,2) = 1D0
       DO b=1, eNoNb
 !        Acceleration (dv_i/dt)
          vd(1) = vd(1) + al(1,b)*Nb(b)
@@ -4331,8 +4438,12 @@ c     2         "can be applied for Neumann boundaries only"
          v(1) = v(1) + yl(1,b)*Nb(b)
          v(2) = v(2) + yl(2,b)*Nb(b)
 
-!        Pressure, pf
-         pf   = pf   + yl(3,b)*Nb(b)
+!        Pressure, p
+         p = p + yl(3,b)*Nb(b)
+
+!        Grad p in reference coordinates
+         px(1) = px(1) + yl(3,b)*Nbx(1,b)
+         px(2) = px(2) + yl(3,b)*Nbx(2,b)
 
 !        Grad v (v_i,I) w.r.t. reference coordinates
          vx(1,1) = vx(1,1) + yl(1,b)*Nbx(1,b)
@@ -4348,13 +4459,65 @@ c     2         "can be applied for Neumann boundaries only"
 
 !        Deformation tensor, F_{iI}. Here the shape function derivatives
 !        are w.r.t. the reference coordinates
-         F(1,1)  = F(1,1)  + ul(1,b)*Nbx(1,b)
-         F(1,2)  = F(1,2)  + ul(1,b)*Nbx(2,b)
-         F(2,1)  = F(2,1)  + ul(2,b)*Nbx(1,b)
-         F(2,2)  = F(2,2)  + ul(2,b)*Nbx(2,b)
+         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
+         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
+         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
+         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
       END DO
       Jac = MAT_DET(F, nsd)
       Fi  = MAT_INV(F, nsd)
+
+!     Update the derivatives in the physical coordinates
+!     grad v (v_i,j) in spatial coordintes
+      rM(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1)
+      rM(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2)
+      rM(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1)
+      rM(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2)
+      vx(:,:) = rM(:,:)
+
+!     grad p (p,i) in spatial coordinates
+      rV(1) = px(1)*Fi(1,1) + px(2)*Fi(2,1)
+      rV(2) = px(1)*Fi(1,2) + px(2)*Fi(2,2)
+      px(:) = rV(:)
+
+!     Divergence of velocity
+      divV = vx(1,1) + vx(2,2)
+
+!     V. grad V
+      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2)
+      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2)
+
+!     First compute all fluid contribution including stabilization
+      kU = v(1)*v(1)*Gm(1,1) + v(1)*v(2)*Gm(1,2)
+     2   + v(2)*v(1)*Gm(2,1) + v(2)*v(2)*Gm(2,2)
+
+      kS = Gm(1,1)*Gm(1,1) + Gm(1,2)*Gm(1,2)
+     2   + Gm(2,1)*Gm(2,1) + Gm(2,2)*Gm(2,2)
+
+      rt = 2D0*ct_f(1)/dt
+      tauM_f = 1D0/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
+
+      vp_f(1) = -tauM_f * (vd(1) + vVx(1) + px(1)/rho_f)
+      vp_f(2) = -tauM_f * (vd(2) + vVx(2) + px(2)/rho_f)
+
+      va_f(1) = v(1) + vp_f(1)
+      va_f(2) = v(2) + vp_f(2)
+
+      rt = Gm(1,1) + Gm(2,2)
+      rt = 16.0D0*rt*tauM_f
+      tauC_f = 1D0/(rt)
+
+      tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
+     2     + vp_f(2)*vp_f(1)*Gm(2,1) + vp_f(2)*vp_f(2)*Gm(2,2)
+
+      IF (ISZERO(tauB)) tauB = eps
+      tauB = 1D0/SQRT(tauB)
+
+!     Solid stabilization parameters
+      CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
+
+      vp_s(1) = -tauM_s * (vd(1) + vVx(1) + px(1)/rho_s)
+      vp_s(2) = -tauM_s * (vd(2) + vVx(2) + px(2)/rho_s)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
 !     Note that S = Siso + Svol. For incompressible solids, Svol = 0
@@ -4362,54 +4525,49 @@ c     2         "can be applied for Neumann boundaries only"
 !     contribution in the solid domain should be removed.
       CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
 
-!     1st Piola-Kirchhoff tensor, P = F_iJ * S_JI
-      P(1,1) = F(1,1)*S(1,1) + F(1,2)*S(2,1)
-      P(1,2) = F(1,1)*S(1,2) + F(1,2)*S(2,2)
-      P(2,1) = F(2,1)*S(1,1) + F(2,2)*S(2,1)
-      P(2,2) = F(2,1)*S(1,2) + F(2,2)*S(2,2)
+!     F * S * F_t
+      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)
+      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)
+      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)
+      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)
+      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2)
+      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2)
+      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2)
+      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2)
 
-!     P*Ft = P_iI * F_jI
-      PFt(1,1) = P(1,1)*F(1,1) + P(1,2)*F(1,2)
-      PFt(1,2) = P(1,1)*F(2,1) + P(1,2)*F(2,2)
-      PFt(2,1) = P(2,1)*F(1,1) + P(2,2)*F(1,2)
-      PFt(2,2) = P(2,1)*F(2,1) + P(2,2)*F(2,2)
+      rV(1) = tauB * (vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
+      rV(2) = tauB * (vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
 
-!     grad v (v_i,j)
-      VxFi(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1)
-      VxFi(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2)
-      VxFi(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1)
-      VxFi(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2)
+      rM(1,1) = (mu_f-mu_s)*Jac*(vx(1,1) + vx(1,1)) - PFt(1,1) +
+     2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
+      rM(1,2) = (mu_f-mu_s)*Jac*(vx(1,2) + vx(2,1)) - PFt(1,2) +
+     2   rho_f*Jac*(rV(1)*vp_f(2) - vp_f(1)*va_f(2))
 
-!     Divergence of velocity
-      divV = VxFi(1,1) + VxFi(2,2)
+      rM(2,1) = (mu_f-mu_s)*Jac*(vx(2,1) + vx(1,2)) - PFt(2,1) +
+     2   rho_f*Jac*(rV(2)*vp_f(1) - vp_f(2)*va_f(1))
+      rM(2,2) = (mu_f-mu_s)*Jac*(vx(2,2) + vx(2,2)) - PFt(2,2) +
+     2   rho_f*Jac*(rV(2)*vp_f(2) - vp_f(2)*va_f(2) + tauC_f*divV)
 
-!     V. grad V
-      vVx(1) = v(1)*VxFi(1,1) + v(2)*VxFi(1,2)
-      vVx(2) = v(1)*VxFi(2,1) + v(2)*VxFi(2,2)
+      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1)) +
+     2   rho_f*Jac*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
+
+      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2)) +
+     2   rho_f*Jac*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
 
 !     Fully incompressible case
       DO a=1, eNoN
-!        Viscous stress = grad N_A . (grad v + grad v^T)
-         VxNx(1) = Nx(1,a)*(VxFi(1,1) + VxFi(1,1)) +
-     2             Nx(2,a)*(VxFi(1,2) + VxFi(2,1))
-
-         VxNx(2) = Nx(1,a)*(VxFi(2,1) + VxFi(1,2)) +
-     2             Nx(2,a)*(VxFi(2,2) + VxFi(2,2))
-
-!        Sress on structure: NxPFt
-         NxP(1)  = Nx(1,a)*PFt(1,1) + Nx(2,a)*PFt(1,2)
-         NxP(2)  = Nx(1,a)*PFt(2,1) + Nx(2,a)*PFt(2,2)
-
-         rM(1)   = N(a)*(rho_f*Jac - rho_s)*(vd(1) + vVx(1)) +
-     2             (mu_f-mu_s)*Jac*VxNx(1) - NxP(1)
-         rM(2)   = N(a)*(rho_f*Jac - rho_s)*(vd(2) + vVx(2)) +
-     2             (mu_f-mu_s)*Jac*VxNx(2) - NxP(2)
-
-         lR(1,a) = w*rM(1)
-         lR(2,a) = w*rM(2)
+         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2))
+         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2))
+         lR(3,a) = -w*Jac*(Nx(1,a)*vp_f(1) + Nx(2,a)*vp_f(2))
       END DO
 
-      IF (incompFlag) RETURN
+      IF (incompFlag) THEN
+         DO a=1, eNoN
+            lR(3,a) = lR(3,a) + w*Jac*
+     2         (Nx(1,a)*vp_s(1) + Nx(2,a)*vp_s(2))
+         END DO
+         RETURN
+      END IF
 
 !     For compressible solids, remove fluid pressure from solid domain.
 !     Also remove divergence term from continuity equation and add
@@ -4417,11 +4575,11 @@ c     2         "can be applied for Neumann boundaries only"
 !     multiplier to weakly enforce their equality. Note that the solid
 !     pressure returned is the one defined in Holzapfel book.
       ps = 0D0
-      CALL GETSVOLP(stModel, Jac, ps, rtmp)
+      CALL GETSVOLP(stModel, Jac, ps, rt)
       DO a=1, eNoN
-         lR(1,a) = lR(1,a) - w*pf*Nx(1,a)
-         lR(2,a) = lR(2,a) - w*pf*Nx(2,a)
-         lR(3,a) = w*Jac*N(a)*(divV + (-ps) - pf)
+         lR(1,a) = lR(1,a) - w*p*Nx(1,a)*Jac
+         lR(2,a) = lR(2,a) - w*p*Nx(2,a)*Jac
+         lR(3,a) = w*Jac*N(a)*(divV + ct_p*(-ps-p))
       END DO
 
       RETURN

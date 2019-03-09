@@ -787,11 +787,11 @@
             CASE (ctau_M)
                lPtr => lPD%get(rtmp,
      2            "Momentum stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.01D0
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.001D0
             CASE (ctau_C)
                lPtr => lPD%get(rtmp,
      2            "Continuity stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.01D0
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.0D0
             CASE (initialization_pressure)
                lPtr => lPD%get(rtmp,"Initialization Pressure",1,lb=0D0)
             CASE DEFAULT

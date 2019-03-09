@@ -166,7 +166,7 @@
             CASE (outGrp_I)
                div = .FALSE.
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = 1.0D0/REAL(cm%np(),KIND=8)
+                  tmpV(1:l,a) = 1.0D0
                END DO
             CASE DEFAULT
                err = "Undefined output"
