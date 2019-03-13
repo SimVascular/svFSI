@@ -299,9 +299,12 @@
 
       REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6,
      2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
-     3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd), kap, Eff, Ess,
-     4   Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6)
+     3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
       REAL(KIND=8) :: r1, r2, g1, g2, g3
+      ! Guccione !
+      REAL(KIND=8) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
+      ! HGO !
+      REAL(KIND=8) :: kap, Eff, Ess, Hff(nsd,nsd), Hss(nsd,nsd)
 
 !     Some preliminaries
       nd   = REAL(nsd, KIND=8)
@@ -402,54 +405,61 @@
          E = 5D-1 * (J2d*C - Idm)
 
 !        Transform into local orthogonal coordinate system
-         Hff(1,:) = fl(:,1)
-         Hff(2,:) = fl(:,2)
-         Hff(3,:) = CROSS(fl)
+         Rm(1,:) = fl(:,1)
+         Rm(2,:) = fl(:,2)
+         Rm(3,:) = CROSS(fl)
 
 !        Project E to local orthogocal coordinate system
-         E = MATMUL(E, TRANSPOSE(Hff))
-         E = MATMUL(Hff, E)
+         Es = MATMUL(E, Rm)
+         Es = MATMUL(TRANSPOSE(Rm), Es)
 
          g1 = stM%bff
          g2 = stM%bss
          g3 = stM%bfs
 
-!        Fiber stiffness contribution to Siso := (dE*_MN / dE_IJ)
-!        - Voigt notation
-         Sfs(:,:,:) = 0D0
-         Sfs(:,:,1) = MAT_DYADPROD(Hff(1,:), Hff(1,:), nsd)
-         Sfs(:,:,2) = MAT_DYADPROD(Hff(2,:), Hff(2,:), nsd)
-         Sfs(:,:,3) = MAT_DYADPROD(Hff(3,:), Hff(3,:), nsd)
-         Sfs(:,:,4) = MAT_SYMMPROD(Hff(1,:), Hff(2,:), nsd)
-         Sfs(:,:,5) = MAT_SYMMPROD(Hff(1,:), Hff(3,:), nsd)
-         Sfs(:,:,6) = MAT_SYMMPROD(Hff(2,:), Hff(3,:), nsd)
+         QQ = g1 * Es(1,1)*Es(1,1) +
+     2        g2 *(Es(2,2)*Es(2,2) + Es(3,3)*Es(3,3)  +
+     3             Es(2,3)*Es(2,3) + Es(3,2)*Es(3,2)) +
+     4        g3 *(Es(1,2)*Es(1,2) + Es(2,1)*Es(2,1)  +
+     5             Es(1,3)*Es(1,3) + Es(3,1)*Es(3,1))
 
-         Eff = g1* E(1,1)*E(1,1) +
-     2         g2*(E(2,2)*E(2,2) + E(3,3)*E(3,3)  +
-     3             E(2,3)*E(2,3) + E(3,2)*E(3,2)) +
-     4         g3*(E(1,2)*E(1,2) + E(2,1)*E(2,1)  +
-     5             E(1,3)*E(1,3) + E(3,1)*E(3,1))
+         r2 = stM%C10 * EXP(QQ)
 
-         Hss = g1*E(1,1)*Sfs(:,:,1)
-         Hss = Hss + g2*(E(2,2)*Sfs(:,:,2) + E(3,3)*Sfs(:,:,3) +
-     2      (E(2,3) + E(3,2))*Sfs(:,:,6))
-         Hss = Hss + g3*( (E(1,2) + E(2,1))*Sfs(:,:,4) +
-     2                    (E(1,3) + E(3,1))*Sfs(:,:,5) )
+         Sb(1,1) = g1*r2*E(1,1)
+         Sb(2,2) = g2*r2*E(2,2)
+         Sb(3,3) = g2*r2*E(3,3)
+         Sb(2,3) = g2*r2*E(2,3)
+         Sb(1,2) = g3*r2*E(1,2)
+         Sb(1,3) = g3*r2*E(1,3)
 
-         r2  = stM%C10 * EXP(Eff)
-         Sb  = r2 * Hss
+         Sb(2,1) = Sb(1,2)
+         Sb(3,1) = Sb(1,3)
+         Sb(3,2) = Sb(2,3)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
          r2  = r2*J2d*J2d
-         CCb = r2 * ( 2D0*TEN_DYADPROD(Hss, Hss, nsd) +
-     2      g1* TEN_DYADPROD(Sfs(:,:,1), Sfs(:,:,1), nsd)  +
-     3      g2*(TEN_DYADPROD(Sfs(:,:,2), Sfs(:,:,2), nsd)  +
-     4          TEN_DYADPROD(Sfs(:,:,3), Sfs(:,:,3), nsd)  +
-     5      2D0*TEN_DYADPROD(Sfs(:,:,6), Sfs(:,:,6), nsd)) + 2D0*
-     6      g3*(TEN_DYADPROD(Sfs(:,:,4), Sfs(:,:,4), nsd)  +
-     7          TEN_DYADPROD(Sfs(:,:,5), Sfs(:,:,5), nsd)) )
+         CCb = 0D0
+         CCb(1,1,1,1) = g1 * r2
+
+         CCb(2,2,2,2) = g2 * r2
+         CCb(3,3,3,3) = CCb(2,2,2,2)
+
+         CCb(2,3,2,3) = 0.5D0 * g2 * r2
+         CCb(3,2,2,3) = CCb(2,3,2,3)
+         CCb(2,3,3,2) = CCb(2,3,2,3)
+         CCb(3,2,3,2) = CCb(2,3,2,3)
+
+         CCb(1,2,1,2) = 0.5D0 * g3 * r2
+         CCb(2,1,1,2) = CCb(1,2,1,2)
+         CCb(1,2,2,1) = CCb(1,2,1,2)
+         CCb(2,1,2,1) = CCb(1,2,1,2)
+
+         CCb(1,3,1,3) = 0.5D0 * g3 * r2
+         CCb(3,1,1,3) = CCb(1,3,1,3)
+         CCb(1,3,3,1) = CCb(1,3,1,3)
+         CCb(3,1,3,1) = CCb(1,3,1,3)
 
          PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
