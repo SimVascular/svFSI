@@ -42,7 +42,7 @@
 
       REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
-      LOGICAL :: flag, sstEq
+      LOGICAL :: flag
       INTEGER :: i, iEq, iDmn, iM, ierr, nnz, gnnz
       CHARACTER(LEN=stdL) :: fTmp, sTmp
       REAL(KIND=8) :: am
@@ -119,6 +119,12 @@
             eq(iEq)%sym = 'SH'
          CASE (phys_FSI)
             dFlag = .TRUE.
+            DO iDmn=1, eq(iEq)%nDmn
+               IF (eq(iEq)%dmn(iDmn)%phys .EQ. phys_vms_struct) THEN
+                  sstEq = .TRUE.
+                  EXIT
+               END IF
+            END DO
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'FS'
          CASE (phys_mesh)

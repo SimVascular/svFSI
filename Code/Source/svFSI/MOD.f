@@ -829,6 +829,8 @@
       LOGICAL pstEq
 !     Whether CMM equation is solved
       LOGICAL cmmEq
+!     Whether stabilized structural dynamics solver is used
+      LOGICAL sstEq
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required

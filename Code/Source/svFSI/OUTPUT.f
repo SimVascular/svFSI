@@ -204,7 +204,7 @@ c      END DO
       IF (.NOT.ibFlag) THEN
          IF (dFlag) THEN
 !           VMS_STRUCT
-            IF (ALLOCATED(Ad)) THEN
+            IF (sstEq) THEN
 !              Prestress
                IF (pstEq) THEN
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),

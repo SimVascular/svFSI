@@ -129,17 +129,20 @@
       IF (mvMsh) THEN
          i = 0
          DO a=1, tnNo
-            IF (ISDOMAIN(1, a, phys_struct)) i = i + 1
+            IF (ISDOMAIN(1, a, phys_struct) .OR.
+     2          ISDOMAIN(1, a, phys_vms_struct)) i = i + 1
          END DO
          ALLOCATE(gNodes(i))
          i = 0
          DO a=1, tnNo
-            IF (ISDOMAIN(1, a, phys_struct)) THEN
+            IF (ISDOMAIN(1, a, phys_struct) .OR.
+     2          ISDOMAIN(1, a, phys_vms_struct)) THEN
                i = i + 1
                gNodes(i) = a
             END IF
          END DO
          CALL FSILS_BC_CREATE(lhs, nFacesLS, i, nsd, BC_TYPE_Dir,gNodes)
+         DEALLOCATE(gNodes)
       END IF
 
       RETURN

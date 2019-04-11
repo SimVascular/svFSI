@@ -156,7 +156,8 @@
 !     For mesh the reference configuration is the one at beginning of
 !     the time step
             xl = xl + dol
-         ELSE IF (cPhys .NE. phys_struct) THEN
+         ELSE IF (cPhys .NE. phys_struct .AND.
+     2            cPhys .NE. phys_vms_struct) THEN
 !     Otherwise we use the most recent configuration
             xl = xl + dl(nsd+2:2*nsd+1,:)
          END IF
@@ -304,87 +305,125 @@
       RETURN
       END SUBROUTINE CONSTRUCT
 !====================================================================
-      SUBROUTINE BCONSTRUCT(lFa, yl, hl, ptr, e)
+      SUBROUTINE BCONSTRUCT(lFa, hg, Yg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(IN) :: lFa
-      INTEGER, INTENT(IN) :: ptr(lFa%eNoN), e
-      REAL(KIND=8), INTENT(IN) :: yl(tDof,lFa%eNoN), hl(lFa%eNoN)
+      REAL(KIND=8), INTENT(IN) :: hg(tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, g, cPhys, eNoN, iM
+      INTEGER a, e, g, Ac, Ec, iM, cPhys, eNoN
       REAL(KIND=8) w, h, nV(nsd), y(tDof), Jac
 
-      REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:)
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: N(:), hl(:), xl(:,:), yl(:,:),
+     2   dl(:,:), lR(:,:), lK(:,:,:), lKd(:,:,:)
 
-      eNoN = lFa%eNoN
-      iM   = lFa%iM
-      ALLOCATE(lK(dof*dof,eNoN,eNoN), lR(dof,eNoN), N(eNoN))
-!     Updating the current domain
-      cDmn = DOMAIN(msh(iM), cEq, lFa%gE(e))
-!     Updating the shape functions, if neccessary
-      IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
-!     If neccessary correct X, if mesh is moving
-      lK    = 0D0
-      lR    = 0D0
-      cPhys = eq(cEq)%dmn(cDmn)%phys
+      iM = lFa%iM
+      DO e=1, lFa%nEl
+         Ec    = lFa%gE(e)
+         cDmn  = DOMAIN(msh(iM), cEq, Ec)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
 
-      DO g=1, lFa%nG
-         CALL GNNB(lFa, e, g, nV)
-         Jac = SQRT(NORM(nV))
-         nV  = nV/Jac
-         w   = lFa%w(g)*Jac
-         N   = lFa%N(:,g)
+         IF (cPhys .EQ. phys_vms_struct) THEN
+!           We use Nanson's formula to take change in normal direction
+!           with deformation into account. Additional calculations based
+!           on mesh element need to be performed.
+            eNoN = msh(iM)%eNoN
 
-         h = 0D0
-         y = 0D0
-         DO a=1, eNoN
-            h = h + N(a)*hl(a)
-            y = y + N(a)*yl(:,a)
-         END DO
+            ALLOCATE(ptr(eNoN), hl(eNoN), xl(nsd,eNoN), dl(tDof,eNoN),
+     2         lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
+     3         lKd(dof*nsd,eNoN,eNoN))
+            lR  = 0D0
+            lK  = 0D0
+            lKd = 0D0
+            DO a=1, msh(iM)%eNoN
+               Ac      = msh(iM)%IEN(a,Ec)
+               ptr(a)  = Ac
+               xl(:,a) = x(:,Ac)
+               dl(:,a) = Dg(:,Ac)
+               hl(a)   = hg(Ac)
+            END DO
 
-         SELECT CASE (cPhys)
-         CASE (phys_fluid, phys_CMM)
-            CALL BFLUID(eNoN, w, N, y, h, nV, lR, lK)
+            CALL BVMS_STRUCT(lFa, eNoN, e, ptr, xl, dl, hl, lR, lK, lKd)
 
-         CASE (phys_heatS)
-            CALL BHEATS(eNoN, w, N, h, lR)
+            DEALLOCATE(ptr, hl, xl, dl, lR, lK, lKd)
+         ELSE
+            eNoN = lFa%eNoN
 
-         CASE (phys_heatF)
-            CALL BHEATF(eNoN, w, N, y, h, nV, lR, lK)
+            ALLOCATE(ptr(eNoN), N(eNoN), hl(eNoN), yl(tDof,eNoN),
+     2         lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+            lK = 0D0
+            lR = 0D0
+            DO a=1, eNoN
+               Ac      = lFa%IEN(a,e)
+               ptr(a)  = Ac
+               yl(:,a) = Yg(:,Ac)
+               hl(a)   = hg(Ac)
+            END DO
 
-         CASE (phys_lElas)
-            CALL BLELAS(eNoN, w, N, h, nV, lR)
+!           Updating the shape functions, if neccessary
+            IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
-         CASE (phys_struct)
-            CALL BLELAS(eNoN, w, N, h, nV, lR)
+            DO g=1, lFa%nG
+               CALL GNNB(lFa, e, g, nV)
+               Jac = SQRT(NORM(nV))
+               nV  = nV/Jac
+               w   = lFa%w(g)*Jac
+               N   = lFa%N(:,g)
 
-         CASE (phys_CEP)
-            CALL BCEP(eNoN, w, N, h, lR)
+               h = 0D0
+               y = 0D0
+               DO a=1, eNoN
+                  h = h + N(a)*hl(a)
+                  y = y + N(a)*yl(:,a)
+               END DO
 
-         CASE (phys_preSt)
-            CALL BLELAS(eNoN, w, N, h, nV, lR)
+               SELECT CASE (cPhys)
+               CASE (phys_fluid, phys_CMM)
+                  CALL BFLUID(eNoN, w, N, y, h, nV, lR, lK)
 
-         CASE (phys_shell)
-            CALL BLELAS(eNoN, w, N, h, nV, lR)
+               CASE (phys_heatS)
+                  CALL BHEATS(eNoN, w, N, h, lR)
 
-         CASE DEFAULT
-            err = "Undefined phys in BCONSTRUCT"
-         END SELECT
-      END DO
+               CASE (phys_heatF)
+                  CALL BHEATF(eNoN, w, N, y, h, nV, lR, lK)
 
-!     Now doing the assembly part
+               CASE (phys_lElas)
+                  CALL BLELAS(eNoN, w, N, h, nV, lR)
+
+               CASE (phys_struct)
+                  CALL BLELAS(eNoN, w, N, h, nV, lR)
+
+               CASE (phys_CEP)
+                  CALL BCEP(eNoN, w, N, h, lR)
+
+               CASE (phys_preSt)
+                  CALL BLELAS(eNoN, w, N, h, nV, lR)
+
+               CASE (phys_shell)
+                  CALL BLELAS(eNoN, w, N, h, nV, lR)
+
+               CASE DEFAULT
+                  err = "Undefined phys in BCONSTRUCT"
+               END SELECT
+            END DO
+
+!           Now doing the assembly part
 #ifdef WITH_TRILINOS
-      IF (useTrilinosAssemAndLS) THEN
-         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-      ELSE
+            IF (useTrilinosAssemAndLS) THEN
+               CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+            ELSE
 #else
-         CALL DOASSEM(eNoN, ptr, lK, lR)
+               CALL DOASSEM(eNoN, ptr, lK, lR)
 #endif
 #ifdef WITH_TRILINOS
-      END IF
+            END IF
 #endif
+            DEALLOCATE(ptr, N, hl, yl, lR, lK)
+         END IF
+      END DO
 
       RETURN
       END SUBROUTINE BCONSTRUCT

@@ -715,30 +715,25 @@
       RETURN
       END SUBROUTINE VMS_STRUCT2D
 !####################################################################
-      SUBROUTINE B_VMS_STRUCTNEU(lFa, hg, Dg)
+      SUBROUTINE BVMS_STRUCT(lFa, eNoN, e, ptr, xl, dl, hl, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: hg(tnNo), Dg(tDof,tnNo)
+      INTEGER, INTENT(IN) :: eNoN, e, ptr(eNoN)
+      REAL(KIND=8), INTENT(IN) :: xl(nsd,eNoN), dl(tDof,eNoN), hl(eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN),
+     2   lKd(dof*nsd,eNoN,eNoN)
 
-      INTEGER :: a, b, e, g, iM, Ac, Ec, eNoN, eNoNb, cPhys
+      INTEGER :: a, b, g, Ac, iM, eNoNb
       REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ksix(nsd,nsd), rt, xib(2), Nb(2)
+     2   ksix(nsd,nsd), rt, xib(2), Nb(2), N(eNoN), Nxi(nsd,eNoN),
+     3   Nx(nsd,eNoN)
       LOGICAL :: l1, l2, l3, l4
-
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:), Nx(:,:),
-     2   dl(:,:), hl(:), lR(:,:), lK(:,:,:), lKd(:,:,:)
 
       iM    = lFa%iM
       eNoNb = lFa%eNoN
-      eNoN  = msh(iM)%eNoN
-
-      ALLOCATE(xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN),
-     2   ptr(eNoN), dl(tDof,eNoN), hl(eNoN),lR(dof,eNoN),
-     3   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
 
 !     Initialize parameteric coordinate for Newton's iterations
       xi0 = 0D0
@@ -764,82 +759,60 @@
          Nb(2) =  1.0001D0
       END IF
 
-      DO e=1, lFa%nEl
-         Ec    = lFa%gE(e)
-         cDmn  = DOMAIN(msh(iM), cEq, Ec)
-         cPhys = eq(cEq)%dmn(cDmn)%phys
-         IF (cPhys .NE. phys_vms_struct) CYCLE
+      DO g=1, lFa%nG
+         xp = 0D0
+         DO a=1, eNoNb
+            Ac = lFa%IEN(a,e)
+            xp = xp + x(:,Ac)*lFa%N(a,g)
+         END DO
 
+         xi = xi0
+         CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, l1)
+
+!        Check if parameteric coordinate is within bounds
+         a = 0
+         DO b=1, nsd
+            IF (xi(b).GE.xib(1) .AND. xi(b).LE.xib(2)) a = a + 1
+         END DO
+         l2 = a .EQ. nsd
+
+         CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
+
+!        Check if shape functions are within bounds and sum to unity
+         b  = 0
+         rt = 0D0
          DO a=1, eNoN
-            Ac      = msh(iM)%IEN(a,Ec)
-            ptr(a)  = Ac
-            xl(:,a) = x(:,Ac)
-            dl(:,a) = Dg(:,Ac)
-            hl(a)   = hg(Ac)
+            rt = rt + N(a)
+            IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) b = b + 1
          END DO
+         l3 = b .EQ. eNoN
+         l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
 
-         lR    = 0D0
-         lK    = 0D0
-         lKd   = 0D0
-         DO g=1, lFa%nG
-            xp = 0D0
-            DO a=1, eNoNb
-               Ac = lFa%IEN(a,e)
-               xp = xp + x(:,Ac)*lFa%N(a,g)
-            END DO
+         l1 = ALL((/l1, l2, l3, l4/))
+         IF (.NOT.l1) err =
+     2      "Error in computing face derivatives (B_VMS_STRUCTNEU)"
 
-            xi = xi0
-            CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, l1)
+         IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
+     2      CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
 
-!           Check if parameteric coordinate is within bounds
-            a = 0
-            DO b=1, nsd
-               IF (xi(b).GE.xib(1) .AND. xi(b).LE.xib(2)) a = a + 1
-            END DO
-            l2 = a .EQ. nsd
+         CALL GNNB(lFa, e, g, nV)
+         Jac = SQRT(NORM(nV))
+         nV  = nV / Jac
+         w   = lFa%w(g)*Jac
 
-            CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-
-!           Check if shape functions are within bounds and sum to unity
-            b  = 0
-            rt = 0D0
-            DO a=1, eNoN
-               rt = rt + N(a)
-               IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) b = b + 1
-            END DO
-            l3 = b .EQ. eNoN
-            l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
-
-            l1 = ALL((/l1, l2, l3, l4/))
-            IF (.NOT.l1) err =
-     2         "Error in computing face derivatives (B_VMS_STRUCTNEU)"
-
-            IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
-     2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
-
-            CALL GNNB(lFa, e, g, nV)
-            Jac = SQRT(NORM(nV))
-            nV  = nV / Jac
-            w   = lFa%w(g)*Jac
-
-            IF (nsd .EQ. 3) THEN
-               CALL B_VMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK,
-     2            lKd)
-            ELSE
-               CALL B_VMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK,
-     2            lKd)
-            END IF
-         END DO
-
-         CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+         IF (nsd .EQ. 3) THEN
+            CALL BVMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+         ELSE
+            CALL BVMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+         END IF
       END DO
 
-      DEALLOCATE(xl, N, Nxi, Nx, ptr, dl, hl, lR, lK, lKd)
+      CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
 
       RETURN
-      END SUBROUTINE B_VMS_STRUCTNEU
+      END SUBROUTINE BVMS_STRUCT
 !--------------------------------------------------------------------
-      SUBROUTINE B_VMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+      SUBROUTINE BVMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -922,9 +895,9 @@
       END DO
 
       RETURN
-      END SUBROUTINE B_VMS_STRUCT3D
+      END SUBROUTINE BVMS_STRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE B_VMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+      SUBROUTINE BVMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -983,7 +956,7 @@
       END DO
 
       RETURN
-      END SUBROUTINE B_VMS_STRUCT2D
+      END SUBROUTINE BVMS_STRUCT2D
 !####################################################################
       SUBROUTINE VMS_STRUCT_DOASSEM(d, eqN, lKd, lK, lR)
       USE COMMOD, ONLY: dof, nsd, rowPtr, colPtr, idMap, Kd, Val, R
@@ -1135,6 +1108,9 @@
 
       REAL(KIND=8), ALLOCATABLE :: KU(:,:)
 
+      IF (eq(cEq)%phys .NE. phys_vms_struct .AND.
+     2    eq(cEq)%phys .NE. phys_FSI) RETURN
+
       s   = eq(cEq)%s
       amg = (eq(cEq)%gam-eq(cEq)%am) / (eq(cEq)%gam-1D0)
       ami = 1D0/eq(cEq)%am
@@ -1145,6 +1121,7 @@
       END IF
 
       DO a=1, tnNo
+         IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
          DO i=1, nsd
             Rd(i,a) = amg*Ad(i,a) - Yg(s+i-1,a)
          END DO
@@ -1154,6 +1131,8 @@
          ALLOCATE(KU(4,tnNo))
          KU = 0D0
          DO a=1, tnNo
+            IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
+
             DO i=rowPtr(a), rowPtr(a+1)-1
                c = colPtr(i)
                KU(1,a) = KU(1,a) + Kd(1 ,i)*Rd(1,c) + Kd(2 ,i)*Rd(2,c) +
@@ -1180,6 +1159,8 @@
          ALLOCATE(KU(3,tnNo))
          KU = 0D0
          DO a=1, tnNo
+            IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
+
             DO i=rowPtr(a), rowPtr(a+1)-1
                c = colPtr(i)
                KU(1,a) = KU(1,a) + Kd(1,i)*Rd(1,c) + Kd(2,i)*Rd(2,c)

@@ -283,8 +283,8 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 12
-      INTEGER fid, iBc, phys(2), propL(maxNProp,10),
+      INTEGER, PARAMETER :: maxOutput = 17
+      INTEGER fid, iBc, phys(3), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPBC
@@ -546,6 +546,12 @@
          mvMsh = .TRUE.
          lEq%phys = phys_FSI
 
+!        3 possible equations: fluid (must), struct/vms_struct
+         phys(1) = phys_fluid
+         phys(2) = phys_struct
+         phys(3) = phys_vms_struct
+
+!        fluid properties
          propL(1,1) = fluid_density
          propL(2,1) = viscosity
          propL(3,1) = permeability
@@ -553,6 +559,8 @@
          propL(5,1) = f_x
          propL(6,1) = f_y
          IF (nsd .EQ. 3) propL(7,1) = f_z
+
+!        struct properties
          propL(1,2) = solid_density
          propL(2,2) = elasticity_modulus
          propL(3,2) = poisson_ratio
@@ -560,23 +568,37 @@
          propL(5,2) = f_x
          propL(6,2) = f_y
          IF (nsd .EQ. 3) propL(7,2) = f_z
-         phys(1) = phys_fluid
-         phys(2) = phys_struct
+
+!        vms_struct properties
+         propL(1,3) = solid_density
+         propL(2,3) = elasticity_modulus
+         propL(3,3) = poisson_ratio
+         propL(4,3) = ctau_M
+         propL(5,3) = ctau_C
+         propL(6,3) = f_x
+         propL(7,3) = f_y
+         IF (nsd .EQ. 3) propL(8,3) = f_z
+
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/12,2,4,0/)
+         nDOP = (/17,3,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
-         outPuts(3)  = out_energyFlux
-         outPuts(4)  = out_absVelocity
-         outPuts(5)  = out_acceleration
-         outPuts(6)  = out_WSS
-         outPuts(7)  = out_vorticity
-         outPuts(8)  = out_vortex
-         outPuts(9)  = out_displacement
-         outPuts(10) = out_strainInv
-         outPuts(11) = out_traction
-         outPuts(12) = out_integ
+         outPuts(3)  = out_displacement
+         outPuts(4)  = out_energyFlux
+         outPuts(5)  = out_absVelocity
+         outPuts(6)  = out_acceleration
+         outPuts(7)  = out_WSS
+         outPuts(8)  = out_vorticity
+         outPuts(9)  = out_vortex
+         outPuts(10) = out_traction
+         outPuts(11) = out_stress
+         outPuts(12) = out_fibDir
+         outPuts(13) = out_fibAlign
+         outPuts(14) = out_strainInv
+         outPuts(15) = out_integ
+         outPuts(16) = out_jacobian
+         outPuts(17) = out_defGrad
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -719,13 +741,9 @@
                lEq%dmn(iDmn)%phys = phys_struct
             CASE("vms_struct")
                lEq%dmn(iDmn)%phys = phys_vms_struct
-            CASE("lElas")
-               lEq%dmn(iDmn)%phys = phys_lElas
-            CASE("CMM")
-               lEq%dmn(iDmn)%phys = phys_CMM
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/vms_struct/lElas/CMM"
+     2            "Equation must be fluid/struct/vms_struct"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys

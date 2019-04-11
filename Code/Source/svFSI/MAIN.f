@@ -171,8 +171,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     Update residue in displacement equation for VMS_STRUCT physics.
 !     Note that this step is done only first iteration. The residue will
 !     be 0 for subsequent iterations
-            IF (eq(cEq)%phys .EQ. phys_vms_struct)
-     2         CALL VMS_STRUCTR(Yg)
+            IF (sstEq) CALL VMS_STRUCTR(Yg)
 
             CALL SETBCUNDEFNEU()
 

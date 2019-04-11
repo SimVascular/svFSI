@@ -4088,7 +4088,7 @@ c     2         "can be applied for Neumann boundaries only"
       REAL(KIND=8), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(3,eNoNb),
      2   N(eNoN), Nx(3,eNoN), Gm(3,3), al(3,eNoNb), yl(4,eNoNb),
      3   ul(3,eNoNb), fNl(3*ib%nFn,eNoNb)
-      REAL(KIND=8), INTENT(OUT) :: lR(3,eNoN)
+      REAL(KIND=8), INTENT(OUT) :: lR(4,eNoN)
 
       REAL(KIND=8), PARAMETER :: ct_f(2) = (/1D0, 3D0/), ct_p = 1D0
 
@@ -4100,7 +4100,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Solid domain parameters
       REAL(KIND=8) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(3,3), Fi(3,3),
      2   S(3,3), PFt(3,3), CC(3,3,3,3), fl(3,ib%nFn), tauM_s, tauC_s,
-     3   vp_s(2)
+     3   vp_s(3)
       TYPE(stModelType) :: stModel
 
 !     Fluid domain parameters

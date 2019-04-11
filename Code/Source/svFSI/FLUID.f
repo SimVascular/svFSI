@@ -48,7 +48,7 @@
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,3D0/)
+      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
       INTEGER a, b
       REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
      2   up(nsd), ua(nsd), udNx(eNoN), updNx(eNoN), uadNx(eNoN),
@@ -130,7 +130,7 @@
      2      + u(3)*ux(3,3) + s*u(3))
 
       tauC = ksix(1,1) + ksix(2,2) + ksix(3,3)
-      tauC = 1D0/tauM/tauC/16D0
+      tauC = 1D0/tauM/tauC
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2)
@@ -246,7 +246,7 @@
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,3D0/)
+      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
       INTEGER a, b
       REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
      2   up(nsd), ua(nsd), udNx(eNoN), updNx(eNoN), uadNx(eNoN),
@@ -310,7 +310,7 @@
      2      + s*u(2))
 
       tauC = ksix(1,1) + ksix(2,2)
-      tauC = 1D0/tauM/tauC/16D0
+      tauC = 1D0/tauM/tauC
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(1)*up(2)*ksix(1,2) + up(2)*up(2)*ksix(2,2)

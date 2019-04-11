@@ -93,15 +93,27 @@ c         CALL IB_SETBCPEN()
 
          Yn(s:e,:) = Yo(s:e,:)
 
-!        struct, lElas, mesh, vms_struct
          IF (dFlag) THEN
-            coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
-     2         /(eq(iEq)%gam - 1D0)
-            Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
-            IF (eq(iEq)%phys .EQ. phys_vms_struct) THEN
-               coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
-               Ad(:,:)   = Ad(:,:)*coef
-               Dn(s:e,:) = Do(s:e,:)
+            IF ( .NOT. sstEq) THEN
+!              struct, lElas, FSI (struct, mesh)
+               coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
+     2            /(eq(iEq)%gam - 1D0)
+               Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
+            ELSE
+!              vms_struct, FSI
+               IF (eq(iEq)%phys .EQ. phys_vms_struct .OR.
+     2             eq(iEq)%phys .EQ. phys_FSI) THEN
+                  coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
+                  Ad(:,:)   = Ad(:,:)*coef
+                  Dn(s:e,:) = Do(s:e,:)
+               ELSE IF (eq(iEq)%phys .EQ. phys_mesh) THEN
+!              mesh
+                  coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
+     2               /(eq(iEq)%gam - 1D0)
+                  Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
+               ELSE
+                  err = "Undefined physics (PICP)"
+               END IF
             END IF
          ELSE
             Dn(s:e,:) = Do(s:e,:)
@@ -140,9 +152,9 @@ c         CALL IB_SETBCPEN()
          END DO
 
 !        Reset pressure variable initiator
-         IF (eq(i)%phys .EQ. phys_fluid .OR.
-     2       eq(i)%phys .EQ. phys_CMM   .OR.
-     3       eq(i)%phys .EQ. phys_FSI) THEN
+         IF ( (eq(i)%phys .EQ. phys_fluid .OR.
+     2         eq(i)%phys .EQ. phys_CMM   .OR.
+     3         eq(i)%phys .EQ. phys_FSI) .AND. .NOT.sstEq ) THEN
             DO a=1, tnNo
                Yg(e,a) = Yn(e,a)
             END DO
@@ -173,23 +185,39 @@ c         CALL IB_SETBCPEN()
       coef(4) = 1D0 / eq(cEq)%am
       coef(5) = coef(2)*coef(4)
 
-      IF (eq(cEq)%phys .EQ. phys_fluid .OR.
-     2    eq(cEq)%phys .EQ. phys_CMM   .OR.
-     3    eq(cEq)%phys .EQ. phys_FSI) THEN
+      IF ( (eq(cEq)%phys .EQ. phys_fluid .OR.
+     2      eq(cEq)%phys .EQ. phys_CMM   .OR.
+     3      eq(cEq)%phys .EQ. phys_FSI) .AND. .NOT.sstEq ) THEN
          DO a=1, tnNo
             An(s:e,a)   = An(s:e,a)   - R(:,a)
             Yn(s:e-1,a) = Yn(s:e-1,a) - R(1:dof-1,a)*coef(1)
             Yn(e,a)     = Yn(e,a)     - R(dof,a)*coef(2)
             Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
          END DO
-      ELSE IF (eq(cEq)%phys .EQ. phys_vms_struct) THEN
-         DO a=1, tnNo
-            An(s:e,a)   = An(s:e,a)   - R(:,a)
-            Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
-            dUl(:)      = Rd(:,a)*coef(4) + R(1:dof-1,a)*coef(5)
-            Ad(:,a)     = Ad(:,a)     - dUl(:)
-            Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
-         END DO
+
+      ELSE IF (sstEq) THEN
+!        vms_struct, FSI (vms_struct)
+         IF (eq(cEq)%phys .EQ. phys_vms_struct .OR.
+     2       eq(cEq)%phys .EQ. phys_FSI) THEN
+            DO a=1, tnNo
+               An(s:e,a)   = An(s:e,a)   - R(:,a)
+               Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
+               dUl(:)      = Rd(:,a)*coef(4) + R(1:dof-1,a)*coef(5)
+               Ad(:,a)     = Ad(:,a)     - dUl(:)
+               Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
+            END DO
+
+         ELSE IF (eq(cEq)%phys .EQ. phys_mesh) THEN
+            DO a=1, tnNo
+               An(s:e,a)   = An(s:e,a) - R(:,a)
+               Yn(s:e,a)   = Yn(s:e,a) - R(:,a)*coef(1)
+               Dn(s:e,a)   = Dn(s:e,a) - R(:,a)*coef(3)
+            END DO
+
+         ELSE
+            err = "Undefined phys (PICC)"
+         END IF
+
       ELSE
          DO a=1, tnNo
             An(s:e,a) = An(s:e,a) - R(:,a)
@@ -202,7 +230,8 @@ c         CALL IB_SETBCPEN()
          s = eq(2)%s
          e = eq(2)%e
          DO Ac=1, tnNo
-            IF (ISDOMAIN(cEq, Ac, phys_struct)) THEN
+            IF (ISDOMAIN(cEq, Ac, phys_struct) .OR.
+     2          ISDOMAIN(cEq, Ac, phys_vms_struct)) THEN
                An(s:e,Ac) = An(1:nsd,Ac)
                Yn(s:e,Ac) = Yn(1:nsd,Ac)
                Dn(s:e,Ac) = Dn(1:nsd,Ac)

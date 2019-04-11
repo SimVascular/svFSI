@@ -92,8 +92,8 @@
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
                   DO a=1, msh(iM)%fa(iFa)%nNo
                      Ac = msh(iM)%fa(iFa)%gN(a)
+                     lDof = 0
                      DO i=1, nsd
-                        lDof = 0
                         IF (eDir(i)) THEN
                            lDof = lDof + 1
                            lY(s+i-1,Ac) = tmpA(lDof,a)
@@ -104,8 +104,8 @@
                ELSE
                   DO a=1, msh(iM)%fa(iFa)%nNo
                      Ac = msh(iM)%fa(iFa)%gN(a)
+                     lDof = 0
                      DO i=1, nsd
-                        lDof = 0
                         IF (eDir(i)) THEN
                            lDof = lDof + 1
                            lA(s+i-1,Ac) = tmpA(lDof,a)
@@ -130,7 +130,8 @@
                END IF
             END IF
 
-            IF (eq(iEq)%phys .EQ. phys_vms_struct) THEN
+            IF ((eq(iEq)%phys .EQ. phys_FSI .AND. sstEq) .OR.
+     2           eq(iEq)%phys .EQ. phys_vms_struct) THEN
                c1  = eq(iEq)%gam * dt
                c1i = 1.0D0 / c1
                c2  = (eq(iEq)%gam - 1.0D0)*dt
@@ -264,14 +265,12 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, Ac, e, s, nNo, eNoN
-      REAL(KIND=8) Q, h, tmp
+      INTEGER a, Ac, s, nNo
+      REAL(KIND=8) h, rtmp
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: hl(:), hg(:), yl(:,:), tmpA(:)
+      REAL(KIND=8), ALLOCATABLE :: hg(:), tmpA(:)
 
       nNo  = lFa%nNo
-      eNoN = lFa%eNoN
 
 !     Geting the contribution of Neu BC
       IF (BTEST(lBc%bType,bType_cpl)) THEN
@@ -279,23 +278,22 @@
       ELSE
          IF (BTEST(lBc%bType,bType_gen)) THEN
 !     Using "hl" as a temporary variable here
-            ALLOCATE(tmpA(nNo), hl(nNo))
-            CALL IGBC(lBc%gm, tmpA, hl)
-            DEALLOCATE(hl)
+            ALLOCATE(tmpA(nNo), hg(nNo))
+            CALL IGBC(lBc%gm, tmpA, hg)
+            DEALLOCATE(hg)
          ELSE IF (BTEST(lBc%bType,bType_res)) THEN
-            Q = Integ(lFa, Yn, eq(cEq)%s, eq(cEq)%s+nsd-1)
-            h = Q*lBc%r
+            h = lBc%r * Integ(lFa, Yn, eq(cEq)%s, eq(cEq)%s+nsd-1)
          ELSE IF (BTEST(lBc%bType,bType_std)) THEN
             h = lBc%g
          ELSE IF (BTEST(lBc%bType,bType_ustd)) THEN
-            CALL IFFT(lBc%gt, h, tmp)
+            CALL IFFT(lBc%gt, h, rtmp)
          ELSE
             err = "Correction in SETBCNEU is needed"
          END IF
       END IF
 
-      ALLOCATE(hg(tnNo), yl(tDof,eNoN), hl(eNoN), ptr(eNoN))
-      hg(:) = 0D0
+      ALLOCATE(hg(tnNo))
+      hg = 0D0
 
 !     Transforming it to a unified format
       IF (BTEST(lBc%bType,bType_gen)) THEN
@@ -325,21 +323,8 @@
          END DO
       END IF
 
-!     Constructing LHS/RHS contribution and assembling them
-      IF (eq(cEq)%phys .EQ. phys_vms_struct) THEN
-         CALL B_VMS_STRUCTNEU(lFa, hg, Dg)
-      ELSE
-         DO e=1, lFa%nEl
-            DO a=1, eNoN
-               Ac      = lFa%IEN(a,e)
-               ptr(a)  = Ac
-               yl(:,a) = Yg(:,Ac)
-               hl(a)   = hg(Ac)
-            END DO
 !     Add Neumann BCs contribution to the LHS/RHS
-            CALL BCONSTRUCT(lFa, yl, hl, ptr, e)
-         END DO
-      END IF
+      CALL BCONSTRUCT(lFa, hg, Yg, Dg)
 
       RETURN
       END SUBROUTINE SETBCNEUL
