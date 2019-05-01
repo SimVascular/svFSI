@@ -100,7 +100,7 @@ c      END DO
       CHARACTER(LEN=stdL) :: sepLine
 
       INTEGER fid, i
-      REAL(KIND=8) tmp, tmp2
+      REAL(KIND=8) tmp, tmp1, tmp2
       CHARACTER c1, c2
       CHARACTER(LEN=stdL) sOut
 
@@ -109,15 +109,15 @@ c      END DO
       fid = 1
       tmp = CPUT()
 
-      sepLine = REPEAT("-", 58)
+      sepLine = REPEAT("-", 67)
 
       IF (co .EQ. 1) THEN
          timeP(1) = tmp - timeP(1)
          timeP(2) = 0D0
          std = " "
          std = TRIM(sepLine)
-         std = "Eq     N-i     T      dB   Ri/R0    R/Ri     lsIt"//
-     2      "  dB  %t"
+         std = "Eq     N-i     T       dB  Ri/R1   Ri/R0    R/Ri  "//
+     2      "   lsIt   dB  %t"
          IF (nEq .EQ. 1) std = TRIM(sepLine)
          RETURN
       END IF
@@ -134,12 +134,14 @@ c      END DO
 
       IF (ISZERO(eq(iEq)%iNorm)) THEN
          tmp  = 1D0
+         tmp1 = 1D0
          tmp2 = 1D0
          i    = 0
       ELSE
          tmp  = eq(iEq)%FSILS%RI%iNorm/eq(iEq)%iNorm
+         tmp1 = tmp/eq(iEq)%pNorm
          tmp2 = eq(iEq)%FSILS%RI%fNorm/eq(iEq)%FSILS%RI%iNorm
-         i    = INT(2D1*LOG10(tmp/eq(iEq)%pNorm))
+         i    = INT(2D1*LOG10(tmp1))
       END IF
 
       IF (i .GT. 20) THEN
@@ -147,8 +149,8 @@ c      END DO
       ELSE
          c1 = "["; c2 = "]"
       END IF
-      sOut = TRIM(sOut)//"  "//c1//STR(i,4)//" "//STR(tmp,7)//" "//
-     2   STR(tmp2,7)//c2
+      sOut = TRIM(sOut)//"  "//c1//STR(i,4)//" "//STR(tmp1,7)//" "//
+     2   STR(tmp,7)//" "//STR(tmp2,7)//c2
 
       IF (ISZERO(timeP(3),timeP(2))) timeP(3) = (1D0+eps)*timeP(2) + eps
       tmp = 1D2*eq(iEq)%FSILS%RI%callD/(timeP(3) - timeP(2))
@@ -161,7 +163,7 @@ c      END DO
          c1 = "!"; c2 = "!"
       END IF
       sOut = TRIM(sOut)//"  "//c1//STR(eq(iEq)%FSILS%RI%itr,4)//" "//
-     2   STR(NINT(eq(iEq)%FSILS%RI%dB),3)//" "//STR(NINT(tmp),3)//c2
+     2   STR(NINT(eq(iEq)%FSILS%RI%dB),4)//" "//STR(NINT(tmp),3)//c2
 
       IF (nEq .GT. 1) THEN
          std = CLR(sOut,iEq)

@@ -1493,8 +1493,12 @@ c     2         "can be applied for Neumann boundaries only"
 !     Default Preconditioners
       lEq%ls%PREC_Type = PREC_NONE
 #ifdef WITH_TRILINOS
-      useTrilinosLS = .TRUE.
-      lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+      IF (FSILSType .EQ. LS_TYPE_NS) THEN
+         lEq%ls%PREC_Type = PREC_FSILS
+      ELSE
+         useTrilinosLS = .TRUE.
+         lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+      END IF
 #endif
 
       IF (ASSOCIATED(lPL)) THEN
@@ -1532,11 +1536,17 @@ c     2         "can be applied for Neumann boundaries only"
      2          //" Undefined type"
             END SELECT
             std = " Using preconditioner: "//TRIM(ctmp)
+         ELSE
+            SELECT CASE (lEq%ls%PREC_Type)
+            CASE (PREC_FSILS)
+               std = " Using preconditioner: FSILS"
+            CASE (PREC_TRILINOS_DIAGONAL)
+               std = " Using preconditioner: Trilinos-Diagonal"
+            CASE DEFAULT
+               err = " Undefined preconditioner"
+            END SELECT
          END IF
 
-!        Set solver options file
-         lPtr => lPL%get(lEq%ls%optionsFile,
-     2            "Solver options file")
          IF (.NOT.useTrilinosAssemAndLS) THEN
             lPtr => lPL%get(flag, "Use Trilinos for assembly")
             IF (ASSOCIATED(lPtr)) useTrilinosAssemAndLS = flag
@@ -1587,7 +1597,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       IF (useTrilinosLS) THEN
          IF (lSolverType .EQ. lSolver_NS) err =
-     2   "NS solver is not supported with Trilinos or PETSc. "//
+     2   "NS solver is not supported with Trilinos"//
      3   "Use GMRES or BICG instead."
       END IF
 

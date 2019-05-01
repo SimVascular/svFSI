@@ -281,7 +281,7 @@
 
          CALL CHNLOUTPUT(chnl,"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"//
      2      "!!!!!!!!")
-         CALL CHNLOUTPUT(chnl,"ERROR occured, see below for more"//
+         CALL CHNLOUTPUT(chnl,"ERROR occurred, see below for more"//
      2      " explanation")
          CALL CHNLOUTPUT(chnl,CLR("ERROR: "//TRIM(ADJUSTL(sTmp))))
          CALL CHNLOUTPUT(chnl,"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"//

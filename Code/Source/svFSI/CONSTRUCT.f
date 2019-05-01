@@ -192,16 +192,16 @@
          SELECT CASE (cPhys)
          CASE (phys_fluid)
             IF (nsd .EQ. 3) THEN
-               CALL FLUID3D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+               CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
             ELSE
-               CALL FLUID2D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+               CALL FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
             END IF
 
          CASE (phys_CMM)
             IF(nsd .EQ. 3) THEN
-               CALL FLUID3D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+               CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
             ELSE
-               CALL FLUID2D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+               CALL FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
             END IF
 
          CASE (phys_heatS)
@@ -415,9 +415,8 @@
             IF (useTrilinosAssemAndLS) THEN
                CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
             ELSE
-#else
-               CALL DOASSEM(eNoN, ptr, lK, lR)
 #endif
+               CALL DOASSEM(eNoN, ptr, lK, lR)
 #ifdef WITH_TRILINOS
             END IF
 #endif
@@ -488,9 +487,8 @@
       IF (useTrilinosAssemAndLS) THEN
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
       ELSE
-#else
-         CALL DOASSEM(eNoN, ptr, lK, lR)
 #endif
+         CALL DOASSEM(eNoN, ptr, lK, lR)
 #ifdef WITH_TRILINOS
       END IF
 #endif

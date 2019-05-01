@@ -172,9 +172,9 @@ c         CALL IB_SETBCPEN()
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL :: l1, l2, l3, l4
+      LOGICAL :: l1, l2, l3, l4, l5
       INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(5), rtmp, dUl(nsd)
+      REAL(KIND=8) :: coef(5), r1, r2, dUl(nsd)
       CHARACTER(LEN=stdL) :: sCmd
 
       s       = eq(cEq)%s
@@ -253,16 +253,16 @@ c         CALL IB_SETBCPEN()
 !     given tolerance
          s = eq(cEq)%s
          e = eq(cEq)%e
-         rtmp = 0D0
+         r1 = 0D0
          DO a=1, tnNo
-            rtmp = rtmp + NORM(Dn(s:e,a))
+            r1 = r1 + NORM(Dn(s:e,a))
          END DO
-         rtmp = SQRT(cm%reduce(rtmp))
+         r1 = SQRT(cm%reduce(r1))
          IF (cm%mas()) THEN
             WRITE(1000,'(A)') STR(cTS)//" "//STR(eq(cEq)%itr)//" "//
-     2         STR(rtmp)
+     2         STR(r1)
             CALL FLUSH(1000)
-            IF(rtmp .LT. 1E-6) THEN
+            IF(r1 .LT. 1E-6) THEN
                sCmd = "touch  "//TRIM(stopTrigName)
                CALL SYSTEM(TRIM(sCmd))
             END IF
@@ -277,14 +277,15 @@ c         CALL IB_SETBCPEN()
       IF (eq(cEq)%itr .EQ. 1) THEN
          eq(cEq)%pNorm = eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm
       END IF
-      rtmp = 2D1*
-     2   LOG10(eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm/eq(cEq)%pNorm)
+      r1 = eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm
+      r2 = 2D1*LOG10(r1/eq(cEq)%pNorm)
 
       l1 = eq(cEq)%itr .GE. eq(cEq)%maxItr
-      l2 = eq(cEq)%FSILS%RI%iNorm .LE. eq(cEq)%tol*eq(cEq)%iNorm
-      l3 = eq(cEq)%itr .GE. eq(cEq)%minItr
-      l4 = rtmp .LE. eq(cEq)%dBr
-      IF (l1 .OR. (l2.AND.l3.AND.l4)) eq(cEq)%ok = .TRUE.
+      l2 = r1 .LE. eq(cEq)%tol
+      l3 = r1 .LE. eq(cEq)%tol*eq(cEq)%pNorm
+      l4 = eq(cEq)%itr .GE. eq(cEq)%minItr
+      l5 = r2 .LE. eq(cEq)%dBr
+      IF (l1 .OR. ((l2.OR.l3).AND.l4.AND.l5)) eq(cEq)%ok = .TRUE.
       IF (ALL(eq%ok)) RETURN
 
       IF (eq(cEq)%coupled) THEN

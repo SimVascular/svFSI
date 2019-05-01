@@ -182,10 +182,7 @@
 
 !     Solver definitions
       INTEGER, PARAMETER :: lSolver_NA = 799, lSolver_CG=798,
-     3   lSolver_GMRES=797, lSolver_NS=796, lSolver_BICGS = 795,
-     4   lSolver_MINRES = 794, lSolver_MUMPS = 793,
-     5   lSolver_UMFPACK = 792, lSolver_PASTIX = 791,
-     6   lSolver_SUPERLU = 790
+     3   lSolver_GMRES=797, lSolver_NS=796, lSolver_BICGS = 795
 
 !     Contact model
       INTEGER, PARAMETER :: cntctM_NA = 800, cntctM_penalty = 801
@@ -481,8 +478,6 @@
          REAL(KIND=8) dB
 !        Calling duration              (OUT)
          REAL(KIND=8) callD
-!        Solver options file           (IN)
-         TYPE(fileType) :: optionsFile
       END TYPE lsType
 
 !--------------------------------------------------------------------

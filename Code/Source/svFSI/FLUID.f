@@ -37,14 +37,14 @@
 !
 !--------------------------------------------------------------------
 
-      PURE SUBROUTINE FLUID3D (eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+      SUBROUTINE FLUID3D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), ksix(nsd,nsd)
+     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(nsd,eNoN), ksix(nsd,nsd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
@@ -78,9 +78,9 @@
       DO a=1, eNoN
          p  = p + N(a)*yl(4,a)
 
-         ud(1) = ud(1) + N(a)*al(1,a)
-         ud(2) = ud(2) + N(a)*al(2,a)
-         ud(3) = ud(3) + N(a)*al(3,a)
+         ud(1) = ud(1) + N(a)*(al(1,a)-bfl(1,a))
+         ud(2) = ud(2) + N(a)*(al(2,a)-bfl(2,a))
+         ud(3) = ud(3) + N(a)*(al(3,a)-bfl(3,a))
 
          px(1) = px(1) + Nx(1,a)*yl(4,a)
          px(2) = px(2) + Nx(2,a)*yl(4,a)
@@ -235,14 +235,14 @@
       RETURN
       END SUBROUTINE FLUID3D
 !--------------------------------------------------------------------
-      PURE SUBROUTINE FLUID2D (eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+      SUBROUTINE FLUID2D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), ksix(nsd,nsd)
+     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(nsd,eNoN), ksix(nsd,nsd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
@@ -275,8 +275,8 @@
       DO a=1, eNoN
          p = p + N(a)*yl(3,a)
 
-         ud(1) = ud(1) + N(a)*al(1,a)
-         ud(2) = ud(2) + N(a)*al(2,a)
+         ud(1) = ud(1) + N(a)*(al(1,a)-bfl(1,a))
+         ud(2) = ud(2) + N(a)*(al(2,a)-bfl(2,a))
 
          px(1) = px(1) + Nx(1,a)*yl(3,a)
          px(2) = px(2) + Nx(2,a)*yl(3,a)
