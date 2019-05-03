@@ -143,7 +143,8 @@
 !     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
 !     the anisotropic fiber-based strain-energy terms
       CASE (stIso_HGO)
-
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "HGO material model (2)"
          kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
@@ -186,6 +187,8 @@
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "Guccione material model (2)"
 !        Compute isochoric component of E
          E = 5D-1 * (J2d*C - Idm)
 
@@ -360,7 +363,8 @@
 !     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
 !     the anisotropic fiber-based strain-energy terms
       CASE (stIso_HGO)
-
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "HGO material model (2)"
          kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
@@ -401,6 +405,8 @@
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "Guccione material model (2)"
 !        Compute isochoric component of E
          E = 5D-1 * (J2d*C - Idm)
 

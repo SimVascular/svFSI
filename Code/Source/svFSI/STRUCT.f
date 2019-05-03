@@ -36,26 +36,25 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE STRUCT3D (eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
-     2   pSl, lR, lK)
+      SUBROUTINE STRUCT3D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2   pS0l, pSl, lR, lK)
 
       USE COMMOD
       USE ALLFUN
 
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
+      INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
-     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN)
+     3   fN(3,nFn), pS0l(nstd,eNoN)
       REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: a, b, i, j, k, iFn
+      INTEGER :: a, b, i, j, k
       REAL(KIND=8) :: rho, dmp, T1, amd, afl, bf(nsd), ud(nsd), NxSNx,
-     2   BmDBm, fl(nsd,nFn), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
-     3   Dm(6,6), DBm(6,3), Bm(6,3,eNoN), CC(nsd,nsd,nsd,nsd),
-     4   S0(nsd,nsd)
+     2   BmDBm, F(nsd,nsd), S(nsd,nsd), P(nsd,nsd), Dm(6,6), DBm(6,3),
+     3   Bm(6,3,eNoN), CC(nsd,nsd,nsd,nsd), S0(nsd,nsd)
       TYPE (stModelType) :: stModel
 
 !     Define parameters
@@ -73,7 +72,6 @@
 
 !     Inertia, body force and deformation tensor (F)
       ud     = -rho*bf
-      fl     = 0D0
       F      = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
@@ -94,13 +92,6 @@
          F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
          F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
 
-         DO iFn=1, nFn
-            b = (iFn-1)*nsd
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
-         END DO
-
          S0(1,1) = S0(1,1) + N(a)*pS0l(1,a)
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
          S0(3,3) = S0(3,3) + N(a)*pS0l(3,a)
@@ -113,7 +104,7 @@
       S0(3,2) = S0(2,3)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
+      CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
 
 !     Prestress contribution
       pSl(1) = S(1,1)
@@ -258,24 +249,23 @@
       RETURN
       END SUBROUTINE STRUCT3D
 !####################################################################
-      SUBROUTINE STRUCT2D (eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
-     2   pSl, lR, lK)
+      SUBROUTINE STRUCT2D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2   pS0l, pSl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
+      INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
-     3   fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN)
+     3   fN(2,nFn), pS0l(nstd,eNoN)
       REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: a, b, i, j, iFn
+      INTEGER :: a, b, i, j
       REAL(KIND=8) :: rho, dmp, T1, amd, afl, bf(nsd), ud(nsd), NxSNx,
-     2   BmDBm, fl(nsd,nFn), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
-     3   Dm(3,3), DBm(3,2), Bm(3,2,eNoN), CC(nsd,nsd,nsd,nsd),
-     4   S0(nsd,nsd)
+     2   BmDBm, F(nsd,nsd), S(nsd,nsd), P(nsd,nsd), Dm(3,3), DBm(3,2),
+     3   Bm(3,2,eNoN), CC(nsd,nsd,nsd,nsd), S0(nsd,nsd)
       TYPE (stModelType) :: stModel
 
 !     Define parameters
@@ -291,7 +281,6 @@
 
 !     Inertia, body force and deformation tensor (F)
       ud     = -rho*bf
-      fl     = 0D0
       F      = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
@@ -305,12 +294,6 @@
          F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
          F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
 
-         DO iFn=1, nFn
-            b = (iFn-1)*nsd
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-         END DO
-
          S0(1,1) = S0(1,1) + N(a)*pS0l(1,a)
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
          S0(1,2) = S0(1,2) + N(a)*pS0l(3,a)
@@ -318,7 +301,7 @@
       S0(2,1) = S0(1,2)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
+      CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
 
 !     Prestress contribution
       S = S + S0

@@ -322,68 +322,49 @@
       END IF
 
 !     Read fiber orientation
-!     Here I read fiber orientation temporarily into msh(iM)%x
-!     Later I integrate them into global variable, fN
-      nFn  = 0
       flag = .FALSE.
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
          j = lPM%srch("Fiber direction file path")
          IF (j .EQ. 0) j = lPM%srch("Fiber direction")
-         IF (nFn .LT. j) nFn = j
+         IF (j .NE. 0) THEN
+            flag = .TRUE.
+            EXIT
+         END IF
       END DO
-      IF (nFn .GT. 0) flag = .TRUE.
 
       IF (flag) THEN
          DO iM=1, nMsh
             lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
-            j = lPM%srch("Fiber direction file path")
-            IF (j .NE. 0) THEN
-               ALLOCATE(msh(iM)%x(nFn*nsd,msh(iM)%gnNo))
-               msh(iM)%x = 0D0
-               DO i=1, j
+            msh(iM)%nFn = lPM%srch("Fiber direction file path")
+            IF (msh(iM)%nFn .NE. 0) THEN
+               ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
+               msh(iM)%fN = 0D0
+               DO i=1, msh(iM)%nFn
                   lPtr => lPM%get(cTmp,
      2               "Fiber direction file path", i)
                   IF (ASSOCIATED(lPtr))
-     2               CALL READVTUPDATA(msh(iM), cTmp, "FIB_DIR", nsd, i)
+     2               CALL READFIBNFF(msh(iM), cTmp, "FIB_DIR", i)
                END DO
             ELSE
-               j = lPM%srch("Fiber direction")
-               IF (j .NE. 0) THEN
-                  ALLOCATE(msh(iM)%x(nFn*nsd,msh(iM)%gnNo))
-                  msh(iM)%x = 0D0
-                  DO i=1, j
+               msh(iM)%nFn = lPM%srch("Fiber direction")
+               IF (msh(iM)%nFn .NE. 0) THEN
+                  ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
+                  msh(iM)%fN = 0D0
+                  DO i=1, msh(iM)%nFn
                      lPtr => lPM%get(fibN, "Fiber direction", i)
-                     IF (ASSOCIATED(lPtr)) THEN
-                        DO a=1, msh(iM)%gnNo
-                           msh(iM)%x((i-1)*nsd+1:i*nsd,a) = fibN(1:nsd)
-                        END DO
-                     END IF
+                     rtmp = SQRT(NORM(fibN))
+                     IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
+                     DO e=1, msh(iM)%gnEl
+                        msh(iM)%fN((i-1)*nsd+1:i*nsd,e) = fibN(1:nsd)
+                     END DO
                   END DO
                END IF
             END IF
          END DO
-
-!     Copy fiber directions and normalize them to unit vectors
-         std = " Loading fiber directions"
-         ALLOCATE(fN(nFn*nsd,gtnNo))
-         fN = 0D0
-         DO iM=1, nMsh
-            IF (.NOT.ALLOCATED(msh(iM)%x)) CYCLE
-            DO a=1, msh(iM)%gnNo
-               Ac = msh(iM)%gN(a)
-               DO i=1, nFn
-                  fibN(:) = msh(iM)%x((i-1)*nsd+1:i*nsd,a)
-                  rtmp = SQRT(NORM(fibN))
-                  IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
-                  fN((i-1)*nsd+1:i*nsd,Ac) = fibN
-               END DO
-            END DO
-            DEALLOCATE(msh(iM)%x)
-         END DO
       ELSE
-         nFn = 1
+         msh(:)%nFn = 0
       END IF
 
 !     Read prestress data
@@ -895,6 +876,45 @@
 
       RETURN
       END SUBROUTINE SETDMNIDFF
+!####################################################################
+!     Read fiber direction from a vtu file
+      SUBROUTINE READFIBNFF(lM, fName, kwrd, idx)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+      CHARACTER(LEN=*) :: fName, kwrd
+      INTEGER, INTENT(IN) :: idx
+
+      TYPE(vtkXMLType) :: vtu
+      INTEGER :: iStat, e
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      iStat = 0;
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtu, fName, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error (init)"
+
+      CALL getVTK_numElems(vtu, e, iStat)
+      IF (e .NE. lM%gnEl) err = "Mismatch in num elems for "//
+     2   TRIM(kwrd)
+
+      ALLOCATE(tmpR(maxNSD,lM%gnEl))
+      tmpR = 0D0
+      CALL getVTK_elemData(vtu, TRIM(kwrd), tmpR, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+      DO e=1, lM%gnEl
+         lM%fN((idx-1)*nsd+1:idx*nsd,e) = tmpR(1:nsd,e)
+      END DO
+      DEALLOCATE(tmpR)
+
+      CALL flushVTK(vtu)
+
+      RETURN
+      END SUBROUTINE READFIBNFF
 !####################################################################
 !     Check the mesh. If this is flag=nonL=.true., then we only check first 4 nodes
 !     of IEN array

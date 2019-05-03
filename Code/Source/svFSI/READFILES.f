@@ -1491,7 +1491,7 @@ c     2         "can be applied for Neumann boundaries only"
       CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
 
 !     Default Preconditioners
-      lEq%ls%PREC_Type = PREC_NONE
+      lEq%ls%PREC_Type = PREC_FSILS
 #ifdef WITH_TRILINOS
       IF (FSILSType .EQ. LS_TYPE_NS) THEN
          lEq%ls%PREC_Type = PREC_FSILS
@@ -1669,7 +1669,7 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(listType), INTENT(INOUT) :: lPD
 
       TYPE(listType), POINTER :: lPtr, list
-      INTEGER iFn
+      INTEGER i, nFn
       REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
 
@@ -1687,10 +1687,16 @@ c     2         "can be applied for Neumann boundaries only"
 
       lPtr => lPD%get(lDmn%cep%nX,"State variables",ll=1)
       lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
-      IF (ALLOCATED(fN)) THEN
-         IF (nFn .GT. 2) err = "EP physics allows only 2 fiber families"
-         DO iFn=1, nFn
-            lPtr => lPD%get(lDmn%cep%Dani(iFn),"Conductivity (ani)",iFn)
+
+      nFn = lPD%srch("Conductivity (ani)")
+      lDmn%cep%nFn = nFn
+      IF (nFn .EQ. 0) lDmn%cep%nFn = 1
+
+      ALLOCATE(lDmn%cep%Dani(lDmn%cep%nFn))
+      lDmn%cep%Dani = 0D0
+      IF (nFn .NE. 0) THEN
+         DO i=1, nFn
+            lPtr => lPD%get(lDmn%cep%Dani(i),"Conductivity (ani)",i)
          END DO
       END IF
 
@@ -1818,8 +1824,6 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%ass, "a6")
          lPtr => lSt%get(lDmn%stM%bss, "b6")
          lPtr => lSt%get(lDmn%stM%kap, "kappa")
-         IF (nFn .NE. 2) err = "Min fiber directions not defined for "//
-     2      "HGO material model (2)"
 
       CASE ("Guccione", "Gucci")
          lDmn%stM%isoType = stIso_Gucci
@@ -1827,7 +1831,7 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%bff, "bf")
          lPtr => lSt%get(lDmn%stM%bss, "bt")
          lPtr => lSt%get(lDmn%stM%bfs, "bfs")
-         IF (nFn.NE.2 .OR. nsd.NE.3) THEN
+         IF (nsd .NE. 3) THEN
             err = "Guccione material model is used for 3D problems "//
      2         "with 2 family of directions"
          END IF

@@ -406,11 +406,11 @@
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
       INTEGER, INTENT(IN) :: m, iEq, outGrp
 
-      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys, insd
+      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, cPhys, insd, nFn
       REAL(KIND=8) w, Jac, detF, ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
      2   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), pSl(:),
-     2   Nx(:,:), N(:), sA(:), sF(:,:), fl(:,:)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), pSl(:),
+     2   Nx(:,:), N(:), sA(:), sF(:,:)
       TYPE(stModelType) :: stModel
 
       eNoN = lM%eNoN
@@ -418,9 +418,11 @@
       i    = eq(iEq)%s
       j    = i + 1
       k    = j + 1
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fNl(nFn*nsd,eNoN), pSl(m), Nx(nsd,eNoN), N(eNoN), fl(nsd,nFn))
+     2   fN(nsd,nFn), pSl(m), Nx(nsd,eNoN), N(eNoN))
 
       sA   = 0D0
       sF   = 0D0
@@ -435,12 +437,17 @@
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
-         fNl = 0D0
+         fN = 0D0
+         IF (ALLOCATED(lM%fN)) THEN
+            DO l=1, nFn
+               fN(:,l) = lM%fN((l-1)*nsd+1:l*nsd,e)
+            END DO
+         END IF
+
          DO a=1, eNoN
             Ac      = lM%IEN(a,e)
             xl(:,a) = x(:,Ac)
             dl(:,a) = lD(:,Ac)
-            IF (ALLOCATED(fN)) fNl(:,a) = fN(:,Ac)
          END DO
 
          stModel = eq(iEq)%dmn(cDmn)%stM
@@ -452,7 +459,6 @@
             N = lM%N(:,g)
 
             F  = MAT_ID(nsd)
-            fl = 0D0
             DO a=1, eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
@@ -470,13 +476,6 @@
                   F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
                   F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
                END IF
-
-               DO iFn=1, nFn
-                  b = (iFn-1)*nsd
-                  DO l=1, nsd
-                     fl(l,iFn) = fl(l,iFn) + N(a)*fNl(b+l,a)
-                  END DO
-               END DO
             END DO
             detF = MAT_DET(F, nsd)
 
@@ -491,12 +490,12 @@
             ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
                IF (cPhys .EQ. phys_vms_struct) THEN
-                  CALL GETPK2CCdev(stModel, F, nFn, fl, S, CC)
+                  CALL GETPK2CCdev(stModel, F, nFn, fN, S, CC)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
                ELSE
-                  CALL GETPK2CC(stModel, F, nFn, fl, S, CC)
+                  CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
                   sigma = S
                END IF
 
@@ -558,26 +557,26 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, fNl, fl, pSl, N, Nx)
+      DEALLOCATE (sA, sF, xl, dl, fN, pSl, N, Nx)
 
       RETURN
       END SUBROUTINE TPOST
 !####################################################################
 !     Routine for post processing fiber directions
-      SUBROUTINE FIBDIRPOST(lM, res, lD, iEq)
+      SUBROUTINE FIBDIRPOST(lM, nFn, res, lD, iEq)
       USE COMMOD
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
 
+      INTEGER, INTENT(IN) :: iEq, nFn
       TYPE(mshType), INTENT(INOUT) :: lM
       REAL(KIND=8), INTENT(INOUT) :: res(nFn*nsd,lM%nNo)
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: iEq
 
       INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
       REAL(KIND=8) w, Jac, F(nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), fl(:,:),
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), fl(:,:),
      2   Nx(:,:), N(:), sA(:), sF(:,:)
 
       eNoN = lM%eNoN
@@ -587,7 +586,7 @@
       k    = j + 1
 
       ALLOCATE (sA(tnNo), sF(nFn*nsd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fNl(nFn*nsd,eNoN), fl(nsd,nFn), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,lM%nFn), fl(nsd,lM%nFn), Nx(nsd,eNoN), N(eNoN))
 
       sA = 0D0
       sF = 0D0
@@ -600,7 +599,10 @@
             Ac       = lM%IEN(a,e)
             xl(:,a)  = x(:,Ac)
             dl(:,a)  = lD(:,Ac)
-            fNl(:,a) = fN(:,Ac)
+         END DO
+
+         DO iFn=1, lM%nFn
+            fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
          END DO
 
          DO g=1, lM%nG
@@ -611,7 +613,6 @@
             N = lM%N(:,g)
 
             F  = MAT_ID(nsd)
-            fl = 0D0
             DO a=1, eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
@@ -629,24 +630,17 @@
                   F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
                   F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
                END IF
-
-               DO iFn=1, nFn
-                  b = (iFn-1)*nsd
-                  DO l=1, nsd
-                     fl(l,iFn) = fl(l,iFn) + N(a)*fNl(b+l,a)
-                  END DO
-               END DO
             END DO
 
-            DO iFn=1, nFn
-               fl(:,iFn) = MATMUL(F, fl(:,iFn))
+            DO iFn=1, lM%nFn
+               fl(:,iFn) = MATMUL(F, fN(:,iFn))
                fl(:,iFn) = fl(:,iFn)/SQRT(NORM(fl(:,iFn)))
             END DO
 
             DO a=1, eNoN
                Ac     = lM%IEN(a,e)
                sA(Ac) = sA(Ac) + w*N(a)
-               DO iFn=1, nFn
+               DO iFn=1, lM%nFn
                   b = (iFn-1)*nsd
                   DO l=1, nsd
                      sF(b+l,Ac) = sF(b+l,Ac) + w*N(a)*fl(l,iFn)
@@ -666,7 +660,7 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, fNl, fl, N, Nx)
+      DEALLOCATE (sA, sF, xl, dl, fN, fl, N, Nx)
 
       RETURN
       END SUBROUTINE FIBDIRPOST
@@ -678,14 +672,14 @@
       USE MATFUN
       IMPLICIT NONE
 
+      INTEGER, INTENT(IN) :: iEq
       TYPE(mshType), INTENT(INOUT) :: lM
       REAL(KIND=8), INTENT(INOUT) :: res(1,lM%nNo)
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: iEq
 
       INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
       REAL(KIND=8) w, Jac, sHat, F(nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fNl(:,:), fl(:,:),
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), fl(:,:),
      2   Nx(:,:), N(:), sA(:), sF(:)
 
       eNoN = lM%eNoN
@@ -695,7 +689,7 @@
       k    = j + 1
 
       ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fNl(nFn*nsd,eNoN), fl(nsd,nFn), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,2), fl(nsd,2), Nx(nsd,eNoN), N(eNoN))
 
       sA = 0D0
       sF = 0D0
@@ -710,8 +704,10 @@
             Ac       = lM%IEN(a,e)
             xl(:,a)  = x(:,Ac)
             dl(:,a)  = lD(:,Ac)
-            fNl(:,a) = fN(:,Ac)
          END DO
+
+         fN(:,1) = lM%fN(1:nsd,e)
+         fN(:,2) = lM%fN(nsd+1:2*nsd,e)
 
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
@@ -721,7 +717,6 @@
             N = lM%N(:,g)
 
             F  = MAT_ID(nsd)
-            fl = 0D0
             DO a=1, eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
@@ -739,17 +734,10 @@
                   F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
                   F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
                END IF
-
-               DO iFn=1, nFn
-                  b = (iFn-1)*nsd
-                  DO l=1, nsd
-                     fl(l,iFn) = fl(l,iFn) + N(a)*fNl(b+l,a)
-                  END DO
-               END DO
             END DO
 
-            DO iFn=1, nFn
-               fl(:,iFn) = MATMUL(F, fl(:,iFn))
+            DO iFn=1, 2
+               fl(:,iFn) = MATMUL(F, fN(:,iFn))
                fl(:,iFn) = fl(:,iFn)/SQRT(NORM(fl(:,iFn)))
             END DO
             sHat = NORM(fl(:,1), fl(:,2))
@@ -772,7 +760,7 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, fNl, fl, N, Nx)
+      DEALLOCATE (sA, sF, xl, dl, fN, fl, N, Nx)
 
       RETURN
       END SUBROUTINE FIBALGNPOST

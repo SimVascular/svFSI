@@ -37,26 +37,25 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE VMS_STRUCT3D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl,
-     2   lR, lK, lKd)
+      SUBROUTINE VMS_STRUCT3D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl,
+     2   fN, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
+      INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(3,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
-     3   fNl(3*nFn,eNoN)
+     3   fN(3,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*3,eNoN,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, k, l, a, b, iFn
+      INTEGER :: i, j, k, l, a, b
       REAL(KIND=8) :: bf(3), am, af, afm, v(3), vd(3), vx(3,3), p, pd,
-     2   px(3), fl(3,nFn), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta,
-     3   Siso(3,3), CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6),
-     4   Pdev(3,3), Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3),
-     5   PxFi(3), VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2,
-     6   T3, Ku
+     2   px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, Siso(3,3),
+     3   CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6), Pdev(3,3),
+     4   Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3), PxFi(3),
+     5   VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku
 
       TYPE (stModelType) :: stModel
 
@@ -83,7 +82,6 @@
       p  = 0D0
       pd = 0D0
       px = 0D0
-      fl = 0D0
       F  = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
@@ -122,20 +120,13 @@
          F(3,1)  = F(3,1) + Nx(1,a)*dl(k,a)
          F(3,2)  = F(3,2) + Nx(2,a)*dl(k,a)
          F(3,3)  = F(3,3) + Nx(3,a)*dl(k,a)
-
-         DO iFn=1, nFn
-            b = (iFn-1)*3
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
-         END DO
       END DO
       Jac = MAT_DET(F, 3)
       Fi  = MAT_INV(F, 3)
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(stModel, F, nFn, fl, Siso, CCiso)
+      CALL GETPK2CCdev(stModel, F, nFn, fN, Siso, CCiso)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)
@@ -447,26 +438,25 @@
       RETURN
       END SUBROUTINE VMS_STRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE VMS_STRUCT2D(eNoN, w, Je, N, Nx, al, yl, dl, bfl, fNl,
-     2   lR, lK, lKd)
+      SUBROUTINE VMS_STRUCT2D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl,
+     2   fN, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
+      INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(2,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN),
-     3   fNl(2*nFn,eNoN)
+     3   fN(2,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*2,eNoN,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, k, a, b, iFn
+      INTEGER :: i, j, k, a, b
       REAL(KIND=8) :: bf(2), am, af, afm, v(2), vd(2), vx(2,2), p, pd,
-     2   px(2), fl(2,nFn), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta,
-     3   Siso(2,2), CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3),
-     4   Pdev(2,2), Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2),
-     5   PxFi(2), VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2,
-     6   T3, Ku
+     2   px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, Siso(2,2),
+     3   CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3), Pdev(2,2),
+     4   Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2), PxFi(2),
+     5   VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku
 
       TYPE (stModelType) :: stModel
 
@@ -491,7 +481,6 @@
       p  = 0D0
       pd = 0D0
       px = 0D0
-      fl = 0D0
       F      = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
@@ -516,19 +505,13 @@
          F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
          F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
          F(2,2)  = F(2,2) + Nx(2,a)*dl(j,a)
-
-         DO iFn=1, nFn
-            b = (iFn-1)*2
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-         END DO
       END DO
       Jac = F(1,1)*F(2,2) - F(1,2)*F(2,1)
       Fi  = MAT_INV(F, 2)
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(stModel, F, nFn, fl, Siso, CCiso)
+      CALL GETPK2CCdev(stModel, F, nFn, fN, Siso, CCiso)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta)

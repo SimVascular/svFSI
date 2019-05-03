@@ -83,10 +83,12 @@
          INTEGER :: cepType = cepModel_NA
 !        Number of unknowns
          INTEGER :: nX
+!        Number of fiber directions
+         INTEGER :: nFn
 !        Isotropic conductivity
          REAL(KIND=8) :: Diso = 0D0
 !        Anisotropic conductivity
-         REAL(KIND=8) :: Dani(2) = (/0.0D0, 0.0D0/)
+         REAL(KIND=8), ALLOCATABLE :: Dani(:)
 !        External stimulus
          TYPE(stimType) :: Istim
 !        Time integration options

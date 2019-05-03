@@ -45,11 +45,11 @@
       REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      INTEGER a, b, e, i, j, Ac, ibl, eNoN
+      INTEGER a, b, e, i, j, k, Ac, ibl, eNoN, nFn
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:), dl(:,:),
-     2   dol(:,:), fNl(:,:), pS0l(:,:), bfl(:,:)
+     2   dol(:,:), fN(:,:), pS0l(:,:), bfl(:,:)
 
 !     For shells, consider extended patch around an element
       IF (lM%lShl .AND. (lM%eType.EQ.eType_TRI))THEN
@@ -58,9 +58,12 @@
          eNoN = lM%eNoN
       END IF
 
+      nFn = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
       ALLOCATE(xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),dl(tDof,eNoN),
-     2   dol(nsd,eNoN), fNl(nFn*nsd,eNoN), pS0l(nstd,eNoN),
-     3   bfl(nsd,eNoN), ptr(eNoN))
+     2   dol(nsd,eNoN), pS0l(nstd,eNoN), fN(nsd,nFn), bfl(nsd,eNoN),
+     3   ptr(eNoN))
 
       i = nsd + 2
       j = 2*nsd + 1
@@ -70,7 +73,7 @@
          yl   = 0D0
          dl   = 0D0
          dol  = 0D0
-         fNl  = 0D0
+         fN   = 0D0
          pS0l = 0D0
          bfl  = 0D0
          ibl  = 0
@@ -90,7 +93,11 @@
             yl(:,a) = Yg(:,Ac)
             dl(:,a) = Dg(:,Ac)
             IF (mvMsh) dol(:,a) = Do(i:j,Ac)
-            IF (ALLOCATED(fN))  fNl(:,a)  = fN(:,Ac)
+            IF (ALLOCATED(lM%fN)) THEN
+               DO k=1, nFn
+                  fN(:,k) = lM%fN((k-1)*nsd+1:k*nsd,e)
+               END DO
+            END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
             IF (ALLOCATED(Bfg)) bfl(:,a)  = bfg(:,Ac)
          END DO
@@ -99,26 +106,26 @@
          END IF
 
 !     Add contribution of current equation to the LHS/RHS
-         CALL CONSTRUCT(lM, e, eNoN, xl, al, yl, dl, dol, fNl, ps0l,
+         CALL CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, fN, pS0l,
      2      bfl, ptr)
       END DO
 
-      DEALLOCATE(xl, al, yl, dl, dol, fNl, pS0l, bfl, ptr)
+      DEALLOCATE(xl, al, yl, dl, dol, fN, pS0l, bfl, ptr)
 
       RETURN
       END SUBROUTINE GLOBALEQASSEM
 !====================================================================
-      SUBROUTINE CONSTRUCT(lM, e, eNoN, xl, al, yl, dl, dol, fNl, pS0l,
-     2   bfl, ptr)
+      SUBROUTINE CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, fN,
+     2   pS0l, bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
+      INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), dol(nsd,eNoN), fNl(nFn*nsd,eNoN),
-     3   pS0l(nstd,eNoN), bfl(nsd,eNoN)
+     2   dl(tDof,eNoN), dol(nsd,eNoN), fN(nsd,nFn), pS0l(nstd,eNoN),
+     3   bfl(nsd,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys, insd
@@ -166,13 +173,14 @@
       IF (cPhys .EQ. phys_shell) THEN
          IF (lM%eType .EQ. eType_TRI) THEN
 !        No need for numerical integration for constant strain triangles
-            CALL SHELLTRI(lM, e, eNoN, al, yl, dl, xl, fNl, ptr)
+            CALL SHELLTRI(lM, e, eNoN, nFn, al, yl, dl, xl, fN, ptr)
             DEALLOCATE(lR, lK, N, Nx, dc)
             RETURN
          ELSE IF (lM%eType .EQ. eType_NRB) THEN
 !        For NURBS, perform Gauss integration
             DO g=1, lM%nG
-               CALL SHELLNRB(lM, g, eNoN, al, yl, dl, xl, fNl, lR,lK)
+               CALL SHELLNRB(lM, g, eNoN, nFn, al, yl, dl, xl, fN, lR,
+     2            lK)
             END DO
 !        Perform global assembly
             CALL DOASSEM(eNoN, ptr, lK, lR)
@@ -227,11 +235,11 @@
 
          CASE (phys_struct, phys_preSt)
             IF (nsd .EQ. 3) THEN
-               CALL STRUCT3D(eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
-     2            pSl, lR, lK)
+               CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2            pS0l, pSl, lR, lK)
             ELSE
-               CALL STRUCT2D(eNoN, w, N, Nx, al, yl, dl, bfl, fNl, pS0l,
-     2            pSl, lR, lK)
+               CALL STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2            pS0l, pSl, lR, lK)
             END IF
 
 !      Map pSl values to global nodal vector
@@ -245,11 +253,11 @@
 
          CASE (phys_vms_struct)
             IF (nsd .EQ. 3) THEN
-               CALL VMS_STRUCT3D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl,
-     2            fNl, lR, lK, lKd)
+               CALL VMS_STRUCT3D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,
+     2            bfl, fN, lR, lK, lKd)
             ELSE
-               CALL VMS_STRUCT2D(eNoN, w, Jac, N, Nx, al, yl, dl, bfl,
-     2            fNl, lR, lK, lKd)
+               CALL VMS_STRUCT2D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,
+     2            bfl, fN, lR, lK, lKd)
             END IF
 
          CASE (phys_mesh)
@@ -271,10 +279,10 @@
 
          CASE (phys_CEP)
             IF (insd .EQ. 3) THEN
-               CALL CEP3D(eNoN, w, N, Nx, al, yl, fNl, lR, lK)
+               CALL CEP3D(eNoN, nFn, w, N, Nx, al, yl, fN, lR, lK)
 
             ELSE IF (insd .EQ. 2) THEN
-               CALL CEP2D(eNoN, w, N, Nx, al, yl, fNl, lR, lK)
+               CALL CEP2D(eNoN, nFn, w, N, Nx, al, yl, fN, lR, lK)
 
             ELSE IF (insd .EQ. 1) THEN
                CALL CEP1D(eNoN, insd, w, N, Nx, al, yl, lR, lK)

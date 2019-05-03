@@ -216,23 +216,6 @@
          DEALLOCATE(part)
       END IF
 
-!     Distribute fiber orientation (fN) to processors
-      CALL cm%bcast(nFn)
-      flag = ALLOCATED(fN)
-      CALL cm%bcast(flag)
-      IF (flag) THEN
-         IF (cm%mas()) THEN
-            ALLOCATE(tmpX(nFn*nsd,gtnNo))
-            tmpX = fN
-            DEALLOCATE(fN)
-         ELSE
-            ALLOCATE(tmpX(0,0))
-         END IF
-         ALLOCATE(fN(nFn*nsd,tnNo))
-         fN = LOCAL(tmpX)
-         DEALLOCATE(tmpX)
-      END IF
-
 !     Distribute prestress (pS0) to processors
       flag = ALLOCATED(pS0)
       CALL cm%bcast(flag)
@@ -490,7 +473,11 @@
          IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP) THEN
             CALL cm%bcast(lEq%dmn(iDmn)%cep%cepType)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nX)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%nFn)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Diso)
+            IF (cm%slv()) THEN
+               ALLOCATE(lEq%dmn(iDmn)%cep%Dani(lEq%dmn(iDmn)%cep%nFn))
+            END IF
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Dani)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%Ts)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%Td)
@@ -887,14 +874,14 @@
       TYPE(mshType), INTENT(INOUT) :: lM
 
       INTEGER(KIND=MPI_OFFSET_KIND) :: idisp
-      LOGICAL :: flag
+      LOGICAL :: flag, fnFlag
       INTEGER :: i, a, Ac, e, Ec, edgecut, nEl, nNo, eNoN, eNoNb, ierr,
-     2   fid, SPLIT, insd
+     2   fid, SPLIT, insd, nFn
       CHARACTER(LEN=stdL) fTmp
 
       INTEGER, ALLOCATABLE :: part(:), gPart(:), tempIEN(:,:),
      2   gtlPtr(:), sCount(:), disp(:)
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:)
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:), tmpFn(:,:)
 
       IF (cm%seq()) THEN
          lM%nEl = lM%gnEl
@@ -923,6 +910,8 @@
       CALL cm%bcast(lM%gnEl)
       CALL cm%bcast(lM%gnNo)
       CALL cm%bcast(lM%name)
+      CALL cm%bcast(lM%nFn)
+      nFn = lM%nFn
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -1096,12 +1085,26 @@ c            wrn = " ParMETIS failed to partition the mesh"
             END DO
             DEALLOCATE(lM%eId)
          END IF
+
+!     This it to distribute fN, if allocated
+         fnFlag = .FALSE.
+         IF (ALLOCATED(lM%fN)) THEN
+            fnFlag = .TRUE.
+            ALLOCATE(tmpFn(nFn*nsd,lM%gnEl))
+            tmpFn = 0D0
+            DO e=1, lM%gnEl
+               Ec = lM%otnIEN(e)
+               tmpFn(:,Ec) = lM%fN(:,e)
+            END DO
+            DEALLOCATE(lM%fN)
+         END IF
       ELSE
          ALLOCATE(lM%otnIEN(0))
       END IF
       DEALLOCATE(gPart)
 
       CALL cm%bcast(flag)
+      CALL cm%bcast(fnFlag)
       CALL cm%bcast(lM%eDist)
 
       nEl = lM%eDist(cm%id() + 1) - lM%eDist(cm%id())
@@ -1120,6 +1123,19 @@ c            wrn = " ParMETIS failed to partition the mesh"
          CALL MPI_SCATTERV(part, sCount, disp, mpint, lM%eId, nEl,
      2      mpint, master, cm%com(), ierr)
          DEALLOCATE(part)
+      END IF
+
+!     Communicating fN, if neccessary
+      IF (fnFlag) THEN
+         ALLOCATE(lM%fN(nFn*nsd,nEl))
+         IF (.NOT.ALLOCATED(tmpFn)) ALLOCATE(tmpFn(0,0))
+         DO i=1, cm%np()
+            disp(i)   = lM%eDist(i-1)*nFn*nsd
+            sCount(i) = lM%eDist(i)*nFn*nsd - disp(i)
+         END DO
+         CALL MPI_SCATTERV(tmpFn, sCount, disp, mpreal, lM%fN,
+     2      nEl*nFn*nsd, mpreal, master, cm%com(), ierr)
+         DEALLOCATE(tmpFn)
       END IF
 
 !     Now scattering the sorted lM%IEN to all processors

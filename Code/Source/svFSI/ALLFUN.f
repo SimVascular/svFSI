@@ -1059,6 +1059,7 @@
       IF (ALLOCATED(lM%nV))     DEALLOCATE(lM%nV)
       IF (ALLOCATED(lM%Nx))     DEALLOCATE(lM%Nx)
       IF (ALLOCATED(lM%Nxx))    DEALLOCATE(lM%Nxx)
+      IF (ALLOCATED(lM%fN))     DEALLOCATE(lM%fN)
 
       IF (ALLOCATED(lM%bs)) THEN
          DO i=1, insd
@@ -1089,6 +1090,7 @@
       lM%nEl   = 0
       lM%nFa   = 0
       lM%nNo   = 0
+      lM%nFn   = 0
 
       RETURN
       END SUBROUTINE DESTROYMSH

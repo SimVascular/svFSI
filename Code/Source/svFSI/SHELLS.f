@@ -36,17 +36,15 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE SHELLTRI (lM, e, eNoN, al, yl, dl, xl, fNl, ptr)
-
+      SUBROUTINE SHELLTRI (lM, e, eNoN, nFn, al, yl, dl, xl, fN, ptr)
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
+      INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), xl(nsd,eNoN), fNl(nsd,eNoN)
+     2   dl(tDof,eNoN), xl(nsd,eNoN), fN(nsd,nFn)
 
       LOGICAL :: bFlag, setIt(3)
       INTEGER :: i, j, k, a, b, g
@@ -944,17 +942,15 @@
       RETURN
       END SUBROUTINE SETSHELLFPL
 !####################################################################
-      SUBROUTINE SHELLNRB (lM, g, eNoN, al, yl, dl, xl, fNl, lR, lK)
-
+      SUBROUTINE SHELLNRB (lM, g, eNoN, nFn, al, yl, dl, xl, fN, lR, lK)
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: g, eNoN
+      INTEGER, INTENT(IN) :: g, eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), xl(nsd,eNoN), fNl(nsd,eNoN)
+     2   dl(tDof,eNoN), xl(nsd,eNoN), fN(nsd,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, l, a, b

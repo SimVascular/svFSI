@@ -670,7 +670,6 @@
       IF (ALLOCATED(Do))       DEALLOCATE(Do)
       IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
       IF (ALLOCATED(R))        DEALLOCATE(R)
-      IF (ALLOCATED(fN))       DEALLOCATE(fN)
       IF (ALLOCATED(Bfg))      DEALLOCATE(Bfg)
 
       IF (ALLOCATED(Ad))       DEALLOCATE(Ad)

@@ -166,7 +166,7 @@
 !     Linear model (S = mu*I), Guccione (1995)
       INTEGER, PARAMETER :: stIso_NA = 600, stIso_StVK = 601,
      2   stIso_mStVK = 602, stIso_nHook = 603, stIso_MR = 604,
-     4   stIso_HGO = 605, stIso_lin = 606, stIso_Gucci = 607
+     3   stIso_HGO = 605, stIso_lin = 606, stIso_Gucci = 607
 
 !     Type of constitutive model (volumetric) for structure eqn:
 !     Quadratic, Simo-Taylor91, Miehe94
@@ -539,6 +539,8 @@
          INTEGER nSl
 !        The element type recognized by VTK format
          INTEGER vtkType
+!        Number of fiber directions
+         INTEGER nFn
 !        IB: Mesh size parameter
          REAL(KIND=8) dx
 !        Element distribution between processors
@@ -580,6 +582,9 @@
          REAL(KIND=8), ALLOCATABLE :: N(:,:)
 !        Normal vector to each nodal point (for Shells)
          REAL(KIND=8), ALLOCATABLE :: nV(:,:)
+!        Fiber orientations stored at the element level - used for
+!        electrophysiology and solid mechanics
+         REAL(KIND=8), ALLOCATABLE :: fN(:,:)
 !        Parent shape functions gradient
          REAL(KIND=8), ALLOCATABLE :: Nx(:,:,:)
 !        Second derivatives of shape functions - used for shells & IGA
@@ -874,8 +879,6 @@
       INTEGER tnNo
 !     Restart Time Step
       INTEGER rsTS
-!     Number of fiber directions
-      INTEGER nFn
 !     Number of stress values to be stored
       INTEGER nstd
 !     FSILS pointer for immersed boundaries
@@ -931,8 +934,6 @@
       REAL(KIND=8), ALLOCATABLE :: Yo(:,:)
 !     New variables
       REAL(KIND=8), ALLOCATABLE :: Yn(:,:)
-!     Fiber direction (for electrophysiology / structure mechanics)
-      REAL(KIND=8), ALLOCATABLE :: fN(:,:)
 !     Body force
       REAL(KIND=8), ALLOCATABLE :: Bfg(:,:)
 

@@ -37,19 +37,21 @@
 !-----------------------------------------------------------------------
 
 !     This is for solving 3D electrophysiology diffusion equations
-      PURE SUBROUTINE CEP3D (eNoN, w, N, Nx, al, yl, fNl, lR, lK)
+      SUBROUTINE CEP3D (eNoN, nFn, w, N, Nx, al, yl, fN, lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
+      INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), fNl(nFn*nsd,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), fN(nsd,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
       INTEGER a, b, i, iFn
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(2),
-     2   fl(nsd,nFn), D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
+      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(nFn),
+     2   D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
 
+      IF (nFn .NE. eq(cEq)%dmn(cDmn)%cep%nFn) err =
+     2   "No. of fibers do not match between mesh and domain"
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
       Diso = eq(cEq)%dmn(cDmn)%cep%Diso
@@ -58,32 +60,22 @@
 
       wl = w*T1
 
-      fl = 0D0
-      DO a=1, eNoN
-         DO iFn=1, nFn
-            b = (iFn-1)*nsd
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
-         END DO
-      END DO
-
       D(:,:) = 0D0
       D(1,1) = Diso
       D(2,2) = Diso
       D(3,3) = Diso
       DO iFn=1, nFn
-         D(1,1) = D(1,1) + Dani(iFn)*fl(1,iFn)*fl(1,iFn)
-         D(1,2) = D(1,2) + Dani(iFn)*fl(1,iFn)*fl(2,iFn)
-         D(1,3) = D(1,3) + Dani(iFn)*fl(1,iFn)*fl(3,iFn)
+         D(1,1) = D(1,1) + Dani(iFn)*fN(1,iFn)*fN(1,iFn)
+         D(1,2) = D(1,2) + Dani(iFn)*fN(1,iFn)*fN(2,iFn)
+         D(1,3) = D(1,3) + Dani(iFn)*fN(1,iFn)*fN(3,iFn)
 
-         D(2,1) = D(2,1) + Dani(iFn)*fl(2,iFn)*fl(1,iFn)
-         D(2,2) = D(2,2) + Dani(iFn)*fl(2,iFn)*fl(2,iFn)
-         D(2,3) = D(2,3) + Dani(iFn)*fl(2,iFn)*fl(3,iFn)
+         D(2,1) = D(2,1) + Dani(iFn)*fN(2,iFn)*fN(1,iFn)
+         D(2,2) = D(2,2) + Dani(iFn)*fN(2,iFn)*fN(2,iFn)
+         D(2,3) = D(2,3) + Dani(iFn)*fN(2,iFn)*fN(3,iFn)
 
-         D(3,1) = D(3,1) + Dani(iFn)*fl(3,iFn)*fl(1,iFn)
-         D(3,2) = D(3,2) + Dani(iFn)*fl(3,iFn)*fl(2,iFn)
-         D(3,3) = D(3,3) + Dani(iFn)*fl(3,iFn)*fl(3,iFn)
+         D(3,1) = D(3,1) + Dani(iFn)*fN(3,iFn)*fN(1,iFn)
+         D(3,2) = D(3,2) + Dani(iFn)*fN(3,iFn)*fN(2,iFn)
+         D(3,3) = D(3,3) + Dani(iFn)*fN(3,iFn)*fN(3,iFn)
       END DO
 
       Td = 0D0
@@ -118,19 +110,21 @@
       END SUBROUTINE CEP3D
 !-----------------------------------------------------------------------
 !     This is for solving 2D electrophysiology diffusion equation
-      PURE SUBROUTINE CEP2D (eNoN, w, N, Nx, al, yl, fNl, lR, lK)
+      SUBROUTINE CEP2D (eNoN, nFn, w, N, Nx, al, yl, fN, lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
+      INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), fNl(nFn*nsd,eNoN)
+     2   al(tDof,eNoN), yl(tDof,eNoN), fN(nsd,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
       INTEGER a, b, i, iFn
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(2),
-     2   fl(nsd,nFn), D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
+      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(nFn),
+     2   D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
 
+      IF (nFn .NE. eq(cEq)%dmn(cDmn)%cep%nFn) err =
+     2   "No. of fibers do not match between mesh and domain"
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
       Diso = eq(cEq)%dmn(cDmn)%cep%Diso
@@ -138,25 +132,15 @@
       i    = eq(cEq)%s
       wl   = w*T1
 
-      fl = 0D0
-      DO a=1, eNoN
-         DO iFn=1, nFn
-            b = (iFn-1)*nsd
-            fl(1,iFn) = fl(1,iFn) + N(a)*fNl(b+1,a)
-            fl(2,iFn) = fl(2,iFn) + N(a)*fNl(b+2,a)
-            fl(3,iFn) = fl(3,iFn) + N(a)*fNl(b+3,a)
-         END DO
-      END DO
-
       D(:,:) = 0D0
       D(1,1) = Diso
       D(2,2) = Diso
       DO iFn=1, nFn
-         D(1,1) = D(1,1) + Dani(iFn)*fl(1,iFn)*fl(1,iFn)
-         D(1,2) = D(1,2) + Dani(iFn)*fl(1,iFn)*fl(2,iFn)
+         D(1,1) = D(1,1) + Dani(iFn)*fN(1,iFn)*fN(1,iFn)
+         D(1,2) = D(1,2) + Dani(iFn)*fN(1,iFn)*fN(2,iFn)
 
-         D(2,1) = D(2,1) + Dani(iFn)*fl(2,iFn)*fl(1,iFn)
-         D(2,2) = D(2,2) + Dani(iFn)*fl(2,iFn)*fl(2,iFn)
+         D(2,1) = D(2,1) + Dani(iFn)*fN(2,iFn)*fN(1,iFn)
+         D(2,2) = D(2,2) + Dani(iFn)*fN(2,iFn)*fN(2,iFn)
       END DO
 
       Td = 0D0

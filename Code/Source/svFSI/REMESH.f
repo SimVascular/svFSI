@@ -369,7 +369,6 @@
       IF (ALLOCATED(Do)) DEALLOCATE(Do)
       IF (ALLOCATED(R)) DEALLOCATE(R)
       IF (ALLOCATED(Val)) DEALLOCATE(Val)
-      IF (ALLOCATED(fN)) DEALLOCATE(fN)
       cplBC%nFa = 0
 
       t2 = CPUT()

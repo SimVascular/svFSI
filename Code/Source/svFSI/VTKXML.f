@@ -377,7 +377,7 @@
 
       CHARACTER(LEN=stdL) :: fName
       INTEGER :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo, nEl, s, l, ie,
-     2   is, nSh, oGrp, outDof, nOut, cOut, itmp, ne, iFn
+     2   is, nSh, oGrp, outDof, nOut, cOut, itmp, ne, iFn, nFn
       LOGICAL :: l1, l2
 
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
@@ -401,8 +401,10 @@
             IF (.NOT.eq(iEq)%output(iOut)%wtn(1)) CYCLE
             oGrp   = eq(iEq)%output(iOut)%grp
             IF (oGrp .EQ. outGrp_fN) THEN
-               IF (.NOT.ALLOCATED(fN)) err = "Invalid output chosen. "//
-     2            "Fiber orientations are not defined"
+               nFn = 1
+               DO iM=1, nMsh
+                  nFn = MAX(nFn, msh(iM)%nFn)
+               END DO
                nOut   = nOut + nFn
                outDof = outDof + eq(iEq)%output(iOut)%l * nFn
             ELSE
@@ -498,6 +500,8 @@
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_vort, outGrp_eFlx, outGrp_hFlx,
      2            outGrp_stInv, outGrp_vortex)
                   CALL POST(msh(iM), tmpV, lY, lD, oGrp, iEq)
@@ -515,7 +519,8 @@
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nFn*nsd,msh(iM)%nNo))
                   tmpV = 0D0
-                  CALL FIBDIRPOST(msh(iM), tmpV, lD, iEq)
+                  IF (msh(iM)%nFn .NE. 0)
+     2               CALL FIBDIRPOST(msh(iM), nFn, tmpV, lD, iEq)
                   DO iFn=1, nFn
                      cOut = cOut + 1
                      is   = outS(cOut)
@@ -525,27 +530,32 @@
      2                  TRIM(eq(iEq)%output(iOut)%name)//STR(iFn)
                      DO a=1, msh(iM)%nNo
                         d(iM)%x(is:ie,a) =
-     2                     tmpV((iFn-1)*nsd+s:(iFn-1)*nsd+e,a)
+     2                     tmpV((iFn-1)*nsd+1:iFn*nsd,a)
                      END DO
                   END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_fA)
-                  IF (nFn .NE. 2) err = "Fiber alignment is computed "//
-     2               "for 2 family for fibers only"
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
                   tmpV = 0D0
-                  CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
+                  IF (msh(iM)%nFn .EQ. 2)
+     2               CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
                   DO a=1, msh(iM)%nNo
-                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
+                     d(iM)%x(is,a) = tmpV(1,a)
                   END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_J)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
                   tmpV = 0D0
                   CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
-                     d(iM)%x(is:ie,a) = tmpV(1,a)
+                     d(iM)%x(is,a) = tmpV(1,a)
                   END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_F)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nsd*nsd,msh(iM)%nNo))
@@ -554,6 +564,8 @@
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE DEFAULT
                   err = "Undefined output"
                END SELECT
