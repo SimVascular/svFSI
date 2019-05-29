@@ -163,10 +163,12 @@
 !     Type of constitutive model (isochoric) for structure equation:
 !     St.Venant-Kirchhoff, modified St.Venant-Kirchhoff, NeoHookean,
 !     Mooney-Rivlin, modified Holzapfel-Gasser-Ogden with dispersion,
-!     Linear model (S = mu*I), Guccione (1995)
+!     Linear model (S = mu*I), Guccione (1995), Holzapfel & Ogden model
+!     for myocardium (2009)
       INTEGER, PARAMETER :: stIso_NA = 600, stIso_StVK = 601,
      2   stIso_mStVK = 602, stIso_nHook = 603, stIso_MR = 604,
-     3   stIso_HGO = 605, stIso_lin = 606, stIso_Gucci = 607
+     3   stIso_HGO = 605, stIso_lin = 606, stIso_Gucci = 607,
+     4   stIso_HO = 608
 
 !     Type of constitutive model (volumetric) for structure eqn:
 !     Quadratic, Simo-Taylor91, Miehe94

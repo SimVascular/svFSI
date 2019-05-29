@@ -1836,6 +1836,18 @@ c     2         "can be applied for Neumann boundaries only"
      2         "with 2 family of directions"
          END IF
 
+      CASE ("HO", "Holzapfel")
+      ! Holzapefel and Ogden model for myocardium !
+         lDmn%stM%isoType = stIso_HO
+         lPtr => lSt%get(lDmn%stM%aff, "a")
+         lPtr => lSt%get(lDmn%stM%bff, "b")
+         lPtr => lSt%get(lDmn%stM%aff, "a4f")
+         lPtr => lSt%get(lDmn%stM%bff, "b4f")
+         lPtr => lSt%get(lDmn%stM%ass, "a4s")
+         lPtr => lSt%get(lDmn%stM%bss, "b4s")
+         lPtr => lSt%get(lDmn%stM%afs, "afs")
+         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
+
       CASE DEFAULT
          err = "Undefined constitutive model used"
       END SELECT

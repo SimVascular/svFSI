@@ -49,11 +49,12 @@
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
       REAL(KIND=8) :: nd, Kp, J, J2d, trE, p, pl, Inv1, Inv2, Inv4,
-     2   Inv6
+     2   Inv6, Inv8
       REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
-     3   Eff, Ess, kap, Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6)
-      REAL(KIND=8) :: r1, r2, g1, g2, g3
+     3   Eff, Ess, Efs, kap, Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6),
+     4   Hfs(nsd,nsd)
+      REAL(KIND=8) :: r1, r2, g1, g2, g3, g4
 
 !     Some preliminaries
       nd   = REAL(nsd, KIND=8)
@@ -253,6 +254,61 @@
          CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
 
+!     HO (Holzapfel-Ogden) model for myocardium (2009)
+      CASE (stIso_HO)
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "Holzapfel material model (2)"
+         Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
+         Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
+         Inv8 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,2)))
+
+         Eff  = Inv4 - 1.0D0
+         Ess  = Inv6 - 1.0D0
+         Efs  = Inv8
+
+         Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+         Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+         Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
+     2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+
+         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
+         g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+         g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+         g4   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         Sb   = g1*IDm + 2D0*(g2*Hff + g3*Hss) + g4*Hfs
+
+         g1   = stM%b * g1
+         g2   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
+         g3   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
+         g4   = stM%afs*(1D0 + 2D0*stM%bfs*Efs*Efs)*EXP(stM%bfs*Efs*Efs)
+
+         g1   = 2D0*J2d*J2d * g1
+         g2   = 4D0*J2d*J2d * g2
+         g3   = 4D0*J2d*J2d * g3
+         g4   = 2D0*J2d*J2d * g4
+
+         CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
+     2          g2 * TEN_DYADPROD(Hff, Hff, nsd) +
+     3          g3 * TEN_DYADPROD(Hss, Hss, nsd) +
+     4          g4 * TEN_DYADPROD(Hfs, Hfs, nsd)
+
+         r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
+         S   = J2d*Sb - r1*Ci
+
+         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         CC  = TEN_DDOT(CCb, PP, nsd)
+         CC  = TEN_TRANSPOSE(CC, nsd)
+         CC  = TEN_DDOT(PP, CC, nsd)
+         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+     4                         TEN_DYADPROD(S, Ci, nsd) )
+
+         S   = S + p*J*Ci
+         CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         RETURN
+
       CASE DEFAULT
          err = "Undefined material constitutive model"
       END SELECT
@@ -300,14 +356,15 @@
       REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
-      REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6,
+      REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6, Inv8,
      2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
      3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
-      REAL(KIND=8) :: r1, r2, g1, g2, g3
+      REAL(KIND=8) :: r1, r2, g1, g2, g3, g4
       ! Guccione !
       REAL(KIND=8) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
-      ! HGO !
-      REAL(KIND=8) :: kap, Eff, Ess, Hff(nsd,nsd), Hss(nsd,nsd)
+      ! HGO, HO !
+      REAL(KIND=8) :: kap, Eff, Ess, Efs, Hff(nsd,nsd), Hss(nsd,nsd),
+     2   Hfs(nsd,nsd)
 
 !     Some preliminaries
       nd   = REAL(nsd, KIND=8)
@@ -475,6 +532,57 @@
      2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
      3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
+
+!     HO (Holzapfel-Ogden) model for myocardium (2009)
+      CASE (stIso_HO)
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "Holzapfel material model (2)"
+         Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
+         Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
+         Inv8 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,2)))
+
+         Eff  = Inv4 - 1.0D0
+         Ess  = Inv6 - 1.0D0
+         Efs  = Inv8
+
+         Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+         Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+         Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
+     2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+
+         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
+         g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+         g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+         g4   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         Sb   = g1*IDm + 2D0*(g2*Hff + g3*Hss) + g4*Hfs
+
+         g1   = stM%b * g1
+         g2   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
+         g3   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
+         g4   = stM%afs*(1D0 + 2D0*stM%bfs*Efs*Efs)*EXP(stM%bfs*Efs*Efs)
+
+         g1   = 2D0*J2d*J2d * g1
+         g2   = 4D0*J2d*J2d * g2
+         g3   = 4D0*J2d*J2d * g3
+         g4   = 2D0*J2d*J2d * g4
+
+         CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
+     2          g2 * TEN_DYADPROD(Hff, Hff, nsd) +
+     3          g3 * TEN_DYADPROD(Hss, Hss, nsd) +
+     4          g4 * TEN_DYADPROD(Hfs, Hfs, nsd)
+
+         r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
+         S   = J2d*Sb - r1*Ci
+
+         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         CC  = TEN_DDOT(CCb, PP, nsd)
+         CC  = TEN_TRANSPOSE(CC, nsd)
+         CC  = TEN_DDOT(PP, CC, nsd)
+         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+     4                         TEN_DYADPROD(S, Ci, nsd) )
+         RETURN
 
       CASE DEFAULT
          err = "Undefined isochoric material constitutive model"
