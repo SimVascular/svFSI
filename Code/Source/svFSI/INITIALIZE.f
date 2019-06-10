@@ -164,6 +164,7 @@
       IF (dFlag .AND. .NOT.cmmEq) i = 3*tDof
       IF (pstEq) i = i + nstd
       IF (sstEq) i = i + nsd
+      IF (cplEM) i = i + 1
       i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tnNo)
 
       IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
@@ -223,6 +224,12 @@
          pS0 = 0D0
          pSn = 0D0
          pSa = 0D0
+      END IF
+
+!     Electro-Mechanics
+      IF (cplEM) THEN
+         ALLOCATE(Ta(tnNo))
+         Ta = 0D0
       END IF
 
       IF (.NOT.resetSim) THEN
@@ -464,6 +471,9 @@
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Ad
+               ELSE IF (cplEM) THEN
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Ta
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad
@@ -472,6 +482,9 @@
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
+               ELSE IF (cplEM) THEN
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ta
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do
@@ -486,6 +499,10 @@
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
+     3            ib%Un, ib%Rfb
+            ELSE IF (cplEM) THEN
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, Ta, ib%An, ib%Yn,
      3            ib%Un, ib%Rfb
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
@@ -687,6 +704,11 @@
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
+
+!     Electro-mechanics
+      IF (cplEM) THEN
+         IF (ALLOCATED(Ta))  DEALLOCATE(Ta)
+      END IF
 
 !     IB structures
       IF (ibFlag) THEN

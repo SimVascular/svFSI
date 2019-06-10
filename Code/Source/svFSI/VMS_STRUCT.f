@@ -38,7 +38,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE VMS_STRUCT3D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl,
-     2   fN, lR, lK, lKd)
+     2   fN, Ta_l, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -46,7 +46,7 @@
       INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(3,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
-     3   fN(3,nFn)
+     3   fN(3,nFn), Ta_l(eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*3,eNoN,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
@@ -55,7 +55,8 @@
      2   px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, Siso(3,3),
      3   CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6), Pdev(3,3),
      4   Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3), PxFi(3),
-     5   VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku
+     5   VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku,
+     6   Ta_g, Sa(3,3)
 
       TYPE (stModelType) :: stModel
 
@@ -86,6 +87,7 @@
       F(1,1) = 1D0
       F(2,2) = 1D0
       F(3,3) = 1D0
+      Ta_g   = 0D0
       DO a=1, eNoN
          v(1)    = v(1)  + N(a)*yl(i,a)
          v(2)    = v(2)  + N(a)*yl(j,a)
@@ -120,6 +122,8 @@
          F(3,1)  = F(3,1) + Nx(1,a)*dl(k,a)
          F(3,2)  = F(3,2) + Nx(2,a)*dl(k,a)
          F(3,3)  = F(3,3) + Nx(3,a)*dl(k,a)
+
+         Ta_g    = Ta_g + N(a)*Ta_l(a)
       END DO
       Jac = MAT_DET(F, 3)
       Fi  = MAT_INV(F, 3)
@@ -133,6 +137,12 @@
 
 !     Compute stabilization parameters
       CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
+
+!     Active stress from electromechanics
+      Sa(:,:) = Ta_g*MAT_DYADPROD(fN(:,1), fN(:,1), nsd)
+
+!     Total stress: elastic (isochoric) + active stress
+      Siso = Siso + Sa
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
@@ -439,7 +449,7 @@
       END SUBROUTINE VMS_STRUCT3D
 !--------------------------------------------------------------------
       SUBROUTINE VMS_STRUCT2D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl,
-     2   fN, lR, lK, lKd)
+     2   fN, Ta_l, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -447,7 +457,7 @@
       INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(2,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN),
-     3   fN(2,nFn)
+     3   fN(2,nFn), Ta_l(eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*2,eNoN,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
@@ -456,7 +466,8 @@
      2   px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, Siso(2,2),
      3   CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3), Pdev(2,2),
      4   Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2), PxFi(2),
-     5   VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku
+     5   VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku,
+     6   Ta_g, Sa(2,2)
 
       TYPE (stModelType) :: stModel
 
@@ -484,6 +495,7 @@
       F      = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
+      Ta_g   = 0D0
       DO a=1, eNoN
          v(1)    = v(1)  + N(a)*yl(i,a)
          v(2)    = v(2)  + N(a)*yl(j,a)
@@ -505,6 +517,8 @@
          F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
          F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
          F(2,2)  = F(2,2) + Nx(2,a)*dl(j,a)
+
+         Ta_g    = Ta_g + N(a)*Ta_l(a)
       END DO
       Jac = F(1,1)*F(2,2) - F(1,2)*F(2,1)
       Fi  = MAT_INV(F, 2)
@@ -518,6 +532,12 @@
 
 !     Compute stabilization parameters
       CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
+
+!     Active stress from electromechanics
+      Sa(:,:) = Ta_g*MAT_DYADPROD(fN(:,1), fN(:,1), nsd)
+
+!     Total stress: elastic (isochoric) + active stress
+      Siso = Siso + Sa
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)

@@ -91,6 +91,7 @@
          ibFlag       = .FALSE.
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
+         cplEM        = .FALSE.
 
          i = IARGC()
          IF (i .EQ. 0) THEN
@@ -254,6 +255,18 @@
      2         " be specified after FSI equation"
          END IF
       END DO
+      IF (cplEM) THEN
+         IF (nEq .EQ. 1) err = "Min equations (2) not solved for"//
+     2      " electro-mechanics coupling"
+         i = 0
+         DO iEq=1, nEq
+            IF (eq(iEq)%phys .EQ. phys_CEP .OR.
+     2          eq(iEq)%phys .EQ. phys_struct .OR.
+     3          eq(iEq)%phys .EQ. phys_vms_struct) i = i + 1
+         END DO
+         IF (i .NE. 2) err = "Both electrophysiology and struct have"//
+     2      " to be solved for electro-mechanics"
+      END IF
       IF (.NOT.ALLOCATED(cplBC%xo)) THEN
          cplBC%nX = 0
          ALLOCATE(cplBC%xo(cplBC%nX))
@@ -645,7 +658,7 @@
 !     Cardiac Electro-Physiology equation----------------------------
       CASE ('CEP')
          lEq%phys = phys_CEP
-
+         lPtr => list%get(cplEM, "Coupled to mechanics")
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/1,1,0,0/)
@@ -1669,7 +1682,9 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(listType), INTENT(INOUT) :: lPD
 
       TYPE(listType), POINTER :: lPtr, list
-      INTEGER i, nFn
+
+      INTEGER i
+      LOGICAL flag
       REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
 
@@ -1685,18 +1700,17 @@ c     2         "can be applied for Neumann boundaries only"
          err = "Unknown electrophysiology model"
       END SELECT
 
-      lPtr => lPD%get(lDmn%cep%nX,"State variables",ll=1)
-      lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
+      lPtr => lPD%get(lDmn%cep%nX, "State variables", ll=1)
 
-      nFn = lPD%srch("Conductivity (ani)")
-      lDmn%cep%nFn = nFn
-      IF (nFn .EQ. 0) lDmn%cep%nFn = 1
+      lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
+      lDmn%cep%nFn = lPD%srch("Conductivity (ani)")
+      IF (lDmn%cep%nFn .EQ. 0) lDmn%cep%nFn = 1
 
       ALLOCATE(lDmn%cep%Dani(lDmn%cep%nFn))
       lDmn%cep%Dani = 0D0
-      IF (nFn .NE. 0) THEN
-         DO i=1, nFn
-            lPtr => lPD%get(lDmn%cep%Dani(i),"Conductivity (ani)",i)
+      IF (lDmn%cep%nFn .NE. 0) THEN
+         DO i=1, lDmn%cep%nFn
+            lPtr => lPD%get(lDmn%cep%Dani(i), "Conductivity (ani)", i)
          END DO
       END IF
 
@@ -1739,6 +1753,15 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => list%get(lDmn%cep%odes%absTol, "Absolute tolerance")
          lPtr => list%get(lDmn%cep%odes%relTol, "Relative tolerance")
       END IF
+
+      lDmn%cep%Vrst = -80.0D0
+      lPtr => lPD%get(rtmp, "Resting potential")
+      IF (ASSOCIATED(lPtr)) lDmn%cep%Vrst = rtmp
+
+      lDmn%cep%Kmef = 0D0
+      lPtr => lPD%get(rtmp, "Parameter for mechano-electric feedback")
+      IF (ASSOCIATED(lPtr)) lDmn%cep%Kmef = rtmp
+      IF (.NOT.cplEM) lDmn%cep%Kmef = 0D0
 
       RETURN
       END SUBROUTINE READCEP

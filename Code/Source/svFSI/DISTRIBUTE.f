@@ -165,6 +165,7 @@
          CALL cm%bcast(useTrilinosLS)
          CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
+         CALL cm%bcast(cplEM)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)
@@ -474,6 +475,8 @@
             CALL cm%bcast(lEq%dmn(iDmn)%cep%cepType)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nX)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nFn)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%Vrst)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%Kmef)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Diso)
             IF (cm%slv()) THEN
                ALLOCATE(lEq%dmn(iDmn)%cep%Dani(lEq%dmn(iDmn)%cep%nFn))

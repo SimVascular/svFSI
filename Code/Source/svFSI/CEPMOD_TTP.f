@@ -917,5 +917,23 @@
       RETURN
       END SUBROUTINE TTP_GETJ
 !-----------------------------------------------------------------------
+!     Compute activation force for electromechanics
+      SUBROUTINE TTP_ACTVNF(X, dt, Tact)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(IN) :: X, dt
+      REAL(KIND=8), INTENT(INOUT) :: Tact
+
+      INCLUDE "PARAMS_TTP.f"
+
+      REAL(KIND=8) :: rt, nr
+
+      rt = EXP(-EXP(-xi_T*(X - Ca_crit)))
+      rt = (eps_0 + (eps_i - eps_0)*rt)*dt
+      nr = Tact + rt*eta_T*(X - Ca_rest)
+      Tact = nr / (1.0D0 + rt)
+
+      RETURN
+      END SUBROUTINE TTP_ACTVNF
+!-----------------------------------------------------------------------
       END MODULE TTPMOD
 !#######################################################################

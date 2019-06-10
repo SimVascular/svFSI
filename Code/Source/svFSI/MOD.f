@@ -100,7 +100,8 @@
 !     equation, linear elasticity, heat in a fluid
 !     (advection-diffusion), fluid-structure-interaction, elector
 !     magnetic, mesh motion, Basset-Boussinesq Oseen equation,
-!     Electro-Physiology, VMS-stabilized-structure
+!     Electro-Physiology, VMS-stabilized-structure,
+!     Coupled-Momentum-Method
       INTEGER, PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_elcMag = 207,
@@ -911,12 +912,14 @@
       INTEGER, ALLOCATABLE :: ltg(:)
 !     Row pointer (for sparse LHS matrix structure)
       INTEGER, ALLOCATABLE :: rowPtr(:)
+!     Array that maps global node id to rowN in the matrix
+      INTEGER, ALLOCATABLE :: idMap(:)
+
+!     Additional arrays for immersed boundaries
 !     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid)
       INTEGER, ALLOCATABLE :: iblank(:)
 !     IB: Solid nodes with iblank=1, and are part of ghost cells
       INTEGER, ALLOCATABLE :: ighost(:)
-!     Array that maps global node id to rowN in the matrix
-      INTEGER, ALLOCATABLE :: idMap(:)
 
 !     Old time derivative of variables (acceleration)
       REAL(KIND=8), ALLOCATABLE :: Ao(:,:)

@@ -37,71 +37,141 @@
 !-----------------------------------------------------------------------
 
 !     This is for solving 3D electrophysiology diffusion equations
-      SUBROUTINE CEP3D (eNoN, nFn, w, N, Nx, al, yl, fN, lR, lK)
+      SUBROUTINE CEP3D (eNoN, nFn, w, N, Nx, al, yl, dl, fN, lR, lK)
       USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), fN(nsd,nFn)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
+     2   yl(tDof,eNoN), dl(tDof,eNoN), fN(3,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER a, b, i, iFn
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(nFn),
-     2   D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
+      INTEGER a, b, i
+      REAL(KIND=8) :: T1, amd, wl, Diso, Dani(nFn), Vrst, Kmef, V, Vd,
+     2   Vx(3), F(3,3), C(3,3), Jac, fl(3,nFn), Ls(nFn), D(3,3), DVx(3),
+     3   DNx(3,eNoN)
 
-      IF (nFn .NE. eq(cEq)%dmn(cDmn)%cep%nFn) err =
-     2   "No. of fibers do not match between mesh and domain"
+      IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
+     2   "No. of anisotropic conductivies exceed mesh fibers"
+
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
+      wl   = w*T1
+
       Diso = eq(cEq)%dmn(cDmn)%cep%Diso
-      Dani = eq(cEq)%dmn(cDmn)%cep%Dani
-      i    = eq(cEq)%s
-
-      wl = w*T1
-
-      D(:,:) = 0D0
-      D(1,1) = Diso
-      D(2,2) = Diso
-      D(3,3) = Diso
-      DO iFn=1, nFn
-         D(1,1) = D(1,1) + Dani(iFn)*fN(1,iFn)*fN(1,iFn)
-         D(1,2) = D(1,2) + Dani(iFn)*fN(1,iFn)*fN(2,iFn)
-         D(1,3) = D(1,3) + Dani(iFn)*fN(1,iFn)*fN(3,iFn)
-
-         D(2,1) = D(2,1) + Dani(iFn)*fN(2,iFn)*fN(1,iFn)
-         D(2,2) = D(2,2) + Dani(iFn)*fN(2,iFn)*fN(2,iFn)
-         D(2,3) = D(2,3) + Dani(iFn)*fN(2,iFn)*fN(3,iFn)
-
-         D(3,1) = D(3,1) + Dani(iFn)*fN(3,iFn)*fN(1,iFn)
-         D(3,2) = D(3,2) + Dani(iFn)*fN(3,iFn)*fN(2,iFn)
-         D(3,3) = D(3,3) + Dani(iFn)*fN(3,iFn)*fN(3,iFn)
+      DO i=1, nFn
+         IF (i .LE. eq(cEq)%dmn(cDmn)%cep%nFn) THEN
+            Dani(i) = eq(cEq)%dmn(cDmn)%cep%Dani(i)
+         ELSE
+            Dani(i) = Dani(i-1)
+         END IF
       END DO
 
-      Td = 0D0
-      Tx = 0D0
-      DO a=1, eNoN
-         Td = Td + N(a)*al(i,a)
+      Vrst = eq(cEq)%dmn(cDmn)%cep%Vrst
+      Kmef = eq(cEq)%dmn(cDmn)%cep%Kmef
 
-         Tx(1) = Tx(1) + Nx(1,a)*yl(i,a)
-         Tx(2) = Tx(2) + Nx(2,a)*yl(i,a)
-         Tx(3) = Tx(3) + Nx(3,a)*yl(i,a)
+!     Compute fiber stretch for mechano-electric feedback which leads to
+!     stretch induced currents. Compute the isotropic part of diffusion
+!     tensor based on spatial isotropy for electromechanics that models
+!     stretch induced changes in conduction velocities
+      Ls(:) = 1D0
+      IF (cplEM) THEN
+!        Get the displacement degrees of freedom
+         DO a=1, nEq
+            IF (eq(a)%phys .EQ. phys_struct .OR.
+     2          eq(a)%phys .EQ. phys_vms_struct) THEN
+               i = eq(a)%s
+               EXIT
+            END IF
+         END DO
+
+!        Compute deformation gradient tensor
+         F(:,:) = 0D0
+         F(1,1) = 1D0
+         F(2,2) = 1D0
+         F(3,3) = 1D0
+         DO a=1, eNoN
+            F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+            F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+            F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+            F(2,1) = F(2,1) + Nx(1,a)*dl(i+1,a)
+            F(2,2) = F(2,2) + Nx(2,a)*dl(i+1,a)
+            F(2,3) = F(2,3) + Nx(3,a)*dl(i+1,a)
+            F(3,1) = F(3,1) + Nx(1,a)*dl(i+2,a)
+            F(3,2) = F(3,2) + Nx(2,a)*dl(i+2,a)
+            F(3,3) = F(3,3) + Nx(3,a)*dl(i+2,a)
+         END DO
+!        Jacobian
+         Jac = MAT_DET(F, 3)
+
+!        Compute Cauchy-Green tensor and its inverse
+         C  = MATMUL(TRANSPOSE(F), F)
+         C  = MAT_INV(C, 3)
+
+!        Compute fiber stretch
+         DO i=1, nFn
+            Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
+            fl(:,i) = fl(:,i) / Ls(i)
+         END DO
+         IF (Ls(1) .LE. 1D0) Ls(1) = 1D0
+
+!        Diffusion tensor - spatial isotropy
+         Diso    = Diso * Jac
+         Dani(:) = Dani(:) * Jac
+         D(:,:)  = Diso * C(:,:)
+      ELSE
+         D(:,:)  = 0D0
+         D(1,1)  = Diso
+         D(2,2)  = Diso
+         D(3,3)  = Diso
+         fl(:,:) = fN(:,:)
+      END IF
+
+!     Compute anisotropic components of diffusion tensor
+      DO i=1, nFn
+         D(1,1) = D(1,1) + Dani(i)*fl(1,i)*fl(1,i)
+         D(1,2) = D(1,2) + Dani(i)*fl(1,i)*fl(2,i)
+         D(1,3) = D(1,3) + Dani(i)*fl(1,i)*fl(3,i)
+
+         D(2,1) = D(2,1) + Dani(i)*fl(2,i)*fl(1,i)
+         D(2,2) = D(2,2) + Dani(i)*fl(2,i)*fl(2,i)
+         D(2,3) = D(2,3) + Dani(i)*fl(2,i)*fl(3,i)
+
+         D(3,1) = D(3,1) + Dani(i)*fl(3,i)*fl(1,i)
+         D(3,2) = D(3,2) + Dani(i)*fl(3,i)*fl(2,i)
+         D(3,3) = D(3,3) + Dani(i)*fl(3,i)*fl(3,i)
+      END DO
+
+      i  = eq(cEq)%s
+      V  = 0D0
+      Vd = 0D0
+      Vx = 0D0
+      DO a=1, eNoN
+         V  = V  + N(a)*yl(i,a)
+
+         Vd = Vd + N(a)*al(i,a)
+
+         Vx(1) = Vx(1) + Nx(1,a)*yl(i,a)
+         Vx(2) = Vx(2) + Nx(2,a)*yl(i,a)
+         Vx(3) = Vx(3) + Nx(3,a)*yl(i,a)
 
          DNx(1,a) = D(1,1)*Nx(1,a) + D(1,2)*Nx(2,a) + D(1,3)*Nx(3,a)
          DNx(2,a) = D(2,1)*Nx(1,a) + D(2,2)*Nx(2,a) + D(2,3)*Nx(3,a)
          DNx(3,a) = D(3,1)*Nx(1,a) + D(3,2)*Nx(2,a) + D(3,3)*Nx(3,a)
       END DO
 
-      DTx(1) = D(1,1)*Tx(1) + D(1,2)*Tx(2) + D(1,3)*Tx(3)
-      DTx(2) = D(2,1)*Tx(1) + D(2,2)*Tx(2) + D(2,3)*Tx(3)
-      DTx(3) = D(3,1)*Tx(1) + D(3,2)*Tx(2) + D(3,3)*Tx(3)
+      DVx(1) = D(1,1)*Vx(1) + D(1,2)*Vx(2) + D(1,3)*Vx(3)
+      DVx(2) = D(2,1)*Vx(1) + D(2,2)*Vx(2) + D(2,3)*Vx(3)
+      DVx(3) = D(3,1)*Vx(1) + D(3,2)*Vx(2) + D(3,3)*Vx(3)
 
+      T1 = Kmef * (Ls(1)-1D0)
       DO a=1, eNoN
-         lR(1,a) = lR(1,a) + w*(N(a)*Td
-     2      + Nx(1,a)*DTx(1) + Nx(2,a)*DTx(2) + Nx(3,a)*DTx(3))
+         lR(1,a) = lR(1,a) + w*(N(a)*(Vd + T1*(V-Vrst))
+     2      + Nx(1,a)*DVx(1) + Nx(2,a)*DVx(2) + Nx(3,a)*DVx(3))
 
          DO b=1, eNoN
-            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd +
+            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*(amd + T1) +
      2         Nx(1,a)*DNx(1,b) + Nx(2,a)*DNx(2,b) + Nx(3,a)*DNx(3,b))
          END DO
       END DO
@@ -110,60 +180,122 @@
       END SUBROUTINE CEP3D
 !-----------------------------------------------------------------------
 !     This is for solving 2D electrophysiology diffusion equation
-      SUBROUTINE CEP2D (eNoN, nFn, w, N, Nx, al, yl, fN, lR, lK)
+      SUBROUTINE CEP2D (eNoN, nFn, w, N, Nx, al, yl, dl, fN, lR, lK)
       USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), fN(nsd,nFn)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
+     2   yl(tDof,eNoN), dl(tDof,eNoN), fN(2,nFn)
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER a, b, i, iFn
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx(nsd), Diso, Dani(nFn),
-     2   D(nsd,nsd), DTx(nsd), DNx(nsd,eNoN)
+      INTEGER a, b, i
+      REAL(KIND=8) :: T1, amd, wl, Diso, Dani(nFn), Vrst, Kmef, V, Vd,
+     2   Vx(2), F(2,2), C(2,2), Jac, fl(2,nFn), Ls(nFn), D(2,2), DVx(2),
+     3   DNx(2,eNoN)
 
-      IF (nFn .NE. eq(cEq)%dmn(cDmn)%cep%nFn) err =
-     2   "No. of fibers do not match between mesh and domain"
+      IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
+     2   "No. of anisotropic conductivies exceed mesh fibers"
+
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
-      Diso = eq(cEq)%dmn(cDmn)%cep%Diso
-      Dani = eq(cEq)%dmn(cDmn)%cep%Dani
-      i    = eq(cEq)%s
       wl   = w*T1
 
-      D(:,:) = 0D0
-      D(1,1) = Diso
-      D(2,2) = Diso
-      DO iFn=1, nFn
-         D(1,1) = D(1,1) + Dani(iFn)*fN(1,iFn)*fN(1,iFn)
-         D(1,2) = D(1,2) + Dani(iFn)*fN(1,iFn)*fN(2,iFn)
-
-         D(2,1) = D(2,1) + Dani(iFn)*fN(2,iFn)*fN(1,iFn)
-         D(2,2) = D(2,2) + Dani(iFn)*fN(2,iFn)*fN(2,iFn)
+      Diso = eq(cEq)%dmn(cDmn)%cep%Diso
+      DO i=1, nFn
+         IF (i .LE. eq(cEq)%dmn(cDmn)%cep%nFn) THEN
+            Dani(i) = eq(cEq)%dmn(cDmn)%cep%Dani(i)
+         ELSE
+            Dani(i) = Dani(i-1)
+         END IF
       END DO
 
-      Td = 0D0
-      Tx = 0D0
-      DO a=1, eNoN
-         Td = Td + N(a)*al(i,a)
+      Vrst = eq(cEq)%dmn(cDmn)%cep%Vrst
+      Kmef = eq(cEq)%dmn(cDmn)%cep%Kmef
 
-         Tx(1) = Tx(1) + Nx(1,a)*yl(i,a)
-         Tx(2) = Tx(2) + Nx(2,a)*yl(i,a)
+!     Compute fiber stretch for mechano-electric feedback which leads to
+!     stretch induced currents. Compute the isotropic part of diffusion
+!     tensor based on spatial isotropy for electromechanics that models
+!     stretch induced changes in conduction velocities
+      Ls(:) = 1D0
+      IF (cplEM) THEN
+         DO a=1, nEq
+            IF (eq(a)%phys .EQ. phys_struct .OR.
+     2          eq(a)%phys .EQ. phys_vms_struct) THEN
+               i = eq(a)%s
+               EXIT
+            END IF
+         END DO
+
+!        Compute deformation gradient tensor
+         F(:,:) = 0D0
+         F(1,1) = 1D0
+         F(2,2) = 1D0
+         DO a=1, eNoN
+            F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+            F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+            F(2,1) = F(2,1) + Nx(1,a)*dl(i+1,a)
+            F(2,2) = F(2,2) + Nx(2,a)*dl(i+1,a)
+         END DO
+!        Jacobian
+         Jac = MAT_DET(F, 2)
+
+!        Compute Cauchy-Green tensor and its inverse
+         C  = MATMUL(TRANSPOSE(F), F)
+         C  = MAT_INV(C, 2)
+
+!        Compute fiber stretch
+         DO i=1, nFn
+            Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
+            fl(:,i) = fl(:,i) / Ls(i)
+         END DO
+         IF (Ls(1) .LE. 1D0) Ls(1) = 1D0
+
+!        Diffusion tensor - spatial isotropy
+         Diso    = Diso * Jac
+         Dani(:) = Dani(:) * Jac
+         D(:,:)  = Diso * C(:,:)
+      ELSE
+         D(:,:) = 0D0
+         D(1,1) = Diso
+         D(2,2) = Diso
+      END IF
+
+      DO i=1, nFn
+         D(1,1) = D(1,1) + Dani(i)*fl(1,i)*fl(1,i)
+         D(1,2) = D(1,2) + Dani(i)*fl(1,i)*fl(2,i)
+
+         D(2,1) = D(2,1) + Dani(i)*fl(2,i)*fl(1,i)
+         D(2,2) = D(2,2) + Dani(i)*fl(2,i)*fl(2,i)
+      END DO
+
+      i  = eq(cEq)%s
+      V  = 0D0
+      Vd = 0D0
+      Vx = 0D0
+      DO a=1, eNoN
+         V  = V  + N(a)*yl(i,a)
+
+         Vd = Vd + N(a)*al(i,a)
+
+         Vx(1) = Vx(1) + Nx(1,a)*yl(i,a)
+         Vx(2) = Vx(2) + Nx(2,a)*yl(i,a)
 
          DNx(1,a) = D(1,1)*Nx(1,a) + D(1,2)*Nx(2,a)
          DNx(2,a) = D(2,1)*Nx(1,a) + D(2,2)*Nx(2,a)
       END DO
 
-      DTx(1) = D(1,1)*Tx(1) + D(1,2)*Tx(2)
-      DTx(2) = D(2,1)*Tx(1) + D(2,2)*Tx(2)
+      DVx(1) = D(1,1)*Vx(1) + D(1,2)*Vx(2)
+      DVx(2) = D(2,1)*Vx(1) + D(2,2)*Vx(2)
 
+      T1 = Kmef * (Ls(1)-1D0)
       DO a=1, eNoN
-         lR(1,a) = lR(1,a) + w*(N(a)*Td
-     2      + Nx(1,a)*DTx(1) + Nx(2,a)*DTx(2))
+         lR(1,a) = lR(1,a) + w*(N(a)*(Vd + T1*(V-Vrst))
+     2      + Nx(1,a)*DVx(1) + Nx(2,a)*DVx(2))
 
          DO b=1, eNoN
-            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd +
+            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*(amd + T1) +
      2         Nx(1,a)*DNx(1,b) + Nx(2,a)*DNx(2,b))
          END DO
       END DO
@@ -266,6 +398,7 @@
             sA = 0D0
             sF = 0D0
             DO Ac=1, tnNo
+               IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
                DO iDmn=1, eq(iEq)%nDmn
                   cPhys = eq(iEq)%dmn(iDmn)%phys
                   dID   = eq(iEq)%dmn(iDmn)%Id
@@ -288,7 +421,7 @@
             DEALLOCATE(sA, sF)
          ELSE
             DO Ac=1, tnNo
-               IF (eq(iEq)%dmn(1)%phys .NE. phys_CEP) CYCLE
+               IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
                nX = eq(iEq)%dmn(1)%cep%nX
                ALLOCATE(Xl(nX))
                CALL CEPINIT(eq(iEq)%dmn(1)%cep, nX, Xl)
@@ -303,11 +436,13 @@
          END DO
       END IF
 
+!     Integrate electric potential based on cellular activation model
       IF (ALLOCATED(dmnId)) THEN
          ALLOCATE(sA(tnNo), sF(nXmax,tnNo))
          sA = 0D0
          sF = 0D0
          DO Ac=1, tnNo
+            IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
             DO iDmn=1, eq(iEq)%nDmn
                cPhys = eq(iEq)%dmn(iDmn)%phys
                dID   = eq(iEq)%dmn(iDmn)%Id
@@ -331,7 +466,7 @@
          DEALLOCATE(sA, sF)
       ELSE
          DO Ac=1, tnNo
-            IF (eq(iEq)%dmn(1)%phys .NE. phys_CEP) CYCLE
+            IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
             nX = eq(iEq)%dmn(1)%cep%nX
             ALLOCATE(Xl(nX))
             Xl(:) = Xion(1:nX,Ac)
@@ -339,6 +474,17 @@
             Xion(1:nX,Ac) = Xl(:)
             DEALLOCATE(Xl)
          END DO
+      END IF
+
+!     Integrate activation force for electromechanics
+      IF (cplEM) THEN
+         ALLOCATE(Xl(nXmax))
+         DO Ac=1, tnNo
+            IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
+            Xl(:) = Xion(:,Ac)
+            CALL CEMACTVN(eq(iEq)%dmn(iDmn)%cep, nXmax, Xl, dt, Ta(Ac))
+         END DO
+         DEALLOCATE(Xl)
       END IF
 
       DO Ac=1, tnNo
@@ -404,10 +550,13 @@
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             CALL AP_INTEGFE(nX, X, t, dt, Istim)
+
          CASE (tIntType_RK4)
             CALL AP_INTEGRK(nX, X, t, dt, Istim)
+
          CASE (tIntType_CN2)
             CALL AP_INTEGCN2(nX, X, t, dt, Istim, IPAR, RPAR)
+
          END SELECT
 
       CASE (cepModel_FN)
@@ -421,10 +570,13 @@
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             CALL FN_INTEGFE(nX, X, t, dt, Istim)
+
          CASE (tIntType_RK4)
             CALL FN_INTEGRK(nX, X, t, dt, Istim)
+
          CASE (tIntType_CN2)
             CALL FN_INTEGCN2(nX, X, t, dt, Istim, IPAR, RPAR)
+
          END SELECT
 
       CASE (cepModel_TTP)
@@ -438,15 +590,19 @@
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             CALL TTP_INTEGFE(nX, X, t, dt, Istim, RPAR)
+
          CASE (tIntType_RK4)
             CALL TTP_INTEGRK(nX, X, t, dt, Istim, RPAR)
+
          CASE (tIntType_CN2)
             CALL TTP_INTEGCN2(nX, X, t, dt, Istim, IPAR, RPAR)
+
          END SELECT
+
       END SELECT
 
       IF (ISNAN(X(1))) THEN
-         WRITE(*,'(A)') " NaN occurence. Aborted!"
+         WRITE(*,'(A)') " NaN occurence (Xion). Aborted!"
          CALL STOPSIM()
       END IF
 
@@ -454,4 +610,29 @@
 
       RETURN
       END SUBROUTINE CEPINTEG
+!####################################################################
+      SUBROUTINE CEMACTVN(cep, nX, Xion, dt, Tact)
+      USE CEPMOD
+      IMPLICIT NONE
+      TYPE(cepModelType), INTENT(IN) :: cep
+      INTEGER, INTENT(IN) :: nX
+      REAL(KIND=8), INTENT(IN) :: dt, Xion(nX)
+      REAL(KIND=8), INTENT(INOUT) :: Tact
+
+      SELECT CASE (cep%cepType)
+      CASE (cepModel_AP)
+         CALL AP_ACTVNF(Xion(1), dt, Tact)
+
+      CASE (cepModel_TTP)
+         CALL TTP_ACTVNF(Xion(4), dt, Tact)
+
+      END SELECT
+
+      IF (ISNAN(Tact)) THEN
+         WRITE(*,'(A)') " NaN occurence (Ta). Aborted!"
+         CALL STOPSIM()
+      END IF
+
+      RETURN
+      END SUBROUTINE CEMACTVN
 !####################################################################

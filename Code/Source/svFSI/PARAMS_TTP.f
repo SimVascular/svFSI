@@ -139,6 +139,20 @@
 !     K_bufss: Ca_ss half-saturation constant for subspace buffer
       REAL(KIND=8) :: K_bufss = 2.5D-4     ! units: mM
 !-----------------------------------------------------------------------
+!     Electromechanics coupling parameters
+!     Ca_rest: Resting Ca concentration
+      REAL(KIND=8) :: Ca_rest = 5.0D-5     ! units: mM
+!     Ca_crit: Critical Ca concentration
+      REAL(KIND=8) :: Ca_crit = 8.0D-4     ! units: mM
+!     eta_T: Saturation of concentration
+      REAL(KIND=8) :: eta_T = 12.5D0       ! units: MPa/mM
+!     eps_0: Minimum activation
+      REAL(KIND=8) :: eps_0 = 0.1D0        ! units: ms^{-1}
+!     eps_i: Maximum activation
+      REAL(KIND=8) :: eps_i = 1.0D0        ! units: ms^{-1}
+!     Transition rate
+      REAL(KIND=8) :: xi_T = 4.0D3         ! units: mM^{-1}
+!-----------------------------------------------------------------------
 !     Scaling factors
 !     Voltage scaling
       REAL(KIND=8) :: Vscale  = 1.0D0

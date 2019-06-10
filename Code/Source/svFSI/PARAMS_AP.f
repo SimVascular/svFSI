@@ -50,9 +50,23 @@
       REAL(KIND=8) :: c     = 8.0D0
       REAL(KIND=8) :: mu1   = 0.2D0
       REAL(KIND=8) :: mu2   = 0.3D0
+!-----------------------------------------------------------------------
+!     Electromechanics coupling parameters
+!     Resting voltage (mV)
+      REAL(KIND=8) :: Vrest = -80.0D0
+!     Critical voltage (mV)
+      REAL(KIND=8) :: Vcrit = -30.0D0
+!     Saturation potential
+      REAL(KIND=8) :: eta_T = 0.005D0
+!     Minimum activation (ms^{-1})
+      REAL(KIND=8) :: eps_0 = 0.1D0
+!     Maximum activation (ms^{-1})
+      REAL(KIND=8) :: eps_i = 1.0D0
+!     Transition rate (mV^{-1})
+      REAL(KIND=8) :: xi_T  = 1.0D0
 
 !     Cm: Cell capacitance per unit surface area
-      REAL(KIND=8) :: Cm  = 1.0d0
+      REAL(KIND=8) :: Cm  = 1.0D0
 !     sV: Surface to volume ratio
       REAL(KIND=8) :: sV  = 1.0D0
 !     rho: Cellular resistivity

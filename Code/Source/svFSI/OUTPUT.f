@@ -211,6 +211,10 @@ c      END DO
                IF (pstEq) THEN
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, Ad
+!              Electromechanics
+               ELSE IF (cplEM) THEN
+                  WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ad, Ta
                ELSE
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ad
@@ -220,6 +224,10 @@ c      END DO
                IF (pstEq) THEN
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn, pS0
+!              Electromechanics
+               ELSE IF (cplEM) THEN
+                  WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ta
                ELSE
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn
@@ -233,8 +241,12 @@ c      END DO
          IF (dFlag) THEN
             IF (pstEq) THEN
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2          eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%An, ib%Yn,
-     3          ib%Un, ib%Rfb
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%An, ib%Yn,
+     3            ib%Un, ib%Rfb
+            ELSE IF (cplEM) THEN
+               WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, Ta, ib%An, ib%Yn,
+     3            ib%Un, ib%Rfb
             ELSE
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
      2            eq%iNorm, cplBC%xn, Yn, An, Dn, ib%An, ib%Yn, ib%Un,

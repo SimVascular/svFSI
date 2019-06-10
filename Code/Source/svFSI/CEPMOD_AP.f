@@ -268,6 +268,24 @@
       RETURN
       END SUBROUTINE AP_GETJ
 !-----------------------------------------------------------------------
+!     Compute activation force for electromechanics
+      SUBROUTINE AP_ACTVNF(X, dt, Tact)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(IN) :: X, dt
+      REAL(KIND=8), INTENT(INOUT) :: Tact
+
+      INCLUDE "PARAMS_AP.f"
+
+      REAL(KIND=8) :: rt, nr
+
+      rt = EXP(-EXP(-xi_T*(X - Vcrit)))
+      rt = (eps_0 + (eps_i - eps_0)*rt)*dt
+      nr = Tact + rt*eta_T*(X - Vrest)
+      Tact = nr / (1.0D0 + rt)
+
+      RETURN
+      END SUBROUTINE AP_ACTVNF
+!-----------------------------------------------------------------------
       END MODULE APMOD
 !#######################################################################
 

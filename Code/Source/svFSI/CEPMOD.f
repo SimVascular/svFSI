@@ -85,6 +85,10 @@
          INTEGER :: nX
 !        Number of fiber directions
          INTEGER :: nFn
+!        Resting potential
+         REAL(KIND=8) :: Vrst
+!        Feedback constant
+         REAL(KIND=8) :: Kmef
 !        Isotropic conductivity
          REAL(KIND=8) :: Diso = 0D0
 !        Anisotropic conductivity
@@ -94,6 +98,11 @@
 !        Time integration options
          TYPE(odeType) :: odeS
       END TYPE cepModelType
+
+!     Whether electrophysiology and mechanics are coupled
+      LOGICAL cplEM
+!     Activation force used for electromechanics
+      REAL(KIND=8), ALLOCATABLE :: Ta(:)
 
       END MODULE CEPMOD
 !#######################################################################
