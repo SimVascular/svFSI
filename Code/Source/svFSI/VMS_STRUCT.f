@@ -56,7 +56,7 @@
      3   CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6), Pdev(3,3),
      4   Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3), PxFi(3),
      5   VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku,
-     6   Ta_g, Sa(3,3)
+     6   Ta_g
 
       TYPE (stModelType) :: stModel
 
@@ -139,10 +139,7 @@
       CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
 
 !     Active stress from electromechanics
-      Sa(:,:) = Ta_g*MAT_DYADPROD(fN(:,1), fN(:,1), nsd)
-
-!     Total stress: elastic (isochoric) + active stress
-      Siso = Siso + Sa
+      CALL ACTVSTRSdev(Ta_g, F, nFn, fN, Siso)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
@@ -467,7 +464,7 @@
      3   CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3), Pdev(2,2),
      4   Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2), PxFi(2),
      5   VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku,
-     6   Ta_g, Sa(2,2)
+     6   Ta_g
 
       TYPE (stModelType) :: stModel
 
@@ -534,10 +531,7 @@
       CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
 
 !     Active stress from electromechanics
-      Sa(:,:) = Ta_g*MAT_DYADPROD(fN(:,1), fN(:,1), nsd)
-
-!     Total stress: elastic (isochoric) + active stress
-      Siso = Siso + Sa
+      CALL ACTVSTRSdev(Ta_g, F, nFn, fN, Siso)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)

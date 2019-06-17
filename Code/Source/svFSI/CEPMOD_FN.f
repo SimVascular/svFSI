@@ -96,7 +96,7 @@
       fext = Istim * Tscale / Vscale
 
       X(1) = (X(1) - Voffset)/Vscale
-      CALL FN_GETF(nX, t, X, f, fext)
+      CALL FN_GETF(nX, X, f, fext)
       X(:) = X(:) + dt*f(:)
       X(1) = X(1)*Vscale + Voffset
 
@@ -122,22 +122,22 @@
 !     RK4: 1st pass
       trk = t
       Xrk(:,1) = X(:)
-      CALL FN_GETF(nX, trk, Xrk(:,1), frk(:,1), fext)
+      CALL FN_GETF(nX, Xrk(:,1), frk(:,1), fext)
 
 !     RK4: 2nd pass
       trk = t + dt/2.0D0
       Xrk(:,2) = X(:) + dt*frk(:,1)/2.0D0
-      CALL FN_GETF(nX, trk, Xrk(:,2), frk(:,2), fext)
+      CALL FN_GETF(nX, Xrk(:,2), frk(:,2), fext)
 
 !     RK4: 3rd pass
       trk = t + dt/2.0D0
       Xrk(:,3) = X(:) + dt*frk(:,2)/2.0D0
-      CALL FN_GETF(nX, trk, Xrk(:,3), frk(:,3), fext)
+      CALL FN_GETF(nX, Xrk(:,3), frk(:,3), fext)
 
 !     RK4: 4th pass
       trk = t + dt
       Xrk(:,4) = X(:) + dt*frk(:,3)
-      CALL FN_GETF(nX, trk, Xrk(:,4), frk(:,4), fext)
+      CALL FN_GETF(nX, Xrk(:,4), frk(:,4), fext)
 
       X(:) = X(:) + (dt/6.0D0) * ( frk(:,1) + 2.0D0*frk(:,2) +
      2   2.0D0*frk(:,3) + frk(:,4) )
@@ -175,7 +175,7 @@
       Xn(1) = (Xn(1) - Voffset)/Vscale
       Im    = MAT_ID(nX)
 
-      CALL FN_GETF(nX, t, Xn, fn, fext)
+      CALL FN_GETF(nX, Xn, fn, fext)
 
       k  = 0
       Xk = Xn
@@ -185,7 +185,7 @@
       t  = Ts + dt
       DO
          k = k + 1
-         CALL FN_GETF(nX, t, Xk, fk, fext)
+         CALL FN_GETF(nX, Xk, fk, fext)
          rK(:) = Xk(:) - Xn(:) - 0.5D0*dt*(fk(:) + fn(:))
 
          rmsA = 0D0
@@ -202,14 +202,14 @@
          l3   = rmsR .LE. rtol
          IF (l1 .OR. l2 .OR. l3) EXIT
 
-         CALL FN_GETJ(nX, t, Xk, JAC)
+         CALL FN_GETJ(nX, Xk, JAC)
          JAC   = Im - 0.5D0*dt*JAC
          JAC   = MAT_INV(JAC, nX)
          rK(:) = MATMUL(JAC, rK)
          Xk(:) = Xk(:) - rK(:)
       END DO
       Xn(:) = Xk(:)
-      CALL FN_GETF(nX, t, Xn, fn, fext)
+      CALL FN_GETF(nX, Xn, fn, fext)
       Xn(1) = Xn(1)*Vscale + Voffset
 
       IF (.NOT.l2 .AND. .NOT.l3) IPAR(2) = IPAR(2) + 1
@@ -217,10 +217,10 @@
       RETURN
       END SUBROUTINE FN_INTEGCN2
 !-----------------------------------------------------------------------
-      SUBROUTINE FN_GETF(n, t, X, f, fext)
+      SUBROUTINE FN_GETF(n, X, f, fext)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: t, X(n), fext
+      REAL(KIND=8), INTENT(IN) :: X(n), fext
       REAL(KIND=8), INTENT(OUT) :: f(n)
 
       INCLUDE "PARAMS_FN.f"
@@ -232,10 +232,10 @@
       RETURN
       END SUBROUTINE FN_GETF
 !-----------------------------------------------------------------------
-      SUBROUTINE FN_GETJ(n, t, X, JAC)
+      SUBROUTINE FN_GETJ(n, X, JAC)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: t, X(n)
+      REAL(KIND=8), INTENT(IN) :: X(n)
       REAL(KIND=8), INTENT(OUT) :: JAC(n,n)
 
       INCLUDE "PARAMS_FN.f"

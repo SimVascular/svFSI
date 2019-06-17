@@ -48,19 +48,20 @@
       REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
-      REAL(KIND=8) :: nd, Kp, J, J2d, trE, p, pl, Inv1, Inv2, Inv4,
+      REAL(KIND=8) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2, Inv4,
      2   Inv6, Inv8
       REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
      3   Eff, Ess, Efs, kap, Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6),
      4   Hfs(nsd,nsd)
-      REAL(KIND=8) :: r1, r2, g1, g2, g3, g4
+      REAL(KIND=8) :: r1, r2, g1, g2, g3
 
 !     Some preliminaries
       nd   = REAL(nsd, KIND=8)
       Kp   = stM%Kpen
       J    = MAT_DET(F, nsd)
       J2d  = J**(-2D0/nd)
+      J4d  = J2d*J2d
 
       IDm  = MAT_ID(nsd)
       C    = MATMUL(TRANSPOSE(F), F)
@@ -69,7 +70,7 @@
 
       trE  = MAT_TRACE(E, nsd)
       Inv1 = J2d*MAT_TRACE(C,nsd)
-      Inv2 = 5D-1*( Inv1*Inv1 - J2d*J2d*MAT_TRACE(MATMUL(C,C), nsd) )
+      Inv2 = 5D-1*( Inv1*Inv1 - J4d*MAT_TRACE(MATMUL(C,C), nsd) )
 
 !     Contribution of dilational penalty terms to S and CC
       p  = 0D0
@@ -123,7 +124,7 @@
          g2  = -2D0 * stM%C01
          Sb  = g1*IDm + g2*J2d*C
 
-         g1  = 4D0*J2d*J2d* stM%C01
+         g1  = 4D0*J4d* stM%C01
          CCb = g1 * (TEN_DYADPROD(IDm, IDm, nsd) - TEN_IDs(nsd))
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
@@ -165,8 +166,8 @@
 
          g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
          g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
-         g1   = 4D0*J2d*J2d * g1
-         g2   = 4D0*J2d*J2d * g2
+         g1   = 4D0*J4d*g1
+         g2   = 4D0*J4d*g2
 
          CCb  = g1 * TEN_DYADPROD(Hff, Hff, nsd) +
      2          g2 * TEN_DYADPROD(Hss, Hss, nsd)
@@ -234,7 +235,7 @@
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         r2  = r2*J2d*J2d
+         r2  = r2*J4d
          CCb = r2 * ( 2D0*TEN_DYADPROD(Hss, Hss, nsd) +
      2      g1* TEN_DYADPROD(Sfs(:,:,1), Sfs(:,:,1), nsd)  +
      3      g2*(TEN_DYADPROD(Sfs(:,:,2), Sfs(:,:,2), nsd)  +
@@ -266,31 +267,39 @@
          Ess  = Inv6 - 1.0D0
          Efs  = Inv8
 
-         Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
-         Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
+         g2   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
      2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+         Sb   = g1*IDm + g2*Hfs
 
-         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
-         g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
-         g4   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
-         Sb   = g1*IDm + 2D0*(g2*Hff + g3*Hss) + g4*Hfs
-
-         g1   = stM%b * g1
-         g2   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
-         g3   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
-         g4   = stM%afs*(1D0 + 2D0*stM%bfs*Efs*Efs)*EXP(stM%bfs*Efs*Efs)
-
-         g1   = 2D0*J2d*J2d * g1
-         g2   = 4D0*J2d*J2d * g2
-         g3   = 4D0*J2d*J2d * g3
-         g4   = 2D0*J2d*J2d * g4
-
+         Efs  = Efs * Efs
+         g1   = 2D0*J4d*stM%b*g1
+         g2   = 2D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
-     2          g2 * TEN_DYADPROD(Hff, Hff, nsd) +
-     3          g3 * TEN_DYADPROD(Hss, Hss, nsd) +
-     4          g4 * TEN_DYADPROD(Hfs, Hfs, nsd)
+     2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
+
+         IF (Eff .GT. 0D0) THEN
+             g1  = 2D0 * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+             Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+             Sb  = Sb + g1*Hff
+
+             Eff = Eff * Eff
+             g1  = stM%aff*(1D0 + 2D0*stM%bff*Eff)*EXP(stM%bff*Eff)*
+     2          4D0*J4d
+             CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
+         END IF
+
+         IF (Eff .GT. 0D0) THEN
+             g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+             Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+             Sb  = Sb + g2*Hss
+
+             Ess = Ess * Ess
+             g2  = 4D0*J4d*stM%ass*(1D0 + 2D0*stM%bss*Ess)*
+     2          EXP(stM%bss*Ess)
+             CCb = CCb + g2*TEN_DYADPROD(Hss, Hss, nsd)
+         END IF
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -356,10 +365,10 @@
       REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
-      REAL(KIND=8) :: nd, J, J2d, trE, Inv1, Inv2, Inv4, Inv6, Inv8,
+      REAL(KIND=8) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,Inv8,
      2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
      3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
-      REAL(KIND=8) :: r1, r2, g1, g2, g3, g4
+      REAL(KIND=8) :: r1, r2, g1, g2, g3
       ! Guccione !
       REAL(KIND=8) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
       ! HGO, HO !
@@ -370,6 +379,7 @@
       nd   = REAL(nsd, KIND=8)
       J    = MAT_DET(F, nsd)
       J2d  = J**(-2D0/nd)
+      J4d  = J2d*J2d
 
       IDm  = MAT_ID(nsd)
       C    = MATMUL(TRANSPOSE(F), F)
@@ -378,7 +388,7 @@
 
       trE  = MAT_TRACE(E, nsd)
       Inv1 = J2d*MAT_TRACE(C,nsd)
-      Inv2 = 5D-1*( Inv1*Inv1 - J2d*J2d*MAT_TRACE(MATMUL(C,C), nsd) )
+      Inv2 = 5D-1*( Inv1*Inv1 - J4d*MAT_TRACE(MATMUL(C,C), nsd) )
 
 !     Isochoric part of 2nd Piola-Kirchhoff and elasticity tensors
       SELECT CASE (stM%isoType)
@@ -401,7 +411,7 @@
          g2  = -2D0 * stM%C01
          Sb  = g1*IDm + g2*J2d*C
 
-         g1  = 4D0*J2d*J2d* stM%C01
+         g1  = 4D0*J4d* stM%C01
          CCb = g1 * (TEN_DYADPROD(IDm, IDm, nsd) - TEN_IDs(nsd))
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
@@ -441,8 +451,8 @@
 
          g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
          g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
-         g1   = 4D0*J2d*J2d * g1
-         g2   = 4D0*J2d*J2d * g2
+         g1   = 4D0*J4d * g1
+         g2   = 4D0*J4d * g2
 
          CCb  = g1 * TEN_DYADPROD(Hff, Hff, nsd) +
      2          g2 * TEN_DYADPROD(Hss, Hss, nsd)
@@ -502,7 +512,7 @@
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         r2  = r2*J2d*J2d
+         r2  = r2*J4d
          CCb = 0D0
          CCb(1,1,1,1) = g1 * r2
 
@@ -545,31 +555,39 @@
          Ess  = Inv6 - 1.0D0
          Efs  = Inv8
 
-         Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
-         Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
+         g2   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
      2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+         Sb   = g1*IDm + g2*Hfs
 
-         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
-         g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
-         g4   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
-         Sb   = g1*IDm + 2D0*(g2*Hff + g3*Hss) + g4*Hfs
-
-         g1   = stM%b * g1
-         g2   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
-         g3   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
-         g4   = stM%afs*(1D0 + 2D0*stM%bfs*Efs*Efs)*EXP(stM%bfs*Efs*Efs)
-
-         g1   = 2D0*J2d*J2d * g1
-         g2   = 4D0*J2d*J2d * g2
-         g3   = 4D0*J2d*J2d * g3
-         g4   = 2D0*J2d*J2d * g4
-
+         Efs  = Efs * Efs
+         g1   = 2D0*J4d*stM%b*g1
+         g2   = 2D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
-     2          g2 * TEN_DYADPROD(Hff, Hff, nsd) +
-     3          g3 * TEN_DYADPROD(Hss, Hss, nsd) +
-     4          g4 * TEN_DYADPROD(Hfs, Hfs, nsd)
+     2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
+
+         IF (Eff .GT. 0D0) THEN
+             g1  = 2D0 * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+             Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+             Sb  = Sb + g1*Hff
+
+             Eff = Eff * Eff
+             g1  = stM%aff*(1D0 + 2D0*stM%bff*Eff)*EXP(stM%bff*Eff)*
+     2          4D0*J4d
+             CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
+         END IF
+
+         IF (Eff .GT. 0D0) THEN
+             g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+             Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
+             Sb  = Sb + g2*Hss
+
+             Ess = Ess * Ess
+             g2  = 4D0*J4d*stM%ass*(1D0 + 2D0*stM%bss*Ess)*
+     2          EXP(stM%bss*Ess)
+             CCb = CCb + g2*TEN_DYADPROD(Hss, Hss, nsd)
+         END IF
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -678,4 +696,48 @@
 
       RETURN
       END SUBROUTINE GETTAU
+!####################################################################
+!     Compute active stress for electromechanics
+      SUBROUTINE ACTVSTRS(Tact, F, nfd, fl, S)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: nfd
+      REAL(KIND=8), INTENT(IN) :: Tact, F(nsd,nsd), fl(nsd,nfd)
+      REAL(KIND=8), INTENT(INOUT) :: S(nsd,nsd)
+
+      S = S + Tact*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+
+      RETURN
+      END SUBROUTINE ACTVSTRS
+!====================================================================
+!     Compute deviatoric component of active stress for electromechanics
+      SUBROUTINE ACTVSTRSdev(Tact, F, nfd, fl, S)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: nfd
+      REAL(KIND=8), INTENT(IN) :: Tact, F(nsd,nsd), fl(nsd,nfd)
+      REAL(KIND=8), INTENT(INOUT) :: S(nsd,nsd)
+
+      REAL(KIND=8) :: nd, J, J2d, IDm(nsd,nsd), C(nsd,nsd), Ci(nsd,nsd),
+     2   Sb(nsd,nsd), r1
+
+      nd  = REAL(nsd, KIND=8)
+      J   = MAT_DET(F, nsd)
+      J2d = J**(-2D0/nd)
+
+      IDm = MAT_ID(nsd)
+      C   = MATMUL(TRANSPOSE(F), F)
+      Ci  = MAT_INV(C, nsd)
+
+      Sb  = Tact * MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+
+      r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
+      S   = S + J2d*Sb - r1*Ci
+
+      RETURN
+      END SUBROUTINE ACTVSTRSdev
 !####################################################################

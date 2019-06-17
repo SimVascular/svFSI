@@ -87,9 +87,9 @@
       INTEGER, INTENT(IN) :: incL(nFacesLS)
       REAL(KIND=8), INTENT(IN) :: res(nFacesLS)
 
+#ifdef WITH_TRILINOS
       INTEGER a
 
-#ifdef WITH_TRILINOS
       IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
          CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
       END IF

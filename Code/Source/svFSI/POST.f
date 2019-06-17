@@ -402,11 +402,11 @@
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER, INTENT(IN) :: m, iEq, outGrp
       REAL(KIND=8), INTENT(INOUT) :: res(m,lM%nNo)
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: m, iEq, outGrp
 
-      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, cPhys, insd, nFn
+      INTEGER a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd, nFn
       REAL(KIND=8) w, Jac, detF, ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
      2   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), pSl(:),
@@ -677,7 +677,7 @@
       REAL(KIND=8), INTENT(INOUT) :: res(1,lM%nNo)
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
 
-      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
+      INTEGER a, e, g, Ac, eNoN, i, j, k, iFn, cPhys
       REAL(KIND=8) w, Jac, sHat, F(nsd,nsd)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), fl(:,:),
      2   Nx(:,:), N(:), sA(:), sF(:)

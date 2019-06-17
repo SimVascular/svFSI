@@ -1684,7 +1684,6 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(listType), POINTER :: lPtr, list
 
       INTEGER i
-      LOGICAL flag
       REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
 

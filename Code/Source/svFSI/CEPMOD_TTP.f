@@ -86,7 +86,7 @@
 
       REAL(KIND=8) :: f(nX)
 
-      CALL TTP_GETF(nX, Ts, X, f, Istim, RPAR)
+      CALL TTP_GETF(nX, X, f, Istim, RPAR)
       X = X + dt*f
 
       RETURN
@@ -104,22 +104,22 @@
 !     RK4: 1st pass
       trk = Ts
       Xrk(:,1) = X(:)
-      CALL TTP_GETF(nX, trk, Xrk(:,1), frk(:,1), Istim, RPAR)
+      CALL TTP_GETF(nX, Xrk(:,1), frk(:,1), Istim, RPAR)
 
 !     RK4: 2nd pass
       trk = Ts + dt/2.0D0
       Xrk(:,2) = X(:) + dt*frk(:,1)/2.0D0
-      CALL TTP_GETF(nX, trk, Xrk(:,2), frk(:,2), Istim, RPAR)
+      CALL TTP_GETF(nX, Xrk(:,2), frk(:,2), Istim, RPAR)
 
 !     RK4: 3rd pass
       trk = Ts + dt/2.0D0
       Xrk(:,3) = X(:) + dt*frk(:,2)/2.0D0
-      CALL TTP_GETF(nX, trk, Xrk(:,3), frk(:,3), Istim, RPAR)
+      CALL TTP_GETF(nX, Xrk(:,3), frk(:,3), Istim, RPAR)
 
 !     RK4: 4th pass
       trk = Ts + dt
       Xrk(:,4) = X(:) + dt*frk(:,3)
-      CALL TTP_GETF(nX, trk, Xrk(:,4), frk(:,4), Istim, RPAR)
+      CALL TTP_GETF(nX, Xrk(:,4), frk(:,4), Istim, RPAR)
 
       X(:) = X(:) + (dt/6.0D0) * ( frk(:,1) + 2.0D0*frk(:,2) +
      2   2.0D0*frk(:,3) + frk(:,4) )
@@ -148,7 +148,7 @@
       rtol  = RPAR(2)
 
       Im = MAT_ID(nX)
-      CALL TTP_GETF(nX, Ts, Xn, fn, Istim, RPAR)
+      CALL TTP_GETF(nX, Xn, fn, Istim, RPAR)
 
       k  = 0
       Xk = Xn
@@ -158,7 +158,7 @@
       t  = Ts + dt
       DO
          k = k + 1
-         CALL TTP_GETF(nX, t, Xk, fk, Istim, RPAR)
+         CALL TTP_GETF(nX, Xk, fk, Istim, RPAR)
          rK(:) = Xk(:) - Xn(:) - 0.5D0*dt*(fk(:) + fn(:))
 
          rmsA = 0D0
@@ -175,24 +175,24 @@
          l3   = rmsR .LE. rtol
          IF (l1 .OR. l2 .OR. l3) EXIT
 
-         CALL TTP_GETJ(nX, t, Xk, JAC)
+         CALL TTP_GETJ(nX, Xk, JAC)
          JAC   = Im - 0.5D0*dt*JAC
          JAC   = MAT_INV(JAC, nX)
          rK(:) = MATMUL(JAC, rK)
          Xk(:) = Xk(:) - rK(:)
       END DO
       Xn(:) = Xk(:)
-      CALL TTP_GETF(nX, Ts, Xn, fn, Istim, RPAR)
+      CALL TTP_GETF(nX, Xn, fn, Istim, RPAR)
 
       IF (.NOT.l2 .AND. .NOT.l3) IPAR(2) = IPAR(2) + 1
 
       RETURN
       END SUBROUTINE TTP_INTEGCN2
 !-----------------------------------------------------------------------
-      SUBROUTINE TTP_GETF(n, time, X, dX, I_stim, RPAR)
+      SUBROUTINE TTP_GETF(n, X, dX, I_stim, RPAR)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: time, X(n), I_stim
+      REAL(KIND=8), INTENT(IN) :: X(n), I_stim
       REAL(KIND=8), INTENT(OUT) :: dX(n)
       REAL(KIND=8), INTENT(INOUT) :: RPAR(18)
 
@@ -451,10 +451,10 @@
       RETURN
       END SUBROUTINE TTP_GETF
 !-----------------------------------------------------------------------
-      SUBROUTINE TTP_GETJ(n, time, X, JAC)
+      SUBROUTINE TTP_GETJ(n, X, JAC)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: time, X(n)
+      REAL(KIND=8), INTENT(IN) :: X(n)
       REAL(KIND=8), INTENT(OUT) :: JAC(n,n)
 
       INCLUDE "PARAMS_TTP.f"

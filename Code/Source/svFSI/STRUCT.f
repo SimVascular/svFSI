@@ -52,7 +52,7 @@
       INTEGER :: a, b, i, j, k
       REAL(KIND=8) :: rho, dmp, T1, amd, afl, Ta_g, bf(3), ud(3), NxSNx,
      2   BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3), Bm(6,3,eNoN),
-     3   CC(3,3,3,3), S0(3,3), Sa(3,3)
+     3   CC(3,3,3,3), S0(3,3)
       TYPE (stModelType) :: stModel
 
 !     Define parameters
@@ -104,21 +104,20 @@
       S0(3,1) = S0(1,3)
       S0(3,2) = S0(2,3)
 
-!     Active stress from electromechanics
-      Sa(:,:) = Ta_g*MAT_DYADPROD(fN(:,1), fN(:,1), nsd)
-
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
       CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
 
-!     Total stress: elastic + prestress + active stress
-      S = S + S0 + Sa
-
+!     Prestress
+      S = S + S0
       pSl(1) = S(1,1)
       pSl(2) = S(2,2)
       pSl(3) = S(3,3)
       pSl(4) = S(1,2)
       pSl(5) = S(1,3)
       pSl(6) = S(2,3)
+
+!     Active stress - electromechanics
+      CALL ACTVSTRS(Ta_g, F, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
@@ -270,7 +269,7 @@
       INTEGER :: a, b, i, j
       REAL(KIND=8) :: rho, dmp, T1, amd, afl, Ta_g, bf(2), ud(2), NxSNx,
      2   BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2), Bm(3,2,eNoN),
-     3   CC(2,2,2,2), S0(2,2), Sa(2,2)
+     3   CC(2,2,2,2), S0(2,2)
       TYPE (stModelType) :: stModel
 
 !     Define parameters
@@ -308,18 +307,17 @@
       END DO
       S0(2,1) = S0(1,2)
 
-!     Active stress from electromechanics
-      Sa(:,:) = Ta_g*MAT_DYADPROD(fN(:,1), fN(:,2), nsd)
-
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
       CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
 
-!     Total stress: elastic + prestress + active stress
-      S = S + S0 + Sa
-
+!     Prestress
+      S = S + S0
       pSl(1) = S(1,1)
       pSl(2) = S(2,2)
       pSl(3) = S(1,2)
+
+!     Active stress - electromechanics
+      CALL ACTVSTRS(Ta_g, F, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
