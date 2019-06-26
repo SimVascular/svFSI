@@ -41,12 +41,13 @@
       USE APMOD
       USE FNMOD
       USE TTPMOD
+      USE BOMOD
       IMPLICIT NONE
 
 !     Type of cardiac electrophysiology models: Aliev-Panfilov model,
-!     tenTusscher-Panfilov model
+!     tenTusscher-Panfilov model, Bueno-Orovio model
       INTEGER, PARAMETER :: cepModel_NA = 100, cepModel_AP = 101,
-     2   cepModel_FN = 102, cepModel_TTP = 103
+     2   cepModel_FN = 102, cepModel_TTP = 103, cepModel_BO = 104
 
 !     Time integration scheme: Forward-Euler, Runge-Kutta 4th order,
 !     Crank-Nicholson
@@ -71,8 +72,8 @@
          REAL(KIND=8) :: Ts
 !        duration of stimulus
          REAL(KIND=8) :: Td
-!        time period
-         REAL(KIND=8) :: Tp
+!        cycle length
+         REAL(KIND=8) :: CL
 !        stimulus amplitude
          REAL(KIND=8) :: A
       END TYPE stimType
@@ -85,12 +86,14 @@
          INTEGER :: nX
 !        Number of fiber directions
          INTEGER :: nFn
-!        Resting potential
-         REAL(KIND=8) :: Vrst
-!        Feedback constant
-         REAL(KIND=8) :: Kmef
+!        Myocardium zone id
+         INTEGER :: imyo
+!        Time step for integration
+         REAL(KIND=8) :: dt
 !        Isotropic conductivity
          REAL(KIND=8) :: Diso = 0D0
+!        Constant for stretch-activated-currents
+         REAL(KIND=8) :: Ksac
 !        Anisotropic conductivity
          REAL(KIND=8), ALLOCATABLE :: Dani(:)
 !        External stimulus
@@ -99,10 +102,22 @@
          TYPE(odeType) :: odeS
       END TYPE cepModelType
 
-!     Whether electrophysiology and mechanics are coupled
-      LOGICAL cplEM
-!     Activation force used for electromechanics
-      REAL(KIND=8), ALLOCATABLE :: Ta(:)
+!     Cardiac electromechanics model type
+      TYPE cemModelType
+!        Whether electrophysiology and mechanics are coupled
+         LOGICAL :: cpld = .FALSE.
+!        Whether active stress formulation is employed
+         LOGICAL :: aStress = .FALSE.
+!        Whether active strain formulation is employed
+         LOGICAL :: aStrain = .FALSE.
+!        Local variable integrated in time
+!          := activation force for active stress model
+!          := fiber stretch for active strain model
+         REAL(KIND=8), ALLOCATABLE :: Ya(:)
+      END TYPE cemModelType
+
+!     Cardiac electromechanics type
+      TYPE(cemModelType) :: cem
 
       END MODULE CEPMOD
 !#######################################################################

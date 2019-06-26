@@ -36,10 +36,8 @@
 !--------------------------------------------------------------------
 
       MODULE CHNLMOD
-
       USE ISO_FORTRAN_ENV
       USE UTILMOD
-
       IMPLICIT NONE
 
 !     Channels cases: standard output, error output, warning output,

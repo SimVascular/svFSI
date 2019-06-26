@@ -51,7 +51,7 @@
       REAL(KIND=8) :: mu1   = 0.2D0
       REAL(KIND=8) :: mu2   = 0.3D0
 !-----------------------------------------------------------------------
-!     Electromechanics coupling parameters
+!     Electromechanics coupling parameters: active stress model
 !     Resting voltage (mV)
       REAL(KIND=8) :: Vrest = -80.0D0
 !     Critical voltage (mV)

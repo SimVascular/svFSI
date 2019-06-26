@@ -765,3 +765,94 @@
       RETURN
       END SUBROUTINE FIBALGNPOST
 !####################################################################
+!     Compute fiber stretch based on 4th invariant: I_{4,f}
+      SUBROUTINE FIBSTRETCH(iEq, lM, lD, res)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: iEq
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
+      REAL(KIND=8), INTENT(INOUT) :: res(lM%nNo)
+
+      INTEGER a, e, g, Ac, eNoN, i, j, k, cPhys
+      REAL(KIND=8) w, Jac, I4f, fl(nsd), F(nsd,nsd)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), Nx(:,:), N(:),
+     2   sA(:), sF(:)
+
+      eNoN = lM%eNoN
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
+
+      ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
+     2   Nx(nsd,eNoN), N(eNoN))
+
+      sA = 0D0
+      sF = 0D0
+      DO e=1, lM%nEl
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+         DO a=1, eNoN
+            Ac       = lM%IEN(a,e)
+            xl(:,a)  = x(:,Ac)
+            dl(:,a)  = lD(:,Ac)
+         END DO
+
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, F)
+            END IF
+            w = lM%w(g)*Jac
+            N = lM%N(:,g)
+
+            F  = MAT_ID(nsd)
+            DO a=1, eNoN
+               IF (nsd .EQ. 3) THEN
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                  F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                  F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                  F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+               ELSE
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+               END IF
+            END DO
+
+            fl  = MATMUL(F, lM%fN(1:nsd,e))
+            I4f = NORM(fl)
+            DO a=1, eNoN
+               Ac     = lM%IEN(a,e)
+               sA(Ac) = sA(Ac) + w*N(a)
+               sF(Ac) = sF(Ac) + w*N(a)*I4f
+            END DO
+         END DO
+      END DO
+
+      CALL COMMU(sF)
+      CALL COMMU(sA)
+
+      res = 0D0
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         IF (.NOT.ISZERO(sA(Ac))) THEN
+            res(a) = res(a) + sF(Ac)/sA(Ac)
+         ENDIF
+      END DO
+
+      DEALLOCATE (sA, sF, xl, dl, N, Nx)
+
+      RETURN
+      END SUBROUTINE FIBSTRETCH
+!####################################################################

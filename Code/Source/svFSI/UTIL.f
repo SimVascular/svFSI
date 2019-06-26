@@ -1082,4 +1082,36 @@
       RETURN
       END FUNCTION STRTOK
 !--------------------------------------------------------------------
+      SUBROUTINE TO_UPPER(strng)
+      IMPLICIT NONE
+      CHARACTER(len=*), INTENT(INOUT) :: strng
+
+      INTEGER i
+
+      DO i=1, LEN(strng)
+         SELECT CASE(strng(i:i))
+         CASE("a":"z")
+            strng(i:i) = ACHAR(IACHAR(strng(i:i))-32)
+         END SELECT
+      END DO
+
+      RETURN
+      END SUBROUTINE TO_UPPER
+!--------------------------------------------------------------------
+      SUBROUTINE TO_LOWER(strng)
+      IMPLICIT NONE
+      CHARACTER(len=*), INTENT(INOUT) :: strng
+
+      INTEGER i
+
+      DO i=1, LEN(strng)
+         SELECT CASE(strng(i:i))
+         CASE("A":"Z")
+            strng(i:i) = ACHAR(IACHAR(strng(i:i))+32)
+         END SELECT
+      END DO
+
+      RETURN
+      END SUBROUTINE TO_LOWER
+!--------------------------------------------------------------------
       END MODULE UTILMOD

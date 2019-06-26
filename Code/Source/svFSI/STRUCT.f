@@ -37,7 +37,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE STRUCT3D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2   pS0l, pSl, Ta_l, lR, lK)
+     2   pS0l, pSl, ya_l, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -45,12 +45,12 @@
       INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
-     3   fN(3,nFn), pS0l(nstd,eNoN), Ta_l(eNoN)
+     3   fN(3,nFn), pS0l(nstd,eNoN), ya_l(eNoN)
       REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: a, b, i, j, k
-      REAL(KIND=8) :: rho, dmp, T1, amd, afl, Ta_g, bf(3), ud(3), NxSNx,
+      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, bf(3), ud(3), NxSNx,
      2   BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3), Bm(6,3,eNoN),
      3   CC(3,3,3,3), S0(3,3)
       TYPE (stModelType) :: stModel
@@ -75,7 +75,7 @@
       F(2,2) = 1D0
       F(3,3) = 1D0
       S0     = 0D0
-      Ta_g   = 0D0
+      ya_g   = 0D0
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
@@ -98,14 +98,14 @@
          S0(1,3) = S0(1,3) + N(a)*pS0l(5,a)
          S0(2,3) = S0(2,3) + N(a)*pS0l(6,a)
 
-         Ta_g    = Ta_g + N(a)*Ta_l(a)
+         ya_g    = ya_g + N(a)*ya_l(a)
       END DO
       S0(2,1) = S0(1,2)
       S0(3,1) = S0(1,3)
       S0(3,2) = S0(2,3)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
+      CALL GETPK2CC(stModel, F, nFn, fN, ya_g, S, CC)
 
 !     Prestress
       S = S + S0
@@ -117,7 +117,7 @@
       pSl(6) = S(2,3)
 
 !     Active stress - electromechanics
-      CALL ACTVSTRS(Ta_g, F, nFn, fN, S)
+      IF (cem%aStress) CALL ACTVSTRESS(ya_g, F, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
@@ -254,7 +254,7 @@
       END SUBROUTINE STRUCT3D
 !####################################################################
       SUBROUTINE STRUCT2D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2   pS0l, pSl, Ta_l, lR, lK)
+     2   pS0l, pSl, ya_l, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -262,12 +262,12 @@
       INTEGER, INTENT(IN) :: eNoN, nFn
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
-     3   fN(2,nFn), pS0l(nstd,eNoN), Ta_l(eNoN)
+     3   fN(2,nFn), pS0l(nstd,eNoN), ya_l(eNoN)
       REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: a, b, i, j
-      REAL(KIND=8) :: rho, dmp, T1, amd, afl, Ta_g, bf(2), ud(2), NxSNx,
+      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, bf(2), ud(2), NxSNx,
      2   BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2), Bm(3,2,eNoN),
      3   CC(2,2,2,2), S0(2,2)
       TYPE (stModelType) :: stModel
@@ -289,7 +289,7 @@
       F(1,1) = 1D0
       F(2,2) = 1D0
       S0     = 0D0
-      Ta_g   = 0D0
+      ya_g   = 0D0
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
@@ -303,12 +303,12 @@
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
          S0(1,2) = S0(1,2) + N(a)*pS0l(3,a)
 
-         Ta_g    = Ta_g + N(a)*Ta_l(a)
+         ya_g    = ya_g + N(a)*ya_l(a)
       END DO
       S0(2,1) = S0(1,2)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
+      CALL GETPK2CC(stModel, F, nFn, fN, ya_g, S, CC)
 
 !     Prestress
       S = S + S0
@@ -317,7 +317,7 @@
       pSl(3) = S(1,2)
 
 !     Active stress - electromechanics
-      CALL ACTVSTRS(Ta_g, F, nFn, fN, S)
+      IF (cem%aStress) CALL ACTVSTRESS(ya_g, F, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)

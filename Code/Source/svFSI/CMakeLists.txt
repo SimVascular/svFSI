@@ -109,12 +109,14 @@ set(FSRCS UTIL.f
          CEPMOD_AP.f
          CEPMOD_FN.f
          CEPMOD_TTP.f
+         CEPMOD_BO.f
          CEPMOD.f
          MOD.f
          ALLFUN.f
          BAFINI.f
          BBO.f
          BF.f
+         CEPION.f
          CEP.f
          CMM.f
          CONSTRUCT.f

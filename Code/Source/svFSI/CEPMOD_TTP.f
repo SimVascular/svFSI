@@ -41,31 +41,77 @@
 
       CONTAINS
 !-----------------------------------------------------------------------
-      SUBROUTINE TTP_INIT(nX, X, X0)
+      SUBROUTINE TTP_INIT(imyo, nX, X, X0)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nX
+      INTEGER, INTENT(IN) :: imyo, nX
       REAL(KINd=8), INTENT(OUT) :: X(nX)
       REAL(KIND=8), INTENT(IN), OPTIONAL :: X0(:)
 
-      X(1)  = -85.23D0      ! V      (units: mV)
-      X(2)  =  136.89D0     ! K_i    (units: mM)
-      X(3)  =  8.6040D0     ! Na_i   (units: mM)
-      X(4)  =  1.26D-4      ! Ca_i   (units: mM)
-      X(5)  =  6.21D-3      ! x_r1   (dimensionless)
-      X(6)  =  4.712D-1     ! x_r2   (dimensionless)
-      X(7)  =  9.5D-3       ! x_s    (dimensionless)
-      X(8)  =  1.72D-3      ! m      (dimensionless)
-      X(9)  =  7.444D-1     ! h      (dimensionless)
-      X(10) =  7.045D-1     ! j      (dimensionless)
-      X(11) =  3.6D-4       ! Ca_ss  (units: mM)
-      X(12) =  3.373D-5     ! d      (dimensionless)
-      X(13) =  7.888D-1     ! f      (dimensionless)
-      X(14) =  9.755D-1     ! f_2    (dimensionless)
-      X(15) =  9.953D-1     ! f_cass (dimensionless)
-      X(16) =  9.99998D-1   ! s      (dimensionless)
-      X(17) =  2.42D-8      ! r      (dimensionless)
-      X(18) =  3.64D0       ! Ca_sr  (units: mM)
-      X(19) =  9.073D-1     ! R'     (dimensionless)
+      SELECT CASE (imyo)
+      CASE (1) ! EPI !
+         X(1)  = -85.23D0      ! V      (units: mV)
+         X(2)  =  136.89D0     ! K_i    (units: mM)
+         X(3)  =  8.6040D0     ! Na_i   (units: mM)
+         X(4)  =  1.26D-4      ! Ca_i   (units: mM)
+         X(5)  =  6.21D-3      ! x_r1   (dimensionless)
+         X(6)  =  4.712D-1     ! x_r2   (dimensionless)
+         X(7)  =  9.5D-3       ! x_s    (dimensionless)
+         X(8)  =  1.72D-3      ! m      (dimensionless)
+         X(9)  =  7.444D-1     ! h      (dimensionless)
+         X(10) =  7.045D-1     ! j      (dimensionless)
+         X(11) =  3.6D-4       ! Ca_ss  (units: mM)
+         X(12) =  3.373D-5     ! d      (dimensionless)
+         X(13) =  7.888D-1     ! f      (dimensionless)
+         X(14) =  9.755D-1     ! f_2    (dimensionless)
+         X(15) =  9.953D-1     ! f_cass (dimensionless)
+         X(16) =  9.99998D-1   ! s      (dimensionless)
+         X(17) =  2.42D-8      ! r      (dimensionless)
+         X(18) =  3.64D0       ! Ca_sr  (units: mM)
+         X(19) =  9.073D-1     ! R'     (dimensionless)
+
+      CASE (2) ! ENDO !
+         X(1)  = -86.709D0     ! V      (units: mV)
+         X(2)  =  138.4D0      ! K_i    (units: mM)
+         X(3)  =  10.355D0     ! Na_i   (units: mM)
+         X(4)  =  1.30D-4      ! Ca_i   (units: mM)
+         X(5)  =  4.48D-3      ! x_r1   (dimensionless)
+         X(6)  =  4.76D-1      ! x_r2   (dimensionless)
+         X(7)  =  8.7D-3       ! x_s    (dimensionless)
+         X(8)  =  1.55D-3      ! m      (dimensionless)
+         X(9)  =  7.573D-1     ! h      (dimensionless)
+         X(10) =  7.225D-1     ! j      (dimensionless)
+         X(11) =  3.6D-4       ! Ca_ss  (units: mM)
+         X(12) =  3.164D-5     ! d      (dimensionless)
+         X(13) =  8.009D-1     ! f      (dimensionless)
+         X(14) =  9.778D-1     ! f_2    (dimensionless)
+         X(15) =  9.953D-1     ! f_cass (dimensionless)
+         X(16) =  3.212D-1     ! s      (dimensionless)
+         X(17) =  2.235D-8     ! r      (dimensionless)
+         X(18) =  3.715D0      ! Ca_sr  (units: mM)
+         X(19) =  9.068D-1     ! R'     (dimensionless)
+
+      CASE (3) ! MID-MYO !
+         X(1)  = -85.423D0     ! V      (units: mV)
+         X(2)  =  138.52D0     ! K_i    (units: mM)
+         X(3)  =  10.132D0     ! Na_i   (units: mM)
+         X(4)  =  1.53D-4      ! Ca_i   (units: mM)
+         X(5)  =  1.65D-2      ! x_r1   (dimensionless)
+         X(6)  =  4.730D-1     ! x_r2   (dimensionless)
+         X(7)  =  1.74D-2      ! x_s    (dimensionless)
+         X(8)  =  1.65D-3      ! m      (dimensionless)
+         X(9)  =  7.490D-1     ! h      (dimensionless)
+         X(10) =  6.788D-1     ! j      (dimensionless)
+         X(11) =  4.2D-4       ! Ca_ss  (units: mM)
+         X(12) =  3.288D-5     ! d      (dimensionless)
+         X(13) =  7.026D-1     ! f      (dimensionless)
+         X(14) =  9.526D-1     ! f_2    (dimensionless)
+         X(15) =  9.942D-1     ! f_cass (dimensionless)
+         X(16) =  9.99998D-1   ! s      (dimensionless)
+         X(17) =  2.347D-8     ! r      (dimensionless)
+         X(18) =  4.272D0      ! Ca_sr  (units: mM)
+         X(19) =  8.978D-1     ! R'     (dimensionless)
+
+      END SELECT
 
       IF (PRESENT(X0)) THEN
          IF (SIZE(X0,1) .NE. nX) THEN
@@ -78,48 +124,48 @@
       END SUBROUTINE TTP_INIT
 !-----------------------------------------------------------------------
 !     Time integration performed using Forward Euler method
-      SUBROUTINE TTP_INTEGFE(nX, X, Ts, dt, Istim, RPAR)
+      SUBROUTINE TTP_INTEGFE(imyo, nX, X, Ts, dt, Istim, Ksac, RPAR)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nX
+      INTEGER, INTENT(IN) :: imyo, nX
       REAL(KIND=8), INTENT(INOUT) :: X(nX), RPAR(18)
-      REAL(KIND=8), INTENT(IN) :: Ts, dt, Istim
+      REAL(KIND=8), INTENT(IN) :: Ts, dt, Istim, Ksac
 
       REAL(KIND=8) :: f(nX)
 
-      CALL TTP_GETF(nX, X, f, Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, X, f, Istim, Ksac, RPAR)
       X = X + dt*f
 
       RETURN
       END SUBROUTINE TTP_INTEGFE
 !-----------------------------------------------------------------------
 !     Time integration performed using 4th order Runge-Kutta method
-      SUBROUTINE TTP_INTEGRK(nX, X, Ts, dt, Istim, RPAR)
+      SUBROUTINE TTP_INTEGRK(imyo, nX, X, Ts, dt, Istim, Ksac, RPAR)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nX
+      INTEGER, INTENT(IN) :: imyo, nX
       REAL(KIND=8), INTENT(INOUT) :: X(nX), RPAR(18)
-      REAL(KIND=8), INTENT(IN) :: Ts, dt, Istim
+      REAL(KIND=8), INTENT(IN) :: Ts, dt, Istim, Ksac
 
       REAL(KIND=8) :: trk, Xrk(nX,4), frk(nX,4)
 
 !     RK4: 1st pass
       trk = Ts
       Xrk(:,1) = X(:)
-      CALL TTP_GETF(nX, Xrk(:,1), frk(:,1), Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, Xrk(:,1), frk(:,1), Istim, Ksac, RPAR)
 
 !     RK4: 2nd pass
       trk = Ts + dt/2.0D0
       Xrk(:,2) = X(:) + dt*frk(:,1)/2.0D0
-      CALL TTP_GETF(nX, Xrk(:,2), frk(:,2), Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, Xrk(:,2), frk(:,2), Istim, Ksac, RPAR)
 
 !     RK4: 3rd pass
       trk = Ts + dt/2.0D0
       Xrk(:,3) = X(:) + dt*frk(:,2)/2.0D0
-      CALL TTP_GETF(nX, Xrk(:,3), frk(:,3), Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, Xrk(:,3), frk(:,3), Istim, Ksac, RPAR)
 
 !     RK4: 4th pass
       trk = Ts + dt
       Xrk(:,4) = X(:) + dt*frk(:,3)
-      CALL TTP_GETF(nX, Xrk(:,4), frk(:,4), Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, Xrk(:,4), frk(:,4), Istim, Ksac, RPAR)
 
       X(:) = X(:) + (dt/6.0D0) * ( frk(:,1) + 2.0D0*frk(:,2) +
      2   2.0D0*frk(:,3) + frk(:,4) )
@@ -128,13 +174,14 @@
       END SUBROUTINE TTP_INTEGRK
 !-----------------------------------------------------------------------
 !     Time integration performed using Crank-Nicholson method
-      SUBROUTINE TTP_INTEGCN2(nX, Xn, Ts, dt, Istim, IPAR, RPAR)
+      SUBROUTINE TTP_INTEGCN2(imyo, nX, Xn, Ts, dt, Istim, Ksac, IPAR,
+     2   RPAR)
       USE MATFUN
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nX
+      INTEGER, INTENT(IN) :: imyo, nX
       INTEGER, INTENT(INOUT) :: IPAR(2)
       REAL(KIND=8), INTENT(INOUT) :: Xn(nX), RPAR(18)
-      REAL(KIND=8), INTENT(IN) :: Ts, dt, Istim
+      REAL(KIND=8), INTENT(IN) :: Ts, dt, Istim, Ksac
 
       REAL(KIND=8), PARAMETER :: eps = EPSILON(eps)
 
@@ -148,7 +195,7 @@
       rtol  = RPAR(2)
 
       Im = MAT_ID(nX)
-      CALL TTP_GETF(nX, Xn, fn, Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, Xn, fn, Istim, Ksac, RPAR)
 
       k  = 0
       Xk = Xn
@@ -158,7 +205,7 @@
       t  = Ts + dt
       DO
          k = k + 1
-         CALL TTP_GETF(nX, Xk, fk, Istim, RPAR)
+         CALL TTP_GETF(imyo, nX, Xk, fk, Istim, Ksac, RPAR)
          rK(:) = Xk(:) - Xn(:) - 0.5D0*dt*(fk(:) + fn(:))
 
          rmsA = 0D0
@@ -175,31 +222,31 @@
          l3   = rmsR .LE. rtol
          IF (l1 .OR. l2 .OR. l3) EXIT
 
-         CALL TTP_GETJ(nX, Xk, JAC)
+         CALL TTP_GETJ(imyo, nX, Xk, JAC, Ksac)
          JAC   = Im - 0.5D0*dt*JAC
          JAC   = MAT_INV(JAC, nX)
          rK(:) = MATMUL(JAC, rK)
          Xk(:) = Xk(:) - rK(:)
       END DO
       Xn(:) = Xk(:)
-      CALL TTP_GETF(nX, Xn, fn, Istim, RPAR)
+      CALL TTP_GETF(imyo, nX, Xn, fn, Istim, Ksac, RPAR)
 
       IF (.NOT.l2 .AND. .NOT.l3) IPAR(2) = IPAR(2) + 1
 
       RETURN
       END SUBROUTINE TTP_INTEGCN2
 !-----------------------------------------------------------------------
-      SUBROUTINE TTP_GETF(n, X, dX, I_stim, RPAR)
+      SUBROUTINE TTP_GETF(i, n, X, dX, I_stim, K_sac, RPAR)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: X(n), I_stim
+      INTEGER, INTENT(IN) :: i, n
+      REAL(KIND=8), INTENT(IN) :: X(n), I_stim, K_sac
       REAL(KIND=8), INTENT(OUT) :: dX(n)
       REAL(KIND=8), INTENT(INOUT) :: RPAR(18)
 
       INCLUDE "PARAMS_TTP.f"
 
       REAL(KIND=8) :: RT, a, b, c, tau, sq5, e1, e2, e3, e4, n1, n2, d1,
-     2   d2, d3
+     2   d2, d3, I_sac
 
       V     = X(1)
       K_i   = X(2)
@@ -220,6 +267,7 @@
       r     = X(17)
       Ca_sr = X(18)
       R_bar = X(19)
+      I_sac = K_sac * (Vrest - V)
 
 !      Diff = 1.0D0 / (1.0D1 * rho * Cm * sV)
       RT   = Rc * Tc / Fc
@@ -232,7 +280,7 @@
       I_Na = G_Na * (m**3.0D0) * h * j * (V - E_Na)
 
 !     I_to: transient outward current
-      I_to = G_to * r * s * (V - E_K)
+      I_to = G_to(i) * r * s * (V - E_K)
 
 !     I_K1: inward rectifier outward current
       e1   = EXP(0.06D0*(V - E_K - 200.0D0))
@@ -249,7 +297,7 @@
       I_Kr = G_Kr * sq5 * xr1 * xr2 * (V - E_K)
 
 !     I_Ks: slow delayed rectifier current
-      I_Ks = G_Ks * (xs**2.0D0) * (V - E_Ks)
+      I_Ks = G_Ks(i) * (xs**2.0D0) * (V - E_Ks)
 
 !     I_CaL: L-type Ca current
       a     = 2.0D0*(V-15.0D0)/RT
@@ -305,7 +353,7 @@
 !     Now compute time derivatives
 !     dV/dt: rate of change of transmembrane voltage
       dX(1)  = -(I_Na + I_to + I_K1 + I_Kr + I_Ks + I_CaL + I_NaCa +
-     2   I_NaK + I_pCa + I_pK + I_bCa + I_bNa  + I_stim)
+     2   I_NaK + I_pCa + I_pK + I_bCa + I_bNa  + I_stim) + I_sac
 
 !     dK_i/dt
       dX(2)  = -(Cm/(V_c*Fc)) * (I_K1 + I_to + I_Kr + I_Ks + I_pK -
@@ -411,9 +459,14 @@
       dX(15) = (fcassi - fcass)/tau
 
 !     s: inactivation gate for I_to
-      si     = 1.0D0/(1.0D0 + EXP((20.0D0+V)/5.0D0))
-      tau    = 85.0D0*EXP(-((V+45.0D0)**2.0D0) /320.0D0)
+      IF (i.EQ.1 .OR. i.EQ.3) THEN
+         si  = 1.0D0/(1.0D0 + EXP((20.0D0+V)/5.0D0))
+         tau = 85.0D0*EXP(-((V+45.0D0)**2.0D0) /320.0D0)
      2       + 5.0D0/(1.0D0+EXP((V-20.0D0)/5.0D0)) + 3.0D0
+      ELSE IF (i .EQ. 2) THEN
+         si  = 1.0D0/(1.0D0 + EXP((28.0D0+V)/5.0D0))
+         tau = 1000.0D0*EXP(-((V+67.0D0)**2.0D0) /1000.0D0) + 8.0D0
+      END IF
       dX(16) = (si - s)/tau
 
 !     r: activation gate for I_to
@@ -451,10 +504,10 @@
       RETURN
       END SUBROUTINE TTP_GETF
 !-----------------------------------------------------------------------
-      SUBROUTINE TTP_GETJ(n, X, JAC)
+      SUBROUTINE TTP_GETJ(i, n, X, JAC, Ksac)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: X(n)
+      INTEGER, INTENT(IN) :: i, n
+      REAL(KIND=8), INTENT(IN) :: X(n), Ksac
       REAL(KIND=8), INTENT(OUT) :: JAC(n,n)
 
       INCLUDE "PARAMS_TTP.f"
@@ -503,11 +556,11 @@
       I_Na_j   = G_Na * (m**3.0D0) * h * (V - E_Na)
 
 !     I_to: transient outward current
-      I_to = G_to * r * s * (V - E_K)
-      I_to_V  = G_to * r * s
+      I_to = G_to(i) * r * s * (V - E_K)
+      I_to_V  = G_to(i) * r * s
       I_to_Ki = I_to_V * (-E_K_Ki)
-      I_to_s  = G_to * r * (V - E_K)
-      I_to_r  = G_to * s * (V - E_K)
+      I_to_s  = G_to(i) * r * (V - E_K)
+      I_to_r  = G_to(i) * s * (V - E_K)
 
 !     I_K1: inward rectifier outward current
       e1   = EXP(0.06D0*(V - E_K - 200.0D0))
@@ -534,11 +587,11 @@
       I_Kr_xr2 = G_Kr * sq5 * xr1 * (V - E_K)
 
 !     I_Ks: slow delayed rectifier current
-      I_Ks = G_Ks * (xs**2.0D0) * (V - E_Ks)
-      I_Ks_V   = G_Ks * (xs**2.0D0)
+      I_Ks = G_Ks(i) * (xs**2.0D0) * (V - E_Ks)
+      I_Ks_V   = G_Ks(i) * (xs**2.0D0)
       I_Ks_Ki  = I_Ks_V * (-E_Ks_Ki)
       I_Ks_Nai = I_Ks_V * (-E_Ks_Nai)
-      I_Ks_xs  = G_Ks * (2.0D0*xs) * (V - E_Ks)
+      I_Ks_xs  = G_Ks(i) * (2.0D0*xs) * (V - E_Ks)
 
 !     I_CaL: L-type Ca current
       a     = 2.0D0*(V-15.0D0)/RT
@@ -645,7 +698,7 @@
 
 !     V
       JAC(1,1)  = -(I_Na_V + I_to_V + I_K1_V + I_Kr_V + I_Ks_V + I_CaL_V
-     2   + I_NaCa_V + I_NaK_V + I_pK_V + I_bCa_V + I_bNa_V)
+     2   + I_NaCa_V + I_NaK_V + I_pK_V + I_bCa_V + I_bNa_V + Ksac)
       JAC(1,2)  = -(I_to_Ki + I_K1_Ki + I_Kr_Ki + I_Ks_Ki + I_pK_Ki)
       JAC(1,3)  = -(I_Na_Nai + I_Ks_Nai + I_NaCa_Nai + I_NaK_Nai
      2   + I_bNa_Nai)
@@ -878,13 +931,22 @@
       JAC(15,15) = -1.0D0 / tau
 
 !     s
-      e1  = EXP((20.0D0+V)/5.0D0)
-      e2  = EXP(-((V+45.0D0)**2.0D0) /320.0D0)
-      e3  = EXP((V-20.0D0)/5.0D0)
-      si  = 1.0D0/(1.0D0 + e1)
-      tau = 85.0D0*e2 + 5.0D0/(1.0D0+e3) + 3.0D0
-      n1  = (-e1/5.0D0) * si**2.0D0
-      n2  = (-e2*85.0D0*(V+45.0D0)/160.0D0) - (e3/(1.0D0+e3)**2.0D0)
+      IF (i.EQ.1 .OR. i.EQ.3) THEN
+         e1  = EXP((20.0D0+V)/5.0D0)
+         e2  = EXP(-((V+45.0D0)**2.0D0) /320.0D0)
+         e3  = EXP((V-20.0D0)/5.0D0)
+         si  = 1.0D0/(1.0D0 + e1)
+         tau = 85.0D0*e2 + 5.0D0/(1.0D0+e3) + 3.0D0
+         n1  = (-e1/5.0D0) * si**2.0D0
+         n2  = (-e2*85.0D0*(V+45.0D0)/160.0D0) - (e3/(1.0D0+e3)**2.0D0)
+      ELSE IF (i .EQ. 2) THEN
+         e1  = EXP((28.0D0+V)/5.0D0)
+         e2  = EXP(-((V+67.0D0)**2.0D0) /1000.0D0)
+         si  = 1.0D0/(1.0D0 + e1)
+         tau = 1000.0D0*e2 + 8.0D0
+         n1  = (-e1/5.0D0) * si**2.0D0
+         n2  = -1000.0D0*e2*(V+67.0D0)/500.0D0
+      END IF
       JAC(16,1)  = (n1 - si*n2/tau) / tau
       JAC(16,16) = -1.0D0 / tau
 
@@ -917,23 +979,56 @@
       RETURN
       END SUBROUTINE TTP_GETJ
 !-----------------------------------------------------------------------
-!     Compute activation force for electromechanics
-      SUBROUTINE TTP_ACTVNF(X, dt, Tact)
+!     Compute activation force for electromechanics based on active
+!     stress model
+      SUBROUTINE TTP_ACTVSTRS(c_Ca, dt, Tact)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: X, dt
+      REAL(KIND=8), INTENT(IN) :: c_Ca, dt
       REAL(KIND=8), INTENT(INOUT) :: Tact
 
       INCLUDE "PARAMS_TTP.f"
 
       REAL(KIND=8) :: rt, nr
 
-      rt = EXP(-EXP(-xi_T*(X - Ca_crit)))
+      rt = EXP(-EXP(-xi_T*(c_Ca - Ca_crit)))
       rt = (eps_0 + (eps_i - eps_0)*rt)*dt
-      nr = Tact + rt*eta_T*(X - Ca_rest)
+      nr = Tact + rt*eta_T*(c_Ca - Ca_rest)
       Tact = nr / (1.0D0 + rt)
 
       RETURN
-      END SUBROUTINE TTP_ACTVNF
+      END SUBROUTINE TTP_ACTVSTRS
+!-----------------------------------------------------------------------
+!     Compute macroscopic fiber strain based on sacromere force-length
+!     relationship and calcium concentration
+      SUBROUTINE TTP_ACTVSTRN(c_Ca, I4f, dt, gf)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(IN) :: c_Ca, I4f, dt
+      REAL(KIND=8), INTENT(INOUT) :: gf
+
+      INCLUDE "PARAMS_TTP.f"
+
+      REAL(KIND=8) :: SL, Fa, rtmp
+
+!     fiber length
+      SL = I4f * SL0
+
+!     Sacromere force-length relationship
+      IF (SL.GE.SLmin .AND. SL.LE.SLmax) THEN
+         SL = 0.5D0*f0 + fc1*COS(SL) + fs1*SIN(SL) +
+     2      fc2*COS(2.0D0*SL) + fs2*SIN(2.0D0*SL)  +
+     3      fc3*COS(3.0D0*SL) + fs3*SIN(3.0D0*SL)
+      ELSE
+         SL = 0.0D0
+      END IF
+
+!     Active force
+      Fa   = alFa * (c_Ca-c_Ca0)*(c_Ca-c_Ca0) * SL
+
+      rtmp = 2.0D0*I4f*(1.0D0/(1.0D0+gf)**3.0D0 - 1.0D0)
+      gf = gf + dt*(Fa + rtmp)/(mu_Ca * c_Ca * c_Ca)
+
+      RETURN
+      END SUBROUTINE TTP_ACTVSTRN
 !-----------------------------------------------------------------------
       END MODULE TTPMOD
 !#######################################################################

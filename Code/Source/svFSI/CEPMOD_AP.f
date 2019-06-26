@@ -84,19 +84,20 @@
       END SUBROUTINE AP_INITV
 !-----------------------------------------------------------------------
 !     Time integration performed using Forward Euler method
-      SUBROUTINE AP_INTEGFE(nX, X, Ts, Ti, Istim)
+      SUBROUTINE AP_INTEGFE(nX, X, Ts, Ti, Istim, Ksac)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nX
       REAL(KIND=8), INTENT(INOUT) :: X(nX)
-      REAL(KIND=8), INTENT(IN) :: Ts, Ti, Istim
+      REAL(KIND=8), INTENT(IN) :: Ts, Ti, Istim, Ksac
 
       INCLUDE "PARAMS_AP.f"
 
-      REAL(KIND=8) :: t, dt, f(nX), fext
+      REAL(KIND=8) :: t, dt, f(nX), fext, Isac
 
       t    = Ts / Tscale
       dt   = Ti / Tscale
-      fext = Istim * Tscale / Vscale
+      Isac = Ksac * (Vrest - X(1))
+      fext = (Istim + Isac) * Tscale / Vscale
 
       X(1) = (X(1) - Voffset)/Vscale
       CALL AP_GETF(nX, X, f, fext)
@@ -107,19 +108,20 @@
       END SUBROUTINE AP_INTEGFE
 !-----------------------------------------------------------------------
 !     Time integration performed using 4th order Runge-Kutta method
-      SUBROUTINE AP_INTEGRK(nX, X, Ts, Ti, Istim)
+      SUBROUTINE AP_INTEGRK(nX, X, Ts, Ti, Istim, Ksac)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nX
       REAL(KIND=8), INTENT(INOUT) :: X(nX)
-      REAL(KIND=8), INTENT(IN) :: Ts, Ti, Istim
+      REAL(KIND=8), INTENT(IN) :: Ts, Ti, Istim, Ksac
 
       INCLUDE "PARAMS_AP.f"
 
-      REAL(KIND=8) :: t, trk, dt, fext, Xrk(nX,4), frk(nX,4)
+      REAL(KIND=8) :: t, trk, dt, fext, Isac, Xrk(nX,4), frk(nX,4)
 
       t    = Ts / Tscale
       dt   = Ti / Tscale
-      fext = Istim * Tscale / Vscale
+      Isac = Ksac * (Vrest - X(1))
+      fext = (Istim + Isac) * Tscale / Vscale
 
       X(1) = (X(1) - Voffset)/Vscale
 !     RK4: 1st pass
@@ -151,13 +153,13 @@
       END SUBROUTINE AP_INTEGRK
 !-----------------------------------------------------------------------
 !     Time integration performed using Crank-Nicholson method
-      SUBROUTINE AP_INTEGCN2(nX, Xn, Ts, Ti, Istim, IPAR, RPAR)
+      SUBROUTINE AP_INTEGCN2(nX, Xn, Ts, Ti, Istim, Ksac, IPAR, RPAR)
       USE MATFUN
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nX
       INTEGER, INTENT(INOUT) :: IPAR(2)
       REAL(KIND=8), INTENT(INOUT) :: Xn(nX), RPAR(2)
-      REAL(KIND=8), INTENT(IN) :: Ts, Ti, Istim
+      REAL(KIND=8), INTENT(IN) :: Ts, Ti, Istim, Ksac
 
       INCLUDE "PARAMS_AP.f"
 
@@ -166,7 +168,7 @@
       INTEGER :: i, k, itMax
       LOGICAL :: l1, l2, l3
       REAL(KIND=8) :: t, dt, fext, atol, rtol, Xk(nX), fn(nX), fk(nX),
-     2   rK(nX), Im(nX,nX), JAC(nX,nX), rmsA, rmsR
+     2   rK(nX), Im(nX,nX), JAC(nX,nX), rmsA, rmsR, Isac
 
       itMax = IPAR(1)
       atol  = RPAR(1)
@@ -174,7 +176,8 @@
 
       t     = Ts / Tscale
       dt    = Ti / Tscale
-      fext  = Istim * Tscale / Vscale
+      Isac  = Ksac * (Vrest - Xn(1))
+      fext  = (Istim + Isac) * Tscale / Vscale
       Xn(1) = (Xn(1) - Voffset)/Vscale
       Im    = MAT_ID(nX)
 
@@ -205,7 +208,7 @@
          l3   = rmsR .LE. rtol
          IF (l1 .OR. l2 .OR. l3) EXIT
 
-         CALL AP_GETJ(nX, Xk, JAC)
+         CALL AP_GETJ(nX, Xk, JAC, Ksac*Tscale)
          JAC   = Im - 0.5D0*dt*JAC
          JAC   = MAT_INV(JAC, nX)
          rK(:) = MATMUL(JAC, rK)
@@ -236,10 +239,10 @@
       RETURN
       END SUBROUTINE AP_GETF
 !-----------------------------------------------------------------------
-      SUBROUTINE AP_GETJ(n, X, JAC)
+      SUBROUTINE AP_GETJ(n, X, JAC, Ksac)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(IN) :: X(n)
+      REAL(KIND=8), INTENT(IN) :: X(n), Ksac
       REAL(KIND=8), INTENT(OUT) :: JAC(n,n)
 
       INCLUDE "PARAMS_AP.f"
@@ -250,7 +253,7 @@
 
       n1 = X(1) - alpha
       n2 = 1.0D0 - X(1)
-      JAC(1,1) = c * (n1*n2 + X(1)*(n2 - n1)) - X(2)
+      JAC(1,1) = c * (n1*n2 + X(1)*(n2 - n1)) - X(2) - Ksac
 
       JAC(1,2) = -X(1)
 
@@ -268,8 +271,9 @@
       RETURN
       END SUBROUTINE AP_GETJ
 !-----------------------------------------------------------------------
-!     Compute activation force for electromechanics
-      SUBROUTINE AP_ACTVNF(X, dt, Tact)
+!     Compute activation force for electromechanics based on active
+!     stress model
+      SUBROUTINE AP_ACTVSTRS(X, dt, Tact)
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: X, dt
       REAL(KIND=8), INTENT(INOUT) :: Tact
@@ -284,7 +288,7 @@
       Tact = nr / (1.0D0 + rt)
 
       RETURN
-      END SUBROUTINE AP_ACTVNF
+      END SUBROUTINE AP_ACTVSTRS
 !-----------------------------------------------------------------------
       END MODULE APMOD
 !#######################################################################

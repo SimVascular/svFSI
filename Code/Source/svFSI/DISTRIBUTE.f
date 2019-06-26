@@ -165,7 +165,6 @@
          CALL cm%bcast(useTrilinosLS)
          CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
-         CALL cm%bcast(cplEM)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)
@@ -475,8 +474,9 @@
             CALL cm%bcast(lEq%dmn(iDmn)%cep%cepType)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nX)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nFn)
-            CALL cm%bcast(lEq%dmn(iDmn)%cep%Vrst)
-            CALL cm%bcast(lEq%dmn(iDmn)%cep%Kmef)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%imyo)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%dt)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%Ksac)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Diso)
             IF (cm%slv()) THEN
                ALLOCATE(lEq%dmn(iDmn)%cep%Dani(lEq%dmn(iDmn)%cep%nFn))
@@ -484,7 +484,7 @@
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Dani)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%Ts)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%Td)
-            CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%Tp)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%CL)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%Istim%A)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%odes%tIntType)
             IF (lEq%dmn(iDmn)%cep%odes%tIntType .EQ. tIntType_CN2) THEN
@@ -500,6 +500,13 @@
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
       END DO
+
+!     Distribute cardiac electromechanics parameters
+      CALL cm%bcast(cem%cpld)
+      IF (cem%cpld) THEN
+         CALL cm%bcast(cem%aStress)
+         CALL cm%bcast(cem%aStrain)
+      END IF
 
       IF (ibFlag) THEN
          IF (cm%slv()) ALLOCATE(lEq%dmnIB(lEq%nDmnIB))

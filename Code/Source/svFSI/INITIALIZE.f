@@ -164,7 +164,7 @@
       IF (dFlag .AND. .NOT.cmmEq) i = 3*tDof
       IF (pstEq) i = i + nstd
       IF (sstEq) i = i + nsd
-      IF (cplEM) i = i + 1
+      IF (cem%cpld) i = i + 1
       i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tnNo)
 
       IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
@@ -227,9 +227,9 @@
       END IF
 
 !     Electro-Mechanics
-      IF (cplEM) THEN
-         ALLOCATE(Ta(tnNo))
-         Ta = 0D0
+      IF (cem%cpld) THEN
+         ALLOCATE(cem%Ya(tnNo))
+         cem%Ya = 0D0
       END IF
 
       IF (.NOT.resetSim) THEN
@@ -471,9 +471,9 @@
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Ad
-               ELSE IF (cplEM) THEN
+               ELSE IF (cem%cpld) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Ta
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, cem%Ya
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad
@@ -482,9 +482,9 @@
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
-               ELSE IF (cplEM) THEN
+               ELSE IF (cem%cpld) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ta
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, cem%Ya
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do
@@ -500,9 +500,9 @@
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
      3            ib%Un, ib%Rfb
-            ELSE IF (cplEM) THEN
+            ELSE IF (cem%cpld) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, Ta, ib%An, ib%Yn,
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, cem%Ya, ib%An, ib%Yn,
      3            ib%Un, ib%Rfb
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
@@ -706,8 +706,8 @@
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
 
 !     Electro-mechanics
-      IF (cplEM) THEN
-         IF (ALLOCATED(Ta))  DEALLOCATE(Ta)
+      IF (cem%cpld) THEN
+         IF (ALLOCATED(cem%Ya))  DEALLOCATE(cem%Ya)
       END IF
 
 !     IB structures

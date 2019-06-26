@@ -64,12 +64,12 @@
       REAL(KIND=8) :: G_Na = 14.838D0      ! units: nS/pF
 !     G_K1: Maximal I_K1 conductance
       REAL(KIND=8) :: G_K1 = 5.405D0       ! units: nS/pF
-!     I_to: Maximal epicardial I_to conductance
-      REAL(KIND=8) :: G_to = 0.294D0       ! units: nS/pF
+!     G_to: Maximal epicardial I_to conductance, units: nS/pF
+      REAL(KIND=8) :: G_to(3) = (/0.294D0, 0.073D0, 0.294D0/)
 !     G_Kr: Maximal I_Kr conductance
       REAL(KIND=8) :: G_Kr = 0.153D0       ! units: nS/pF
-!     G_Ks: Maximal epicardial I_Ks conductance
-      REAL(KIND=8) :: G_Ks = 0.392D0       ! units: nS/pF
+!     G_Ks: Maximal epicardial I_Ks conductance, units: nS/pF
+      REAL(KIND=8) :: G_Ks(3) = (/0.392D0, 0.392D0, 0.098D0/)
 !     p_KNa: Relative I_Ks permeability to Na
       REAL(KIND=8) :: p_KNa = 0.03D0       ! dimensionless
 !     G_CaL: Maximal I_CaL conductance
@@ -113,11 +113,11 @@
 !     k2p: O to I and R to RI, I_rel transition rate
       REAL(KIND=8) :: k2p = 0.045D0        ! units: mM^{-1}/ms
 !     k3: O to R and I to RI, I_rel transition rate
-      REAL(KIND=8) :: k3  = 0.06D0         ! units: ms^{-1}
+      REAL(KIND=8) :: k3 = 0.06D0         ! units: ms^{-1}
 !     k4: I to O and Ri to I, I_rel transition rate
-      REAL(KIND=8) :: k4  = 5.0D-3         ! units: ms^{-1}
+      REAL(KIND=8) :: k4 = 5.0D-3         ! units: ms^{-1}
 !     EC: Ca_sr half-saturation constant of k_casr
-      REAL(KIND=8) :: EC  = 1.5D0          ! units: mM
+      REAL(KIND=8) :: EC = 1.5D0          ! units: mM
 !     max_sr: Maximum value of k_casr
       REAL(KIND=8) :: max_sr = 2.5D0       ! dimensionless
 !     min_sr: Minimum value of k_casr
@@ -138,8 +138,10 @@
       REAL(KIND=8) :: Buf_ss = 0.4D0       ! units: mM
 !     K_bufss: Ca_ss half-saturation constant for subspace buffer
       REAL(KIND=8) :: K_bufss = 2.5D-4     ! units: mM
+!     Resting potential
+      REAL(KIND=8) :: Vrest = -85.23D0    ! units: mV
 !-----------------------------------------------------------------------
-!     Electromechanics coupling parameters
+!     Electromechanics coupling parameters: active stress model
 !     Ca_rest: Resting Ca concentration
       REAL(KIND=8) :: Ca_rest = 5.0D-5     ! units: mM
 !     Ca_crit: Critical Ca concentration
@@ -152,6 +154,31 @@
       REAL(KIND=8) :: eps_i = 1.0D0        ! units: ms^{-1}
 !     Transition rate
       REAL(KIND=8) :: xi_T = 4.0D3         ! units: mM^{-1}
+!-----------------------------------------------------------------------
+!     Electromechanics coupling parameters: active strain model
+!     Active force of sacromere (-mM^{-2})
+      REAL(KIND=8) :: alFa = -4.0D6
+!     Resting Ca concentration (mM)
+      REAL(KIND=8) :: c_Ca0 = 2.155D-4
+!     Viscous-type constant (ms-mM^{-2})
+      REAL(KIND=8) :: mu_Ca = 5.0D6
+
+!     Force-length relationship parameters
+!     Initial length of sacromeres (um)
+      REAL(KIND=8) :: SL0 = 1.95D0
+!     Min. length of sacromeres (um)
+      REAL(KIND=8) :: SLmin = 1.7D0
+!     Max. length of sacromeres (um)
+      REAL(KIND=8) :: SLmax = 2.6D0
+!     Fourier coefficients
+      REAL(KIND=8) :: f0  = -4333.618335582119D0
+      REAL(KIND=8) :: fc1 =  2570.395355352195D0
+      REAL(KIND=8) :: fs1 = -2051.827278991976D0
+      REAL(KIND=8) :: fc2 =  1329.53611689133D0
+      REAL(KIND=8) :: fs2 =  302.216784558222D0
+      REAL(KIND=8) :: fc3 =  104.943770305116D0
+      REAL(KIND=8) :: fs3 =  218.375174229422D0
+
 !-----------------------------------------------------------------------
 !     Scaling factors
 !     Voltage scaling

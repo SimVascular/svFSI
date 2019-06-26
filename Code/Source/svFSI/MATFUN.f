@@ -44,6 +44,10 @@
 
       PRIVATE :: ISZERO
 
+      INTERFACE TEN_DDOT
+         MODULE PROCEDURE TEN_DDOT_3434
+      END INTERFACE TEN_DDOT
+
       CONTAINS
 !--------------------------------------------------------------------
 !     Create a second order identity matrix of rank nd
@@ -488,8 +492,9 @@
       RETURN
       END FUNCTION TEN_MDDOT
 !--------------------------------------------------------------------
-!     Double dot product of 2 4th order tensors (A_ijmn * B_klmn)
-      FUNCTION TEN_DDOT(A, B, nd) RESULT(C)
+!     Double dot product of 2 4th order tensors
+!     T_ijkl = A_ijmn * B_klmn
+      FUNCTION TEN_DDOT_3434(A, B, nd) RESULT(C)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nd
       REAL(KIND=8), INTENT(IN) :: A(nd,nd,nd,nd), B(nd,nd,nd,nd)
@@ -529,7 +534,93 @@
       END IF
 
       RETURN
-      END FUNCTION TEN_DDOT
+      END FUNCTION TEN_DDOT_3434
+!--------------------------------------------------------------------
+!     T_ijkl = A_ijmn * B_kmln
+      FUNCTION TEN_DDOT_3424(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd,nd,nd), B(nd,nd,nd,nd)
+      REAL(KIND=8) :: C(nd,nd,nd,nd)
+
+      INTEGER :: ii, nn, i, j, k, l
+
+      C  = 0D0
+      nn = nd**4
+      IF (nd .EQ. 2) THEN
+         DO ii=1, nn
+            i = t_ind(1,ii)
+            j = t_ind(2,ii)
+            k = t_ind(3,ii)
+            l = t_ind(4,ii)
+            C(i,j,k,l) = C(i,j,k,l) + A(i,j,1,1)*B(k,1,l,1)
+     2                              + A(i,j,1,2)*B(k,1,l,2)
+     3                              + A(i,j,2,1)*B(k,2,l,1)
+     4                              + A(i,j,2,2)*B(k,2,l,2)
+         END DO
+      ELSE
+         DO ii=1, nn
+            i = t_ind(1,ii)
+            j = t_ind(2,ii)
+            k = t_ind(3,ii)
+            l = t_ind(4,ii)
+            C(i,j,k,l) = C(i,j,k,l) + A(i,j,1,1)*B(k,1,l,1)
+     2                              + A(i,j,1,2)*B(k,1,l,2)
+     3                              + A(i,j,1,3)*B(k,1,l,3)
+     4                              + A(i,j,2,1)*B(k,2,l,1)
+     5                              + A(i,j,2,2)*B(k,2,l,2)
+     6                              + A(i,j,2,3)*B(k,2,l,3)
+     7                              + A(i,j,3,1)*B(k,3,l,1)
+     8                              + A(i,j,3,2)*B(k,3,l,2)
+     9                              + A(i,j,3,3)*B(k,3,l,3)
+         END DO
+      END IF
+
+      RETURN
+      END FUNCTION TEN_DDOT_3424
+!--------------------------------------------------------------------
+!     T_ijkl = A_imjn * B_mnkl
+      FUNCTION TEN_DDOT_2412(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: nd
+      REAL(KIND=8), INTENT(IN) :: A(nd,nd,nd,nd), B(nd,nd,nd,nd)
+      REAL(KIND=8) :: C(nd,nd,nd,nd)
+
+      INTEGER :: ii, nn, i, j, k, l
+
+      C  = 0D0
+      nn = nd**4
+      IF (nd .EQ. 2) THEN
+         DO ii=1, nn
+            i = t_ind(1,ii)
+            j = t_ind(2,ii)
+            k = t_ind(3,ii)
+            l = t_ind(4,ii)
+            C(i,j,k,l) = C(i,j,k,l) + A(i,1,j,1)*B(1,1,k,l)
+     2                              + A(i,1,j,2)*B(1,2,k,l)
+     3                              + A(i,2,j,1)*B(2,1,k,l)
+     4                              + A(i,2,j,2)*B(2,2,k,l)
+         END DO
+      ELSE
+         DO ii=1, nn
+            i = t_ind(1,ii)
+            j = t_ind(2,ii)
+            k = t_ind(3,ii)
+            l = t_ind(4,ii)
+            C(i,j,k,l) = C(i,j,k,l) + A(i,1,j,1)*B(1,1,k,l)
+     2                              + A(i,1,j,2)*B(1,2,k,l)
+     3                              + A(i,1,j,3)*B(1,3,k,l)
+     4                              + A(i,2,j,1)*B(2,1,k,l)
+     5                              + A(i,2,j,2)*B(2,2,k,l)
+     6                              + A(i,2,j,3)*B(2,3,k,l)
+     7                              + A(i,3,j,1)*B(3,1,k,l)
+     8                              + A(i,3,j,2)*B(3,2,k,l)
+     9                              + A(i,3,j,3)*B(3,3,k,l)
+         END DO
+      END IF
+
+      RETURN
+      END FUNCTION TEN_DDOT_2412
 !--------------------------------------------------------------------
       FUNCTION ISZERO(ia)
       IMPLICIT NONE

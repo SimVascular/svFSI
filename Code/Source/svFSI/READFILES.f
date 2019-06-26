@@ -91,7 +91,6 @@
          ibFlag       = .FALSE.
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
-         cplEM        = .FALSE.
 
          i = IARGC()
          IF (i .EQ. 0) THEN
@@ -255,10 +254,12 @@
      2         " be specified after FSI equation"
          END IF
       END DO
-      IF (cplEM) THEN
+
+      IF (cem%cpld) THEN
          IF (nEq .EQ. 1) err = "Min equations (2) not solved for"//
      2      " electro-mechanics coupling"
          i = 0
+
          DO iEq=1, nEq
             IF (eq(iEq)%phys .EQ. phys_CEP .OR.
      2          eq(iEq)%phys .EQ. phys_struct .OR.
@@ -266,7 +267,25 @@
          END DO
          IF (i .NE. 2) err = "Both electrophysiology and struct have"//
      2      " to be solved for electro-mechanics"
+
+         IF (cem%aStress .AND. cem%aStrain) err = "Cannot set "//
+     2      "both active strain and active stress coupling"
+
+         IF (cem%aStrain) THEN
+            IF (nsd .NE. 3) err = "Active strain coupling is allowed"//
+     2         " only for 3D bodies"
+            DO iEq=1, nEq
+               DO i=1, eq(iEq)%nDmn
+                  IF (eq(iEq)%dmn(i)%phys .NE. phys_vms_struct .AND.
+     2                eq(iEq)%dmn(i)%phys .NE. phys_struct) CYCLE
+                  IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO) err =
+     2               "Active strain is allowed with Holzapfel-Ogden "//
+     3               "passive constitutive model only"
+               END DO
+            END DO
+         END IF
       END IF
+
       IF (.NOT.ALLOCATED(cplBC%xo)) THEN
          cplBC%nX = 0
          ALLOCATE(cplBC%xo(cplBC%nX))
@@ -297,9 +316,11 @@
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
       INTEGER, PARAMETER :: maxOutput = 17
+
       INTEGER fid, iBc, phys(3), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
+
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) fTmp
 
@@ -658,7 +679,20 @@
 !     Cardiac Electro-Physiology equation----------------------------
       CASE ('CEP')
          lEq%phys = phys_CEP
-         lPtr => list%get(cplEM, "Coupled to mechanics")
+         lPtr => list%get(ctmp, "Coupling with mechanics")
+         IF (ASSOCIATED(lPtr)) THEN
+            cem%cpld = .TRUE.
+            CALL TO_LOWER(ctmp)
+            SELECT CASE (TRIM(ctmp))
+            CASE ("active stress")
+               cem%aStress = .TRUE.
+            CASE ("active strain")
+               cem%aStrain = .TRUE.
+            CASE DEFAULT
+               err = "Undefined coupling for cardiac electromechanics"
+            END SELECT
+         END IF
+
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/1,1,0,0/)
@@ -1482,17 +1516,18 @@ c     2         "can be applied for Neumann boundaries only"
       FSILSType   = ilsType
       lPL => list%get(ctmp,"LS type")
       IF (ASSOCIATED(lPL)) THEN
+         CALL TO_LOWER(ctmp)
          SELECT CASE(TRIM(ctmp))
-         CASE('NS')
+         CASE('ns')
             lSolverType = lSolver_NS
             FSILSType   = LS_TYPE_NS
-         CASE('GMRES')
+         CASE('gmres')
             lSolverType = lSolver_GMRES
             FSILSType   = LS_TYPE_GMRES
-         CASE('CG')
+         CASE('cg')
             lSolverType = lSolver_CG
             FSILSType   = LS_TYPE_CG
-         CASE('BICG')
+         CASE('bicg')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
          CASE DEFAULT
@@ -1517,30 +1552,31 @@ c     2         "can be applied for Neumann boundaries only"
       IF (ASSOCIATED(lPL)) THEN
          lPtr => lPL%get(ctmp, "Preconditioner")
          IF (ASSOCIATED(lPtr)) THEN
+            CALL TO_LOWER(ctmp)
             SELECT CASE(TRIM(ctmp))
-            CASE('fsiLS', 'FSILS', 'svFSI')
+            CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
                useTrilinosLS = .FALSE.
 #ifdef WITH_TRILINOS
-            CASE('Trilinos-Diagonal')
+            CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
                useTrilinosLS = .TRUE.
-            CASE('Trilinos-BlockJacobi', 'BlockJacobi')
+            CASE('trilinos-blockjacobi', 'blockjacobi')
                lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
                useTrilinosLS = .TRUE.
-            CASE('Trilinos-ILU')
+            CASE('trilinos-ilu')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILU
                useTrilinosLS = .TRUE.
-            CASE('Trilinos-ILUT')
+            CASE('trilinos-ilut')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
                useTrilinosLS = .TRUE.
-            CASE('Trilinos-IC')
+            CASE('trilinos-ic')
                lEq%ls%PREC_Type = PREC_TRILINOS_IC
                useTrilinosLS = .TRUE.
-            CASE('Trilinos-ICT')
+            CASE('trilinos-ict')
                lEq%ls%PREC_Type = PREC_TRILINOS_ICT
                useTrilinosLS = .TRUE.
-            CASE ('Trilinos-ML')
+            CASE ('trilinos-ml')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
                useTrilinosLS = .TRUE.
 #endif
@@ -1688,13 +1724,24 @@ c     2         "can be applied for Neumann boundaries only"
       CHARACTER(LEN=stdL) ctmp
 
       lPtr => lPD%get(ctmp, "Electrophysiology model")
+      CALL TO_LOWER(ctmp)
       SELECT CASE(TRIM(ctmp))
-      CASE ("AP", "ap", "Aliev-Panfilov", "aliev-panfilov")
+      CASE ("ap", "aliev-panfilov")
          lDmn%cep%cepType = cepModel_AP
-      CASE ("FN", "fn", "Fitzhugh-Nagumo", "fitzhugh-nagumo")
+         IF (cem%aStrain) err = " Active strain is not formulated "//
+     2      "Aliev-Panfilov model"
+
+      CASE ("fn", "fitzhugh-nagumo")
          lDmn%cep%cepType = cepModel_FN
-      CASE ("TTP", "tTP", "ttp", "tenTusscher-Panfilov")
+         IF (cem%cpld) err = " Electromechanics is not formulated "//
+     2      "Fitzhugh-Nagumo model"
+
+      CASE ("ttp", "tentusscher-panfilov")
          lDmn%cep%cepType = cepModel_TTP
+
+      CASE ("bo", "bueno-orovio")
+         lDmn%cep%cepType = cepModel_BO
+
       CASE DEFAULT
          err = "Unknown electrophysiology model"
       END SELECT
@@ -1713,9 +1760,25 @@ c     2         "can be applied for Neumann boundaries only"
          END DO
       END IF
 
+      lDmn%cep%imyo = 1
+      lPtr => lPD%get(ctmp, "Myocardial zone")
+      IF (ASSOCIATED(lPtr)) THEN
+         CALL TO_LOWER(ctmp)
+         SELECT CASE (TRIM(ctmp))
+         CASE ("epi", "epicardium")
+            lDmn%cep%imyo = 1
+         CASE ("endo", "endocardium")
+            lDmn%cep%imyo = 2
+         CASE ("myo", "mid-myo", "myocardium")
+            lDmn%cep%imyo = 3
+         CASE DEFAULT
+            err = "Undefined myocardium zone"
+         END SELECT
+      END IF
+
       lDmn%cep%Istim%A  = 0.0d0
-      lDmn%cep%Istim%Ts = HUGE(rtmp)
-      lDmn%cep%Istim%Tp = HUGE(rtmp)
+      lDmn%cep%Istim%Ts = 9999999.0d0
+      lDmn%cep%Istim%CL = 9999999.0d0
       lDmn%cep%Istim%Td = 0.0d0
 
       list => lPD%get(ctmp, "Stimulus")
@@ -1724,23 +1787,35 @@ c     2         "can be applied for Neumann boundaries only"
          IF (.NOT.ISZERO(lDmn%cep%Istim%A)) THEN
             lPtr => list%get(lDmn%cep%Istim%Ts, "Start time")
             lPtr => list%get(lDmn%cep%Istim%Td, "Duration")
-            lPtr => list%get(lDmn%cep%Istim%Tp, "Period")
+            lPtr => list%get(lDmn%cep%Istim%CL, "Cycle length")
+            IF (.NOT.ASSOCIATED(lPtr)) THEN
+               lDmn%cep%Istim%CL = REAL(nTS, KIND=8) * dt
+            END IF
          END IF
       END IF
 
       lDmn%cep%odes%tIntType = tIntType_FE
       lPtr => lPD%get(ctmp, "ODE solver")
       IF (ASSOCIATED(lPtr)) THEN
+         CALL TO_LOWER(ctmp)
          SELECT CASE (ctmp)
-         CASE ("FE", "Euler", "Explicit")
+         CASE ("fe", "euler", "explicit")
             lDmn%cep%odes%tIntType = tIntType_FE
-         CASE ("RK4", "Runge")
+         CASE ("rk", "rk4", "runge")
             lDmn%cep%odes%tIntType = tIntType_RK4
-         CASE ("CN2", "Implicit")
+         CASE ("cn", "cn2", "implicit")
             lDmn%cep%odes%tIntType = tIntType_CN2
          CASE DEFAULT
             err = " Unknown ODE time integrator"
          END SELECT
+      END IF
+
+!     Dual time stepping for cellular activation model
+      lPtr => lPD%get(rtmp, "Time step for integration")
+      IF (ASSOCIATED(lPtr)) THEN
+         lDmn%cep%dt = rtmp
+      ELSE
+         lDmn%cep%dt = dt
       END IF
 
       IF (lDmn%cep%odes%tIntType .EQ. tIntType_CN2) THEN
@@ -1753,14 +1828,11 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => list%get(lDmn%cep%odes%relTol, "Relative tolerance")
       END IF
 
-      lDmn%cep%Vrst = -80.0D0
-      lPtr => lPD%get(rtmp, "Resting potential")
-      IF (ASSOCIATED(lPtr)) lDmn%cep%Vrst = rtmp
-
-      lDmn%cep%Kmef = 0D0
-      lPtr => lPD%get(rtmp, "Parameter for mechano-electric feedback")
-      IF (ASSOCIATED(lPtr)) lDmn%cep%Kmef = rtmp
-      IF (.NOT.cplEM) lDmn%cep%Kmef = 0D0
+      lDmn%cep%Ksac = 0D0
+      lPtr => lPD%get(rtmp, "Feedback parameter for "//
+     2   "stretch-activated-currents")
+      IF (ASSOCIATED(lPtr)) lDmn%cep%Ksac = rtmp
+      IF (.NOT.cem%cpld) lDmn%cep%Ksac = 0D0
 
       RETURN
       END SUBROUTINE READCEP

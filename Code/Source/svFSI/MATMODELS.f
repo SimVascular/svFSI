@@ -38,14 +38,14 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC(stM, F, nfd, fl, S, CC)
+      SUBROUTINE GETPK2CC(stM, F, nfd, fl, ya, S, CC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(stModelType), INTENT(IN) :: stM
       INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
+      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
       REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
       REAL(KIND=8) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2, Inv4,
@@ -55,16 +55,29 @@
      3   Eff, Ess, Efs, kap, Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6),
      4   Hfs(nsd,nsd)
       REAL(KIND=8) :: r1, r2, g1, g2, g3
+!     Active strain for electromechanics
+      REAL(KIND=8) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
 !     Some preliminaries
       nd   = REAL(nsd, KIND=8)
       Kp   = stM%Kpen
-      J    = MAT_DET(F, nsd)
+
+!     Electromechanics coupling based on active strain
+      Fe   = F
+      Fa   = MAT_ID(nsd)
+      Fai  = Fa
+      IF (cem%aStrain) THEN
+         CALL ACTVSTRAIN(ya, nfd, fl, Fa)
+         Fai  = MAT_INV(Fa, nsd)
+         Fe   = MATMUL(F, Fai)
+      END IF
+
+      J    = MAT_DET(Fe, nsd)
       J2d  = J**(-2D0/nd)
       J4d  = J2d*J2d
 
       IDm  = MAT_ID(nsd)
-      C    = MATMUL(TRANSPOSE(F), F)
+      C    = MATMUL(TRANSPOSE(Fe), Fe)
       E    = 5D-1 * (C - IDm)
       Ci   = MAT_INV(C, nsd)
 
@@ -254,6 +267,7 @@
          S   = S + p*J*Ci
          CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         RETURN
 
 !     HO (Holzapfel-Ogden) model for myocardium (2009)
       CASE (stIso_HO)
@@ -316,6 +330,16 @@
          S   = S + p*J*Ci
          CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+
+         IF (cem%aStrain) THEN
+            S = MATMUL(Fai, S)
+            S = MATMUL(S, TRANSPOSE(Fai))
+            CCb = 0D0
+            CCb = TEN_DYADPROD(Fai, Fai, nsd)
+            CC  = TEN_DDOT_3424(CC, CCb, nsd)
+            CC  = TEN_DDOT_2412(CCb, CC, nsd)
+         END IF
+
          RETURN
 
       CASE DEFAULT
@@ -698,7 +722,7 @@
       END SUBROUTINE GETTAU
 !####################################################################
 !     Compute active stress for electromechanics
-      SUBROUTINE ACTVSTRS(Tact, F, nfd, fl, S)
+      SUBROUTINE ACTVSTRESS(Tact, F, nfd, fl, S)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
@@ -710,7 +734,7 @@
       S = S + Tact*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
       RETURN
-      END SUBROUTINE ACTVSTRS
+      END SUBROUTINE ACTVSTRESS
 !====================================================================
 !     Compute deviatoric component of active stress for electromechanics
       SUBROUTINE ACTVSTRSdev(Tact, F, nfd, fl, S)
@@ -740,4 +764,36 @@
 
       RETURN
       END SUBROUTINE ACTVSTRSdev
+!####################################################################
+!     Compute active component of deformation gradient tensor for
+!     electromechanics coupling based on active strain formulation
+      SUBROUTINE ACTVSTRAIN(gf, nfd, fl, Fa)
+      USE MATFUN
+      USE UTILMOD
+      USE COMMOD, ONLY : nsd
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: nfd
+      REAL(KIND=8), INTENT(IN) :: gf, fl(nsd,nfd)
+      REAL(KIND=8), INTENT(INOUT) :: Fa(nsd,nsd)
+
+      REAL(KIND=8) :: gs, gn, af(nsd), as(nsd), an(nsd), IDm(nsd,nsd),
+     2   Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
+
+      af  = fl(:,1)
+      as  = fl(:,2)
+      an  = CROSS(fl)
+
+      gs  = 4.0D0*gf
+      gn  = 1.0D0/((1.0D0+gf)*(1.0D0+gs)) - 1.0D0
+
+      IDm = MAT_ID(nsd)
+      Hf  = MAT_DYADPROD(af, af, nsd)
+      Hs  = MAT_DYADPROD(as, as, nsd)
+      Hn  = MAT_DYADPROD(an, an, nsd)
+
+      Fa = IDm + gf*Hf + gs*Hs + gn*Hn
+
+      RETURN
+      END SUBROUTINE ACTVSTRAIN
 !####################################################################
