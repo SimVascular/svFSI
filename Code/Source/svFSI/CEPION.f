@@ -247,7 +247,7 @@
 
 !     External stimulus duration
       icl = FLOOR(t1/cep%Istim%CL)
-      Ts  = cep%Istim%Ts + REAL(icl, KIND=8)*dt
+      Ts  = cep%Istim%Ts + REAL(icl, KIND=8)*cep%Istim%CL
       Te  = Ts + cep%Istim%Td
 
       SELECT CASE (cep%cepType)

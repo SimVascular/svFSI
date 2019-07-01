@@ -1749,12 +1749,12 @@ c     2         "can be applied for Neumann boundaries only"
       lPtr => lPD%get(lDmn%cep%nX, "State variables", ll=1)
 
       lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
-      lDmn%cep%nFn = lPD%srch("Conductivity (ani)")
-      IF (lDmn%cep%nFn .EQ. 0) lDmn%cep%nFn = 1
+      i = lPD%srch("Conductivity (ani)")
+      IF (i .EQ. 0) lDmn%cep%nFn = 1
 
       ALLOCATE(lDmn%cep%Dani(lDmn%cep%nFn))
       lDmn%cep%Dani = 0D0
-      IF (lDmn%cep%nFn .NE. 0) THEN
+      IF (i .NE. 0) THEN
          DO i=1, lDmn%cep%nFn
             lPtr => lPD%get(lDmn%cep%Dani(i), "Conductivity (ani)", i)
          END DO
@@ -1794,6 +1794,14 @@ c     2         "can be applied for Neumann boundaries only"
          END IF
       END IF
 
+!     Dual time stepping for cellular activation model
+      lPtr => lPD%get(rtmp, "Time step for integration")
+      IF (ASSOCIATED(lPtr)) THEN
+         lDmn%cep%dt = rtmp
+      ELSE
+         lDmn%cep%dt = dt
+      END IF
+
       lDmn%cep%odes%tIntType = tIntType_FE
       lPtr => lPD%get(ctmp, "ODE solver")
       IF (ASSOCIATED(lPtr)) THEN
@@ -1808,14 +1816,6 @@ c     2         "can be applied for Neumann boundaries only"
          CASE DEFAULT
             err = " Unknown ODE time integrator"
          END SELECT
-      END IF
-
-!     Dual time stepping for cellular activation model
-      lPtr => lPD%get(rtmp, "Time step for integration")
-      IF (ASSOCIATED(lPtr)) THEN
-         lDmn%cep%dt = rtmp
-      ELSE
-         lDmn%cep%dt = dt
       END IF
 
       IF (lDmn%cep%odes%tIntType .EQ. tIntType_CN2) THEN
