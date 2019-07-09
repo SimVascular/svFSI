@@ -36,21 +36,100 @@
 !
 !-----------------------------------------------------------------------
 
-      SUBROUTINE CEPION(iEq, iDof)
+!     Initialize Cardiac Electrophysiology Model
+      SUBROUTINE CEPINIT()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER a, iEq, iDmn, cPhys, dID, nX
+
+      REAL(KIND=8), ALLOCATABLE :: Xl(:), sA(:), sF(:,:)
+
+      DO iEq=1, nEq
+         IF (eq(iEq)%phys .NE. phys_CEP) CYCLE
+
+         IF (ALLOCATED(dmnId)) THEN
+            ALLOCATE(sA(tnNo), sF(nXion,tnNo))
+            sA = 0D0
+            sF = 0D0
+            DO a=1, tnNo
+               IF (.NOT.ISDOMAIN(iEq, a, phys_CEP)) CYCLE
+               DO iDmn=1, eq(iEq)%nDmn
+                  cPhys = eq(iEq)%dmn(iDmn)%phys
+                  dID   = eq(iEq)%dmn(iDmn)%Id
+                  IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(a),dID))
+     2                CYCLE
+                  nX = eq(iEq)%dmn(iDmn)%cep%nX
+                  ALLOCATE(Xl(nX))
+                  CALL CEPINITL(eq(iEq)%dmn(iDmn)%cep, nX, Xl)
+                  sA(a) = sA(a) + 1.0D0
+                  sF(1:nX,a) = sF(1:nX,a) + Xl(:)
+                  DEALLOCATE(Xl)
+               END DO
+            END DO
+            CALL COMMU(sA)
+            CALL COMMU(sF)
+            DO a=1, tnNo
+               IF (.NOT.ISZERO(sA(a)))
+     2            Xion(:,a) = sF(:,a)/sA(a)
+            END DO
+            DEALLOCATE(sA, sF)
+         ELSE
+            DO a=1, tnNo
+               IF (.NOT.ISDOMAIN(iEq, a, phys_CEP)) CYCLE
+               nX = eq(iEq)%dmn(1)%cep%nX
+               ALLOCATE(Xl(nX))
+               CALL CEPINITL(eq(iEq)%dmn(1)%cep, nX, Xl)
+               Xion(1:nX,a) = Xl(:)
+               DEALLOCATE(Xl)
+            END DO
+         END IF
+      END DO
+
+      RETURN
+      END SUBROUTINE CEPINIT
+!-----------------------------------------------------------------------
+      SUBROUTINE CEPINITL(cep, nX, X)
+      USE CEPMOD
+      IMPLICIT NONE
+      TYPE(cepModelType), INTENT(IN) :: cep
+      INTEGER, INTENT(IN) :: nX
+      REAL(KIND=8), INTENT(OUT) :: X(nX)
+
+      SELECT CASE (cep%cepType)
+      CASE (cepModel_AP)
+         CALL AP_INIT(nX, X)
+
+      CASE (cepModel_FN)
+         CALL FN_INIT(nX, X)
+
+      CASE (cepModel_TTP)
+         CALL TTP_INIT(cep%imyo, nX, X)
+
+      CASE (cepModel_BO)
+         CALL BO_INIT(nX, X)
+
+      END SELECT
+
+      RETURN
+      END SUBROUTINE CEPINITL
+!#######################################################################
+!     State variable integration
+      SUBROUTINE CEPINTEG(iEq, iDof, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: iEq, iDof
+      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
 
       LOGICAL :: IPASS = .TRUE.
-      INTEGER :: a, Ac, iM, iDmn, cPhys, dID, nX, nXmax
+      INTEGER :: a, Ac, iM, iDmn, cPhys, dID, nX
       REAL(KIND=8) :: yl
 
-      REAL(KIND=8), ALLOCATABLE :: Xl(:), Xion(:,:), sA(:), sF(:,:),
-     2   sY(:), I4f(:)
-
-      SAVE IPASS, nXmax, Xion
+      REAL(KIND=8), ALLOCATABLE :: Xl(:), I4f(:), sA(:), sY(:), sF(:,:)
+      SAVE IPASS
 
       ALLOCATE(I4f(tnNo))
       I4f = 0D0
@@ -61,7 +140,7 @@
             IF (msh(iM)%nFn .NE. 0) THEN
                ALLOCATE(sA(msh(iM)%nNo))
                sA = 0D0
-               CALL FIBSTRETCH(iEq, msh(iM), Do, sA)
+               CALL FIBSTRETCH(iEq, msh(iM), Dg, sA)
                DO a=1, msh(iM)%nNo
                   Ac = msh(iM)%gN(a)
                   I4f(Ac) = sA(a)
@@ -71,58 +150,9 @@
          END DO
       END IF
 
-!     Initialization step
+!     Ignore first pass as Xion is already initialized
       IF (IPASS) THEN
          IPASS = .FALSE.
-!        Determine max. state variables for all domains
-         nXmax = 0
-         DO iDmn=1, eq(iEq)%nDmn
-            cPhys = eq(iEq)%dmn(iDmn)%phys
-            IF (cPhys .NE. phys_CEP) CYCLE
-
-            nX = eq(iEq)%dmn(iDmn)%cep%nX
-            IF (nX .GT. nXmax) nXmax = nX
-         END DO
-
-!        Initialize CEP model state variables
-         ALLOCATE(Xion(nxMax,tnNo))
-         Xion = 0D0
-         IF (ALLOCATED(dmnId)) THEN
-            ALLOCATE(sA(tnNo), sF(nXmax,tnNo))
-            sA = 0D0
-            sF = 0D0
-            DO Ac=1, tnNo
-               IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
-               DO iDmn=1, eq(iEq)%nDmn
-                  cPhys = eq(iEq)%dmn(iDmn)%phys
-                  dID   = eq(iEq)%dmn(iDmn)%Id
-                  IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(Ac),dID))
-     2                CYCLE
-                  nX = eq(iEq)%dmn(iDmn)%cep%nX
-                  ALLOCATE(Xl(nX))
-                  CALL CEPINIT(eq(iEq)%dmn(iDmn)%cep, nX, Xl)
-                  sA(Ac) = sA(Ac) + 1.0D0
-                  sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
-                  DEALLOCATE(Xl)
-               END DO
-            END DO
-            CALL COMMU(sA)
-            CALL COMMU(sF)
-            DO Ac=1, tnNo
-               IF (.NOT.ISZERO(sA(Ac)))
-     2            Xion(:,Ac) = sF(:,Ac)/sA(Ac)
-            END DO
-            DEALLOCATE(sA, sF)
-         ELSE
-            DO Ac=1, tnNo
-               IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
-               nX = eq(iEq)%dmn(1)%cep%nX
-               ALLOCATE(Xl(nX))
-               CALL CEPINIT(eq(iEq)%dmn(1)%cep, nX, Xl)
-               Xion(1:nX,Ac) = Xl(:)
-               DEALLOCATE(Xl)
-            END DO
-         END IF
       ELSE
 !        Copy action potential after diffusion as first state variable
          DO Ac=1, tnNo
@@ -132,7 +162,7 @@
 
 !     Integrate electric potential based on cellular activation model
       IF (ALLOCATED(dmnId)) THEN
-         ALLOCATE(sA(tnNo), sF(nXmax,tnNo), sY(tnNo))
+         ALLOCATE(sA(tnNo), sF(nXion,tnNo), sY(tnNo))
          sA = 0D0
          sF = 0D0
          sY = 0D0
@@ -148,8 +178,8 @@
                Xl = Xion(1:nX,Ac)
                yl = 0D0
                IF (cem%cpld) yl = cem%Ya(Ac)
-               CALL CEPINTEG(eq(iEq)%dmn(iDmn)%cep, nX, Xl, time-dt,
-     2            time, yl, I4f(Ac))
+               CALL CEPINTEGL(eq(iEq)%dmn(iDmn)%cep, nX, Xl, time-dt,
+     2            yl, I4f(Ac))
                sA(Ac) = sA(Ac) + 1.0D0
                sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
                IF (cem%cpld) sY(Ac) = sY(Ac) + yl
@@ -174,8 +204,8 @@
             Xl = Xion(1:nX,Ac)
             yl = 0D0
             IF (cem%cpld) yl = cem%Ya(Ac)
-            CALL CEPINTEG(eq(iEq)%dmn(iDmn)%cep, nX, Xl, time-dt, time,
-     2         yl, I4f(Ac))
+            CALL CEPINTEGL(eq(iEq)%dmn(1)%cep, nX, Xl, time-dt, yl,
+     2         I4f(Ac))
             Xion(1:nX,Ac) = Xl(:)
             IF (cem%cpld) cem%Ya(Ac) = yl
             DEALLOCATE(Xl)
@@ -189,44 +219,19 @@
       DEALLOCATE(I4f)
 
       RETURN
-      END SUBROUTINE CEPION
-!#######################################################################
-      SUBROUTINE CEPINIT(cep, nX, X)
-      USE CEPMOD
-      IMPLICIT NONE
-      TYPE(cepModelType), INTENT(IN) :: cep
-      INTEGER, INTENT(IN) :: nX
-      REAL(KIND=8), INTENT(OUT) :: X(nX)
-
-      SELECT CASE (cep%cepType)
-      CASE (cepModel_AP)
-         CALL AP_INIT(nX, X)
-
-      CASE (cepModel_FN)
-         CALL FN_INIT(nX, X)
-
-      CASE (cepModel_TTP)
-         CALL TTP_INIT(cep%imyo, nX, X)
-
-      CASE (cepModel_BO)
-         CALL BO_INIT(nX, X)
-
-      END SELECT
-
-      RETURN
-      END SUBROUTINE CEPINIT
+      END SUBROUTINE CEPINTEG
 !-----------------------------------------------------------------------
-!     Integrate local electrophysiology variables from t1 to t2. Also
+!     Integrate local electrophysiology variables from t1 to t1+dt. Also
 !     integrate excitation-activation variables form coupled electro-
 !     mechanics. The equations are integrated at domain nodes.
-      SUBROUTINE CEPINTEG(cep, nX, X, t1, t2, yl, I4f)
+      SUBROUTINE CEPINTEGL(cep, nX, X, t1, yl, I4f)
       USE CEPMOD
       USE UTILMOD, ONLY : eps
       USE COMMOD, ONLY : dt
       IMPLICIT NONE
       TYPE(cepModelType), INTENT(IN) :: cep
       INTEGER, INTENT(IN) :: nX
-      REAL(KIND=8), INTENT(IN) :: t1, t2, I4f
+      REAL(KIND=8), INTENT(IN) :: t1, I4f
       REAL(KIND=8), INTENT(INOUT) :: X(nX), yl
 
       INTEGER i, icl, nt
@@ -243,10 +248,10 @@
       END IF
 
 !     Total time steps
-      nt = FLOOR((t2 - t1)/cep%dt) + 1
+      nt = NINT(dt/cep%dt)
 
 !     External stimulus duration
-      icl = FLOOR(t1/cep%Istim%CL)
+      icl = MAX(FLOOR(t1/cep%Istim%CL), 0)
       Ts  = cep%Istim%Ts + REAL(icl, KIND=8)*cep%Istim%CL
       Te  = Ts + cep%Istim%Td
 
@@ -263,7 +268,7 @@
          CASE (tIntType_FE)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -279,7 +284,7 @@
          CASE (tIntType_RK4)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -295,7 +300,7 @@
          CASE (tIntType_CN2)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -322,7 +327,7 @@
          CASE (tIntType_FE)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -333,7 +338,7 @@
          CASE (tIntType_RK4)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -344,7 +349,7 @@
          CASE (tIntType_CN2)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -365,7 +370,7 @@
          CASE (tIntType_FE)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -384,7 +389,7 @@
          CASE (tIntType_RK4)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -403,7 +408,7 @@
          CASE (tIntType_CN2)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -432,7 +437,7 @@
          CASE (tIntType_FE)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -451,7 +456,7 @@
          CASE (tIntType_RK4)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -470,7 +475,7 @@
          CASE (tIntType_CN2)
             DO i=1, nt
                t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t1.GE.Ts-eps .AND. t1.LE.Te+eps) THEN
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
                   Istim = 0D0
@@ -497,5 +502,5 @@
       DEALLOCATE(IPAR, RPAR)
 
       RETURN
-      END SUBROUTINE CEPINTEG
+      END SUBROUTINE CEPINTEGL
 !####################################################################

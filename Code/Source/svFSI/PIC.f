@@ -88,7 +88,7 @@ c         CALL IB_SETBCPEN()
 
 !        electrophysiology
          IF (eq(iEq)%phys .EQ. phys_CEP) THEN
-            CALL CEPION(iEq, e)
+            CALL CEPINTEG(iEq, e, Do)
          END IF
 
          Yn(s:e,:) = Yo(s:e,:)
@@ -236,6 +236,14 @@ c         CALL IB_SETBCPEN()
                Yn(s:e,Ac) = Yn(1:nsd,Ac)
                Dn(s:e,Ac) = Dn(1:nsd,Ac)
             END IF
+         END DO
+      END IF
+
+!     Update Xion for cardiac electrophysiology
+      IF (eq(cEq)%phys .EQ. phys_CEP) THEN
+         s = eq(cEq)%s
+         DO a=1, tnNo
+            Xion(1,a) = Yn(s,a)
          END DO
       END IF
 

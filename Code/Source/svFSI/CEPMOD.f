@@ -116,6 +116,12 @@
          REAL(KIND=8), ALLOCATABLE :: Ya(:)
       END TYPE cemModelType
 
+!     Whether cardiac electrophysiology is solved
+      LOGICAL cepEq
+!     Max. number of unknowns in cellular activation model
+      INTEGER :: nXion = 0
+!     State variables stored at all nodes
+      REAL(KIND=8), ALLOCATABLE :: Xion(:,:)
 !     Cardiac electromechanics type
       TYPE(cemModelType) :: cem
 

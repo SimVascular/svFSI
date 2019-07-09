@@ -164,7 +164,10 @@
       IF (dFlag .AND. .NOT.cmmEq) i = 3*tDof
       IF (pstEq) i = i + nstd
       IF (sstEq) i = i + nsd
-      IF (cem%cpld) i = i + 1
+      IF (cepEq) THEN
+         i = i + nXion
+         IF (cem%cpld) i = i + 1
+      END IF
       i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tnNo)
 
       IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
@@ -226,10 +229,18 @@
          pSa = 0D0
       END IF
 
-!     Electro-Mechanics
-      IF (cem%cpld) THEN
-         ALLOCATE(cem%Ya(tnNo))
-         cem%Ya = 0D0
+!     Electrophysiology
+      IF (cepEq) THEN
+         ALLOCATE(Xion(nXion,tnNo))
+         Xion(:,:) = 0D0
+
+         CALL CEPINIT()
+
+!        Electro-Mechanics
+         IF (cem%cpld) THEN
+            ALLOCATE(cem%Ya(tnNo))
+            cem%Ya = 0D0
+         END IF
       END IF
 
       IF (.NOT.resetSim) THEN
@@ -311,6 +322,11 @@
          ALLOCATE(rmsh%D0(tDof,tnNo)); rmsh%D0(:,:) = Do(:,:)
       END IF ! resetSim
 
+!     Initialize new variables
+      An = Ao
+      Yn = Yo
+      Dn = Do
+
       DO iM=1, nMsh
          IF (cm%mas()) THEN
             fTmp = TRIM(appPath)//".partitioning_"//
@@ -358,9 +374,6 @@
      2         "domain "//iDmn//" of equation "//iEq//" is zero"
          END DO
       END DO
-
-!     Predicting new variables
-      CALL PICP
 
 !     Preparing faces and BCs
       CALL BAFINI()
@@ -471,9 +484,11 @@
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Ad
-               ELSE IF (cem%cpld) THEN
+               ELSE IF (cepEq) THEN
+                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
+     2               "combination. Cannot load restart files"
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, cem%Ya
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Xion, cem%Ya
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad
@@ -482,27 +497,30 @@
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
-               ELSE IF (cem%cpld) THEN
+               ELSE IF (cepEq) THEN
+                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
+     2               "combination. Cannot load restart files"
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, cem%Ya
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Xion, cem%Ya
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do
                END IF
             END IF
          ELSE
-            READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao
+            IF (cepEq) THEN
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2          eq%iNorm, cplBC%xo, Yo, Ao, Xion
+            ELSE
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao
+            END IF
          END IF
       ELSE
          IF (dFlag .AND. .NOT.cmmEq) THEN
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
-     3            ib%Un, ib%Rfb
-            ELSE IF (cem%cpld) THEN
-               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, cem%Ya, ib%An, ib%Yn,
      3            ib%Un, ib%Rfb
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
@@ -705,9 +723,12 @@
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
 
-!     Electro-mechanics
-      IF (cem%cpld) THEN
-         IF (ALLOCATED(cem%Ya))  DEALLOCATE(cem%Ya)
+!     Electrophysiology and Electromechanics
+      IF (cepEq) THEN
+         IF (ALLOCATED(Xion))  DEALLOCATE(Xion)
+         IF (cem%cpld) THEN
+            IF (ALLOCATED(cem%Ya))  DEALLOCATE(cem%Ya)
+         END IF
       END IF
 
 !     IB structures

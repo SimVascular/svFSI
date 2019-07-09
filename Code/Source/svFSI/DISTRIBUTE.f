@@ -186,6 +186,9 @@
          END IF
          CALL cm%bcast(ibFlag)
          IF (ibFlag) CALL DISTIB()
+!        CEP
+         CALL cm%bcast(cepEq)
+         CALL cm%bcast(nXion)
       END IF
 
 !     Distributing X to processors

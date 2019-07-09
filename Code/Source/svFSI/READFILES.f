@@ -678,7 +678,9 @@
 
 !     Cardiac Electro-Physiology equation----------------------------
       CASE ('CEP')
+         cepEq    = .TRUE.
          lEq%phys = phys_CEP
+
          lPtr => list%get(ctmp, "Coupling with mechanics")
          IF (ASSOCIATED(lPtr)) THEN
             cem%cpld = .TRUE.
@@ -1747,9 +1749,11 @@ c     2         "can be applied for Neumann boundaries only"
       END SELECT
 
       lPtr => lPD%get(lDmn%cep%nX, "State variables", ll=1)
+      IF (nXion .LT. lDmn%cep%nX) nXion = lDmn%cep%nX
 
       lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
       i = lPD%srch("Conductivity (ani)")
+      lDmn%cep%nFn = i
       IF (i .EQ. 0) lDmn%cep%nFn = 1
 
       ALLOCATE(lDmn%cep%Dani(lDmn%cep%nFn))

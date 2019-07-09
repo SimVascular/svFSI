@@ -212,9 +212,11 @@ c      END DO
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, Ad
 !              Electromechanics
-               ELSE IF (cem%cpld) THEN
+               ELSE IF (cepEq) THEN
+                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
+     2               "combination. Cannot write restart files"
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
-     2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ad, cem%Ya
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ad, Xion, cem%Ya
                ELSE
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn, Ad
@@ -225,27 +227,31 @@ c      END DO
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn, pS0
 !              Electromechanics
-               ELSE IF (cem%cpld) THEN
+               ELSE IF (cepEq) THEN
+                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
+     2               "combination. Cannot write restart files"
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
-     2               eq%iNorm, cplBC%xn, Yn, An, Dn, cem%Ya
+     2               eq%iNorm, cplBC%xn, Yn, An, Dn, Xion, cem%Ya
                ELSE
                   WRITE(fid, REC=myID) stamp, cTS, time,CPUT()-timeP(1),
      2               eq%iNorm, cplBC%xn, Yn, An, Dn
                END IF
             END IF
          ELSE
-            WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2         eq%iNorm, cplBC%xn, Yn, An
+!           Electrophysiology
+            IF (cepEq) THEN
+               WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2            eq%iNorm, cplBC%xn, Yn, An, Xion
+            ELSE
+               WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
+     2            eq%iNorm, cplBC%xn, Yn, An
+            END IF
          END IF
       ELSE
          IF (dFlag) THEN
             IF (pstEq) THEN
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
      2            eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%An, ib%Yn,
-     3            ib%Un, ib%Rfb
-            ELSE IF (cem%cpld) THEN
-               WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2            eq%iNorm, cplBC%xn, Yn, An, Dn, cem%Ya, ib%An, ib%Yn,
      3            ib%Un, ib%Rfb
             ELSE
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
