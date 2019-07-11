@@ -42,9 +42,9 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER a, iEq, iDmn, cPhys, dID, nX
+      INTEGER a, iEq, iDmn, cPhys, dID, nX, nG
 
-      REAL(KIND=8), ALLOCATABLE :: Xl(:), sA(:), sF(:,:)
+      REAL(KIND=8), ALLOCATABLE :: Xl(:), Xgl(:), sA(:), sF(:,:)
 
       DO iEq=1, nEq
          IF (eq(iEq)%phys .NE. phys_CEP) CYCLE
@@ -61,11 +61,13 @@
                   IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(a),dID))
      2                CYCLE
                   nX = eq(iEq)%dmn(iDmn)%cep%nX
-                  ALLOCATE(Xl(nX))
-                  CALL CEPINITL(eq(iEq)%dmn(iDmn)%cep, nX, Xl)
+                  nG = eq(iEq)%dmn(iDmn)%cep%nG
+                  ALLOCATE(Xl(nX), Xgl(nG))
+                  CALL CEPINITL(eq(iEq)%dmn(iDmn)%cep, nX, nG, Xl, Xgl)
                   sA(a) = sA(a) + 1.0D0
-                  sF(1:nX,a) = sF(1:nX,a) + Xl(:)
-                  DEALLOCATE(Xl)
+                  sF(1:nX,a)  = sF(1:nX,a) + Xl(:)
+                  sF(nX+1:nX+nG,a) = sF(nX+1:nX+nG,a) + Xgl(:)
+                  DEALLOCATE(Xl, Xgl)
                END DO
             END DO
             CALL COMMU(sA)
@@ -79,10 +81,12 @@
             DO a=1, tnNo
                IF (.NOT.ISDOMAIN(iEq, a, phys_CEP)) CYCLE
                nX = eq(iEq)%dmn(1)%cep%nX
-               ALLOCATE(Xl(nX))
-               CALL CEPINITL(eq(iEq)%dmn(1)%cep, nX, Xl)
+               nG = eq(iEq)%dmn(1)%cep%nG
+               ALLOCATE(Xl(nX), Xgl(nG))
+               CALL CEPINITL(eq(iEq)%dmn(1)%cep, nX, nG, Xl, Xgl)
                Xion(1:nX,a) = Xl(:)
-               DEALLOCATE(Xl)
+               Xion(nX+1:nX+nG,a) = Xgl(:)
+               DEALLOCATE(Xl, Xgl)
             END DO
          END IF
       END DO
@@ -90,25 +94,26 @@
       RETURN
       END SUBROUTINE CEPINIT
 !-----------------------------------------------------------------------
-      SUBROUTINE CEPINITL(cep, nX, X)
+      SUBROUTINE CEPINITL(cep, nX, nG, X, Xg)
       USE CEPMOD
       IMPLICIT NONE
+
       TYPE(cepModelType), INTENT(IN) :: cep
-      INTEGER, INTENT(IN) :: nX
-      REAL(KIND=8), INTENT(OUT) :: X(nX)
+      INTEGER, INTENT(IN) :: nX, nG
+      REAL(KIND=8), INTENT(OUT) :: X(nX), Xg(nG)
 
       SELECT CASE (cep%cepType)
       CASE (cepModel_AP)
          CALL AP_INIT(nX, X)
 
+      CASE (cepModel_BO)
+         CALL BO_INIT(nX, X)
+
       CASE (cepModel_FN)
          CALL FN_INIT(nX, X)
 
       CASE (cepModel_TTP)
-         CALL TTP_INIT(cep%imyo, nX, X)
-
-      CASE (cepModel_BO)
-         CALL BO_INIT(nX, X)
+         CALL TTP_INIT(cep%imyo, nX, nG, X, Xg)
 
       END SELECT
 
@@ -125,10 +130,11 @@
       REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
 
       LOGICAL :: IPASS = .TRUE.
-      INTEGER :: a, Ac, iM, iDmn, cPhys, dID, nX
+      INTEGER :: a, Ac, iM, iDmn, cPhys, dID, nX, nG
       REAL(KIND=8) :: yl
 
-      REAL(KIND=8), ALLOCATABLE :: Xl(:), I4f(:), sA(:), sY(:), sF(:,:)
+      REAL(KIND=8), ALLOCATABLE :: I4f(:), Xl(:), Xgl(:), sA(:), sY(:),
+     2   sF(:,:)
       SAVE IPASS
 
       ALLOCATE(I4f(tnNo))
@@ -174,21 +180,24 @@
                IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(Ac),dID))
      2             CYCLE
                nX = eq(iEq)%dmn(iDmn)%cep%nX
-               ALLOCATE(Xl(nX))
-               Xl = Xion(1:nX,Ac)
-               yl = 0D0
+               nG = eq(iEq)%dmn(iDmn)%cep%nG
+               ALLOCATE(Xl(nX), Xgl(nG))
+               Xl  = Xion(1:nX,Ac)
+               Xgl = Xion(nX+1:nX+nG,Ac)
+               yl  = 0D0
                IF (cem%cpld) yl = cem%Ya(Ac)
-               CALL CEPINTEGL(eq(iEq)%dmn(iDmn)%cep, nX, Xl, time-dt,
-     2            yl, I4f(Ac))
+               CALL CEPINTEGL(eq(iEq)%dmn(iDmn)%cep, nX, nG, Xl, Xgl,
+     2            time-dt, yl, I4f(Ac))
                sA(Ac) = sA(Ac) + 1.0D0
                sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
+               sF(nX+1:nX+nG,Ac) = sF(nX+1:nX+nG,Ac) + Xgl(:)
                IF (cem%cpld) sY(Ac) = sY(Ac) + yl
-               DEALLOCATE(Xl)
+               DEALLOCATE(Xl, Xgl)
             END DO
          END DO
          CALL COMMU(sA)
          CALL COMMU(sF)
-         CALL COMMU(sY)
+         IF (cem%cpld) CALL COMMU(sY)
          DO Ac=1, tnNo
             IF (.NOT.ISZERO(sA(Ac))) THEN
                Xion(:,Ac) = sF(:,Ac)/sA(Ac)
@@ -200,15 +209,18 @@
          DO Ac=1, tnNo
             IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
             nX = eq(iEq)%dmn(1)%cep%nX
-            ALLOCATE(Xl(nX))
-            Xl = Xion(1:nX,Ac)
+            nG = eq(iEq)%dmn(1)%cep%nG
+            ALLOCATE(Xl(nX), Xgl(nG))
+            Xl  = Xion(1:nX,Ac)
+            Xgl = Xion(nX+1:nX+nG,Ac)
             yl = 0D0
             IF (cem%cpld) yl = cem%Ya(Ac)
-            CALL CEPINTEGL(eq(iEq)%dmn(1)%cep, nX, Xl, time-dt, yl,
-     2         I4f(Ac))
+            CALL CEPINTEGL(eq(iEq)%dmn(1)%cep, nX, nG, Xl, Xgl, time-dt,
+     2         yl, I4f(Ac))
             Xion(1:nX,Ac) = Xl(:)
+            Xion(nX+1:nX+nG,Ac) = Xgl(:)
             IF (cem%cpld) cem%Ya(Ac) = yl
-            DEALLOCATE(Xl)
+            DEALLOCATE(Xl, Xgl)
          END DO
       END IF
 
@@ -224,18 +236,18 @@
 !     Integrate local electrophysiology variables from t1 to t1+dt. Also
 !     integrate excitation-activation variables form coupled electro-
 !     mechanics. The equations are integrated at domain nodes.
-      SUBROUTINE CEPINTEGL(cep, nX, X, t1, yl, I4f)
+      SUBROUTINE CEPINTEGL(cep, nX, nG, X, Xg, t1, yl, I4f)
       USE CEPMOD
       USE UTILMOD, ONLY : eps
       USE COMMOD, ONLY : dt
       IMPLICIT NONE
       TYPE(cepModelType), INTENT(IN) :: cep
-      INTEGER, INTENT(IN) :: nX
+      INTEGER, INTENT(IN) :: nX, nG
       REAL(KIND=8), INTENT(IN) :: t1, I4f
-      REAL(KIND=8), INTENT(INOUT) :: X(nX), yl
+      REAL(KIND=8), INTENT(INOUT) :: X(nX), Xg(nG), yl
 
       INTEGER i, icl, nt
-      REAL(KIND=8) :: t, Ts, Te, Istim, Ksac
+      REAL(KIND=8) :: t, Ts, Te, Istim, Ksac, epsX
 
       INTEGER, ALLOCATABLE :: IPAR(:)
       REAL(KIND=8), ALLOCATABLE :: RPAR(:)
@@ -277,7 +289,7 @@
 
 !              Electromechanics excitation-activation
                IF (cem%aStress) THEN
-                  CALL AP_ACTVSTRS(X(1), cep%dt, yl)
+                  CALL AP_ACTVSTRS(X(1), cep%dt, yl, epsX)
                END IF
             END DO
 
@@ -293,7 +305,7 @@
 
 !              Electromechanics excitation-activation
                IF (cem%aStress) THEN
-                  CALL AP_ACTVSTRS(X(1), cep%dt, yl)
+                  CALL AP_ACTVSTRS(X(1), cep%dt, yl, epsX)
                END IF
             END DO
 
@@ -310,7 +322,74 @@
 
 !              Electromechanics excitation-activation
                IF (cem%aStress) THEN
-                  CALL AP_ACTVSTRS(X(1), cep%dt, yl)
+                  CALL AP_ACTVSTRS(X(1), cep%dt, yl, epsX)
+               END IF
+            END DO
+         END SELECT
+
+      CASE (cepModel_BO)
+         ALLOCATE(IPAR(2), RPAR(5))
+         IPAR(1) = cep%odes%maxItr
+         IPAR(2) = 0
+         RPAR(:) = 0D0
+         RPAR(1) = cep%odes%absTol
+         RPAR(2) = cep%odes%relTol
+
+         SELECT CASE (cep%odes%tIntType)
+         CASE (tIntType_FE)
+            DO i=1, nt
+               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
+                  Istim = cep%Istim%A
+               ELSE
+                  Istim = 0D0
+               END IF
+               CALL BO_INTEGFE(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
+     2            RPAR)
+
+!              Electromechanics excitation-activation
+               IF (cem%aStress) THEN
+                  CALL BO_ACTVSTRS(X(1), cep%dt, yl, epsX)
+               ELSE IF (cem%aStrain) THEN
+                  CALL BO_ACTVSTRN(X(4), I4f, cep%dt, yl)
+               END IF
+            END DO
+
+         CASE (tIntType_RK4)
+            DO i=1, nt
+               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
+                  Istim = cep%Istim%A
+               ELSE
+                  Istim = 0D0
+               END IF
+               CALL BO_INTEGRK(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
+     2            RPAR)
+
+!              Electromechanics excitation-activation
+               IF (cem%aStress) THEN
+                  CALL BO_ACTVSTRS(X(1), cep%dt, yl, epsX)
+               ELSE IF (cem%aStrain) THEN
+                  CALL BO_ACTVSTRN(X(4), I4f, cep%dt, yl)
+               END IF
+            END DO
+
+         CASE (tIntType_CN2)
+            DO i=1, nt
+               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
+                  Istim = cep%Istim%A
+               ELSE
+                  Istim = 0D0
+               END IF
+               CALL BO_INTEGCN2(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
+     2            IPAR, RPAR)
+
+!              Electromechanics excitation-activation
+               IF (cem%aStress) THEN
+                  CALL BO_ACTVSTRS(X(1), cep%dt, yl, epsX)
+               ELSE IF (cem%aStrain) THEN
+                  CALL BO_ACTVSTRN(X(4), I4f, cep%dt, yl)
                END IF
             END DO
          END SELECT
@@ -375,12 +454,12 @@
                ELSE
                   Istim = 0D0
                END IF
-               CALL TTP_INTEGFE(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
-     2            RPAR)
+               CALL TTP_INTEGFE(cep%imyo, nX, nG, X, Xg, t, cep%dt,
+     2            Istim, Ksac, RPAR)
 
 !              Electromechanics excitation-activation
                IF (cem%aStress) THEN
-                  CALL TTP_ACTVSTRS(X(4), cep%dt, yl)
+                  CALL TTP_ACTVSTRS(X(4), cep%dt, yl, epsX)
                ELSE IF (cem%aStrain) THEN
                   CALL TTP_ACTVSTRN(X(4), I4f, cep%dt, yl)
                END IF
@@ -394,12 +473,12 @@
                ELSE
                   Istim = 0D0
                END IF
-               CALL TTP_INTEGRK(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
-     2            RPAR)
+               CALL TTP_INTEGRK(cep%imyo, nX, nG, X, Xg, t, cep%dt,
+     2            Istim, Ksac, RPAR)
 
 !              Electromechanics excitation-activation
                IF (cem%aStress) THEN
-                  CALL TTP_ACTVSTRS(X(4), cep%dt, yl)
+                  CALL TTP_ACTVSTRS(X(4), cep%dt, yl, epsX)
                ELSE IF (cem%aStrain) THEN
                   CALL TTP_ACTVSTRN(X(4), I4f, cep%dt, yl)
                END IF
@@ -413,81 +492,14 @@
                ELSE
                   Istim = 0D0
                END IF
-               CALL TTP_INTEGCN2(cep%imyo, nX, X, t, cep%dt, Istim,
-     2            Ksac, IPAR, RPAR)
+               CALL TTP_INTEGCN2(cep%imyo, nX, nG, X, Xg, t, cep%dt,
+     2            Istim, Ksac, IPAR, RPAR)
 
 !              Electromechanics excitation-activation
                IF (cem%aStress) THEN
-                  CALL TTP_ACTVSTRS(X(4), cep%dt, yl)
+                  CALL TTP_ACTVSTRS(X(4), cep%dt, yl, epsX)
                ELSE IF (cem%aStrain) THEN
                   CALL TTP_ACTVSTRN(X(4), I4f, cep%dt, yl)
-               END IF
-            END DO
-         END SELECT
-
-      CASE (cepModel_BO)
-         ALLOCATE(IPAR(2), RPAR(5))
-         IPAR(1) = cep%odes%maxItr
-         IPAR(2) = 0
-         RPAR(:) = 0D0
-         RPAR(1) = cep%odes%absTol
-         RPAR(2) = cep%odes%relTol
-
-         SELECT CASE (cep%odes%tIntType)
-         CASE (tIntType_FE)
-            DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
-                  Istim = cep%Istim%A
-               ELSE
-                  Istim = 0D0
-               END IF
-               CALL BO_INTEGFE(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
-     2            RPAR)
-
-!              Electromechanics excitation-activation
-               IF (cem%aStress) THEN
-                  CALL BO_ACTVSTRS(X(1), cep%dt, yl)
-               ELSE IF (cem%aStrain) THEN
-                  CALL BO_ACTVSTRN(X(4), I4f, cep%dt, yl)
-               END IF
-            END DO
-
-         CASE (tIntType_RK4)
-            DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
-                  Istim = cep%Istim%A
-               ELSE
-                  Istim = 0D0
-               END IF
-               CALL BO_INTEGRK(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
-     2            RPAR)
-
-!              Electromechanics excitation-activation
-               IF (cem%aStress) THEN
-                  CALL BO_ACTVSTRS(X(1), cep%dt, yl)
-               ELSE IF (cem%aStrain) THEN
-                  CALL BO_ACTVSTRN(X(4), I4f, cep%dt, yl)
-               END IF
-            END DO
-
-         CASE (tIntType_CN2)
-            DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
-               IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
-                  Istim = cep%Istim%A
-               ELSE
-                  Istim = 0D0
-               END IF
-               CALL BO_INTEGCN2(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
-     2            IPAR, RPAR)
-
-!              Electromechanics excitation-activation
-               IF (cem%aStress) THEN
-                  CALL BO_ACTVSTRS(X(1), cep%dt, yl)
-               ELSE IF (cem%aStrain) THEN
-                  CALL BO_ACTVSTRN(X(4), I4f, cep%dt, yl)
                END IF
             END DO
          END SELECT

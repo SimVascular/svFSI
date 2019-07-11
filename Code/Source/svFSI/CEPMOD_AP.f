@@ -116,36 +116,33 @@
 
       INCLUDE "PARAMS_AP.f"
 
-      REAL(KIND=8) :: t, trk, dt, fext, Isac, Xrk(nX,4), frk(nX,4)
+      REAL(KIND=8) :: t, dt, dt6, fext, Isac, Xrk(nX), frk(nX,4)
 
       t    = Ts / Tscale
       dt   = Ti / Tscale
+      dt6  = dt / 6.0D0
+
       Isac = Ksac * (Vrest - X(1))
       fext = (Istim + Isac) * Tscale / Vscale
-
       X(1) = (X(1) - Voffset)/Vscale
+
 !     RK4: 1st pass
-      trk = t
-      Xrk(:,1) = X(:)
-      CALL AP_GETF(nX, Xrk(:,1), frk(:,1), fext)
+      Xrk  = X
+      CALL AP_GETF(nX, Xrk, frk(:,1), fext)
 
 !     RK4: 2nd pass
-      trk = t + dt/2.0D0
-      Xrk(:,2) = X(:) + dt*frk(:,1)/2.0D0
-      CALL AP_GETF(nX, Xrk(:,2), frk(:,2), fext)
+      Xrk  = X + dt*frk(:,1)/2.0D0
+      CALL AP_GETF(nX, Xrk, frk(:,2), fext)
 
 !     RK4: 3rd pass
-      trk = t + dt/2.0D0
-      Xrk(:,3) = X(:) + dt*frk(:,2)/2.0D0
-      CALL AP_GETF(nX, Xrk(:,3), frk(:,3), fext)
+      Xrk  = X + dt*frk(:,2)/2.0D0
+      CALL AP_GETF(nX, Xrk, frk(:,3), fext)
 
 !     RK4: 4th pass
-      trk = t + dt
-      Xrk(:,4) = X(:) + dt*frk(:,3)
-      CALL AP_GETF(nX, Xrk(:,4), frk(:,4), fext)
+      Xrk  = X + dt*frk(:,3)
+      CALL AP_GETF(nX, Xrk, frk(:,4), fext)
 
-      X(:) = X(:) + (dt/6.0D0) * ( frk(:,1) + 2.0D0*frk(:,2) +
-     2   2.0D0*frk(:,3) + frk(:,4) )
+      X = X + dt6*(frk(:,1) + 2.0D0*(frk(:,2) + frk(:,3)) + frk(:,4))
 
       X(1) = X(1)*Vscale + Voffset
 
@@ -273,19 +270,20 @@
 !-----------------------------------------------------------------------
 !     Compute activation force for electromechanics based on active
 !     stress model
-      SUBROUTINE AP_ACTVSTRS(X, dt, Tact)
+      SUBROUTINE AP_ACTVSTRS(X, dt, Tact, epsX)
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: X, dt
+      REAL(KIND=8), INTENT(OUT) :: epsX
       REAL(KIND=8), INTENT(INOUT) :: Tact
 
       INCLUDE "PARAMS_AP.f"
 
-      REAL(KIND=8) :: rt, nr
+      REAL(KIND=8) :: nr
 
-      rt = EXP(-EXP(-xi_T*(X - Vcrit)))
-      rt = (eps_0 + (eps_i - eps_0)*rt)*dt
-      nr = Tact + rt*eta_T*(X - Vrest)
-      Tact = nr / (1.0D0 + rt)
+      epsX = EXP(-EXP(-xi_T*(X - Vcrit)))
+      epsX = eps_0 + (eps_i - eps_0)*epsX
+      nr   = Tact + epsX*dt*eta_T*(X - Vrest)
+      Tact = nr / (1.0D0 + epsX*dt)
 
       RETURN
       END SUBROUTINE AP_ACTVSTRS

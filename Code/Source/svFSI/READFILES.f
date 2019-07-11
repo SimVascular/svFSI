@@ -1726,30 +1726,37 @@ c     2         "can be applied for Neumann boundaries only"
       CHARACTER(LEN=stdL) ctmp
 
       lPtr => lPD%get(ctmp, "Electrophysiology model")
+      lDmn%cep%nG = 0
       CALL TO_LOWER(ctmp)
       SELECT CASE(TRIM(ctmp))
       CASE ("ap", "aliev-panfilov")
          lDmn%cep%cepType = cepModel_AP
+         lDmn%cep%nX = 2
          IF (cem%aStrain) err = " Active strain is not formulated "//
      2      "Aliev-Panfilov model"
 
+      CASE ("bo", "bueno-orovio")
+         lDmn%cep%cepType = cepModel_BO
+         lDmn%cep%nX = 4
+
       CASE ("fn", "fitzhugh-nagumo")
          lDmn%cep%cepType = cepModel_FN
+         lDmn%cep%nX = 2
          IF (cem%cpld) err = " Electromechanics is not formulated "//
      2      "Fitzhugh-Nagumo model"
 
       CASE ("ttp", "tentusscher-panfilov")
          lDmn%cep%cepType = cepModel_TTP
-
-      CASE ("bo", "bueno-orovio")
-         lDmn%cep%cepType = cepModel_BO
+         lDmn%cep%nX = 7
+         lDmn%cep%nG = 12
 
       CASE DEFAULT
          err = "Unknown electrophysiology model"
       END SELECT
 
-      lPtr => lPD%get(lDmn%cep%nX, "State variables", ll=1)
-      IF (nXion .LT. lDmn%cep%nX) nXion = lDmn%cep%nX
+      IF (nXion .LT. lDmn%cep%nX + lDmn%cep%nG) THEN
+         nXion = lDmn%cep%nX + lDmn%cep%nG
+      END IF
 
       lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
       i = lPD%srch("Conductivity (ani)")
@@ -1771,10 +1778,13 @@ c     2         "can be applied for Neumann boundaries only"
          SELECT CASE (TRIM(ctmp))
          CASE ("epi", "epicardium")
             lDmn%cep%imyo = 1
+
          CASE ("endo", "endocardium")
             lDmn%cep%imyo = 2
+
          CASE ("myo", "mid-myo", "myocardium")
             lDmn%cep%imyo = 3
+
          CASE DEFAULT
             err = "Undefined myocardium zone"
          END SELECT
@@ -1813,10 +1823,18 @@ c     2         "can be applied for Neumann boundaries only"
          SELECT CASE (ctmp)
          CASE ("fe", "euler", "explicit")
             lDmn%cep%odes%tIntType = tIntType_FE
+
          CASE ("rk", "rk4", "runge")
             lDmn%cep%odes%tIntType = tIntType_RK4
+
          CASE ("cn", "cn2", "implicit")
             lDmn%cep%odes%tIntType = tIntType_CN2
+            IF (lDmn%cep%cepType .EQ. cepModel_TTP) THEN
+               err = "Implicit time integration for tenTusscher-"//
+     2            "Panfilov model can give unexpected results. "//
+     3            "Use FE or RK4 instead"
+            END IF
+
          CASE DEFAULT
             err = " Unknown ODE time integrator"
          END SELECT

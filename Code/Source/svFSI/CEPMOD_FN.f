@@ -112,35 +112,32 @@
 
       INCLUDE "PARAMS_FN.f"
 
-      REAL(KIND=8) :: t, trk, dt, fext, Xrk(nX,4), frk(nX,4)
+      REAL(KIND=8) :: t, dt, dt6, fext, Xrk(nX), frk(nX,4)
 
       t    = Ts / Tscale
       dt   = Ti / Tscale
-      fext = Istim * Tscale / Vscale
+      dt6  = dt / 6.0D0
 
+      fext = Istim * Tscale / Vscale
       X(1) = (X(1) - Voffset)/Vscale
+
 !     RK4: 1st pass
-      trk = t
-      Xrk(:,1) = X(:)
-      CALL FN_GETF(nX, Xrk(:,1), frk(:,1), fext)
+      Xrk  = X
+      CALL FN_GETF(nX, Xrk, frk(:,1), fext)
 
 !     RK4: 2nd pass
-      trk = t + dt/2.0D0
-      Xrk(:,2) = X(:) + dt*frk(:,1)/2.0D0
-      CALL FN_GETF(nX, Xrk(:,2), frk(:,2), fext)
+      Xrk  = X + dt*frk(:,1)/2.0D0
+      CALL FN_GETF(nX, Xrk, frk(:,2), fext)
 
 !     RK4: 3rd pass
-      trk = t + dt/2.0D0
-      Xrk(:,3) = X(:) + dt*frk(:,2)/2.0D0
-      CALL FN_GETF(nX, Xrk(:,3), frk(:,3), fext)
+      Xrk  = X + dt*frk(:,2)/2.0D0
+      CALL FN_GETF(nX, Xrk, frk(:,3), fext)
 
 !     RK4: 4th pass
-      trk = t + dt
-      Xrk(:,4) = X(:) + dt*frk(:,3)
-      CALL FN_GETF(nX, Xrk(:,4), frk(:,4), fext)
+      Xrk  = X + dt*frk(:,3)
+      CALL FN_GETF(nX, Xrk, frk(:,4), fext)
 
-      X(:) = X(:) + (dt/6.0D0) * ( frk(:,1) + 2.0D0*frk(:,2) +
-     2   2.0D0*frk(:,3) + frk(:,4) )
+      X = X + dt6*(frk(:,1) + 2.0D0*(frk(:,2) + frk(:,3)) + frk(:,4))
 
       X(1) = X(1)*Vscale + Voffset
 

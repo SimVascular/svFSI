@@ -67,17 +67,17 @@
 
       INCLUDE "PARAMS_BO.f"
 
-      INTEGER :: i, iPar
       REAL(KIND=8) :: t, dt, f(nX), fext, Isac
 
       t    = Ts / Tscale
       dt   = Ti / Tscale
+
       Isac = Ksac * (Vrest - X(1))
       fext = (Istim + Isac) * Tscale / Vscale
 
       X(1) = (X(1) - Voffset)/Vscale
 
-      CALL BO_GETF(imyo, nX, t, X, f, fext, RPAR)
+      CALL BO_GETF(imyo, nX, X, f, fext, RPAR)
       X(:) = X(:) + dt*f(:)
 
       X(1) = X(1)*Vscale + Voffset
@@ -94,37 +94,33 @@
 
       INCLUDE "PARAMS_BO.f"
 
-      INTEGER :: i
-      REAL(KIND=8) :: t, trk, dt, fext, Isac, Xrk(nX,4), frk(nX,4)
+      REAL(KIND=8) :: t, dt, dt6, fext, Isac, Xrk(nX), frk(nX,4)
 
       t    = Ts / Tscale
       dt   = Ti / Tscale
+      dt6  = dt/6.0D0
+
       Isac = Ksac * (Vrest - X(1))
       fext = (Istim + Isac) * Tscale / Vscale
-
       X(1) = (X(1) - Voffset)/Vscale
+
 !     RK4: 1st pass
-      trk = t
-      Xrk(:,1) = X(:)
-      CALL BO_GETF(imyo, nX, trk, Xrk(:,1), frk(:,1), fext, RPAR)
+      Xrk  = X
+      CALL BO_GETF(imyo, nX, Xrk, frk(:,1), fext, RPAR)
 
 !     RK4: 2nd pass
-      trk = t + dt/2.0D0
-      Xrk(:,2) = X(:) + dt*frk(:,1)/2.0D0
-      CALL BO_GETF(imyo, nX, trk, Xrk(:,2), frk(:,2), fext, RPAR)
+      Xrk  = X + dt*frk(:,1)/2.0D0
+      CALL BO_GETF(imyo, nX, Xrk, frk(:,2), fext, RPAR)
 
 !     RK4: 3rd pass
-      trk = t + dt/2.0D0
-      Xrk(:,3) = X(:) + dt*frk(:,2)/2.0D0
-      CALL BO_GETF(imyo, nX, trk, Xrk(:,3), frk(:,3), fext, RPAR)
+      Xrk  = X + dt*frk(:,2)/2.0D0
+      CALL BO_GETF(imyo, nX, Xrk, frk(:,3), fext, RPAR)
 
 !     RK4: 4th pass
-      trk = t + dt
-      Xrk(:,4) = X(:) + dt*frk(:,3)
-      CALL BO_GETF(imyo, nX, trk, Xrk(:,4), frk(:,4), fext, RPAR)
+      Xrk  = X + dt*frk(:,3)
+      CALL BO_GETF(imyo, nX, Xrk, frk(:,4), fext, RPAR)
 
-      X(:) = X(:) + (dt/6.0D0) * ( frk(:,1) + 2.0D0*frk(:,2) +
-     2   2.0D0*frk(:,3) + frk(:,4) )
+      X = X + dt6*(frk(:,1) + 2.0D0*(frk(:,2) + frk(:,3)) + frk(:,4))
 
       X(1) = X(1)*Vscale + Voffset
 
@@ -162,7 +158,7 @@
       Xn(1) = (Xn(1) - Voffset)/Vscale
       Im    = MAT_ID(nX)
 
-      CALL BO_GETF(imyo, nX, t, Xn, fn, fext, RPAR)
+      CALL BO_GETF(imyo, nX, Xn, fn, fext, RPAR)
 
       k  = 0
       Xk = Xn
@@ -172,7 +168,7 @@
       t  = Ts + dt
       DO
          k = k + 1
-         CALL BO_GETF(imyo, nX, t, Xk, fk, fext, RPAR)
+         CALL BO_GETF(imyo, nX, Xk, fk, fext, RPAR)
          rK(:) = Xk(:) - Xn(:) - 0.5D0*dt*(fk(:) + fn(:))
 
          rmsA = 0D0
@@ -189,14 +185,14 @@
          l3   = rmsR .LE. rtol
          IF (l1 .OR. l2 .OR. l3) EXIT
 
-         CALL BO_GETJ(imyo, nX, t, Xk, JAC)
+         CALL BO_GETJ(imyo, nX, Xk, JAC)
          JAC   = Im - 0.5D0*dt*JAC
          JAC   = MAT_INV(JAC, nX)
          rK(:) = MATMUL(JAC, rK)
          Xk(:) = Xk(:) - rK(:)
       END DO
       Xn(:) = Xk(:)
-      CALL BO_GETF(imyo, nX, t, Xn, fn, fext, RPAR)
+      CALL BO_GETF(imyo, nX, Xn, fn, fext, RPAR)
       Xn(1) = Xn(1)*Vscale + Voffset
 
       IF (.NOT.l2 .AND. .NOT.l3) IPAR(2) = IPAR(2) + 1
@@ -204,10 +200,10 @@
       RETURN
       END SUBROUTINE BO_INTEGCN2
 !-----------------------------------------------------------------------
-      SUBROUTINE BO_GETF(i, n, t, X, f, fext, RPAR)
+      SUBROUTINE BO_GETF(i, n, X, f, fext, RPAR)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: i, n
-      REAL(KIND=8), INTENT(IN) :: t, X(n), fext
+      REAL(KIND=8), INTENT(IN) :: X(n), fext
       REAL(KIND=8), INTENT(OUT) :: f(n)
       REAL(KIND=8), INTENT(INOUT) :: RPAR(5)
 
@@ -259,10 +255,10 @@
       RETURN
       END SUBROUTINE BO_GETF
 !-----------------------------------------------------------------------
-      SUBROUTINE BO_GETJ(i, n, t, X, JAC)
+      SUBROUTINE BO_GETJ(i, n, X, JAC)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: i, n
-      REAL(KIND=8), INTENT(IN) :: t, X(n)
+      REAL(KIND=8), INTENT(IN) :: X(n)
       REAL(KIND=8), INTENT(OUT) :: JAC(n,n)
 
       INCLUDE "PARAMS_BO.f"
@@ -331,19 +327,22 @@
       RETURN
       END SUBROUTINE BO_GETJ
 !-----------------------------------------------------------------------
-      SUBROUTINE BO_ACTVSTRS(X, dt, Tact)
+!     Compute activation force for electromechanics based on active
+!     stress model
+      SUBROUTINE BO_ACTVSTRS(X, dt, Tact, epsX)
       IMPLICIT NONE
       REAL(KIND=8), INTENT(IN) :: X, dt
+      REAL(KIND=8), INTENT(OUT) :: epsX
       REAL(KIND=8), INTENT(INOUT) :: Tact
 
       INCLUDE "PARAMS_BO.f"
 
-      REAL(KIND=8) :: rt, nr
+      REAL(KIND=8) :: nr
 
-      rt = EXP(-EXP(-xi_T*(X - Vcrit)))
-      rt = (eps_0 + (eps_i - eps_0)*rt)*dt
-      nr = Tact + rt*eta_T*(X - Vrest)
-      Tact = nr / (1.0D0 + rt)
+      epsX = EXP(-EXP(-xi_T*(X - Vcrit)))
+      epsX = eps_0 + (eps_i - eps_0)*epsX
+      nr   = Tact + epsX*dt*eta_T*(X - Vrest)
+      Tact = nr / (1.0D0 + epsX*dt)
 
       RETURN
       END SUBROUTINE BO_ACTVSTRS

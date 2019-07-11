@@ -39,15 +39,16 @@
 
       MODULE CEPMOD
       USE APMOD
+      USE BOMOD
       USE FNMOD
       USE TTPMOD
-      USE BOMOD
       IMPLICIT NONE
 
 !     Type of cardiac electrophysiology models: Aliev-Panfilov model,
-!     tenTusscher-Panfilov model, Bueno-Orovio model
+!     Bueno-Orovio-Cherry-Fenton model, Fitzhugh-Nagumo model,
+!     tenTusscher-Panfilov 2006 model
       INTEGER, PARAMETER :: cepModel_NA = 100, cepModel_AP = 101,
-     2   cepModel_FN = 102, cepModel_TTP = 103, cepModel_BO = 104
+     2   cepModel_BO = 102, cepModel_FN = 103, cepModel_TTP = 104
 
 !     Time integration scheme: Forward-Euler, Runge-Kutta 4th order,
 !     Crank-Nicholson
@@ -59,41 +60,43 @@
 !        Time integration method type
          INTEGER :: tIntType = tIntType_NA
 !        Max. iterations for Newton-Raphson method
-         INTEGER :: maxItr
+         INTEGER :: maxItr = 5
 !        Absolute tolerance
-         REAL(KIND=8) :: absTol
+         REAL(KIND=8) :: absTol = 1D-8
 !        Relative tolerance
-         REAL(KIND=8) :: relTol
+         REAL(KIND=8) :: relTol = 1D-4
       END TYPE odeType
 
 !     External stimulus type
       TYPE stimType
 !        start time
-         REAL(KIND=8) :: Ts
+         REAL(KIND=8) :: Ts = 0D0
 !        duration of stimulus
-         REAL(KIND=8) :: Td
+         REAL(KIND=8) :: Td = 0D0
 !        cycle length
-         REAL(KIND=8) :: CL
+         REAL(KIND=8) :: CL = 0D0
 !        stimulus amplitude
-         REAL(KIND=8) :: A
+         REAL(KIND=8) :: A = 0D0
       END TYPE stimType
 
 !     Cardiac electrophysiology model type
       TYPE cepModelType
 !        Type of cardiac electrophysiology model
          INTEGER :: cepType = cepModel_NA
-!        Number of unknowns
+!        Number of state variables
          INTEGER :: nX
+!        Number of gating variables
+         INTEGER :: nG
 !        Number of fiber directions
          INTEGER :: nFn
 !        Myocardium zone id
          INTEGER :: imyo
 !        Time step for integration
          REAL(KIND=8) :: dt
-!        Isotropic conductivity
-         REAL(KIND=8) :: Diso = 0D0
 !        Constant for stretch-activated-currents
          REAL(KIND=8) :: Ksac
+!        Isotropic conductivity
+         REAL(KIND=8) :: Diso = 0D0
 !        Anisotropic conductivity
          REAL(KIND=8), ALLOCATABLE :: Dani(:)
 !        External stimulus
@@ -118,9 +121,9 @@
 
 !     Whether cardiac electrophysiology is solved
       LOGICAL cepEq
-!     Max. number of unknowns in cellular activation model
+!     Max. dof in cellular activation model
       INTEGER :: nXion = 0
-!     State variables stored at all nodes
+!     Unknowns stored at all nodes
       REAL(KIND=8), ALLOCATABLE :: Xion(:,:)
 !     Cardiac electromechanics type
       TYPE(cemModelType) :: cem

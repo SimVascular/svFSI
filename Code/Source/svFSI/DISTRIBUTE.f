@@ -476,6 +476,7 @@
          IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP) THEN
             CALL cm%bcast(lEq%dmn(iDmn)%cep%cepType)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nX)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%nG)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nFn)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%imyo)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%dt)

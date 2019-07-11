@@ -228,26 +228,30 @@
 !     I_xfer: diffusive Ca current
       REAL(KIND=8) :: I_xfer
 !-----------------------------------------------------------------------
-!     Other auxillary variables
+!     State variables
       REAL(KIND=8) :: V
       REAL(KIND=8) :: K_i
       REAL(KIND=8) :: Na_i
       REAL(KIND=8) :: Ca_i
+      REAL(KIND=8) :: Ca_ss
+      REAL(KIND=8) :: Ca_sr
+      REAL(KIND=8) :: R_bar
+
+!     Gating variables (runtime, steady state)
       REAL(KIND=8) :: xr1, xr1i
       REAL(KIND=8) :: xr2, xr2i
       REAL(KIND=8) :: xs, xsi
       REAL(KIND=8) :: m, mi
       REAL(KIND=8) :: h, hi
       REAL(KIND=8) :: j, ji
-      REAL(KIND=8) :: Ca_ss
       REAL(KIND=8) :: d, di
       REAL(KIND=8) :: f, fi
       REAL(KIND=8) :: f2, f2i
       REAL(KIND=8) :: fcass, fcassi
       REAL(KIND=8) :: s, si
       REAL(KIND=8) :: r, ri
-      REAL(KIND=8) :: Ca_sr
-      REAL(KIND=8) :: R_bar
+
+!     Other variables
       REAL(KIND=8) :: k1
       REAL(KIND=8) :: k2
       REAL(KIND=8) :: k_casr
@@ -255,13 +259,12 @@
 
 !     Jacobian variables
       REAL(KIND=8) :: E_Na_Nai, E_K_Ki, E_Ca_Cai, E_Ks_Ki, E_Ks_Nai
-      REAL(KINd=8) :: I_Na_V, I_Na_Nai, I_Na_m, I_Na_h, I_Na_j
-      REAL(KIND=8) :: I_to_V, I_to_Ki, I_to_s, I_to_r
+      REAL(KINd=8) :: I_Na_V, I_Na_Nai
+      REAL(KIND=8) :: I_to_V, I_to_Ki
       REAL(KIND=8) :: I_K1_V, I_K1_Ki
-      REAL(KIND=8) :: I_Kr_V, I_Kr_Ki, I_Kr_xr1, I_Kr_xr2
-      REAL(KIND=8) :: I_Ks_V, I_Ks_Ki, I_Ks_Nai, I_Ks_xs
-      REAL(KIND=8) :: I_CaL_V, I_CaL_Cass, I_CaL_d, I_CaL_f, I_CaL_f2,
-     2   I_CaL_fcass
+      REAL(KIND=8) :: I_Kr_V, I_Kr_Ki
+      REAL(KIND=8) :: I_Ks_V, I_Ks_Ki, I_Ks_Nai
+      REAL(KIND=8) :: I_CaL_V, I_CaL_Cass
       REAL(KIND=8) :: I_NaCa_V, I_NaCa_Nai, I_NaCa_Cai
       REAL(KIND=8) :: I_NaK_V, I_NaK_Nai
       REAL(KIND=8) :: I_pCa_Cai
