@@ -52,6 +52,7 @@
             IF (msh(iM)%lFib) CYCLE
             CALL FACEINI(msh(iM)%fa(iFa))
          END DO
+         IF (msh(iM)%lShl) CALL SHLINI(msh(iM))
       END DO
 
 !     Initialize face BC profile
@@ -141,7 +142,23 @@
                gNodes(i) = a
             END IF
          END DO
-         CALL FSILS_BC_CREATE(lhs, nFacesLS, i, nsd, BC_TYPE_Dir,gNodes)
+         lsPtr = nFacesLS
+         CALL FSILS_BC_CREATE(lhs, lsPtr, i, nsd, BC_TYPE_Dir, gNodes)
+         DEALLOCATE(gNodes)
+      END IF
+
+      IF (cmmInit) THEN
+         i = SUM(cmmBdry)
+         ALLOCATE(gNodes(i))
+         i = 0
+         DO a=1, tnNo
+            IF (cmmBdry(a) .EQ. 1) THEN
+               i = i + 1
+               gNodes(i) = a
+            END IF
+         END DO
+         lsPtr = nFacesLS
+         CALL FSILS_BC_CREATE(lhs, lsPtr, i, nsd, BC_TYPE_Dir, gNodes)
          DEALLOCATE(gNodes)
       END IF
 
@@ -229,6 +246,9 @@
          RETURN
       END IF
 
+      IF (BTEST(lBc%bType,bType_Robin) .AND. .NOT.dFlag) err =
+     2    "Robin BC can be set for a displacement-based eqn only"
+
       iM  = lFa%iM
       iFa = lBc%iFa
       IF (.NOT.ALLOCATED(lBc%gx)) ALLOCATE(lBc%gx(lFa%nNo))
@@ -315,8 +335,6 @@
             Ac    = lFa%gN(a)
             s(Ac) = lBc%gx(a)
          END DO
-      ELSE IF (BTEST(lBc%bType,bType_ddep)) THEN
-         s = 1D0
       END IF
 
 !     Now correcting the inlet BC for the inlet ring
@@ -467,31 +485,21 @@
       RETURN
       END SUBROUTINE FSILSINI
 !####################################################################
-!     Initializing shells
-      SUBROUTINE SHLINI(lM)
+!     Compute shell extended IEN for triangular elements. Reqd. to
+!     resolve bending moments
+      SUBROUTINE SETSHLXIEN(lM)
       USE COMMOD
-      USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER :: a, b, e, f, g, Ac, Bc, nNo, nEl, eNoN, ep(2,3)
-      LOGICAL :: flag
-      REAL(KIND=8) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
+      INTEGER :: a, b, e, f, Ac, Bc, nEl, eNoN, ep(2,3)
 
       INTEGER, ALLOCATABLE :: incN(:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sV(:,:)
 
-      IF (lM%eType .EQ. eType_NRB) THEN
-         ALLOCATE(lM%eIEN(0,0), lM%sbc(lM%eNoN,lM%nEl))
-         lM%sbc = 0
-         RETURN
-      END IF
+      eNoN = lM%eNoN
+      nEl  = lM%nEl
 
       ep   = RESHAPE((/2,3,3,1,1,2/), SHAPE(ep))
-      nNo  = lM%nNo
-      nEl  = lM%nEl
-      eNoN = lM%eNoN
       ALLOCATE(incN(eNoN), lM%eIEN(eNoN,nEl), lM%sbc(eNoN,nEl))
 
       lM%eIEN = 0
@@ -517,13 +525,33 @@
                   EXIT
                END IF
             END DO
-
             IF (lM%eIEN(a,e) .EQ. 0) THEN
                lM%sbc(a,e) = IBSET(lM%sbc(a,e), bType_free)
             END IF
          END DO
       END DO
       DEALLOCATE(incN)
+
+      RETURN
+      END SUBROUTINE SETSHLXIEN
+!--------------------------------------------------------------------
+!     Initializing shell normals and area
+      SUBROUTINE SHLINI(lM)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+
+      INTEGER :: a, e, g, Ac, nNo, nEl, eNoN
+      LOGICAL :: flag
+      REAL(KIND=8) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
+
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sV(:,:)
+
+      nNo  = lM%nNo
+      nEl  = lM%nEl
+      eNoN = lM%eNoN
 
 !     Compute shell director (normal)
       ALLOCATE(xl(nsd,eNoN), sV(nsd,tnNo), lM%nV(nsd,nNo))

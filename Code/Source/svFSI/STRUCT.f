@@ -43,14 +43,14 @@
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
-     3   fN(3,nFn), pS0l(nstd,eNoN), ya_l(eNoN)
-      REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
+     2   yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN), fN(3,nFn),
+     3   pS0l(6,eNoN), ya_l(eNoN)
+      REAL(KIND=8), INTENT(OUT) :: pSl(6)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: a, b, i, j, k
-      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, bf(3), ud(3), NxSNx,
+      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3), NxSNx,
      2   BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3), Bm(6,3,eNoN),
      3   CC(3,3,3,3), S0(3,3)
       TYPE (stModelType) :: stModel
@@ -59,9 +59,9 @@
       stModel = eq(cEq)%dmn(cDmn)%stM
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
-      bf(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
-      bf(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
-      bf(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
+      fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
       amd     = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
       afl     = eq(cEq)%af*eq(cEq)%beta*dt*dt
       i       = eq(cEq)%s
@@ -69,7 +69,7 @@
       k       = j + 1
 
 !     Inertia, body force and deformation tensor (F)
-      ud     = -rho*bf
+      ud     = -rho*fb
       F      = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
@@ -117,7 +117,7 @@
       pSl(6) = S(2,3)
 
 !     Active stress - electromechanics
-      IF (cem%aStress) CALL ACTVSTRESS(ya_g, F, nFn, fN, S)
+      IF (cem%aStress) CALL ACTVSTRESS(ya_g, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
@@ -260,14 +260,14 @@
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(nsd,eNoN),
-     3   fN(2,nFn), pS0l(nstd,eNoN), ya_l(eNoN)
-      REAL(KIND=8), INTENT(OUT) :: pSl(nstd)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
+     2   yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN), fN(2,nFn),
+     3   pS0l(3,eNoN), ya_l(eNoN)
+      REAL(KIND=8), INTENT(OUT) :: pSl(3)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: a, b, i, j
-      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, bf(2), ud(2), NxSNx,
+      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, fb(2), ud(2), NxSNx,
      2   BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2), Bm(3,2,eNoN),
      3   CC(2,2,2,2), S0(2,2)
       TYPE (stModelType) :: stModel
@@ -276,15 +276,15 @@
       stModel = eq(cEq)%dmn(cDmn)%stM
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
-      bf(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
-      bf(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       amd     = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
       afl     = eq(cEq)%af*eq(cEq)%beta*dt*dt
       i       = eq(cEq)%s
       j       = i + 1
 
 !     Inertia, body force and deformation tensor (F)
-      ud     = -rho*bf
+      ud     = -rho*fb
       F      = 0D0
       F(1,1) = 1D0
       F(2,2) = 1D0
@@ -317,7 +317,7 @@
       pSl(3) = S(1,2)
 
 !     Active stress - electromechanics
-      IF (cem%aStress) CALL ACTVSTRESS(ya_g, F, nFn, fN, S)
+      IF (cem%aStress) CALL ACTVSTRESS(ya_g, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)

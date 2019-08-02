@@ -476,6 +476,8 @@
       b      = 200.0D0/(1.0D0 + EXP((13.0D0-V)/10.0D0))
       c      = 180.0D0/(1.0D0 + EXP((30.0D0+V)/10.0D0)) + 20.0D0
       tau    = a + b + c
+c!     for spiral wave breakup
+c      IF (V .GT. 0D0) tau = tau*2.0D0
       Xg(8)  = fi - (fi - f)*EXP(-dt/tau)
 
 !     f2: fast inactivation gate for I_CaL

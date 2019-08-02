@@ -36,58 +36,6 @@
 !
 !--------------------------------------------------------------------
 
-!     This is to find if any exception occures, commenting this out
-!     untill fortran2003 is standard in all compilers
-      SUBROUTINE EXCEPTIONS
-
-c      USE IEEE_EXCEPTIONS
-      USE COMMOD, ONLY: stdL
-
-      IMPLICIT NONE
-
-!     I am assuming nExCk is 5, if a compilation error occured, you need
-!     to adjust the following arrays accordingely
-c      INTEGER, PARAMETER :: nExCk = SIZE(IEEE_ALL)
-c      LOGICAL, PARAMETER :: check(nExCk) =
-c     2   (/.TRUE.,.TRUE.,.TRUE.,.TRUE.,.FALSE./)
-c      CHARACTER(LEN=stdL), PARAMETER :: ieWarn(nExCk) =
-c     2   (/"Overflow", "Divide by zero", "Invalid arithmetic operation",
-c     3   "Underflow", "Inexact operation"/)
-c
-c      LOGICAL, SAVE :: iniSet = .TRUE., sprtFlag(nExCk)
-c
-c      LOGICAL fg
-c      INTEGER i
-c      REAL(KIND=8) r
-c
-c      IF (iniSet) THEN
-c         iniSet = .FALSE.
-c         DO i=1, nExCk
-c            IF (.NOT.check(i)) CYCLE
-c            sprtFlag(i) = IEEE_SUPPORT_FLAG(IEEE_ALL(i), r)
-c         END DO
-c
-c         fg = .FALSE.
-c         DO i=1, nExCk
-c            IF (.NOT.check(i)) CYCLE
-c            IF (sprtFlag(i)) CALL IEEE_SET_HALTING_MODE(IEEE_ALL(i), fg)
-c         END DO
-c      END IF
-c
-c      DO i=1, nExCk
-c         IF (.NOT.check(i)) CYCLE
-c         IF (sprtFlag(i)) THEN
-c            CALL IEEE_GET_FLAG(IEEE_ALL(i), fg)
-c            IF (fg) THEN
-c               CALL WARNING(ieWarn(i))
-c               CALL IEEE_SET_FLAG(IEEE_ALL(i), .FALSE.)
-c            END IF
-c         END IF
-c      END DO
-
-      RETURN
-      END SUBROUTINE EXCEPTIONS
-!####################################################################
 !     Prepares the output of svFSI to the standard output.
       SUBROUTINE OUTRESULT(timeP, co, iEq)
       USE COMMOD
@@ -271,4 +219,91 @@ c      END DO
 
       RETURN
       END SUBROUTINE WRITERESTART
+!####################################################################
+!     Prints norm of the displacement in the solid domain when being
+!     solved for prestress
+      SUBROUTINE OUTDNORM()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      INTEGER iEq, iDmn, s, e
+      REAL(KIND=8) dnorm, vol
+      CHARACTER(LEN=stdL) sepLine
+
+      sepLine = REPEAT('-',67)
+      std = TRIM(sepLine)
+      DO iEq=1, nEq
+         s = eq(iEq)%s
+         e = s + nsd - 1
+         DO iDmn=1, eq(iEq)%nDmn
+            IF ( (eq(iEq)%dmn(iDmn)%phys .NE. phys_struct) .AND.
+     2           (eq(iEq)%dmn(iDmn)%phys .NE. phys_vms_struct) .AND.
+     3           (eq(iEq)%dmn(iDmn)%phys .NE. phys_lElas)  .AND.
+     4           (eq(iEq)%dmn(iDmn)%phys .NE. phys_preSt) .AND.
+     5           (eq(iEq)%dmn(iDmn)%phys .NE. phys_shell) .AND.
+     6           (eq(iEq)%dmn(iDmn)%phys .NE. phys_CMM) ) CYCLE
+            dnorm = Integ(eq(iEq)%dmn(iDmn)%Id, Dn, s, e)
+            vol = eq(iEq)%dmn(iDmn)%v
+            IF (.NOT.ISZERO(vol)) dnorm = dnorm / vol
+            std = " Displacement norm on domain "//STR(iDmn)//": "//
+     2         STR(dnorm)
+         END DO
+      END DO
+      std = TRIM(sepLine)
+
+      RETURN
+      END SUBROUTINE OUTDNORM
+!####################################################################
+!     This is to find if any exception occures, commenting this out
+!     untill fortran2003 is standard in all compilers
+      SUBROUTINE EXCEPTIONS
+
+c      USE IEEE_EXCEPTIONS
+      USE COMMOD, ONLY: stdL
+
+      IMPLICIT NONE
+
+!     I am assuming nExCk is 5, if a compilation error occured, you need
+!     to adjust the following arrays accordingely
+c      INTEGER, PARAMETER :: nExCk = SIZE(IEEE_ALL)
+c      LOGICAL, PARAMETER :: check(nExCk) =
+c     2   (/.TRUE.,.TRUE.,.TRUE.,.TRUE.,.FALSE./)
+c      CHARACTER(LEN=stdL), PARAMETER :: ieWarn(nExCk) =
+c     2   (/"Overflow", "Divide by zero", "Invalid arithmetic operation",
+c     3   "Underflow", "Inexact operation"/)
+c
+c      LOGICAL, SAVE :: iniSet = .TRUE., sprtFlag(nExCk)
+c
+c      LOGICAL fg
+c      INTEGER i
+c      REAL(KIND=8) r
+c
+c      IF (iniSet) THEN
+c         iniSet = .FALSE.
+c         DO i=1, nExCk
+c            IF (.NOT.check(i)) CYCLE
+c            sprtFlag(i) = IEEE_SUPPORT_FLAG(IEEE_ALL(i), r)
+c         END DO
+c
+c         fg = .FALSE.
+c         DO i=1, nExCk
+c            IF (.NOT.check(i)) CYCLE
+c            IF (sprtFlag(i)) CALL IEEE_SET_HALTING_MODE(IEEE_ALL(i), fg)
+c         END DO
+c      END IF
+c
+c      DO i=1, nExCk
+c         IF (.NOT.check(i)) CYCLE
+c         IF (sprtFlag(i)) THEN
+c            CALL IEEE_GET_FLAG(IEEE_ALL(i), fg)
+c            IF (fg) THEN
+c               CALL WARNING(ieWarn(i))
+c               CALL IEEE_SET_FLAG(IEEE_ALL(i), .FALSE.)
+c            END IF
+c         END IF
+c      END DO
+
+      RETURN
+      END SUBROUTINE EXCEPTIONS
 !####################################################################

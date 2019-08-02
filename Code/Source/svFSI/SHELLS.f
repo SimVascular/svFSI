@@ -36,20 +36,20 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE SHELLTRI (lM, e, eNoN, nFn, al, yl, dl, xl, fN, ptr)
+      SUBROUTINE SHELLTRI (lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
+      INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), xl(nsd,eNoN), fN(nsd,nFn)
+     2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
 
       LOGICAL :: bFlag, setIt(3)
       INTEGER :: i, j, k, a, b, g
       REAL(KIND=8) :: rho, dmp, elM, nu, ht, T1, amd, afl, w, Jac0, Jac,
-     2   ud(3), bf(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2), gCov(3,2),
+     2   ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2), gCov(3,2),
      3   gCnv(3,2), x0(3,eNoN), xc(3,eNoN), eLoc(3,3), Jm(2,2), Qm(3,3),
      4   Dm(3,3), Em(3), Eb(3), DEm(3), DEb(3), Bm(3,3,eNoN),
      5   Bb(3,3,eNoN), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDE, BtDB, NxSNx
@@ -67,9 +67,9 @@
       elM   = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
       nu    = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       ht    = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
-      bf(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
-      bf(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
-      bf(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
 
       amd  = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
       afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
@@ -264,11 +264,11 @@
          N = lM%N(:,g)
          w = lM%w(g)*Jac0*ht
 !        Acceleration and mass damping at the integration point
-         ud = -bf
+         ud = -fb
          DO a=1, lM%eNoN
-            ud(1) = ud(1) + N(a)*(rho*al(i,a) + dmp*yl(i,a))
-            ud(2) = ud(2) + N(a)*(rho*al(j,a) + dmp*yl(j,a))
-            ud(3) = ud(3) + N(a)*(rho*al(k,a) + dmp*yl(k,a))
+            ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
+            ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
+            ud(3) = ud(3) + N(a)*(rho*(al(k,a)-bfl(3,a)) + dmp*yl(k,a))
          END DO
 
 !        Local residue
@@ -399,7 +399,15 @@
       END DO
 
 !     Global assembly
-      CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+      IF (useTrilinosAssemAndLS) THEN
+         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+      ELSE
+#endif
+         CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+      END IF
+#endif
 
       DEALLOCATE(N, Nx, lR, lK)
 
@@ -802,160 +810,82 @@
       END SUBROUTINE SHELLBENDTRI
 !####################################################################
 !     Set follower pressure load/net traction on shells
-      SUBROUTINE SETSHELLFP(Dg)
-
-      USE COMMOD
-      USE ALLFUN
-
-      IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
-
-      INTEGER :: iM, e, a, Ac, eNoN
-      REAL(KIND=8) :: tfn
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: dl(:,:), xl(:,:)
-
-      DO iM=1, nMsh
-         IF (msh(iM)%lShl) THEN
-            cDmn = DOMAIN(msh(iM), cEq, 1)
-            CALL GETSFP(eq(cEq)%dmn(cDmn), tfn)
-            IF (ISZERO(tfn)) CYCLE
-
-            eNoN = msh(iM)%eNoN
-            ALLOCATE(dl(tDof,eNoN), xl(nsd,eNoN), ptr(eNoN))
-            DO e=1, msh(iM)%nEl
-               IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), e)
-               cDmn = DOMAIN(msh(iM), cEq, e)
-               DO a=1, eNoN
-                  Ac = msh(iM)%IEN(a,e)
-                  ptr(a) = Ac
-                  xl(:,a) = x(:,Ac)
-                  dl(:,a) = Dg(:,Ac)
-               END DO
-               CALL SETSHELLFPL(msh(iM), eNoN, dl, xl, tfn, ptr)
-            END DO
-            DEALLOCATE(dl, xl, ptr)
-         END IF
-      END DO
-
-      RETURN
-      CONTAINS
-!--------------------------------------------------------------------
-      SUBROUTINE GETSFP(lDmn, fP)
+      SUBROUTINE SHELLFP (eNoN, w, N, Nx, dl, xl, tfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      TYPE(dmnType), INTENT(IN) :: lDmn
-      REAL(KIND=8), INTENT(OUT) :: fP
 
-      REAL(KIND=8) :: rTmp
+      INTEGER, INTENT(IN) :: eNoN
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), dl(tDof,eNoN),
+     2   xl(3,eNoN), tfl(eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      fP = 0D0
-      IF (ALLOCATED(lDmn%shlFp)) THEN
-         IF (BTEST(lDmn%shlFp%bType,bType_std)) THEN
-            fP = lDmn%shlFp%p
-         ELSE IF (BTEST(lDmn%shlFp%bType, bType_ustd)) THEN
-            CALL IFFT(lDmn%shlFp%pt, fP, rTmp)
-         END IF
-      END IF
-
-      RETURN
-      END SUBROUTINE GETSFP
-!--------------------------------------------------------------------
-      END SUBROUTINE SETSHELLFP
-!--------------------------------------------------------------------
-      SUBROUTINE SETSHELLFPL (lM, eNoN, dl, xl, tfn, ptr)
-
-      USE COMMOD
-      USE ALLFUN
-
-      IMPLICIT NONE
-
-      TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: eNoN, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: dl(tDof,eNoN), xl(nsd,eNoN), tfn
-
-      INTEGER :: i, j, k, a, b, g
-      REAL(KIND=8) :: T1, afl, nV(3), gCov(3,2), gCnv(3,2), N(eNoN),
-     2   Nx(2,eNoN), xc(3,eNoN), lKp(3)
-
-      REAL(KIND=8), ALLOCATABLE :: lR(:,:), lK(:,:,:)
-
-      ALLOCATE(lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+      INTEGER :: i, j, k, a, b
+      REAL(KIND=8) :: T1, afl, wl, tfn, nV(3), gCov(3,2), gCnv(3,2),
+     2   xc(3,eNoN), lKP(3)
 
       afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
       i    = eq(cEq)%s
       j    = i + 1
       k    = j + 1
 
-!     Get the current configuration
+!     Get the current configuration and traction vector
+      tfn = 0D0
       DO a=1, eNoN
          xc(1,a) = xl(1,a) + dl(i,a)
          xc(2,a) = xl(2,a) + dl(j,a)
          xc(3,a) = xl(3,a) + dl(k,a)
+
+         tfn = tfn + N(a)*tfl(a)
+      END DO
+      wl = w * tfn
+
+!     Covariant and contravariant bases in current config
+      CALL GNNS(eNoN, Nx, xc, nV, gCov, gCnv)
+
+!     Local residue
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - wl*N(a)*nV(1)
+         lR(2,a) = lR(2,a) - wl*N(a)*nV(2)
+         lR(3,a) = lR(3,a) - wl*N(a)*nV(3)
       END DO
 
-!     Assembly to residue and stiffness matrices
-!     Inertia and follower traction load along normal direction
-      lR = 0D0
-      lK = 0D0
-      DO g=1, lM%nG
-         N = lM%N(:,g)
-         Nx(:,:) = lM%Nx(:,:,g)
-
-!        Covariant and contravariant bases in current config
-         CALL GNNS(eNoN, Nx, xc, nV, gCov, gCnv)
-
-!        Local residue
+!     Local stiffness: mass matrix and stiffness contribution due to
+!     follower traction load
+      T1 = afl*wl*5D-1
+      DO b=1, eNoN
          DO a=1, eNoN
-            lR(1,a) = lR(1,a) - lM%w(g)*N(a)*tfn*nV(1)
-            lR(2,a) = lR(2,a) - lM%w(g)*N(a)*tfn*nV(2)
-            lR(3,a) = lR(3,a) - lM%w(g)*N(a)*tfn*nV(3)
-         END DO
+            lKp(:) = gCov(:,1)*(N(b)*Nx(2,a) - N(a)*Nx(2,b))
+     2             - gCov(:,2)*(N(b)*Nx(1,a) - N(a)*Nx(1,b))
 
-!        Local stiffness: mass matrix and stiffness contribution due to
-!        follower traction load
-         T1 = afl*lM%w(g)*tfn*5D-1
-         DO b=1, eNoN
-            DO a=1, eNoN
-               lKp(:) = gCov(:,1)*(N(b)*Nx(2,a) - N(a)*Nx(2,b))
-     2                - gCov(:,2)*(N(b)*Nx(1,a) - N(a)*Nx(1,b))
+            lK(2,a,b) = lK(2,a,b) - T1*lKp(3)
+            lK(3,a,b) = lK(3,a,b) + T1*lKp(2)
 
-               lK(2,a,b) = lK(2,a,b) - T1*lKp(3)
-               lK(3,a,b) = lK(3,a,b) + T1*lKp(2)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + T1*lKp(3)
+            lK(dof+3,a,b) = lK(dof+3,a,b) - T1*lKp(1)
 
-               lK(dof+1,a,b) = lK(dof+1,a,b) + T1*lKp(3)
-               lK(dof+3,a,b) = lK(dof+3,a,b) - T1*lKp(1)
-
-               lK(2*dof+1,a,b) = lK(2*dof+1,a,b) - T1*lKp(2)
-               lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + T1*lKp(1)
-            END DO
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) - T1*lKp(2)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + T1*lKp(1)
          END DO
       END DO
-
-!     Global assembly
-      CALL DOASSEM(eNoN, ptr, lK, lR)
-
-      DEALLOCATE(lR, lK)
 
       RETURN
-      END SUBROUTINE SETSHELLFPL
+      END SUBROUTINE SHELLFP
 !####################################################################
-      SUBROUTINE SHELLNRB (lM, g, eNoN, nFn, al, yl, dl, xl, fN, lR, lK)
+      SUBROUTINE SHELLNRB (lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: g, eNoN, nFn
+      INTEGER, INTENT(IN) :: g, eNoN
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), xl(nsd,eNoN), fN(nsd,nFn)
+     2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, l, a, b
       REAL(KIND=8) :: rho, dmp, elM, nu, ht, amd, afl, w, wb, Jac0, Jac,
-     2   ud(3), bf(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2), gCov(3,2),
+     2   ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2), gCov(3,2),
      3   gCnv(3,2), N(eNoN), Nx(2,eNoN), Nxx(3,eNoN), x0(3,eNoN),
      4   xc(3,eNoN),Jm(2,2), eLoc(3,3), Qm(3,3), Dm(3,3), Em(3), Eb(3),
      5   DEm(3), DEb(3), Bm(3,3,eNoN), Bb(3,3,eNoN), K0(3,3), Kc(3,3),
@@ -968,9 +898,9 @@
       elM   = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
       nu    = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       ht    = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
-      bf(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
-      bf(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
-      bf(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
 
       amd  = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
       afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
@@ -1182,11 +1112,11 @@
       END DO
 
 !     Acceleration and mass damping at the integration point
-      ud = -bf
+      ud = -fb
       DO a=1, eNoN
-         ud(1) = ud(1) + N(a)*(rho*al(i,a) + dmp*yl(i,a))
-         ud(2) = ud(2) + N(a)*(rho*al(j,a) + dmp*yl(j,a))
-         ud(3) = ud(3) + N(a)*(rho*al(k,a) + dmp*yl(k,a))
+         ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
+         ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
+         ud(3) = ud(3) + N(a)*(rho*(al(k,a)-bfl(3,a)) + dmp*yl(k,a))
       END DO
 
 !     Local residue

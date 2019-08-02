@@ -722,13 +722,13 @@
       END SUBROUTINE GETTAU
 !####################################################################
 !     Compute active stress for electromechanics
-      SUBROUTINE ACTVSTRESS(Tact, F, nfd, fl, S)
+      SUBROUTINE ACTVSTRESS(Tact, nfd, fl, S)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: Tact, F(nsd,nsd), fl(nsd,nfd)
+      REAL(KIND=8), INTENT(IN) :: Tact, fl(nsd,nfd)
       REAL(KIND=8), INTENT(INOUT) :: S(nsd,nsd)
 
       S = S + Tact*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)

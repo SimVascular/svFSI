@@ -319,11 +319,11 @@
       INTEGER, PARAMETER :: maxOutput = 5
 
       LOGICAL flag
-      INTEGER i, fid, iBc, propL(maxNProp), iDmn, iProp, prop, nDOP(4),
+      INTEGER i, iBc, propL(maxNProp), iDmn, iProp, prop, nDOP(4),
      2   outputs(maxOutput)
       REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr, lPD, lSFp, lPBC
+      TYPE(listType), POINTER :: lPtr, lPD, lPBC
 
       IF (.NOT.ALLOCATED(ib%msh)) err = " No IB mesh is read yet"
       IF (.NOT.ALLOCATED(ib%dmnId)) err = " No IB domain is read yet"
@@ -442,14 +442,6 @@
             lEq%dmnIB(iDmn)%prop(prop) = rtmp
          END DO
 
-         IF (lEq%dmnIB(iDmn)%phys .EQ. phys_shell) THEN
-            lSFp => lPD%get(ctmp,"Follower pressure load")
-            IF (ASSOCIATED(lSFp)) THEN
-               ALLOCATE(lEq%dmnIB(iDmn)%shlFp)
-               CALL READShlFp(lSFp, lEq%dmnIB(iDmn)%shlFp, ctmp)
-            END IF
-         END IF
-
          IF (lEq%dmnIB(iDmn)%phys .EQ. phys_struct) THEN
             CALL READMATMODEL(lEq%dmnIB(iDmn), lPD)
          END IF
@@ -479,63 +471,6 @@
       END DO
 
       RETURN
-      CONTAINS
-!--------------------------------------------------------------------
-      SUBROUTINE READShlFp(list, lFp, ctmp)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      TYPE(listType), INTENT(INOUT) :: list
-      TYPE(shlFpType), INTENT(INOUT) :: lFp
-      CHARACTER(LEN=stdL), INTENT(IN) :: ctmp
-
-      INTEGER i, j
-      TYPE(fileType) fTmp
-
-      SELECT CASE (TRIM(ctmp))
-      CASE ("steady")
-         lFp%bType = IBSET(lFp%bType, bType_std)
-         lPtr => list%get(lFp%p,"Value",1)
-      CASE ("unsteady")
-         lFp%bType = IBSET(lFp%bType, bType_ustd)
-         ALLOCATE(lFp%pt)
-         lPtr => list%get(ftmp, "Temporal values file path")
-         IF (ASSOCIATED(lPtr)) THEN
-            fid = fTmp%open()
-            READ(fid,*) i, j
-            IF (i .LT. 2) THEN
-               std = "Enter nPnts nFCoef; nPts*(t Q)"
-               err = "Wrong format in: "//fTmp%fname
-            END IF
-            lFp%pt%n = j
-            ALLOCATE(lFp%pt%r(j))
-            ALLOCATE(lFp%pt%i(j))
-            CALL FFT(fid, i, lFp%pt)
-            CLOSE(fid)
-         ELSE
-            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
-            fid = fTmp%open()
-            READ (fid,*) lFp%pt%ti
-            READ (fid,*) lFp%pt%T
-            READ (fid,*) lFp%pt%qi
-            READ (fid,*) lFp%pt%qs
-            READ (fid,*) j
-            lFp%pt%n = j
-            ALLOCATE(lFp%pt%r(j))
-            ALLOCATE(lFp%pt%i(j))
-            DO i=1, j
-               READ (fid,*) lFp%pt%r(i), lFp%pt%i(i)
-            END DO
-            CLOSE(fid)
-         END IF
-      CASE DEFAULT
-         err = "Undefined follower load type"
-      END SELECT
-
-      RETURN
-      END SUBROUTINE READShlFp
-!--------------------------------------------------------------------
       END SUBROUTINE IB_READEQ
 !####################################################################
 !     This subroutine is to read from input file on how to process the
@@ -892,8 +827,6 @@ c     2         "can be applied for Neumann boundaries only"
          IF (iFa .EQ. 0) err = "Parabolic profile not yet set up for "//
      2      "immersed shells"
          lBc%bType = IBSET(lBc%bType,bType_para)
-      CASE ('D_dependent')
-         lBc%bType = IBSET(lBc%bType,bType_ddep)
       CASE ('User_defined')
          lBc%bType = IBSET(lBc%bType,bType_ud)
          lPtr => list%get(fTmp,"Spatial profile file path",1)
@@ -1237,8 +1170,6 @@ c     2         "can be applied for Neumann boundaries only"
             Ac    = lFa%gN(a)
             s(Ac) = lBc%gx(a)
          END DO
-      ELSE IF (BTEST(lBc%bType,bType_ddep)) THEN
-         s = 1D0
       END IF
 
 !     Now correcting the inlet BC for the inlet ring
@@ -1298,8 +1229,6 @@ c     2         "can be applied for Neumann boundaries only"
             Ac    = lM%gN(a)
             s(Ac) = lBc%gx(a)
          END DO
-      ELSE IF (BTEST(lBc%bType,bType_ddep)) THEN
-         s = 1D0
       END IF
 
 !     Zero perimeter - all faces of the shell are zeroed
@@ -4094,7 +4023,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       LOGICAL :: incompFlag
       INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: bf(3), vd(3), v(3), p, px(3), vx(3,3), divV,
+      REAL(KIND=8) :: fb(3), vd(3), v(3), p, px(3), vx(3,3), divV,
      2   vVx(3), rt, rV(3), rM(3,3)
 
 !     Solid domain parameters
@@ -4125,12 +4054,12 @@ c     2         "can be applied for Neumann boundaries only"
       nu_f   = mu_f/rho_f
 
 !     Body force
-      bf(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-      bf(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-      bf(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
+      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+      fb(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
 
 !     Inertia, body force and deformation tensor (F)
-      vd     = -bf
+      vd     = -fb
       v      = 0D0
       p      = 0D0
       px     = 0D0
@@ -4385,7 +4314,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       LOGICAL :: incompFlag
       INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: bf(2), vd(2), v(2), p, px(2), vx(2,2), divV,
+      REAL(KIND=8) :: fb(2), vd(2), v(2), p, px(2), vx(2,2), divV,
      2   vVx(2), rt, rV(2), rM(2,2)
 
 !     Solid domain parameters
@@ -4416,11 +4345,11 @@ c     2         "can be applied for Neumann boundaries only"
       nu_f   = mu_f/rho_f
 
 !     Body force
-      bf(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-      bf(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
 
 !     Inertia, body force and deformation tensor (F)
-      vd     = -bf
+      vd     = -fb
       v      = 0D0
       p      = 0D0
       px     = 0D0

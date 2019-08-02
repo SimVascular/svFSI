@@ -105,6 +105,10 @@
          MODULE PROCEDURE :: CONVI, CONVR
       END INTERFACE CONV
 
+      INTERFACE SWAP
+         MODULE PROCEDURE :: SWAPI, SWAPR
+      END INTERFACE SWAP
+
       CONTAINS
 
 !####################################################################
@@ -957,7 +961,7 @@
 
       RETURN
       END FUNCTION CONVR
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE RSEED(s)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: s
@@ -974,7 +978,7 @@
 
       RETURN
       END SUBROUTINE RSEED
-!--------------------------------------------------------------------
+!####################################################################
       FUNCTION SEARCHARG(arg, exist) RESULT(r)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: arg
@@ -1009,7 +1013,7 @@
 
       RETURN
       END FUNCTION SEARCHARG
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE parseString(strng, toks, ntoks)
       IMPLICIT NONE
       CHARACTER(len=*), INTENT(IN) :: strng
@@ -1081,7 +1085,7 @@
 
       RETURN
       END FUNCTION STRTOK
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE TO_UPPER(strng)
       IMPLICIT NONE
       CHARACTER(len=*), INTENT(INOUT) :: strng
@@ -1113,5 +1117,31 @@
 
       RETURN
       END SUBROUTINE TO_LOWER
+!####################################################################
+      SUBROUTINE SWAPI(a, b)
+      IMPLICIT NONE
+      INTEGER, INTENT(INOUT) :: a, b
+
+      INTEGER c
+
+      c = a
+      a = b
+      b = c
+
+      RETURN
+      END SUBROUTINE SWAPI
 !--------------------------------------------------------------------
+      SUBROUTINE SWAPR(a, b)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(INOUT) :: a, b
+
+      REAL(KIND=8) c
+
+      c = a
+      a = b
+      b = c
+
+      RETURN
+      END SUBROUTINE SWAPR
+!####################################################################
       END MODULE UTILMOD

@@ -312,7 +312,8 @@
 
       END DO
       CALL cm%bcast(gtnNo)
-      DEALLOCATE(x,rmsh%A0,rmsh%Y0,rmsh%D0)
+      DEALLOCATE(x, rmsh%A0, rmsh%Y0, rmsh%D0)
+
       IF (cm%mas()) THEN
          ALLOCATE(x(nsd,gtnNo))
          ALLOCATE(rmsh%A0(tDof,gtnNo))
@@ -331,19 +332,27 @@
 
       DO iM=1, nMsh
          IF (cm%mas()) THEN
-            IF (ALLOCATED(msh(iM)%eDist)) DEALLOCATE(msh(iM)%eDist)
-            IF (ALLOCATED(msh(iM)%eId)) DEALLOCATE(msh(iM)%eId)
-            IF (ALLOCATED(msh(iM)%IEN)) DEALLOCATE(msh(iM)%IEN)
-            IF (ALLOCATED(msh(iM)%INN)) DEALLOCATE(msh(iM)%INN)
-            IF (ALLOCATED(msh(iM)%gN)) DEALLOCATE(msh(iM)%gN)
-            IF (ALLOCATED(msh(iM)%lN)) DEALLOCATE(msh(iM)%lN)
-            IF (ALLOCATED(msh(iM)%Nx)) DEALLOCATE(msh(iM)%Nx)
-            IF (ALLOCATED(msh(iM)%nW)) DEALLOCATE(msh(iM)%nW)
-            IF (ALLOCATED(msh(iM)%w))  DEALLOCATE(msh(iM)%w)
-            IF (ALLOCATED(msh(iM)%x))  DEALLOCATE(msh(iM)%x)
-            IF (ALLOCATED(msh(iM)%N))  DEALLOCATE(msh(iM)%N)
+            IF (ALLOCATED(msh(iM)%eDist))  DEALLOCATE(msh(iM)%eDist)
+            IF (ALLOCATED(msh(iM)%eId))    DEALLOCATE(msh(iM)%eId)
+            IF (ALLOCATED(msh(iM)%gN))     DEALLOCATE(msh(iM)%gN)
+            IF (ALLOCATED(msh(iM)%gpN))    DEALLOCATE(msh(iM)%gpN)
+            IF (ALLOCATED(msh(iM)%IEN))    DEALLOCATE(msh(iM)%IEN)
             IF (ALLOCATED(msh(iM)%otnIEN)) DEALLOCATE(msh(iM)%otnIEN)
-            IF (ALLOCATED(msh(iM)%gpN)) DEALLOCATE(msh(iM)%gpN)
+            IF (ALLOCATED(msh(iM)%INN))    DEALLOCATE(msh(iM)%INN)
+            IF (ALLOCATED(msh(iM)%lN))     DEALLOCATE(msh(iM)%lN)
+            IF (ALLOCATED(msh(iM)%eIEN))   DEALLOCATE(msh(iM)%eIEN)
+            IF (ALLOCATED(msh(iM)%sbc))    DEALLOCATE(msh(iM)%sbc)
+            IF (ALLOCATED(msh(iM)%iGC))    DEALLOCATE(msh(iM)%iGC)
+            IF (ALLOCATED(msh(iM)%nW))     DEALLOCATE(msh(iM)%nW)
+            IF (ALLOCATED(msh(iM)%w))      DEALLOCATE(msh(iM)%w)
+            IF (ALLOCATED(msh(iM)%xiL))    DEALLOCATE(msh(iM)%xiL)
+            IF (ALLOCATED(msh(iM)%xi))     DEALLOCATE(msh(iM)%xi)
+            IF (ALLOCATED(msh(iM)%x))      DEALLOCATE(msh(iM)%x)
+            IF (ALLOCATED(msh(iM)%N))      DEALLOCATE(msh(iM)%N)
+            IF (ALLOCATED(msh(iM)%nV))     DEALLOCATE(msh(iM)%nV)
+            IF (ALLOCATED(msh(iM)%fN))     DEALLOCATE(msh(iM)%fN)
+            IF (ALLOCATED(msh(iM)%Nx))     DEALLOCATE(msh(iM)%Nx)
+            IF (ALLOCATED(msh(iM)%Nxx))    DEALLOCATE(msh(iM)%Nxx)
          ELSE
             CALL DESTROY(msh(iM))
          END IF
@@ -357,19 +366,32 @@
          DEALLOCATE(eq)
       END IF
 
-      IF (ALLOCATED(dmnID)) DEALLOCATE(dmnID)
-      IF (ALLOCATED(ltg)) DEALLOCATE(ltg)
-      IF (ALLOCATED(colPtr)) DEALLOCATE(colPtr)
-      IF (ALLOCATED(rowPtr)) DEALLOCATE(rowPtr)
-      IF (ALLOCATED(An)) DEALLOCATE(An)
-      IF (ALLOCATED(Yn)) DEALLOCATE(Yn)
-      IF (ALLOCATED(Dn)) DEALLOCATE(Dn)
-      IF (ALLOCATED(Ao)) DEALLOCATE(Ao)
-      IF (ALLOCATED(Yo)) DEALLOCATE(Yo)
-      IF (ALLOCATED(Do)) DEALLOCATE(Do)
-      IF (ALLOCATED(R)) DEALLOCATE(R)
-      IF (ALLOCATED(Val)) DEALLOCATE(Val)
+      IF (ALLOCATED(colPtr))   DEALLOCATE(colPtr)
+      IF (ALLOCATED(dmnID))    DEALLOCATE(dmnID)
+      IF (ALLOCATED(ltg))      DEALLOCATE(ltg)
+      IF (ALLOCATED(rowPtr))   DEALLOCATE(rowPtr)
+      IF (ALLOCATED(idMap))    DEALLOCATE(idMap)
+      IF (ALLOCATED(cmmBdry))  DEALLOCATE(cmmBdry)
+      IF (ALLOCATED(iblank))   DEALLOCATE(iblank)
+      IF (ALLOCATED(ighost))   DEALLOCATE(ighost)
+      IF (ALLOCATED(Ao))       DEALLOCATE(Ao)
+      IF (ALLOCATED(An))       DEALLOCATE(An)
+      IF (ALLOCATED(Do))       DEALLOCATE(Do)
+      IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
+      IF (ALLOCATED(R))        DEALLOCATE(R)
+      IF (ALLOCATED(Val))      DEALLOCATE(Val)
+      IF (ALLOCATED(Yo))       DEALLOCATE(Yo)
+      IF (ALLOCATED(Yn))       DEALLOCATE(Yn)
+      IF (ALLOCATED(Bf))       DEALLOCATE(Bf)
       cplBC%nFa = 0
+
+!     Additional physics based variables to be deallocated
+      IF (ALLOCATED(Ad))       DEALLOCATE(Ad)
+      IF (ALLOCATED(Rd))       DEALLOCATE(Rd)
+      IF (ALLOCATED(Kd))       DEALLOCATE(Kd)
+      IF (ALLOCATED(pS0))      DEALLOCATE(pS0)
+      IF (ALLOCATED(pSn))      DEALLOCATE(pSn)
+      IF (ALLOCATED(pSa))      DEALLOCATE(pSa)
 
       t2 = CPUT()
 

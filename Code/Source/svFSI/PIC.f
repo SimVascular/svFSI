@@ -45,16 +45,12 @@
       REAL(KIND=8) coef, ctime
 
 !     Prestress initialization
-      DO iEq=1, nEq
-         IF (eq(iEq)%phys .EQ. phys_preSt) THEN
-            pS0 = pS0 + pSn
-            eq(iEq)%iNorm = 0D0
-            eq(iEq)%pNorm = HUGE(coef)
-            Ao = 0D0
-            Yo = 0D0
-            Do = 0D0
-         END IF
-      END DO
+      IF (pstEq) THEN
+         pS0 = pS0 + pSn
+         Ao = 0D0
+         Yo = 0D0
+         Do = 0D0
+      END IF
 
 !     Immersed body treatment (explicit)
       IF (ibFlag) THEN
@@ -94,7 +90,7 @@ c         CALL IB_SETBCPEN()
          Yn(s:e,:) = Yo(s:e,:)
 
          IF (dFlag) THEN
-            IF ( .NOT. sstEq) THEN
+            IF (.NOT.sstEq) THEN
 !              struct, lElas, FSI (struct, mesh)
                coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
      2            /(eq(iEq)%gam - 1D0)
@@ -154,14 +150,15 @@ c         CALL IB_SETBCPEN()
 !        Reset pressure variable initiator
          IF ( (eq(i)%phys .EQ. phys_fluid .OR.
      2         eq(i)%phys .EQ. phys_CMM   .OR.
-     3         eq(i)%phys .EQ. phys_FSI) .AND. .NOT.sstEq ) THEN
+     3         eq(i)%phys .EQ. phys_FSI) .AND.
+     4        .NOT.sstEq .AND. .NOT.cmmInit ) THEN
             DO a=1, tnNo
                Yg(e,a) = Yn(e,a)
             END DO
          END IF
-
-         IF (eq(i)%phys .EQ. phys_preSt) pSn(:,:) = 0D0
       END DO
+
+      IF (pstEq) pSn(:,:) = 0D0
 
       RETURN
       END SUBROUTINE PICI
@@ -175,7 +172,6 @@ c         CALL IB_SETBCPEN()
       LOGICAL :: l1, l2, l3, l4, l5
       INTEGER :: s, e, a, Ac
       REAL(KIND=8) :: coef(5), r1, r2, dUl(nsd)
-      CHARACTER(LEN=stdL) :: sCmd
 
       s       = eq(cEq)%s
       e       = eq(cEq)%e
@@ -187,7 +183,8 @@ c         CALL IB_SETBCPEN()
 
       IF ( (eq(cEq)%phys .EQ. phys_fluid .OR.
      2      eq(cEq)%phys .EQ. phys_CMM   .OR.
-     3      eq(cEq)%phys .EQ. phys_FSI) .AND. .NOT.sstEq ) THEN
+     3      eq(cEq)%phys .EQ. phys_FSI) .AND.
+     4     .NOT.sstEq .AND. .NOT.cmmInit ) THEN
          DO a=1, tnNo
             An(s:e,a)   = An(s:e,a)   - R(:,a)
             Yn(s:e-1,a) = Yn(s:e-1,a) - R(1:dof-1,a)*coef(1)
@@ -248,7 +245,7 @@ c         CALL IB_SETBCPEN()
       END IF
 
 !     Update prestress at the nodes and re-initialize
-      IF (eq(cEq)%phys .EQ. phys_preSt) THEN
+      IF (pstEq) THEN
          CALL COMMU(pSn)
          CALL COMMU(pSa)
          DO a=1, tnNo
@@ -257,28 +254,15 @@ c         CALL IB_SETBCPEN()
             END IF
          END DO
          pSa = 0D0
-!     Stop the simulation if the norm of displacements is less than a
-!     given tolerance
-         s = eq(cEq)%s
-         e = eq(cEq)%e
-         r1 = 0D0
-         DO a=1, tnNo
-            r1 = r1 + NORM(Dn(s:e,a))
-         END DO
-         r1 = SQRT(cm%reduce(r1))
-         IF (cm%mas()) THEN
-            WRITE(1000,'(A)') STR(cTS)//" "//STR(eq(cEq)%itr)//" "//
-     2         STR(r1)
-            CALL FLUSH(1000)
-            IF(r1 .LT. 1E-6) THEN
-               sCmd = "touch  "//TRIM(stopTrigName)
-               CALL SYSTEM(TRIM(sCmd))
-            END IF
-         END IF
       END IF
 
-!     Filter out the non-wall displacements if solving the CMM equation
-      IF (eq(cEQ)%phys .EQ. phys_CMM) CALL CMM_DISPF(eq(cEq), Dn)
+!     Filter out the non-wall displacements for CMM equation
+      IF (eq(cEq)%phys.EQ.phys_CMM .AND. .NOT.cmmInit) THEN
+         DO a=1, tnNo
+            r1 = REAL(cmmBdry(a), KIND=8)
+            Dn(s:e-1,a) = Dn(s:e-1,a)*r1
+         END DO
+      END IF
 
       IF (ISZERO(eq(cEq)%FSILS%RI%iNorm)) eq(cEq)%FSILS%RI%iNorm = eps
       IF (ISZERO(eq(cEq)%iNorm)) eq(cEq)%iNorm = eq(cEq)%FSILS%RI%iNorm

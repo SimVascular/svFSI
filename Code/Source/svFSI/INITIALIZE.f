@@ -52,21 +52,25 @@
 
       tDof     = 0
       dFlag    = .FALSE.
-      sstEq    = .FALSE.
-      pstEq    = .FALSE.
-      cmmEq    = .FALSE.
+
+!     Set faces for linear solver
       nFacesLS = SUM(eq%nBc)
-      ibLSptr  = 0
-      IF (ibFlag) THEN
-         nFacesLS = nFacesLS + 1
-         ibLSptr  = nFacesLS
-      END IF
-      IF (mvMsh) nFacesLS = nFacesLS + 1
+!     Remove LS pointer for faces with weakly applied Dir. BC
       DO iEq=1, nEq
          DO i=1, eq(iEq)%nBc
             IF (eq(iEq)%bc(i)%weakDir) nFacesLS = nFacesLS - 1
          END DO
       END DO
+!     Pointer to all immersed solid nodes (iblank=1)
+      ibLSptr  = 0
+      IF (ibFlag) THEN
+         nFacesLS = nFacesLS + 1
+         ibLSptr  = nFacesLS
+      END IF
+!     For FSI simulations, LS pointer to structure nodes
+      IF (mvMsh) nFacesLS = nFacesLS + 1
+!     For initializing CMM, LS pointer to fixed edge nodes
+      IF (cmmInit) nFacesLS = nFacesLS + 1
 
       IF (ANY(eq(1)%bc%cplBCptr .NE. 0)) cplBC%coupled = .TRUE.
 
@@ -98,19 +102,17 @@
             eq(iEq)%sym = 'ST'
          CASE (phys_vms_struct)
             dFlag = .TRUE.
-            sstEq = .TRUE.
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'ST'
          CASE (phys_preSt)
             dFlag = .TRUE.
-            pstEq = .TRUE.
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'PS'
          CASE (phys_CMM)
             dFlag = .TRUE.
-            cmmEq = .TRUE.
             eq(iEq)%dof = nsd + 1
+            IF (cmmInit) eq(iEq)%dof = nsd
             eq(iEq)%sym = 'CM'
          CASE (phys_shell)
             dFlag = .TRUE.
@@ -119,12 +121,6 @@
             eq(iEq)%sym = 'SH'
          CASE (phys_FSI)
             dFlag = .TRUE.
-            DO iDmn=1, eq(iEq)%nDmn
-               IF (eq(iEq)%dmn(iDmn)%phys .EQ. phys_vms_struct) THEN
-                  sstEq = .TRUE.
-                  EXIT
-               END IF
-            END DO
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'FS'
          CASE (phys_mesh)
@@ -132,9 +128,6 @@
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'MS'
-         CASE (phys_BBO)
-            eq(iEq)%dof = nsd
-            eq(iEq)%sym = 'BB'
          CASE (phys_CEP)
             eq(iEq)%dof = 1
             eq(iEq)%sym = 'EP'
@@ -152,7 +145,7 @@
       END DO
 
       ierr = 0
-      IF (dFlag .AND. .NOT.cmmEq) ierr = 1
+      IF (dFlag) ierr = 1
 
       i = 0
       IF (cplBC%coupled) i = cplBC%nX
@@ -161,7 +154,7 @@
 
 !     Calculating the record length
       i = 2*tDof
-      IF (dFlag .AND. .NOT.cmmEq) i = 3*tDof
+      IF (dFlag) i = 3*tDof
       IF (pstEq) i = i + nstd
       IF (sstEq) i = i + nsd
       IF (cepEq) THEN
@@ -178,9 +171,19 @@
       END IF
 
 !     Initialize shell eIEN data structure. Used later in LHSA.
-      DO iM=1, nMsh
-         IF (msh(iM)%lShl) CALL SHLINI(msh(iM))
-      END DO
+      IF (shlEq) THEN
+         DO iM=1, nMsh
+            IF (msh(iM)%lShl) THEN
+               IF (msh(iM)%eType .EQ. eType_NRB) THEN
+                  ALLOCATE(msh(iM)%eIEN(0,0))
+                  ALLOCATE(msh(iM)%sbc(msh(iM)%eNoN,msh(iM)%nEl))
+                  msh(iM)%sbc = 0
+               ELSE IF (msh(iM)%eType .EQ. eType_TRI) THEN
+                  CALL SETSHLXIEN(msh(iM))
+               END IF
+            END IF
+         END DO
+      END IF
 
 !     Initialize tensor operations
       CALL TEN_INIT(nsd)
@@ -207,7 +210,7 @@
 
 !     Variable allocation and initialization
       ALLOCATE(Ao(tDof,tnNo), An(tDof,tnNo), Yo(tDof,tnNo),
-     2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo))
+     2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo), Bf(nsd,tnNo))
       IF (ibFlag) CALL IB_MEMALLOC()
 
 !     Additional physics dependent variables
@@ -286,25 +289,6 @@
             END IF ! stFileFlag
          END IF
 
-!        For CMM Equation
-         IF (cmmEq) THEN
-!           Reset time step
-            cTS  = 0
-            time = 0D0
-
-!           Reset dof written to restart files
-            i = 3
-            IF (pstEq) i = i + nstd
-            i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
-            IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
-            IF (cm%seq()) THEN
-               recLn = i
-            ELSE
-               CALL MPI_ALLREDUCE(i, recLn, 1, mpint, MPI_MAX, cm%com(),
-     2            ierr)
-            END IF
-         END IF
-
 !        Load any explicitly provided solution variables
          CALL INITSOLNVAR()
 
@@ -368,10 +352,13 @@
       s = 1D0
       DO iEq=1, nEq
          DO iDmn=1, eq(iEq)%nDmn
-            eq(iEq)%dmn(iDmn)%v = Integ(eq(iEq)%dmn(iDmn)%Id, s, 1, 1)
-            std = " Volume of domain "//STR(eq(iEq)%dmn(iDmn)%v)
-            IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "Volume of "//
-     2         "domain "//iDmn//" of equation "//iEq//" is zero"
+            eq(iEq)%dmn(iDmn)%v =
+     2         Integ(eq(iEq)%dmn(iDmn)%Id, s, 1, 1)
+            IF (.NOT.shlEq .AND. .NOT.cmmInit) THEN
+               std = " Volume of domain "//STR(eq(iEq)%dmn(iDmn)%v)
+               IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "Volume of "//
+     2            "domain "//iDmn//" of equation "//iEq//" is zero"
+            END IF
          END DO
       END DO
 
@@ -479,7 +466,7 @@
       std = " Initializing from "//fName
       OPEN(fid, FILE=fName, ACCESS='DIRECT', RECL=recLn)
       IF (.NOT.ibFlag) THEN
-         IF (dFlag .AND. .NOT.cmmEq) THEN
+         IF (dFlag) THEN
             IF (sstEq) THEN
                IF (pstEq) THEN
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
@@ -517,7 +504,7 @@
             END IF
          END IF
       ELSE
-         IF (dFlag .AND. .NOT.cmmEq) THEN
+         IF (dFlag) THEN
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
@@ -705,7 +692,7 @@
       IF (ALLOCATED(Do))       DEALLOCATE(Do)
       IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
       IF (ALLOCATED(R))        DEALLOCATE(R)
-      IF (ALLOCATED(Bfg))      DEALLOCATE(Bfg)
+      IF (ALLOCATED(Bf))       DEALLOCATE(Bf)
 
       IF (ALLOCATED(Ad))       DEALLOCATE(Ad)
       IF (ALLOCATED(Rd))       DEALLOCATE(Rd)

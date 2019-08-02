@@ -51,7 +51,7 @@
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, l, a, b
-      REAL(KIND=8) :: bf(3), am, af, afm, v(3), vd(3), vx(3,3), p, pd,
+      REAL(KIND=8) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p, pd,
      2   px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, Siso(3,3),
      3   CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6), Pdev(3,3),
      4   Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3), PxFi(3),
@@ -62,9 +62,9 @@
 
 !     Define parameters
       stModel = eq(cEq)%dmn(cDmn)%stM
-      bf(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
-      bf(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
-      bf(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
+      fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
       am      = eq(cEq)%am
       af      = eq(cEq)%af*eq(cEq)%gam*dt
       afm     = af / am
@@ -78,7 +78,7 @@
 !     Inertia (velocity and acceleration), body force, fiber directions,
 !     and deformation tensor (F) at integration point
       v  = 0D0
-      vd = -bf
+      vd = -fb
       vx = 0D0
       p  = 0D0
       pd = 0D0
@@ -459,7 +459,7 @@
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER :: i, j, k, a, b
-      REAL(KIND=8) :: bf(2), am, af, afm, v(2), vd(2), vx(2,2), p, pd,
+      REAL(KIND=8) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p, pd,
      2   px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, Siso(2,2),
      3   CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3), Pdev(2,2),
      4   Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2), PxFi(2),
@@ -470,8 +470,8 @@
 
 !     Define parameters
       stModel = eq(cEq)%dmn(cDmn)%stM
-      bf(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
-      bf(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
       af      = eq(cEq)%af*eq(cEq)%gam*dt
       afm     = af / am
@@ -484,7 +484,7 @@
 !     Inertia (velocity and acceleration), body force, fiber directions,
 !     and deformation tensor (F) at integration point
       v  = 0D0
-      vd = -bf
+      vd = -fb
       vx = 0D0
       p  = 0D0
       pd = 0D0

@@ -52,7 +52,7 @@
      2   dol(:,:), fN(:,:), pS0l(:,:), bfl(:,:), ya_l(:)
 
 !     For shells, consider extended patch around an element
-      IF (lM%lShl .AND. (lM%eType.EQ.eType_TRI))THEN
+      IF (shlEq .AND. lM%eType.EQ.eType_TRI)THEN
          eNoN = 2*lM%eNoN
       ELSE
          eNoN = lM%eNoN
@@ -62,7 +62,7 @@
       IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE(xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),dl(tDof,eNoN),
-     2   dol(nsd,eNoN), pS0l(nstd,eNoN), fN(nsd,nFn), bfl(nsd,eNoN),
+     2   dol(nsd,eNoN), bfl(nsd,eNoN), pS0l(nstd,eNoN), fN(nsd,nFn),
      3   ya_l(eNoN), ptr(eNoN))
 
       i = nsd + 2
@@ -89,10 +89,11 @@
                ptr(a) = Ac
                IF (Ac .EQ. 0) CYCLE
             END IF
-            xl(:,a) = x (:,Ac)
-            al(:,a) = Ag(:,Ac)
-            yl(:,a) = Yg(:,Ac)
-            dl(:,a) = Dg(:,Ac)
+            xl(:,a)  = x (:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
             IF (mvMsh) dol(:,a) = Do(i:j,Ac)
             IF (ALLOCATED(lM%fN)) THEN
                DO k=1, nFn
@@ -100,25 +101,24 @@
                END DO
             END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
-            IF (ALLOCATED(Bfg)) bfl(:,a)  = bfg(:,Ac)
-            IF (cem%cpld)  ya_l(a) = cem%Ya(Ac)
+            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
          END DO
          IF (ibl .EQ. lM%eNoN) THEN
             IF (ib%mthd .NE. ibMthd_IFEM) CYCLE
          END IF
 
 !     Add contribution of current equation to the LHS/RHS
-         CALL CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, fN, pS0l,
-     2      bfl, ya_l, ptr)
+         CALL CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, bfl, fN,
+     2      pS0l, ya_l, ptr)
       END DO
 
-      DEALLOCATE(xl, al, yl, dl, dol, fN, pS0l, bfl, ya_l, ptr)
+      DEALLOCATE(xl, al, yl, dl, dol, bfl, fN, pS0l, ya_l, ptr)
 
       RETURN
       END SUBROUTINE GLOBALEQASSEM
-!====================================================================
-      SUBROUTINE CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, fN,
-     2   pS0l, bfl, ya_l, ptr)
+!####################################################################
+      SUBROUTINE CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, bfl,
+     2   fN, pS0l, ya_l, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -126,8 +126,8 @@
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), dol(nsd,eNoN), fN(nsd,nFn), pS0l(nstd,eNoN),
-     3   bfl(nsd,eNoN), ya_l(eNoN)
+     2   dl(tDof,eNoN), dol(nsd,eNoN), bfl(nsd,eNoN), fN(nsd,nFn),
+     3   pS0l(nstd,eNoN), ya_l(eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys, insd
@@ -172,23 +172,43 @@
          END IF
       END IF
 
+!     Solve for shell dynamics
       IF (cPhys .EQ. phys_shell) THEN
          IF (lM%eType .EQ. eType_TRI) THEN
 !        No need for numerical integration for constant strain triangles
-            CALL SHELLTRI(lM, e, eNoN, nFn, al, yl, dl, xl, fN, ptr)
-            DEALLOCATE(lR, lK, N, Nx, dc)
+            CALL SHELLTRI(lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
+            DEALLOCATE(lR, lK, N, Nx, dc, pSl)
             RETURN
          ELSE IF (lM%eType .EQ. eType_NRB) THEN
 !        For NURBS, perform Gauss integration
             DO g=1, lM%nG
-               CALL SHELLNRB(lM, g, eNoN, nFn, al, yl, dl, xl, fN, lR,
-     2            lK)
+               CALL SHELLNRB(lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
             END DO
 !        Perform global assembly
-            CALL DOASSEM(eNoN, ptr, lK, lR)
-            DEALLOCATE(lR, lK, N, Nx, dc)
+#ifdef WITH_TRILINOS
+            IF (useTrilinosAssemAndLS) THEN
+               CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+            ELSE
+#endif
+               CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+            END IF
+#endif
+            DEALLOCATE(lR, lK, N, Nx, dc, pSl)
             RETURN
          END IF
+      END IF
+
+!     CMM initialization
+      IF (cmmInit) THEN
+         pSl(:) = 0D0
+         DO a=1, eNoN
+            pSl(:) = pSl(:) + pS0l(:,a)
+         END DO
+         pSl(:) = pSl(:)/REAL(eNoN,KIND=8)
+         CALL CMMi(lM, eNoN, al, dl, xl, bfl, pSl, ptr)
+         DEALLOCATE(lR, lK, N, Nx, dc, pSl)
+         RETURN
       END IF
 
       DO g=1, lM%nG
@@ -208,11 +228,7 @@
             END IF
 
          CASE (phys_CMM)
-            IF(nsd .EQ. 3) THEN
-               CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
-            ELSE
-               CALL FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
-            END IF
+            CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
 
          CASE (phys_heatS)
             IF (nsd .EQ. 3) THEN
@@ -230,9 +246,9 @@
 
          CASE (phys_lElas)
             IF (nsd .EQ. 3) THEN
-               CALL LELAS3D(eNoN, w, N, Nx, al, dl, lR, lK)
+               CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, lR, lK)
             ELSE
-               CALL LELAS2D(eNoN, w, N, Nx, al, dl, lR, lK)
+               CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, lR, lK)
             END IF
 
          CASE (phys_struct, phys_preSt)
@@ -245,7 +261,7 @@
             END IF
 
 !      Map pSl values to global nodal vector
-            IF (cPhys .EQ. phys_preSt) THEN
+            IF (pstEq) THEN
                DO a=1, eNoN
                   Ac = ptr(a)
                   pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
@@ -266,17 +282,10 @@
             w = w/Jac
             IF (nsd .EQ. 3) THEN
                dc(5:7,:) = dl(5:7,:) - dol
-               CALL LELAS3D(eNoN, w, N, Nx, al, dc, lR, lK)
+               CALL LELAS3D(eNoN, w, N, Nx, al, dc, bfl, lR, lK)
             ELSE
                dc(4:5,:) = dl(4:5,:) - dol
-               CALL LELAS2D(eNoN, w, N, Nx, al, dc, lR, lK)
-            END IF
-
-         CASE (phys_BBO)
-            IF (nsd .EQ. 3) THEN
-               CALL BBO3D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
-            ELSE
-               CALL BBO2D(eNoN, w, N, Nx, al, yl, ksix, lR, lK)
+               CALL LELAS2D(eNoN, w, N, Nx, al, dc, bfl, lR, lK)
             END IF
 
          CASE (phys_CEP)
@@ -312,9 +321,11 @@
       END IF
 #endif
 
+      DEALLOCATE(lR, lK, N, Nx, dc, pSl)
+
       RETURN
       END SUBROUTINE CONSTRUCT
-!====================================================================
+!####################################################################
       SUBROUTINE BCONSTRUCT(lFa, hg, Yg, Dg)
       USE COMMOD
       USE ALLFUN
@@ -391,7 +402,10 @@
                END DO
 
                SELECT CASE (cPhys)
-               CASE (phys_fluid, phys_CMM)
+               CASE (phys_fluid)
+                  CALL BFLUID(eNoN, w, N, y, h, nV, lR, lK)
+
+               CASE (phys_CMM)
                   CALL BFLUID(eNoN, w, N, y, h, nV, lR, lK)
 
                CASE (phys_heatS)
@@ -436,73 +450,4 @@
 
       RETURN
       END SUBROUTINE BCONSTRUCT
-!====================================================================
-!     This subroutines actually calculates the LHS and RHS
-!     contributions and adds their contributions for the Coupled
-!     Momentum Method (CMM)
-      SUBROUTINE CMM_CONSTRUCT(lFa, al, dl, xl, pS0l, ptr, e)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      TYPE(faceType), INTENT(IN) :: lFa
-      INTEGER, INTENT(IN) :: ptr(lFa%eNon), e
-      REAL(KIND=8), INTENT(IN) :: al(tDof,lFa%eNoN),
-     2   dl(tDof,lFa%eNoN), xl(nsd,lFa%eNoN), pS0l(nstd,lFa%eNoN)
-
-      INTEGER g, cPhys, eNoN, iM, a, b
-      REAL(KIND=8) w, nV(nsd), Jac, S0(nstd)
-
-      REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:)
-
-      eNoN = lFa%eNoN
-      iM = lFa%iM
-      ALLOCATE(lK(dof*dof,eNoN,eNoN), lR(dof,eNoN), N(eNoN),
-     2   Nx(nsd-1,eNoN))
-
-!     Updating the current domain
-      cDmn = DOMAIN(msh(iM), cEq, e)
-
-!     Updating the shape functions, if neccesary
-      IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
-
-      lK = 0D0
-      lR = 0D0
-      cPhys = eq(cEq)%dmn(cDmn)%phys
-
-!     Compute the averaged pre-stressed tensor, S0
-      S0 = 0D0
-      DO a=1, eNoN
-         DO b=1, nstd
-            S0(b) = S0(b) + pS0l(b,a)/REAL(eNoN, KIND=8)
-         END DO
-      END DO
-
-!     Finding the local basis vectors for the element, and the local
-!     versions of the acceleration, velocity, and displacement
-      CALL CMM_STIFFNESS(lFa, xl, dl, S0, lR, lK)
-
-!     Add in the mass matrix contribution
-      DO g=1, lFa%nG
-         CALL GNNB(lFa, e, g, nV)
-         Jac = SQRT(NORM(nV))
-         nV  = nV/Jac
-         w   = lFa%w(g)*Jac
-         N   = lFa%N(:,g)
-         CALL CMM_MASS(eNoN, w, N, al, lR, lK)
-      END DO
-
-!     Now doing the assembly part
-#ifdef WITH_TRILINOS
-      IF (useTrilinosAssemAndLS) THEN
-         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-      ELSE
-#endif
-         CALL DOASSEM(eNoN, ptr, lK, lR)
-#ifdef WITH_TRILINOS
-      END IF
-#endif
-
-      RETURN
-      END SUBROUTINE CMM_CONSTRUCT
 !####################################################################

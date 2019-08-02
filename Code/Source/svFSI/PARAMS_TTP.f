@@ -68,8 +68,12 @@
       REAL(KIND=8) :: G_to(3) = (/0.294D0, 0.073D0, 0.294D0/)
 !     G_Kr: Maximal I_Kr conductance
       REAL(KIND=8) :: G_Kr = 0.153D0       ! units: nS/pF
+c!     G_Kr for spiral wave breakup
+c      REAL(KIND=8) :: G_Kr = 0.172D0       ! units: nS/pF
 !     G_Ks: Maximal epicardial I_Ks conductance, units: nS/pF
       REAL(KIND=8) :: G_Ks(3) = (/0.392D0, 0.392D0, 0.098D0/)
+c!     G_Ks for spiral wave breakup (epi)
+c      REAL(KIND=8) :: G_Ks(3) = (/0.441D0, 0.392D0, 0.098D0/)
 !     p_KNa: Relative I_Ks permeability to Na
       REAL(KIND=8) :: p_KNa = 0.03D0       ! dimensionless
 !     G_CaL: Maximal I_CaL conductance
@@ -94,8 +98,12 @@
       REAL(KIND=8) :: K_mNa = 40.0D0       ! units: mM
 !     G_pK: Maximal I_pK conductance
       REAL(KIND=8) :: G_pK = 1.46D-2       ! units: nS/pF
+c!     G_pK for spiral wave breakup
+c      REAL(KIND=8) :: G_pK = 2.19D-3       ! units: nS/pF
 !     G_pCa: Maximal I_pCa conductance
       REAL(KIND=8) :: G_pCa = 0.1238D0     ! units: pA/pF
+c!     G_pCa for spiral wave breakup
+c      REAL(KIND=8) :: G_pCa = 0.8666D0     ! units: pA/pF
 !     K_pCa: Half-saturation constant of I_pCa
       REAL(KIND=8) :: K_pCa = 5.0D-4       ! units: mM
 !     G_bNa: Maximal I_bNa conductance

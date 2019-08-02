@@ -144,10 +144,10 @@
      2                  "NURBS for shell elements should be p > 1"
                   END DO
                END IF
-               IF (msh(iM)%eType .EQ. eType_TRI) THEN
-                  IF (.NOT.cm%seq()) err = "Triangular shell elements"//
-     2               " should be run sequentially"
-               END IF
+c               IF (msh(iM)%eType .EQ. eType_TRI) THEN
+c                  IF (.NOT.cm%seq()) err = "Triangular shell elements"//
+c     2               " should be run sequentially"
+c               END IF
             END IF
          END DO
 
@@ -300,7 +300,11 @@
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
          lPtr => lPM%get(fTmp,"Domain file path")
-         IF (ASSOCIATED(lPtr)) CALL SETDMNIDFF(msh(iM), fTmp%open())
+         IF (ASSOCIATED(lPtr)) THEN
+            IF (rmsh%isReqd) err = "Variable domain properties is not"//
+     2         " allowed with remeshing"
+            CALL SETDMNIDFF(msh(iM), fTmp%open())
+         END IF
 
          lPtr => lPM%get(i,"Domain",ll=0,ul=BIT_SIZE(dmnId)-1)
          IF (ASSOCIATED(lPtr)) CALL SETDMNID(msh(iM),i)
@@ -339,6 +343,8 @@
 
             msh(iM)%nFn = lPM%srch("Fiber direction file path")
             IF (msh(iM)%nFn .NE. 0) THEN
+               IF (rmsh%isReqd) err = "Fiber directions read from "//
+     2            "file is not allowed with remeshing"
                ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
                msh(iM)%fN = 0D0
                DO i=1, msh(iM)%nFn
@@ -374,6 +380,9 @@
 
          lPtr => lPM%get(cTmp, "Prestress file path (vtu)")
          IF (ASSOCIATED(lPtr)) THEN
+            IF (rmsh%isReqd) THEN
+               err = "Prestress is currently not allowed with remeshing"
+            END IF
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nstd,msh(iM)%gnNo))
             msh(iM)%x = 0D0
@@ -393,90 +402,8 @@
          END DO
       END IF
 
-!     Read general body force data
-      DO iM=1, nMsh
-         lPM => list%get(msh(iM)%name,"Add mesh",iM)
-         lPtr => lPM%get(fTmp, "Body force file path")
-         IF (ASSOCIATED(lPtr)) CALL READBF(msh(iM), fTmp%open())
-      END DO
-
-!     Initialize pressure field from file
-      flag = .FALSE.
-      DO iM=1, nMsh
-         lPM => list%get(msh(iM)%name,"Add mesh",iM)
-
-         lPtr => lPM%get(cTmp,"Initial pressures file path (vtu)")
-         IF(ASSOCIATED(lPtr)) THEN
-            flag = .TRUE.
-            ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
-            CALL READVTUPDATA(msh(iM), cTmp, "NS_Pressure", 1, 1)
-         END IF
-      END DO
-      IF (flag) THEN
-         ALLOCATE(Pinit(gtnNo))
-         Pinit = 0D0
-         DO iM=1, nMsh
-            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
-            DO a=1, msh(iM)%gnNo
-               Ac = msh(iM)%gN(a)
-               Pinit(Ac) = msh(iM)%x(1,a)
-            END DO
-            DEALLOCATE(msh(iM)%x)
-         END DO
-      END IF
-
-!     Initialize velocity field from file
-      flag = .FALSE.
-      DO iM=1, nMsh
-         lPM => list%get(msh(iM)%name,"Add mesh",iM)
-
-         lPtr => lPM%get(cTmp,"Initial velocities file path (vtu)")
-         IF(ASSOCIATED(lPtr)) THEN
-            flag = .TRUE.
-            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
-            CALL READVTUPDATA(msh(iM), cTmp, "NS_Velocity", nsd, 1)
-         END IF
-      END DO
-      IF (flag) THEN
-         ALLOCATE(Vinit(nsd,gtnNo))
-         Vinit = 0D0
-         DO iM=1, nMsh
-            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
-            DO a=1, msh(iM)%gnNo
-               Ac = msh(iM)%gN(a)
-               Vinit(:,Ac) = msh(iM)%x(:,a)
-            END DO
-            DEALLOCATE(msh(iM)%x)
-         END DO
-      END IF
-
-!     Initializing displacement field from file. Used for CMM inflation
-      flag = .FALSE.
-      DO iM=1, nMsh
-         lPM => list%get(msh(iM)%name, "Add mesh",iM)
-
-         lPtr => lPM%get(ctmp,"Initial displacements file path (vtu)")
-         IF(ASSOCIATED(lPtr)) THEN
-            flag = .TRUE.
-            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
-            CALL READVTUPDATA(msh(iM), cTmp, "Displacement", nsd, 1)
-         END IF
-      END DO
-      IF (flag) THEN
-         ALLOCATE(Dinit(nsd,gtnNo))
-         Dinit = 0D0
-         DO iM=1, nMsh
-            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
-            DO a=1, msh(iM)%gnNo
-               Ac = msh(iM)%gN(a)
-               Dinit(:,Ac) = msh(iM)%x(:,a)
-            END DO
-            DEALLOCATE(msh(iM)%x)
-         END DO
-      END IF
+!      Load any initial data (velocity, pressure, displacements)
+      IF (.NOT.resetSim) CALL LOADVARINI(list)
 
       IF (nMsh .GT. 1) THEN
          IF (.NOT.resetSim) THEN
@@ -527,59 +454,6 @@
 
       RETURN
       END SUBROUTINE READMSH
-!--------------------------------------------------------------------
-      SUBROUTINE READBF(lM, fid)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: fid
-
-      INTEGER a, i, j, nTP, nNo, Ac
-      REAL(KIND=8) rtmp
-
-      READ (fid,*) i, nTP, nNo
-      IF (nNo .GT. lM%gnNo) err = "No. of nodes out of bounds"//
-     2   " (body force for mesh <"//TRIM(lM%name)//">)"
-      IF (i .NE. nsd) err = "DOF should equal spatial dimension "//nsd//
-     2   " (body force for mesh <"//TRIM(lM%name)//">)"
-
-      ALLOCATE(lM%bf)
-      lM%bf%dof = i
-      lM%bf%nTP = nTP
-
-      ALLOCATE(lM%bf%t(nTP), lM%bf%d(i,gtnNo,nTP))
-      lM%bf%d = 0D0
-
-      DO j=1, nTP
-         READ(fid,*) rtmp
-         lM%bf%t(j) = rtmp
-         IF (j .EQ. 1) THEN
-            IF (.NOT.ISZERO(rtmp)) err = "First time step should be 0"//
-     2         " (body force for mesh <"//TRIM(lM%name)//">)"
-         ELSE
-            rtmp = rtmp - lM%bf%t(j-1)
-            IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-increasing "//
-     2         "time trend found (body force for mesh <"//
-     3         TRIM(lM%name)//">)"
-         END IF
-      END DO
-
-      lM%bf%period = lM%bf%t(nTP)
-      DO a=1, nNo
-         READ(fid,*) Ac
-         IF (Ac.GT.lM%gnNo .OR. Ac.LE.0) THEN
-            err = "Entry "//Ac//" is out of bounds"//
-     2         " (body force for mesh <"//TRIM(lM%name)//">)"
-         END IF
-         Ac = lM%gN(Ac)
-         DO j=1, nTP
-            READ(fid,*) (lM%bf%d(i,Ac,j), i=1, lM%bf%dof)
-         END DO
-      END DO
-      CLOSE(fid)
-
-      RETURN
-      END SUBROUTINE READBF
 !####################################################################
 !     This routines associates two faces with each other and sets gN
       SUBROUTINE SETPROJECTOR(list, avNds)
@@ -1111,6 +985,98 @@
       RETURN
       END SUBROUTINE CALCNBC
 !####################################################################
+      SUBROUTINE LOADVARINI(list)
+      USE COMMOD
+      USE LISTMOD
+      IMPLICIT NONE
+      TYPE(listType), INTENT(INOUT) :: list
+
+      LOGICAL flag
+      INTEGER a, Ac, iM
+      CHARACTER(LEN=stdL) cTmp
+      TYPE(listType), POINTER :: lPtr, lPM
+
+!     Initialize pressure field from file
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+
+         lPtr => lPM%get(cTmp,"Initial pressures file path (vtu)")
+         IF(ASSOCIATED(lPtr)) THEN
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Pressure", 1, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(Pinit(gtnNo))
+         Pinit = 0D0
+         DO iM=1, nMsh
+            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               Pinit(Ac) = msh(iM)%x(1,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+
+!     Initialize velocity field from file
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+
+         lPtr => lPM%get(cTmp,"Initial velocities file path (vtu)")
+         IF(ASSOCIATED(lPtr)) THEN
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Velocity", nsd, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(Vinit(nsd,gtnNo))
+         Vinit = 0D0
+         DO iM=1, nMsh
+            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               Vinit(:,Ac) = msh(iM)%x(:,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+
+!     Initializing displacement field from file
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name, "Add mesh",iM)
+
+         lPtr => lPM%get(ctmp,"Initial displacements file path (vtu)")
+         IF(ASSOCIATED(lPtr)) THEN
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Displacement", nsd, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(Dinit(nsd,gtnNo))
+         Dinit = 0D0
+         DO iM=1, nMsh
+            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               Dinit(:,Ac) = msh(iM)%x(:,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+
+      RETURN
+      END SUBROUTINE LOADVARINI
+!####################################################################
 !     Calculate mesh properties to check its quality
       SUBROUTINE CALCMESHPROPS(nMesh, mesh)
       USE COMMOD
@@ -1202,7 +1168,7 @@
 
          IF (mvMsh) xl = xl + dol
 
-         Jac(e) = JACOBIAN(nsd,lM%eNoN,xl,lM%Nx(:,:,1))
+         Jac(e) = JACOBIAN(nsd, lM%eNoN, xl, lM%Nx(:,:,1))
          IF (Jac(e) .LT. 0D0) THEN
             cnt = cnt + 1
             IF (cPhys .NE. phys_fluid) err = "Negative Jacobian in "//
@@ -1291,6 +1257,7 @@ c         wrn = " Skewness is computed for TRI and TET elements only"
          END DO ! i
       END DO ! e
 
+      maxSk = MAXVAL(Skw(:))
       maxSk = cm%reduce(maxSk, MPI_MAX)
       bins  = cm%reduce(bins)
       tmp(:) = 1D2 * REAL(bins(:),KIND=8) / REAL(lM%gnEl,KIND=8)

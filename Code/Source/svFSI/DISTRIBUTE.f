@@ -43,12 +43,12 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER :: iEq, iM, iFa, a, e, i, Ac
+      INTEGER :: a, e, i, Ac, iEq, iM, iFa, iBf
 
       INTEGER, ALLOCATABLE :: part(:), gmtl(:)
       REAL, ALLOCATABLE :: iWgt(:)
       REAL(KIND=8), ALLOCATABLE :: wgt(:,:), wrk(:), tmpX(:,:),
-     2   tmpX3(:,:,:)
+     2   tmpD(:,:,:)
       TYPE(mshType), ALLOCATABLE :: tMs(:)
 
 !     Preparing IO incase of error or warning. I'm keeping dbg channel
@@ -116,22 +116,37 @@
       END DO
       IF (cm%seq()) THEN
 !        Rearrange body force structure, if necessary
-         DO iM=1, nMsh
-            IF (ALLOCATED(msh(iM)%bf)) THEN
-               ALLOCATE(tmpX3(msh(iM)%bf%dof,gtnNo,msh(iM)%bf%nTP))
-               tmpX3 = msh(iM)%bf%d
-               DEALLOCATE(msh(iM)%bf%d)
-               ALLOCATE(msh(iM)%bf%d(msh(iM)%bf%dof,msh(iM)%nNo,
-     2            msh(iM)%bf%nTP))
-               msh(iM)%bf%d = 0D0
-               DO i=1, msh(iM)%bf%nTP
+         DO iEq=1, nEq
+            DO iBf=1, eq(iEq)%nBf
+               IF (ALLOCATED(eq(iEq)%bf(iBf)%bx)) THEN
+                  i  = eq(iEq)%bf(iBf)%dof
+                  iM = eq(iEq)%bf(iBf)%iM
+                  ALLOCATE(tmpX(i,gtnNo))
+                  tmpX = eq(iEq)%bf(iBf)%bx
+                  DEALLOCATE(eq(iEq)%bf(iBf)%bx)
+                  ALLOCATE(eq(iEq)%bf(iBf)%bx(i,msh(iM)%nNo))
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
-                     msh(iM)%bf%d(:,a,i) = tmpX3(:,Ac,i)
+                     eq(iEq)%bf(iBf)%bx(:,a) = tmpX(:,Ac)
                   END DO
-               END DO
-               DEALLOCATE(tmpX3)
-            END IF
+                  DEALLOCATE(tmpX)
+               ELSE IF (ALLOCATED(eq(iEq)%bf(iBf)%bm)) THEN
+                  i = eq(iEq)%bf(iBf)%bm%dof
+                  a = eq(iEq)%bf(iBf)%bm%nTP
+                  ALLOCATE(tmpD(i,gtnNo,a))
+                  tmpD = eq(iEq)%bf(iBf)%bm%d
+                  DEALLOCATE(eq(iEq)%bf(iBf)%bm%d)
+                  ALLOCATE(eq(iEq)%bf(iBf)%bm%d(i,msh(iM)%nNo,a))
+                  eq(iEq)%bf(iBf)%bm%d = 0D0
+                  DO i=1, eq(iEq)%bf(iBf)%bm%nTP
+                     DO a=1, msh(iM)%nNo
+                        Ac = msh(iM)%gN(a)
+                        eq(iEq)%bf(iBf)%bm%d(:,a,i) = tmpD(:,Ac,i)
+                     END DO
+                  END DO
+                  DEALLOCATE(tmpD)
+               END IF
+            END DO
          END DO
          RETURN
       END IF
@@ -165,6 +180,11 @@
          CALL cm%bcast(useTrilinosLS)
          CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
+         CALL cm%bcast(cmmInit)
+         CALL cm%bcast(shlEq)
+         CALL cm%bcast(pstEq)
+         CALL cm%bcast(sstEq)
+         CALL cm%bcast(cepEq)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)
@@ -186,8 +206,6 @@
          END IF
          CALL cm%bcast(ibFlag)
          IF (ibFlag) CALL DISTIB()
-!        CEP
-         CALL cm%bcast(cepEq)
          CALL cm%bcast(nXion)
       END IF
 
@@ -235,45 +253,28 @@
          DEALLOCATE(tmpX)
       END IF
 
-!     Distribute body force to processors
-      DO iM=1, nMsh
-         flag = ALLOCATED(msh(iM)%bf)
-         CALL cm%bcast(flag)
-         IF (flag) THEN
-            IF (cm%slv()) ALLOCATE(msh(iM)%bf)
-            CALL cm%bcast(msh(iM)%bf%dof)
-            CALL cm%bcast(msh(iM)%bf%nTP)
-            CALL cm%bcast(msh(iM)%bf%period)
-            IF (cm%slv()) ALLOCATE(msh(iM)%bf%t(msh(iM)%bf%nTP))
-            CALL cm%bcast(msh(iM)%bf%t)
-
-            IF (cm%mas()) THEN
-               ALLOCATE(tmpX3(msh(iM)%bf%dof,gtnNo,msh(iM)%bf%nTP))
-               tmpX3 = msh(iM)%bf%d
-               DEALLOCATE(msh(iM)%bf%d)
-            ELSE
-               ALLOCATE(tmpX3(0,0,0))
-            END IF
-            ALLOCATE(tmpX(msh(iM)%bf%dof,tnNo),
-     2         msh(iM)%bf%d(msh(iM)%bf%dof,msh(iM)%nNo,msh(iM)%bf%nTP))
-            msh(iM)%bf%d = 0D0
-            DO i=1, msh(iM)%bf%nTP
-               tmpX = LOCAL(tmpX3(:,:,i))
-               DO a=1, msh(iM)%nNo
-                  Ac = msh(iM)%gN(a)
-                  msh(iM)%bf%d(:,a,i) = tmpX(:,Ac)
-               END DO
-            END DO
-            DEALLOCATE(tmpX3, tmpX)
-         END IF
-      END DO
-
 !     And distributing eq to processors
       IF (cm%slv()) ALLOCATE(eq(nEq))
       DO iEq=1, nEq
          CALL DISTEQ(eq(iEq), tMs, gmtl)
          dbg = "Distributed equation "//iEq
       END DO
+
+!     For CMM initialization
+      flag = ALLOCATED(cmmBdry)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(part(gtnNo))
+            part = cmmBdry
+            DEALLOCATE(cmmBdry)
+         ELSE
+            ALLOCATE(part(0))
+         END IF
+         ALLOCATE(cmmBdry(tnNo))
+         cmmBdry = LOCAL(part)
+         DEALLOCATE(part)
+      END IF
 
 !     Communicating cplBC data
       CALL cm%bcast(cplBC%nFa)
@@ -425,8 +426,7 @@
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(mshType), INTENT(IN) :: tMs(nMsh)
 
-      LOGICAL flag
-      INTEGER iDmn, iOut, iBc
+      INTEGER iDmn, iOut, iBc, iBf
 
 !     Distribute equation parameters
       CALL cm%bcast(lEq%nOutput)
@@ -437,6 +437,7 @@
       CALL cm%bcast(lEq%phys)
       CALL cm%bcast(lEq%nDmn)
       CALL cm%bcast(lEq%nBc)
+      CALL cm%bcast(lEq%nBf)
       CALL cm%bcast(lEq%tol)
       CALL cm%bcast(lEq%dBr)
       IF (ibFlag) THEN
@@ -519,12 +520,6 @@
             CALL cm%bcast(lEq%dmnIB(iDmn)%Id)
             CALL cm%bcast(lEq%dmnIB(iDmn)%prop)
             CALL DIST_MATCONSTS(lEq%dmnIB(iDmn)%stM)
-            flag = ALLOCATED(lEq%dmnIB(iDmn)%shlFp)
-            CALL cm%bcast(flag)
-            IF (flag) THEN
-               IF (cm%slv()) ALLOCATE(lEq%dmnIB(iDmn)%shlFp)
-               CALL DISTSFP(lEq%dmnIB(iDmn)%shlFp)
-            END IF
          END DO
       END IF
 
@@ -550,6 +545,12 @@
             CALL DISTBCIB(lEq%bcIB(iBc))
          END DO
       END IF
+
+!     Distribute BF information
+      IF (cm%slv()) ALLOCATE(lEq%bf(lEq%nBf))
+      DO iBf=1, lEq%nBf
+         CALL DISTBF(lEq%bf(iBf))
+      END DO
 
       RETURN
       END SUBROUTINE DISTEQ
@@ -578,6 +579,8 @@
       CALL cm%bcast(lBc%iM)
       CALL cm%bcast(lBc%r)
       CALL cm%bcast(lBc%g)
+      CALL cm%bcast(lBc%k)
+      CALL cm%bcast(lBc%c)
       CALL cm%bcast(lBc%h)
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
@@ -815,40 +818,117 @@
       RETURN
       END SUBROUTINE DISTBCIB
 !--------------------------------------------------------------------
-!     This routine distributes follower loads for shells
-      SUBROUTINE DISTSFP(lShlFp)
+!     This routine distributes the BF between processors
+      SUBROUTINE DISTBF(lBf)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
-      TYPE(shlFpType), INTENT(INOUT) :: lShlFp
+      TYPE(bfType), INTENT(INOUT) :: lBf
 
       LOGICAL flag
-      INTEGER j
+      INTEGER a, i, j, Ac, iM, idof, nTP
 
-      CALL cm%bcast(lShlFp%bType)
-      CALL cm%bcast(lShlFp%p)
+      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), tmpD(:,:,:)
 
-      flag = ALLOCATED(lShlFp%pt)
+      CALL cm%bcast(lBf%bType)
+      CALL cm%bcast(lBf%dof)
+      CALL cm%bcast(lBf%iM)
+      iM = lBf%iM
+
+!     Steady value
+      flag = ALLOCATED(lBf%b)
+      CALL cm%bcast(flag)
       IF (flag) THEN
-         IF (cm%slv()) ALLOCATE(lShlFp%pt)
-         CALL cm%bcast(lShlFp%pt%qi)
-         CALL cm%bcast(lShlFp%pt%qs)
-         CALL cm%bcast(lShlFp%pt%ti)
-         CALL cm%bcast(lShlFp%pt%n)
-         CALL cm%bcast(lShlFp%pt%T)
-         j = lShlFp%pt%n
-         IF (cm%slv()) THEN
-            ALLOCATE(lShlFp%pt%r(j))
-            ALLOCATE(lShlFp%pt%i(j))
+         IF (cm%slv()) ALLOCATE(lBf%b(lBf%dof))
+         CALL cm%bcast(lBf%b)
+      END IF
+
+!     Communicating spatially dependent BF
+      flag = ALLOCATED(lBf%bx)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpX(lBf%dof,gtnNo))
+            tmpX = lBf%bx
+            DEALLOCATE(lBf%bx)
+         ELSE
+            ALLOCATE(tmpX(0,0))
          END IF
-         CALL cm%bcast(lShlFp%pt%r)
-         CALL cm%bcast(lShlFp%pt%i)
+         ALLOCATE(lBf%bx(lBf%dof,tnNo))
+         lBf%bx = LOCAL(tmpX)
+         DEALLOCATE(tmpX)
+         ALLOCATE(tmpX(lBf%dof,tnNo))
+         tmpX = lBf%bx
+         DEALLOCATE(lBf%bx)
+         ALLOCATE(lBf%bx(lBf%dof,msh(iM)%nNo))
+         lBf%bx = 0D0
+         DO a=1, msh(iM)%nNo
+            Ac = msh(iM)%gN(a)
+            lBf%bx(:,a) = tmpX(:,Ac)
+         END DO
+         DEALLOCATE(tmpX)
+      END IF
+
+!     Communicating time-dependent BF data
+      flag = ALLOCATED(lBf%bt)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%slv()) ALLOCATE(lBf%bt(lBf%dof))
+         DO i=1, lBf%dof
+            CALL cm%bcast(lBf%bt(i)%lrmp)
+            CALL cm%bcast(lBf%bt(i)%qi)
+            CALL cm%bcast(lBf%bt(i)%qs)
+            CALL cm%bcast(lBf%bt(i)%ti)
+            CALL cm%bcast(lBf%bt(i)%n)
+            CALL cm%bcast(lBf%bt(i)%T)
+            j = lBf%bt(i)%n
+            IF (cm%slv()) THEN
+               ALLOCATE(lBf%bt(i)%r(j))
+               ALLOCATE(lBf%bt(i)%i(j))
+            END IF
+            CALL cm%bcast(lBf%bt(i)%r)
+            CALL cm%bcast(lBf%bt(i)%i)
+         END DO
+      END IF
+
+!     Communicating moving BF data
+      flag = ALLOCATED(lBf%bm)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%slv()) ALLOCATE(lBf%bm)
+         CALL cm%bcast(lBf%bm%period)
+!     Communication the %t data
+         CALL cm%bcast(lBf%bm%nTP)
+         CALL cm%bcast(lBf%bm%dof)
+         nTP  = lBf%bm%nTP
+         idof = lBf%bm%dof
+         IF (cm%slv()) ALLOCATE(lBf%bm%t(nTP))
+         CALL cm%bcast(lBf%bm%t)
+
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpD(lBf%bm%dof,gtnNo,lBf%bm%nTP))
+            tmpD = lBf%bm%d
+            DEALLOCATE(lBf%bm%d)
+         ELSE
+            ALLOCATE(tmpD(0,0,0))
+         END IF
+         ALLOCATE(tmpX(lBf%bm%dof,tnNo),
+     2      lBf%bm%d(lBf%bm%dof,msh(iM)%nNo,lBf%bm%nTP))
+         lBf%bm%d = 0D0
+         DO i=1, lBf%bm%nTP
+            tmpX = LOCAL(tmpD(:,:,i))
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               lBf%bm%d(:,a,i) = tmpX(:,Ac)
+            END DO
+         END DO
+         DEALLOCATE(tmpX, tmpD)
       END IF
 
       RETURN
-      END SUBROUTINE DISTSFP
-!!--------------------------------------------------------------------
+      END SUBROUTINE DISTBF
+!--------------------------------------------------------------------
 !     This subroutine distributes constants and parameters of the
 !     constitutive model to all processes
       SUBROUTINE DIST_MATCONSTS(lStM)

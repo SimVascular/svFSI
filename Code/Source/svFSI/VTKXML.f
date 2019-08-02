@@ -280,6 +280,52 @@
 
       RETURN
       END SUBROUTINE READVTUPDATA
+!--------------------------------------------------------------------
+!     Read a particular point dataset from a vtp file. Point data will
+!     be read and stored in lFa%x array
+      SUBROUTINE READVTPPDATA(lFa, fName, kwrd, m, idx)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(INOUT) :: lFa
+      CHARACTER(LEN=*) :: fName, kwrd
+      INTEGER, INTENT(IN) :: m, idx
+
+      TYPE(vtkXMLType) :: vtp
+      INTEGER :: iStat, a
+
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      iStat = 0;
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtp, fName, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (init)"
+
+      CALL getVTK_numPoints(vtp, a, iStat)
+      IF (a .NE. lFa%nNo) err = "Mismatch in num points for "//
+     2   TRIM(kwrd)
+
+      IF (m .EQ. nsd) THEN
+         ALLOCATE(tmpR(maxNSD,lFa%nNo))
+         tmpR = 0D0
+         CALL getVTK_pointData(vtp, TRIM(kwrd), tmpR, iStat)
+         IF (iStat .LT. 0) err = "VTP file read error "//TRIM(kwrd)
+         DO a=1, lFa%nNo
+            lFa%x((idx-1)*nsd+1:idx*nsd,a) = tmpR(1:nsd,a)
+         END DO
+         DEALLOCATE(tmpR)
+      ELSE
+         CALL getVTK_pointData(vtp, TRIM(kwrd), lFa%x, iStat)
+         IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+      END IF
+
+      CALL flushVTK(vtp)
+
+      RETURN
+      END SUBROUTINE READVTPPDATA
 !####################################################################
       SUBROUTINE WRITEVTU(lM, fName)
       USE COMMOD
@@ -452,10 +498,18 @@
                is   = outS(cOut)
                ie   = is + l - 1
                outS(cOut+1)   = ie + 1
-               outNames(cOut) = eq(iEq)%sym//"_"//
-     2            TRIM(eq(iEq)%output(iOut)%name)
 
                oGrp = eq(iEq)%output(iOut)%grp
+               IF(eq(iEq)%phys.EQ.phys_CMM .AND. cmmInit) THEN
+                  IF(oGrp .EQ. outGrp_D) outNames(cOut) =
+     2               TRIM(eq(iEq)%output(iOut)%name)
+                  IF(oGrp .EQ. outGrp_stress) outNames(cOut) =
+     2               "PS_"//TRIM(eq(iEq)%output(iOut)%name)
+               ELSE
+                  outNames(cOut) = eq(iEq)%sym//"_"//
+     2               TRIM(eq(iEq)%output(iOut)%name)
+               END IF
+
                SELECT CASE (oGrp)
                   CASE (outGrp_NA)
                   err = "Undefined output grp in VTK"
@@ -490,13 +544,15 @@
                   IF (eq(iEq)%phys .EQ. phys_struct .OR.
      2                eq(iEq)%phys .EQ. phys_vms_struct) THEN
                      tmpV = 0D0
-                  ELSE IF (eq(iEq)%phys .EQ. phys_preSt) THEN
+                  ELSE IF (pstEq) THEN
                      DO a=1, msh(iM)%nNo
                         Ac = msh(iM)%gN(a)
                         tmpV(:,a) = pS0(:,Ac)
                      END DO
                   END IF
-                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  IF (.NOT.cmmInit) THEN
+                     CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  END IF
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO

@@ -119,9 +119,6 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 !     Apply Dirichlet BCs strongly
          CALL SETBCDIR(An, Yn, Dn)
 
-!     Get body force arrayfor current time if present
-         CALL GETBF()
-
 !     Inner loop for iteration
          DO
             iEqOld = cEq
@@ -141,6 +138,10 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             dbg = 'Allocating the RHS and LHS'
             CALL LSALLOC()
 
+!           Compute body forces. If phys is shells or CMM (init),
+!           apply contribution from body forces (pressure) to residue
+            CALL SETBF(Dg)
+
             dbg = "Assembling equation <"//eq(cEq)%sym//">"
             DO iM=1, nMsh
                CALL GLOBALEQASSEM(msh(iM), Ag, Yg, Dg)
@@ -152,14 +153,10 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
             CALL SETBCNEU(Yg, Dg)
 
 !     Apply CMM BC conditions
-            CALL SETBCCMM(Ag, Yg, Dg)
+            IF (.NOT.cmmInit) CALL SETBCCMM(Ag, Dg)
 
 !     Apply weakly applied Dirichlet BCs
             CALL SETBCDIRW(Yg, Dg)
-
-!     Constructing the element stiffness matrix due to traction forces
-!     or follower loads for shells
-            CALL SETSHELLFP(Dg)
 
 !     Apply contact model and add its contribution to residue
             IF (iCntct) CALL CONTACTFORCES(Dg)
@@ -180,6 +177,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
 
             incL = 0
             IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
+            IF (cmmInit) incL(nFacesLS) = 1
             DO iBc=1, eq(cEq)%nBc
                i = eq(cEq)%bc(iBc)%lsPtr
                IF (i .NE. 0) THEN
@@ -187,7 +185,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
                   incL(i) = 1
                END IF
             END DO
-            IF (ibLSptr.NE.0) incL(ibLSptr) = 1
+            IF (ibLSptr .NE. 0) incL(ibLSptr) = 1
 
             dbg = "Solving equation <"//eq(cEq)%sym//">"
             CALL LSSOLVE(eq(cEq), incL, res)
@@ -243,6 +241,7 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          ELSE
             CALL OUTRESULT(timeP, 2, iEqOld)
          END IF
+         IF (pstEq) CALL OUTDNORM()
 
          IF (ibFlag) CALL IB_OUTR()
 

@@ -37,10 +37,8 @@
 
 !     This is for solving heat equation in a fluid.
       PURE SUBROUTINE HEATF3D (eNoN, w, N, Nx, al, yl, ksix, lR, lK)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -135,9 +133,7 @@
       END SUBROUTINE HEATF3D
 !====================================================================
       PURE SUBROUTINE BHEATF (eNoN, w, N, y, h, nV, lR, lK)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -167,13 +163,10 @@
 
       RETURN
       END SUBROUTINE BHEATF
-
 !####################################################################
 !     This is for solving the heat equation in a solid
       PURE SUBROUTINE HEATS3D (eNoN, w, N, Nx, al, yl, lR, lK)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -182,12 +175,14 @@
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
       INTEGER i, a, b
-      REAL(KIND=8) nu, T1, amd, wl, Td, Tx(nsd), s
+      REAL(KIND=8) nu, T1, amd, wl, Td, Tx(nsd), s, rho
 
-      T1  = eq(cEq)%af*eq(cEq)%gam*dt
-      amd = eq(cEq)%am/T1
       nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
       s   = eq(cEq)%dmn(cDmn)%prop(source_term)
+      rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
+
+      T1  = eq(cEq)%af*eq(cEq)%gam*dt
+      amd = eq(cEq)%am * rho/T1
       i   = eq(cEq)%s
 
       wl = w*T1
@@ -201,6 +196,7 @@
          Tx(2) = Tx(2) + Nx(2,a)*yl(i,a)
          Tx(3) = Tx(3) + Nx(3,a)*yl(i,a)
       END DO
+      Td = Td * rho
 
       DO a=1,eNoN
          lR(1,a) = lR(1,a) + w*(N(a)*Td
@@ -216,9 +212,7 @@
       END SUBROUTINE HEATS3D
 !====================================================================
       PURE SUBROUTINE BHEATS (eNoN, w, N, h, lR)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -234,7 +228,6 @@
 
       RETURN
       END SUBROUTINE BHEATS
-
 !####################################################################
 
 !     2D versions
@@ -242,10 +235,8 @@
 !####################################################################
 !     This is for solving heat equation in a fluid
       PURE SUBROUTINE HEATF2D (eNoN, w, N, Nx, al, yl, ksix, lR, lK)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -326,13 +317,10 @@
 
       RETURN
       END SUBROUTINE HEATF2D
-
 !####################################################################
 !     This is for solving the heat equation in a solid
       PURE SUBROUTINE HEATS2D (eNoN, w, N, Nx, al, yl, lR, lK)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -341,12 +329,14 @@
       REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
       INTEGER i, a, b
-      REAL(KIND=8) nu, T1, amd, wl, Td, Tx(nsd), s
+      REAL(KIND=8) nu, T1, amd, wl, Td, Tx(nsd), s, rho
 
-      T1  = eq(cEq)%af*eq(cEq)%gam*dt
-      amd = eq(cEq)%am/T1
       nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
       s   = eq(cEq)%dmn(cDmn)%prop(source_term)
+      rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
+
+      T1  = eq(cEq)%af*eq(cEq)%gam*dt
+      amd = eq(cEq)%am * rho/T1
       i   = eq(cEq)%s
 
       wl = w*T1
@@ -359,6 +349,7 @@
          Tx(1) = Tx(1) + Nx(1,a)*yl(i,a)
          Tx(2) = Tx(2) + Nx(2,a)*yl(i,a)
       END DO
+      Td = Td * rho
 
       DO a=1, eNoN
          lR(1,a) = lR(1,a) + w*(N(a)*Td + (Nx(1,a)*Tx(1)
@@ -372,5 +363,4 @@
 
       RETURN
       END SUBROUTINE HEATS2D
-
 !####################################################################

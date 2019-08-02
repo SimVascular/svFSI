@@ -43,17 +43,17 @@
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(nsd,eNoN), ksix(nsd,nsd)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
+     2   yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
       REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
       INTEGER a, b
       REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
-     2   up(nsd), ua(nsd), udNx(eNoN), updNx(eNoN), uadNx(eNoN),
-     3   rV(nsd), rM(nsd,nsd), NxdNx, amd, wl, wr, wrl, s, ud(nsd),
-     4   u(nsd), p, ux(nsd,nsd), px(nsd), f(nsd)
+     2  amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3), ua(3),
+     3  ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3), rM(3,3),
+     4  NxdNx
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       nu   = eq(cEq)%dmn(cDmn)%prop(viscosity)/rho
@@ -62,11 +62,11 @@
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
 
-      wr  = w*rho
-      T1  = eq(cEq)%af*eq(cEq)%gam*dt
-      amd = eq(cEq)%am/T1
-      wrl = wr*T1
-      wl  = w*T1
+      wr   = w*rho
+      T1   = eq(cEq)%af*eq(cEq)%gam*dt
+      amd  = eq(cEq)%am/T1
+      wrl  = wr*T1
+      wl   = w*T1
 
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first
@@ -241,17 +241,17 @@
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(nsd,eNoN), ksix(nsd,nsd)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
+     2   yl(tDof,eNoN), bfl(2,eNoN), ksix(2,2)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
       REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
       INTEGER a, b
       REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
-     2   up(nsd), ua(nsd), udNx(eNoN), updNx(eNoN), uadNx(eNoN),
-     3   rV(nsd), rM(nsd,nsd), NxdNx, amd, wl, wr, wrl, s, ud(nsd),
-     4   u(nsd), p, ux(nsd,nsd), px(nsd), f(nsd)
+     2  amd, wl, wr, wrl, s, p, u(2), ud(2), px(2), f(2), up(2), ua(2),
+     3  ux(2,2), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(2), rM(2,2),
+     4  NxdNx
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       nu   = eq(cEq)%dmn(cDmn)%prop(viscosity)/rho
@@ -259,11 +259,11 @@
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
 
-      wr  = w*rho
-      T1  = eq(cEq)%af*eq(cEq)%gam*dt
-      amd = eq(cEq)%am/T1
-      wrl = wr*T1
-      wl  = w*T1
+      wr   = w*rho
+      T1   = eq(cEq)%af*eq(cEq)%gam*dt
+      amd  = eq(cEq)%am/T1
+      wrl  = wr*T1
+      wl   = w*T1
 
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first

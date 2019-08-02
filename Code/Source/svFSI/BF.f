@@ -31,56 +31,182 @@
 !
 !--------------------------------------------------------------------
 !
-!     This routine computes body force on a mesh.
+!     This routine computes body force for the current equation and
+!     assembles it to the residue
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE GETBF()
+      SUBROUTINE SETBF(Dg)
+      USE COMMOD
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
+
+      INTEGER iBf, iM
+
+      Bf(:,:) = 0D0
+      DO iBf=1, eq(cEq)%nBf
+         iM = eq(cEq)%bf(iBf)%iM
+         CALL SETBFL(eq(cEq)%bf(iBf), msh(iM), Dg)
+      END DO
+
+      RETURN
+      END SUBROUTINE SETBF
+!--------------------------------------------------------------------
+      SUBROUTINE SETBFL(lBf, lM, Dg)
       USE COMMOD
       IMPLICIT NONE
 
-      LOGICAL flag
-      INTEGER iM
+      TYPE(bfType), INTENT(IN) :: lBf
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
 
-      flag = .FALSE.
-      DO iM=1, nMsh
-         IF (ALLOCATED(msh(iM)%bf)) THEN
-            flag = .TRUE.
-            EXIT
-         END IF
-      END DO
-      IF (flag) THEN
-         IF (ALLOCATED(Bfg)) DEALLOCATE(Bfg)
-         ALLOCATE(Bfg(nsd,tnNo))
-         Bfg = 0D0
-         DO iM=1, nMsh
-            IF (ALLOCATED(msh(iM)%bf)) CALL GETBFL(msh(iM), Bfg)
+      INTEGER a, e, i, Ac, idof, nNo, eNoN
+      REAL(KIND=8) rtmp, hsgn
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: f(:), bfl(:,:), bfg(:,:), xl(:,:),
+     2   dl(:,:)
+
+      nNo  = lM%nNo
+      idof = lBf%dof
+      eNoN = lM%eNoN
+
+      hsgn = 1.0D0
+      IF (BTEST(lBf%btype,bfType_Neu)) hsgn = -1.0D0
+
+      ALLOCATE(f(idof))
+
+      IF (BTEST(lBf%bType, bfType_std)) THEN
+         f(:) = lBf%b(:)
+      ELSE IF (BTEST(lBf%bType,bfType_ustd)) THEN
+         DO i=1, idof
+            CALL IFFT(lBf%bt(i), f(i), rtmp)
+         END DO
+      ELSE IF (BTEST(lBf%bType, bfType_gen)) THEN
+         ALLOCATE(bfl(idof,nNo), xl(idof,nNo))
+         CALL IGBC(lBf%bm, bfl, xl)
+         DEALLOCATE(xl)
+      END IF
+
+      ALLOCATE(bfg(idof,tnNo))
+      bfg = 0D0
+
+      IF (BTEST(lBf%bType,bfType_gen)) THEN
+         DO a=1, lM%nNo
+            Ac = lM%gN(a)
+            bfg(:,Ac) = bfl(:,a)
+         END DO
+         DEALLOCATE(bfl)
+      ELSE IF (BTEST(lBf%bType,bfType_spl)) THEN
+         DO a=1, lM%nNo
+            Ac = lM%gN(a)
+            bfg(:,Ac) = lBf%bx(:,a)
+         END DO
+      ELSE
+         DO a=1, lM%nNo
+            Ac = lM%gN(a)
+            bfg(:,Ac) = f(:)
          END DO
       END IF
 
+      DEALLOCATE(f)
+
+!     Apply -ve sign for pressure loads
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         bfg(:,Ac) = hsgn*bfg(:,Ac)
+      END DO
+
+!     Assemble pressure/traction load (shells/CMM initialization) to
+!     residue. For general body force (vector), assemble later with
+!     other volumetric forces
+      IF (BTEST(lBf%bType, bfType_vol)) THEN
+         DO a=1, nNo
+            Ac = lM%gN(a)
+            Bf(:,Ac) = bfg(:,Ac)
+         END DO
+
+      ELSE
+         ALLOCATE(bfl(idof,eNoN), xl(nsd,eNoN), dl(tDof,eNoN),
+     2      ptr(eNoN))
+         DO e=1, lM%nEl
+            DO a=1, eNoN
+               Ac = lM%IEN(a,e)
+               ptr(a)   = Ac
+               xl(:,a)  = x(:,Ac)
+               dl(:,a)  = Dg(:,Ac)
+               bfl(:,a) = bfg(:,Ac)
+            END DO
+            CALL BFCONSTRUCT(lM, e, eNoN, idof, xl, dl, bfl, ptr)
+         END DO
+         DEALLOCATE(bfl, xl, dl, ptr)
+      END IF
+
+      DEALLOCATE(bfg)
+
       RETURN
-      END SUBROUTINE GETBF
-!--------------------------------------------------------------------
-      SUBROUTINE GETBFL(lM, lBf)
+      END SUBROUTINE SETBFL
+!####################################################################
+!     This subroutine is reached only for shell follower pressre loads
+!     or applying initialization pressure for CMM method. nsd must be
+!     equal to 3
+      SUBROUTINE BFCONSTRUCT(lM, e, eNoN, idof, xl, dl, bfl, ptr)
       USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(INOUT) :: lBf(nsd,tnNo)
+      INTEGER, INTENT(IN) :: e, eNoN, idof, ptr(eNoN)
+      REAL(KIND=8), INTENT(IN) :: dl(tDof,eNoN), bfl(idof,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
-      INTEGER :: a, Ac
-      REAL(KIND=8), ALLOCATABLE :: tmpY(:,:), tmpA(:,:)
+      INTEGER :: g, cPhys
+      REAL(KIND=8) :: w
 
-      ALLOCATE(tmpY(lM%bf%dof,lM%nNo), tmpA(lM%bf%dof,lM%nNo))
-      CALL IGBC(lM%bf, tmpY, tmpA)
+      REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
-      DO a=1, lM%nNo
-         Ac = lM%gN(a)
-         lBf(:,Ac) = tmpY(:,a)
+      IF (nsd .NE. 3) err = "Unexpected encounter. Correction needed "//
+     2   "in BFCONSTRUCT"
+
+      ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+
+      cDmn  = DOMAIN(lM, cEq, e)
+      cPhys = eq(cEq)%dmn(cDmn)%phys
+
+!     Updating the shape functions, if neccessary
+      IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!     Setting intial values
+      lR = 0D0
+      lK = 0D0
+
+      DO g=1, lM%nG
+         w  = lM%w(g)
+         N  = lM%N(:,g)
+         Nx = lM%Nx(:,:,g)
+         SELECT CASE (cPhys)
+         CASE (phys_shell)
+            CALL SHELLFP(eNoN, w, N, Nx, dl, xl, bfl, lR, lK)
+
+         CASE (phys_CMM)
+            CALL BCMMi(eNoN, idof, w, N, Nx, xl, bfl, lR)
+
+         CASE DEFAULT
+            err = "Undefined phys in BFCONSTRUCT"
+         END SELECT
       END DO
 
-      DEALLOCATE(tmpY, tmpA)
+!     Now doing the assembly part
+#ifdef WITH_TRILINOS
+      IF (useTrilinosAssemAndLS) THEN
+         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+      ELSE
+#endif
+         CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+      END IF
+#endif
 
       RETURN
-      END SUBROUTINE GETBFL
+      END SUBROUTINE BFCONSTRUCT
 !####################################################################

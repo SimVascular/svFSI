@@ -114,7 +114,6 @@ set(FSRCS UTIL.f
          MOD.f
          ALLFUN.f
          BAFINI.f
-         BBO.f
          BF.f
          CEPION.f
          CEP.f

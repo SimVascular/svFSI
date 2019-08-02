@@ -51,7 +51,7 @@
 !     of output variables, size of blocks for openMP communications,
 !     master is assumed to have zero ID, version, maximum number of
 !     properties, License expiration date
-      INTEGER, PARAMETER :: maxnsd = 3, version = 8, maxNProp = 30,
+      INTEGER, PARAMETER :: maxnsd = 3, version = 8, maxNProp = 20,
      3   expDate(3)=(/2020,1,1/)
 
 !     Gauss points and their corresponding weights, upto 5 points
@@ -74,18 +74,16 @@
 
 !     Possible physical properties. Current maxNPror is 20.
 !     When adding more properties, remember to increase maxNProp
-!     Density of fluid, viscosity of fluid, density of solid, elsticity
-!     modulus, Poisson's ratio, conductivity, internal force(X,Y,Z),
-!     particles diameter, particle density, stabilization coefficient
-!     for backflow divergence, shell thickness, stabilization parameters
-!     for VMS_STRUCT (ctauM, ctauC), CMM initialization pressure
+!     Density of fluid, viscosity of fluid, density of solid, elasticity
+!     modulus, Poisson's ratio, conductivity, internal force (X, Y, Z),
+!     permeability, stabilization coeff. for backflow divergence,
+!     external source, damping, shell thickness, stabilization coeffs.
+!     for VMS_STRUCT (mom., cont.)
       INTEGER, PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   viscosity = 2, solid_density = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
-     4   particle_diameter = 10, particle_density = 11,
-     5   permeability = 12, backflow_stab = 13, source_term = 14,
-     6   damping = 15, shell_thickness = 16, ctau_M = 17, ctau_C = 18,
-     7   initialization_pressure = 19
+     4   permeability = 10, backflow_stab = 11, source_term = 12,
+     5   damping = 13, shell_thickness = 14, ctau_M = 15, ctau_C = 16
 
 !     Types of accepted elements
 !     Linear (1D), triangle (2D), tetrahedral (3D), bilinear (2D), quad
@@ -98,16 +96,14 @@
 !     Types of equations that are included in this solver
 !     Fluid equation (Navier-Stokes), structure (non-linear), heat
 !     equation, linear elasticity, heat in a fluid
-!     (advection-diffusion), fluid-structure-interaction, elector
-!     magnetic, mesh motion, Basset-Boussinesq Oseen equation,
-!     Electro-Physiology, VMS-stabilized-structure,
-!     Coupled-Momentum-Method
+!     (advection-diffusion), fluid-structure-interaction, mesh motion,
+!     Prestress, Shell mechanics, Coupled-Momentum-Method,
+!     Cardiac Electro-Physiology, VMS-stabilized-structure
       INTEGER, PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
-     3   phys_heatF = 205, phys_FSI = 206, phys_elcMag = 207,
-     4   phys_mesh = 208, phys_BBO = 209, phys_preSt = 210,
-     5   phys_shell = 211, phys_CEP = 212, phys_vms_struct = 213,
-     6   phys_CMM = 214
+     3   phys_heatF = 205, phys_FSI = 206, phys_mesh = 207,
+     4   phys_preSt = 208, phys_shell = 209, phys_CMM = 210,
+     5   phys_CEP = 211, phys_vms_struct = 212
 
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit
@@ -121,23 +117,26 @@
 !     Beside these nodes at the boundary perimeter can be set to
 !     zero and flux through surface can be assigned instead of nodal
 !     values.
-!     For non-matching meshes, variables can be projected at the
-!     interface.
-!     Drichlet, Neumann, periodic, steady, unsteady, coupled,
-!     general (combination of ud/ustd), resistance, flat profile,
-!     parabolic profile, user defined profile, zero out perimeter,
-!     impose flux instead of value, L2 projection, backflow
-!     stabilization, impose BC on the integral of state variable or D
-!     (instead of Y), diplacement dependent,
-!     fixed (shells), hinged (shells), free (shells), symmetric (shells),
-!     coupled momentum method (CMM), undeforming Neumann
+!     Dirichlet, Neumann, Traction, CMM, Robin, steady, unsteady,
+!     coupled, general (combination of ud/ustd), resistance, imposed
+!     flux, zero out perimeter, impose BC on the integral of state
+!     variable or D (instead of Y), flat profile, parabolic profile,
+!     user defined profile, backflow stabilization, BCs for shells
+!     (fixed, hinged, free, symmetric), undeforming Neu
       INTEGER, PARAMETER :: bType_Dir = 0, bType_Neu = 1,
-     2   bType_per = 2, bType_std = 3, bType_ustd = 4, bType_cpl = 5,
-     3   bType_gen = 6, bType_res = 7, bType_flx = 8, bType_flat = 9,
-     4   bType_para = 10, bType_ud = 11, bType_zp = 12, bType_bfs = 13,
-     5   bType_impD = 14, bType_ddep = 15, bType_trac = 16,
-     6   bType_fix = 17, bType_hing = 18, bType_free = 19,
-     7   bType_symm = 20, bType_CMM = 21, bType_undefNeu = 22
+     2   bType_trac = 2, bType_CMM = 3, bType_Robin = 4, bType_std = 5,
+     3   bType_ustd = 6, bType_cpl = 7, bType_gen = 8, bType_res = 9,
+     4   bType_flx = 10, bType_zp = 11, bType_impD = 12, bType_flat =13,
+     5   bType_para = 14, bType_ud = 15, bType_bfs = 16, bType_fix = 17,
+     6   bType_hing = 18, bType_free = 19, bType_symm = 20,
+     7   bType_undefNeu = 21
+
+!     Body force types: volumetric (default), traction, Neumann
+!     (pressure based), time dependence (steady, unsteady, spatially
+!     varying, general)
+      INTEGER, PARAMETER :: bfType_vol = 0, bfType_trac = 1,
+     2   bfType_Neu = 2, bfType_std = 3, bfType_ustd = 4,
+     3   bfType_spl = 5, bfType_gen = 6
 
 !     Possible senarios for the output, followed by the possible outputs
 !     Undefined output, extract it from A, extract it from Y, extract it
@@ -259,31 +258,79 @@
          REAL(KIND=8), ALLOCATABLE :: r(:)
       END TYPE fcType
 
-!     Follower pressure load data type for shells. This force acts along
-!     the shell director (or normal)
-      TYPE shlFpType
-         INTEGER :: bType = 0
-!        Defined steady value
-         REAL(KIND=8) :: p = 0D0
-!        Time depandant body force
-         TYPE(fcType), ALLOCATABLE :: pt
-      END TYPE shlFpType
+!     Moving boundary data structure (used for general BC)
+      TYPE MBType
+!     Degrees of freedom of d(:,.,.)
+         INTEGER dof
+!     Number of time points to be read
+         INTEGER :: nTP = 0
+!     The period of data
+         REAL(KIND=8) period
+!     Time points
+         REAL(KIND=8), ALLOCATABLE :: t(:)
+!     Displacements at each direction, location, and time point
+         REAL(KIND=8), ALLOCATABLE :: d(:,:,:)
+      END TYPE MBType
 
-!     Contact model type
-      TYPE cntctModelType
-!        Contact model
-         INTEGER :: cType = cntctM_NA
-!        Penalty parameter
-         REAL(KIND=8) k
-!        Min depth of penetration
-         REAL(KIND=8) h
-!        Max depth of penetration
-         REAL(KIND=8) c
-!        Min norm of face normals in contact
-         REAL(KIND=8) al
-!        Tolerance
-         REAL(KIND=8) :: tol = 1E-6
-      END TYPE cntctModelType
+!     Boundary condition data type
+      TYPE bcType
+!        Strong/Weak application of Dirichlet BC
+         LOGICAL :: weakDir
+!        Whether feedback force is along normal direction only
+         LOGICAL :: fbN = .FALSE.
+!        Pre/Res/Flat/Para... boundary types
+         INTEGER :: bType = 0
+!        Pointer to coupledBC%face
+         INTEGER :: cplBCptr = 0
+!        The face index that corresponds to this BC
+         INTEGER iFa
+!        The mesh index that corresponds to this BC
+         INTEGER iM
+!        Pointer to FSILS%bc
+         INTEGER lsPtr
+!        Undeforming Neu BC master-slave node parameters.
+         INTEGER masN
+!        Defined steady value
+         REAL(KIND=8) :: g = 0D0
+!        Neu: defined resistance
+         REAL(KIND=8) :: r = 0D0
+!        Robin: stiffness
+         REAL(KIND=8) :: k = 0D0
+!        Robin: damping
+         REAL(KIND=8) :: c = 0D0
+!        Penalty parameters for weakly applied Dir BC / immersed bodies
+         REAL(KIND=8) :: tauB(2) = 0D0
+!        IB: Feedback force constant
+         REAL(KIND=8) :: tauF = 0D0
+!        Direction vector for imposing the BC
+         INTEGER, ALLOCATABLE :: eDrn(:)
+!        Defined steady vector (traction)
+         REAL(KIND=8), ALLOCATABLE :: h(:)
+!        Spatial dependant BC (profile data)
+         REAL(KIND=8), ALLOCATABLE :: gx(:)
+!        General BC (unsteady and UD combination)
+         TYPE(MBType), ALLOCATABLE :: gm
+!        Time dependant BC (Unsteady imposed value)
+         TYPE(fcType), ALLOCATABLE :: gt
+      END TYPE bcType
+
+!     Body force data structure type
+      TYPE bfType
+!        Type of body force applied
+         INTEGER :: bType = 0
+!        No. of dimensions (1 or nsd)
+         INTEGER :: dof
+!        Mesh index corresponding to this body force
+         INTEGER :: iM
+!        Steady value
+         REAL(KIND=8), ALLOCATABLE :: b(:)
+!        Steady but spatially dependant
+         REAL(KIND=8), ALLOCATABLE :: bx(:,:)
+!        Time dependant (unsteady imposed value)
+         TYPE(fcType), ALLOCATABLE :: bt(:)
+!        General (unsteady and spatially dependent combination)
+         TYPE(MBType), ALLOCATABLE :: bm
+      END TYPE bfType
 
 !     Domain type is to keep track with element belong to which domain
 !     and also different hysical quantities
@@ -300,8 +347,6 @@
          TYPE(cepModelType) :: cep
 !        Structure material model
          TYPE(stModelType) :: stM
-!        Follower pressure loads for shells
-         TYPE(shlFpType), ALLOCATABLE :: shlFp
       END TYPE dmnType
 
 !     Mesh adjacency (neighboring element for each element)
@@ -395,58 +440,6 @@
          CHARACTER(LEN=stdL) name
       END TYPE outputType
 
-!     Moving boundary data structure (used for general BC)
-      TYPE MBType
-!     Degrees of freedom of d(:,.,.)
-         INTEGER dof
-!     Number of time points to be read
-         INTEGER :: nTP = 0
-!     The period of data
-         REAL(KIND=8) period
-!     Time points
-         REAL(KIND=8), ALLOCATABLE :: t(:)
-!     Displacements at each direction, location, and time point
-         REAL(KIND=8), ALLOCATABLE :: d(:,:,:)
-      END TYPE MBType
-
-!     Boundary condition data type
-      TYPE bcType
-!        Strong/Weak application of Dirichlet BC
-         LOGICAL :: weakDir
-!        Whether feedback force is along normal direction only
-         LOGICAL :: fbN = .FALSE.
-!        Pre/Res/Flat/Para... boundary types
-         INTEGER :: bType = 0
-!        Pointer to coupledBC%face
-         INTEGER :: cplBCptr = 0
-!        The face index that corresponds to this BC
-         INTEGER iFa
-!        The mesh index that corresponds to this BC
-         INTEGER iM
-!        Pointer to FSILS%bc
-         INTEGER lsPtr
-!        Undeforming Neu BC master-slave node parameters.
-         INTEGER masN
-!        Defined steady value
-         REAL(KIND=8) :: g = 0D0
-!        Neu: defined resistance
-         REAL(KIND=8) :: r = 0D0
-!        Penalty parameters for weakly applied Dir BC / immersed bodies
-         REAL(KIND=8) :: tauB(2) = 0D0
-!        IB: Feedback force constant
-         REAL(KIND=8) :: tauF = 0D0
-!        Direction vector for imposing the BC
-         INTEGER, ALLOCATABLE :: eDrn(:)
-!        Defined steady vector
-         REAL(KIND=8), ALLOCATABLE :: h(:)
-!        Spatial depanadant BC (profile data)
-         REAL(KIND=8), ALLOCATABLE :: gx(:)
-!        General BC (unsteady and UD combination)
-         TYPE(MBType), ALLOCATABLE :: gm
-!        Time depandant BC (Unsteady imposed value)
-         TYPE(fcType), ALLOCATABLE :: gt
-      END TYPE bcType
-
 !     Linear system of equations solver type
       TYPE lsType
 !        LS solver                     (IN)
@@ -482,6 +475,22 @@
 !        Calling duration              (OUT)
          REAL(KIND=8) callD
       END TYPE lsType
+
+!     Contact model type
+      TYPE cntctModelType
+!        Contact model
+         INTEGER :: cType = cntctM_NA
+!        Penalty parameter
+         REAL(KIND=8) k
+!        Min depth of penetration
+         REAL(KIND=8) h
+!        Max depth of penetration
+         REAL(KIND=8) c
+!        Min norm of face normals in contact
+         REAL(KIND=8) al
+!        Tolerance
+         REAL(KIND=8) :: tol = 1E-6
+      END TYPE cntctModelType
 
 !--------------------------------------------------------------------
 !     All the subTypes are defined, now defining the major types that
@@ -604,8 +613,6 @@
          TYPE(faceType), ALLOCATABLE :: fa(:)
 !        IB: tracers
          TYPE(traceType) :: trc
-!        General type for body force
-         TYPE(MBtype), ALLOCATABLE :: bf
       END TYPE mshType
 
 !     Equation type
@@ -636,6 +643,8 @@
          INTEGER :: nBc = 0
 !        IB: Number of BCs on immersed surfaces
          INTEGER :: nBcIB = 0
+!        Number of BFs
+         INTEGER :: nBf = 0
 !        Type of equation fluid/heatF/heatS/lElas/FSI
          INTEGER phys
 !        Pointer to start of unknown Yo(:,s:e)
@@ -668,6 +677,8 @@
          TYPE(FSILS_lsType) lsIB
 !        BCs associated with this equation
          TYPE(bcType), ALLOCATABLE :: bc(:)
+!        Body force associated with this equation
+         TYPE(bfType), ALLOCATABLE :: bf(:)
 !        IB: BCs associated with this equation on immersed surfaces
          TYPE(bcType), ALLOCATABLE :: bcIB(:)
 !        domains that this equation must be solved
@@ -828,10 +839,12 @@
       LOGICAL ichckIEN
 !     Reset averaging variables from zero
       LOGICAL zeroAve
+!     Whether CMM equation is initialized
+      LOGICAL cmmInit
+!     Whether shell equation is being solved
+      LOGICAL shlEq
 !     Whether PRESTRESS equation is solved
       LOGICAL pstEq
-!     Whether CMM equation is solved
-      LOGICAL cmmEq
 !     Whether stabilized structural dynamics solver is used
       LOGICAL sstEq
 !     Whether to detect and apply any contact model
@@ -915,6 +928,9 @@
 !     Array that maps global node id to rowN in the matrix
       INTEGER, ALLOCATABLE :: idMap(:)
 
+!     Boundary nodes set for CMM initialization
+      INTEGER, ALLOCATABLE :: cmmBdry(:)
+
 !     Additional arrays for immersed boundaries
 !     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid)
       INTEGER, ALLOCATABLE :: iblank(:)
@@ -940,7 +956,7 @@
 !     New variables
       REAL(KIND=8), ALLOCATABLE :: Yn(:,:)
 !     Body force
-      REAL(KIND=8), ALLOCATABLE :: Bfg(:,:)
+      REAL(KIND=8), ALLOCATABLE :: Bf(:,:)
 
 !     Additional arrays for velocity-based formulation of nonlinear
 !     solid mechanics

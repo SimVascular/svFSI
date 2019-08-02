@@ -69,9 +69,10 @@
       END INTERFACE LOCAL
 
       INTERFACE DESTROY
-         MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYEQ,
-     2      DESTROYBS, DESTROYMB, DESTROYDATA, DESTROYADJ, DESTROYSTACK,
-     3      DESTROYQUEUE, DESTROYTRACE, DESTROYIBCM
+         MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYBF,
+     2      DESTROYDMN, DESTROYEQ, DESTROYBS, DESTROYMB, DESTROYDATA,
+     3      DESTROYADJ, DESTROYSTACK, DESTROYQUEUE, DESTROYTRACE,
+     4      DESTROYIBCM
       END INTERFACE DESTROY
 
       INTERFACE GETNADJCNCY
@@ -1006,19 +1007,21 @@
       IMPLICIT NONE
       TYPE(faceType), INTENT(OUT) :: lFa
 
-      IF (ALLOCATED(lFa%gE))   DEALLOCATE(lFa%gE)
-      IF (ALLOCATED(lFa%gN))   DEALLOCATE(lFa%gN)
-      IF (ALLOCATED(lFa%lN))   DEALLOCATE(lFa%lN)
-      IF (ALLOCATED(lFa%IEN))  DEALLOCATE(lFa%IEN)
-      IF (ALLOCATED(lFa%gebc)) DEALLOCATE(lFa%gebc)
-      IF (ALLOCATED(lFa%w))    DEALLOCATE(lFa%w)
-      IF (ALLOCATED(lFa%x))    DEALLOCATE(lFa%x)
-      IF (ALLOCATED(lFa%xi))   DEALLOCATE(lFa%xi)
-      IF (ALLOCATED(lFa%N))    DEALLOCATE(lFa%N)
-      IF (ALLOCATED(lFa%nV))   DEALLOCATE(lFa%nV)
-      IF (ALLOCATED(lFa%Nx))   DEALLOCATE(lFa%Nx)
-      IF (ALLOCATED(lFa%Nxx))  DEALLOCATE(lFa%Nxx)
+      IF (ALLOCATED(lFa%gE))     DEALLOCATE(lFa%gE)
+      IF (ALLOCATED(lFa%gN))     DEALLOCATE(lFa%gN)
+      IF (ALLOCATED(lFa%lN))     DEALLOCATE(lFa%lN)
+      IF (ALLOCATED(lFa%IEN))    DEALLOCATE(lFa%IEN)
+      IF (ALLOCATED(lFa%gebc))   DEALLOCATE(lFa%gebc)
+      IF (ALLOCATED(lFa%w))      DEALLOCATE(lFa%w)
+      IF (ALLOCATED(lFa%x))      DEALLOCATE(lFa%x)
+      IF (ALLOCATED(lFa%xi))     DEALLOCATE(lFa%xi)
+      IF (ALLOCATED(lFa%N))      DEALLOCATE(lFa%N)
+      IF (ALLOCATED(lFa%nV))     DEALLOCATE(lFa%nV)
+      IF (ALLOCATED(lFa%Nx))     DEALLOCATE(lFa%Nx)
+      IF (ALLOCATED(lFa%Nxx))    DEALLOCATE(lFa%Nxx)
 
+      CALL DESTROYADJ(lFa%nAdj)
+      CALL DESTROYADJ(lFa%eAdj)
       CALL DESTROYTRACE(lFa%trc)
 
       lFa%eType = eType_NA
@@ -1039,27 +1042,28 @@
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
 
-      IF (ALLOCATED(lM%eDist))  DEALLOCATE(lM%eDist)
-      IF (ALLOCATED(lM%eId))    DEALLOCATE(lM%eId)
-      IF (ALLOCATED(lM%gN))     DEALLOCATE(lM%gN)
-      IF (ALLOCATED(lM%gpN))    DEALLOCATE(lM%gpN)
-      IF (ALLOCATED(lM%gIEN))   DEALLOCATE(lM%gIEN)
-      IF (ALLOCATED(lM%IEN))    DEALLOCATE(lM%IEN)
-      IF (ALLOCATED(lM%otnIEN)) DEALLOCATE(lM%otnIEN)
-      IF (ALLOCATED(lM%INN))    DEALLOCATE(lM%INN)
-      IF (ALLOCATED(lM%lN))     DEALLOCATE(lM%lN)
-      IF (ALLOCATED(lM%eIEN))   DEALLOCATE(lM%eIEN)
-      IF (ALLOCATED(lM%sbc))    DEALLOCATE(lM%sbc)
-      IF (ALLOCATED(lM%iGC))    DEALLOCATE(lM%iGC)
-      IF (ALLOCATED(lM%nW))     DEALLOCATE(lM%nW)
-      IF (ALLOCATED(lM%w))      DEALLOCATE(lM%w)
-      IF (ALLOCATED(lM%xi))     DEALLOCATE(lM%xi)
-      IF (ALLOCATED(lM%x))      DEALLOCATE(lM%x)
-      IF (ALLOCATED(lM%N))      DEALLOCATE(lM%N)
-      IF (ALLOCATED(lM%nV))     DEALLOCATE(lM%nV)
-      IF (ALLOCATED(lM%Nx))     DEALLOCATE(lM%Nx)
-      IF (ALLOCATED(lM%Nxx))    DEALLOCATE(lM%Nxx)
-      IF (ALLOCATED(lM%fN))     DEALLOCATE(lM%fN)
+      IF (ALLOCATED(lM%eDist))   DEALLOCATE(lM%eDist)
+      IF (ALLOCATED(lM%eId))     DEALLOCATE(lM%eId)
+      IF (ALLOCATED(lM%gN))      DEALLOCATE(lM%gN)
+      IF (ALLOCATED(lM%gpN))     DEALLOCATE(lM%gpN)
+      IF (ALLOCATED(lM%gIEN))    DEALLOCATE(lM%gIEN)
+      IF (ALLOCATED(lM%IEN))     DEALLOCATE(lM%IEN)
+      IF (ALLOCATED(lM%otnIEN))  DEALLOCATE(lM%otnIEN)
+      IF (ALLOCATED(lM%INN))     DEALLOCATE(lM%INN)
+      IF (ALLOCATED(lM%lN))      DEALLOCATE(lM%lN)
+      IF (ALLOCATED(lM%eIEN))    DEALLOCATE(lM%eIEN)
+      IF (ALLOCATED(lM%sbc))     DEALLOCATE(lM%sbc)
+      IF (ALLOCATED(lM%iGC))     DEALLOCATE(lM%iGC)
+      IF (ALLOCATED(lM%nW))      DEALLOCATE(lM%nW)
+      IF (ALLOCATED(lM%w))       DEALLOCATE(lM%w)
+      IF (ALLOCATED(lM%xiL))     DEALLOCATE(lM%xiL)
+      IF (ALLOCATED(lM%xi))      DEALLOCATE(lM%xi)
+      IF (ALLOCATED(lM%x))       DEALLOCATE(lM%x)
+      IF (ALLOCATED(lM%N))       DEALLOCATE(lM%N)
+      IF (ALLOCATED(lM%nV))      DEALLOCATE(lM%nV)
+      IF (ALLOCATED(lM%fN))      DEALLOCATE(lM%fN)
+      IF (ALLOCATED(lM%Nx))      DEALLOCATE(lM%Nx)
+      IF (ALLOCATED(lM%Nxx))     DEALLOCATE(lM%Nxx)
 
       IF (ALLOCATED(lM%bs)) THEN
          DO i=1, insd
@@ -1078,10 +1082,6 @@
       CALL DESTROYADJ(lM%nAdj)
       CALL DESTROYADJ(lM%eAdj)
       CALL DESTROYTRACE(lM%trc)
-      IF (ALLOCATED(lM%bf)) THEN
-         CALL DESTROYMB(lM%bf)
-         DEALLOCATE(lM%bf)
-      END IF
 
       lM%lShl  = .FALSE.
       lM%eType = eType_NA
@@ -1100,35 +1100,108 @@
       IMPLICIT NONE
       TYPE(bcType), INTENT(OUT) :: lBc
 
+      IF (ALLOCATED(lBc%eDrn))   DEALLOCATE(lBc%eDrn)
+      IF (ALLOCATED(lBc%h))      DEALLOCATE(lBc%h)
+      IF (ALLOCATED(lBc%gx))     DEALLOCATE(lBc%gx)
+
       IF (ALLOCATED(lBc%gt)) THEN
          IF (ALLOCATED(lBc%gt%r)) DEALLOCATE(lBc%gt%r)
          IF (ALLOCATED(lBc%gt%i)) DEALLOCATE(lBc%gt%i)
          DEALLOCATE(lBc%gt)
       END IF
+
       IF (ALLOCATED(lBc%gm)) THEN
-         IF (ALLOCATED(lBc%gm%t))    DEALLOCATE(lBc%gm%t)
-         IF (ALLOCATED(lBc%gm%d))    DEALLOCATE(lBc%gm%d)
+         CALL DESTROYMB(lBc%gm)
          DEALLOCATE(lBc%gm)
       END IF
-      IF (ALLOCATED(lBc%h))    DEALLOCATE(lBc%h)
-      IF (ALLOCATED(lBc%gx))   DEALLOCATE(lBc%gx)
-      IF (ALLOCATED(lBc%eDrn)) DEALLOCATE(lBc%eDrn)
 
+      lBc%weakDir  = .FALSE.
+      lBc%fbN      = .FALSE.
       lBc%bType    = 0
       lBc%cplBCptr = 0
-      lBc%eDrn     = 0
       lBc%g        = 0D0
       lBc%r        = 0D0
+      lBc%k        = 0D0
+      lBc%k        = 0D0
+      lBc%tauB     = 0D0
+      lBc%tauF     = 0D0
 
       RETURN
       END SUBROUTINE DESTROYBC
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYBF(lBf)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(bfType), INTENT(OUT) :: lBf
+
+      INTEGER i
+
+      IF (ALLOCATED(lBf%b))  DEALLOCATE(lBf%b)
+      IF (ALLOCATED(lBf%bx)) DEALLOCATE(lBf%bx)
+      IF (ALLOCATED(lBf%bt)) THEN
+         DO i=1, lBf%dof
+            IF (ALLOCATED(lBf%bt(i)%r)) DEALLOCATE(lBf%bt(i)%r)
+            IF (ALLOCATED(lBf%bt(i)%i)) DEALLOCATE(lBf%bt(i)%i)
+         END DO
+         DEALLOCATE(lBf%bt)
+      END IF
+      IF (ALLOCATED(lBf%bm)) THEN
+         CALL DESTROYMB(lBf%bm)
+         DEALLOCATE(lBf%bm)
+      END IF
+      lBf%bType    = 0
+
+      RETURN
+      END SUBROUTINE DESTROYBF
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYDMN(lDmn)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(OUT) :: lDmn
+
+      lDmn%Id   = -1
+      lDmn%v    = 0D0
+      lDmn%prop = 0D0
+
+      ! lDmn%stM
+      lDmn%stM%volType = stVol_NA
+      lDmn%stM%Kpen    = 0D0
+      lDmn%stM%isoType = stIso_NA
+      lDmn%stM%C10     = 0D0
+      lDmn%stM%C01     = 0D0
+      lDmn%stM%a       = 0D0
+      lDmn%stM%b       = 0D0
+      lDmn%stM%aff     = 0D0
+      lDmn%stM%bff     = 0D0
+      lDmn%stM%ass     = 0D0
+      lDmn%stM%bss     = 0D0
+      lDmn%stM%afs     = 0D0
+      lDmn%stM%bfs     = 0D0
+
+      ! lDmn%cep
+      lDmn%cep%cepType  = cepModel_NA
+      lDmn%cep%Diso     = 0D0
+      IF (ALLOCATED(lDmn%cep%Dani)) DEALLOCATE(lDmn%cep%Dani)
+
+      lDmn%cep%Istim%Ts = 0D0
+      lDmn%cep%Istim%Td = 0D0
+      lDmn%cep%Istim%CL = 0D0
+      lDmn%cep%Istim%A  = 0D0
+
+      lDmn%cep%odeS%tIntType = tIntType_NA
+      lDmn%cep%odeS%maxItr   = 5
+      lDmn%cep%odeS%absTol   = 1D-8
+      lDmn%cep%odeS%relTol   = 1D-4
+
+      RETURN
+      END SUBROUTINE DESTROYDMN
 !--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYEQ(lEq)
       USE COMMOD
       IMPLICIT NONE
       TYPE(eqType), INTENT(OUT) :: lEq
 
-      INTEGER iBc
+      INTEGER iBc, iBf, iDmn
 
       IF (ALLOCATED(lEq%bc)) THEN
          DO iBc=1, lEq%nBc
@@ -1142,21 +1215,40 @@
          END DO
          DEALLOCATE(lEq%bcIB)
       END IF
-      IF (ALLOCATED(lEq%output)) DEALLOCATE(lEq%output)
-      IF (ALLOCATED(lEq%dmn))    DEALLOCATE(lEq%dmn)
-      IF (ALLOCATED(lEq%dmnIB))  DEALLOCATE(lEq%dmnIB)
+      IF (ALLOCATED(lEq%dmn)) THEN
+         DO iDmn=1, lEq%nDmn
+            CALL DESTROYDMN(lEq%dmn(iDmn))
+         END DO
+      END IF
+      IF (ALLOCATED(lEq%dmnIB)) THEN
+         DO iDmn=1, lEq%nDmnIB
+            CALL DESTROYDMN(lEq%dmnIB(iDmn))
+         END DO
+      END IF
+      IF (ALLOCATED(lEq%bf)) THEN
+         DO iBf=1, lEq%nBf
+            CALL DESTROYBF(lEq%bf(iBf))
+         END DO
+         DEALLOCATE(lEq%bf)
+      END IF
+      IF (ALLOCATED(lEq%dmn))      DEALLOCATE(lEq%dmn)
+      IF (ALLOCATED(lEq%dmnIB))    DEALLOCATE(lEq%dmnIB)
+      IF (ALLOCATED(lEq%output))   DEALLOCATE(lEq%output)
+      IF (ALLOCATED(lEq%outIB))    DEALLOCATE(lEq%outIB)
 
       lEq%coupled = .TRUE.
       lEq%dof     = 0
       lEq%maxItr  = 5
       lEq%minItr  = 1
-      lEq%nBc     = 0
-      lEq%nDmn    = 0
       lEq%nOutput = 0
+      lEq%nOutIB  = 0
+      lEq%nDmn    = 0
+      lEq%nDmnIB  = 0
+      lEq%nBc     = 0
+      lEq%nBcIB   = 0
+      lEq%nBf     = 0
       lEq%dBr     = -4D1
       lEq%tol     = 1D64
-      lEq%nBcIB   = 0
-      lEq%nDmnIB  = 0
 
       RETURN
       END SUBROUTINE DESTROYEQ
@@ -1393,6 +1485,21 @@
       RETURN
       END SUBROUTINE SETDMNID
 !####################################################################
+!     Finding the mesh ID based on the mesh name
+      SUBROUTINE FINDMSH(mshName, iM)
+      USE COMMOD
+      IMPLICIT NONE
+      CHARACTER(LEN=stdL) :: mshName
+      INTEGER, INTENT(OUT) :: iM
+
+      DO iM=1, nMsh
+         IF (msh(iM)%name .EQ. mshName) EXIT
+      END DO
+      IF (iM .GT. nMsh) err="Unable to find msh <"//TRIM(mshName)//">"
+
+      RETURN
+      END SUBROUTINE FINDMSH
+!--------------------------------------------------------------------
 !     Finding the face ID and mesh ID based on the face name
       SUBROUTINE FINDFACE(faceName, iM, iFa)
       USE COMMOD
@@ -1406,7 +1513,6 @@
             IF (msh(iM)%fa(iFa)%name .EQ. faceName) EXIT MY_LOOP
          END DO
       END DO MY_LOOP
-
       IF (iM .GT. nMsh) err="Unable to find face <"//TRIM(faceName)//">"
 
       RETURN

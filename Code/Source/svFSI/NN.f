@@ -889,7 +889,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          END DO
          IF (b .GT. eNoN) THEN
             WRITE(*,'(A)')
-            WRITE(*,'(A)') "========================================="
+            WRITE(*,'(A)') "=========================================="
             WRITE(*,'(A)') " ERROR: could not find matching face nodes"
             WRITE(*,'(A)',ADVANCE='NO') "    Face "//TRIM(lFa%name)//
      2         " e: "//STR(e)
@@ -903,7 +903,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
                WRITE(*,'(A)',ADVANCE='NO') " "//STR(msh(iM)%IEN(b,Ec))
             END DO
             WRITE(*,'(A)')
-            WRITE(*,'(A)') "========================================="
+            WRITE(*,'(A)') "=========================================="
             WRITE(*,'(A)')
             CALL STOPSIM()
          END IF

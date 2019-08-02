@@ -265,7 +265,7 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, Ac, s, nNo
+      INTEGER a, Ac, nNo
       REAL(KIND=8) h, rtmp
 
       REAL(KIND=8), ALLOCATABLE :: hg(:), tmpA(:)
@@ -301,21 +301,6 @@
             Ac     = lFa%gN(a)
             hg(Ac) = tmpA(a)
          END DO
-      ELSE IF (BTEST(lBc%bType,bType_ddep)) THEN
-         s = eq(cEq)%s
-         IF (eq(cEq)%dof .EQ. 1) THEN
-            DO a=1, nNo
-               Ac     = lFa%gN(a)
-               hg(Ac) = -h*Dg(s,Ac)
-            END DO
-         ELSE IF (eq(cEq)%dof .GE. nsd) THEN
-            DO a=1, nNo
-               Ac     = lFa%gN(a)
-               hg(Ac) = -h*NORM(Dg(s:s+nsd-1,Ac),lFa%nV(:,a))
-            END DO
-         ELSE
-            err = "Correction in SETBCNEU is needed"
-         END IF
       ELSE
          DO a=1, nNo
             Ac     = lFa%gN(a)
@@ -325,6 +310,10 @@
 
 !     Add Neumann BCs contribution to the LHS/RHS
       CALL BCONSTRUCT(lFa, hg, Yg, Dg)
+
+!     Now treat Robin BC (stiffness and damping) here
+      IF (BTEST(lBc%bType,bType_Robin))
+     2   CALL SETBCRBNL(lFa, lBc%k, lBc%c, Yg, Dg)
 
       RETURN
       END SUBROUTINE SETBCNEUL
@@ -417,6 +406,162 @@
 
       RETURN
       END SUBROUTINE SETBCTRACL
+!--------------------------------------------------------------------
+      SUBROUTINE SETBCRBNL(lFa, ks, cs, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(IN) :: lFa
+      REAL(KIND=8), INTENT(IN) :: ks, cs, Yg(tDof,tnNo), Dg(tDof,tnNo)
+
+      INTEGER :: a, b, e, g, s, Ac, iM, eNoN, cPhys
+      REAL(KIND=8) :: af, am, afm, w, wl, T1, T2, nV(nsd), u(nsd),
+     2   ud(nsd), h(nsd)
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=8), ALLOCATABLE :: N(:), xl(:,:), yl(:,:), dl(:,:),
+     2   lR(:,:), lK(:,:,:), lKd(:,:,:)
+
+      s   = eq(cEq)%s
+      am  = eq(cEq)%af*eq(cEq)%gam*dt
+      af  = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afm = am/eq(cEq)%am
+
+      iM   = lFa%iM
+      eNoN = lFa%eNoN
+
+      ALLOCATE(N(eNoN), xl(nsd,eNoN), yl(nsd,eNoN), dl(nsd,eNoN),
+     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN), ptr(eNoN))
+
+      IF (cPhys .EQ. phys_vms_struct) ALLOCATE(lKd(nsd*dof,eNoN,eNoN))
+
+      DO e=1, lFa%nEl
+         cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+
+         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
+
+
+         DO a=1, eNoN
+            Ac      = lFa%IEN(a,e)
+            ptr(a)  = Ac
+            xl(:,a) =  x(:,Ac)
+            yl(:,a) = Yg(s:s+nsd-1,Ac)
+            dl(:,a) = Dg(s:s+nsd-1,Ac)
+         END DO
+
+         lK = 0D0
+         lR = 0D0
+         IF (cPhys .EQ. phys_vms_struct) lKd = 0D0
+         DO g=1, lFa%nG
+            CALL GNNB(lFa, e, g, nV)
+            w  = lFa%w(g) * SQRT(NORM(nV))
+            N  = lFa%N(:,g)
+
+            u  = 0D0
+            ud = 0D0
+            DO a=1, eNoN
+               u(:)  = u(:)  + N(a)*dl(:,a)
+               ud(:) = ud(:) + N(a)*yl(:,a)
+            END DO
+            h(:) = ks*u(:) + cs*ud(:)
+
+            IF (nsd .EQ. 3) THEN
+               DO a=1, eNoN
+                  lR(1,a) = lR(1,a) - w*N(a)*h(1)
+                  lR(2,a) = lR(2,a) - w*N(a)*h(2)
+                  lR(3,a) = lR(3,a) - w*N(a)*h(3)
+               END DO
+
+               IF (cPhys .EQ. phys_vms_struct) THEN
+                  wl = w*af
+                  DO a=1, eNoN
+                     DO b=1, eNoN
+                        T1 = wl*N(a)*N(b)
+                        T2 = (afm*ks + cs)*T1
+                        T1 = T1*ks
+
+!                       dM_1/dV_1 + af/am*dM_1/dU_1
+                        lKd(1,a,b) = lKd(1,a,b) + T1
+                        lK(1,a,b)  = lK(1,a,b)  + T2
+
+!                       dM_2/dV_2 + af/am*dM_2/dU_2
+                        lKd(5,a,b) = lKd(5,a,b) + T1
+                        lK(6,a,b)  = lK(6,a,b)  + T2
+
+!                       dM_3/dV_3 + af/am*dM_3/dU_3
+                        lKd(9,a,b) = lKd(9,a,b) + T1
+                        lK(11,a,b) = lK(11,a,b) + T2
+                     END DO
+                  END DO
+               ELSE
+                 wl = w*(ks*af + cs*am)
+                  DO  a=1, eNoN
+                     DO b=1, eNoN
+                        T1 = N(a)*N(b)
+                        lK(1,a,b) = lK(1,a,b) - wl*T1
+                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1
+                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b) - wl*T1
+                     END DO
+                  END DO
+               END IF
+            ELSE IF (nsd .EQ. 2) THEN
+               DO a=1, eNoN
+                  lR(1,a) = lR(1,a) - w*N(a)*h(1)
+                  lR(2,a) = lR(2,a) - w*N(a)*h(2)
+               END DO
+
+               IF (cPhys .EQ. phys_vms_struct) THEN
+                  wl = w*af
+                  DO a=1, eNoN
+                     DO b=1, eNoN
+                        T1 = wl*N(a)*N(b)
+                        T2 = (afm*ks + cs)*T1
+                        T1 = T1*ks
+
+!                       dM_1/dV_1 + af/am*dM_1/dU_1
+                        lKd(1,a,b) = lKd(1,a,b) + T1
+                        lK(1,a,b)  = lK(1,a,b)  + T2
+
+!                       dM_2/dV_2 + af/am*dM_2/dU_2
+                        lKd(4,a,b) = lKd(4,a,b) + T1
+                        lK(5,a,b)  = lK(5,a,b)  + T2
+                     END DO
+                  END DO
+               ELSE
+                  wl = w*(ks*af + cs*am)
+                  DO a=1, eNoN
+                     DO b=1, eNoN
+                        T1 = N(a)*N(b)
+                        lK(1,a,b) = lK(1,a,b) - wl*T1
+                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1
+                     END DO
+                  END DO
+               END IF
+            END IF
+         END DO
+
+#ifdef WITH_TRILINOS
+         IF (useTrilinosAssemAndLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            IF (cPhys .EQ. phys_vms_struct) THEN
+               CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+            ELSE
+               CALL DOASSEM(eNoN, ptr, lK, lR)
+            END IF
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO
+
+      DEALLOCATE(N, xl, yl, dl, lR, lK, ptr)
+      IF (ALLOCATED(lKd)) DEALLOCATE(lKd)
+
+      RETURN
+      END SUBROUTINE SETBCRBNL
 !####################################################################
 !     Treat Neumann boundaries that are not deforming.
 !     Leave the row corresponding to the master node of the owner
@@ -863,12 +1008,11 @@
       END SUBROUTINE cplBC_Integ_X
 !####################################################################
 ! Below defines the SET_BC methods for the Coupled Momentum Method (CMM)
-      SUBROUTINE SETBCCMM(Ag, Yg, Dg)
+      SUBROUTINE SETBCCMM(Ag, Dg)
       USE COMMOD
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo)
+      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER iFa, iBc, iM
 
@@ -876,7 +1020,12 @@
           IF(.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_CMM)) CYCLE
           iFa = eq(cEq)%bc(iBc)%iFa
           iM = eq(cEq)%bc(iBc)%iM
-          CALL SETBCCMML(msh(iM)%fa(iFa), Ag, Yg, Dg)
+          IF (msh(iM)%eType .NE. eType_TET .AND.
+     2        msh(iM)%fa(iFa)%eType .NE. eType_TRI) THEN
+              err = "CMM equation is formulated for tetrahedral "//
+     2           "elements (volume) and triangular (surface) elements"
+          END IF
+          CALL SETBCCMML(msh(iM)%fa(iFa), Ag, Dg)
       END DO
 
       RETURN
@@ -887,42 +1036,50 @@
 !     borrows heavily from the current implementation of the 2D
 !     linear elasticity equations, modified for the CMM method
 !     It then will add the contributions to the LHS and RHS matrices
-      SUBROUTINE SETBCCMML(lFa, Ag, Yg, Dg)
+      SUBROUTINE SETBCCMML(lFa, Ag, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo)
+      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, Ac, e, eNoN
+      INTEGER a, e, Ac, iM, eNoN
+      REAL(KIND=8) :: pSl(6)
 
       INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: al(:,:), yl(:,:), dl(:,:), xl(:,:),
-     2  pS0l(:,:)
+      REAL(KIND=8), ALLOCATABLE :: al(:,:), dl(:,:), xl(:,:), bfl(:,:)
 
+      iM   = lFa%iM
       eNoN = lFa%eNoN
-      ALLOCATE(ptr(eNoN), al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN),
-     2   xl(nsd,eNoN), pS0l(nstd,eNoN))
+      ALLOCATE(al(tDof,eNoN), dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN),
+     2   ptr(eNoN))
 
-      pS0l = 0D0
 !     Constructing the CMM contributions to the LHS/RHS and
 !     assembling them
       DO e=1, lFa%nEl
-          DO a=1, lFa%eNoN
-              Ac = lFa%IEN(a,e)
-              ptr(a)  = Ac
-              al(:,a) = Ag(:,Ac)
-              yl(:,a) = Yg(:,Ac)
-              dl(:,a) = Dg(:,Ac)
-              xl(:,a) = x(:,Ac)
-              IF(ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
-          END DO
+         cDmn = DOMAIN(msh(iM), cEq, lFa%gE(e))
+         IF (eq(cEq)%dmn(cDmn)%phys .NE. phys_CMM) CYCLE
+
+         pSl = 0D0
+         DO a=1, eNoN
+            Ac = lFa%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+            IF(ALLOCATED(pS0)) THEN
+               pSl(:) = pSl(:) + pS0(:,Ac)
+            END IF
+         END DO
+         pSl(:) = pSl(:) / REAL(eNoN,KIND=8)
 
 !     Add CMM BCs contributions to the LHS/RHS
-          CALL CMM_CONSTRUCT(lFa, al, yl, dl, xl, pS0l, ptr, e)
+         CALL CMMb(lFa, e, eNoN, al, dl, xl, bfl, pSl, ptr)
       END DO
+
+      DEALLOCATE(al, dl, xl, bfl, ptr)
 
       RETURN
       END SUBROUTINE SETBCCMML

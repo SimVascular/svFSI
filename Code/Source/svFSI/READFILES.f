@@ -42,7 +42,6 @@
       USE LISTMOD
       IMPLICIT NONE
 
-      LOGICAL :: ltmp
       INTEGER :: i, iEq
       INTEGER :: tArray(8)
       REAL(KIND=8) :: roInf
@@ -88,9 +87,13 @@
          rmsh%isReqd  = .FALSE.
          ichckIEN     = .TRUE.
          zeroAve      = .FALSE.
-         ibFlag       = .FALSE.
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
+         cmmInit      = .FALSE.
+         shlEq        = .FALSE.
+         pstEq        = .FALSE.
+         sstEq        = .FALSE.
+         ibFlag       = .FALSE.
 
          i = IARGC()
          IF (i .EQ. 0) THEN
@@ -105,16 +108,13 @@
       list = listType(mfsIn,io)
 
       IF (.NOT.resetSim) THEN
-         ltmp = .TRUE.
-         lPtr => list%get(ltmp,"Save results in a folder")
-         IF (ltmp) THEN
-             saveName = ""
-             lPtr => list%get(saveName,"Save results in folder")
-             IF (saveName == "") THEN
-                appPath = STR(cm%np())//"-procs"//delimiter
-             ELSE
-                appPath = TRIM(saveName)//delimiter
-             END IF
+         lPtr => list%get(ctmp, "Save results in folder")
+         IF (ASSOCIATED(lPtr)) THEN
+            saveName = TRIM(ctmp)
+            appPath = TRIM(saveName)//delimiter
+         ELSE
+            saveName = ""
+            appPath = STR(cm%np())//"-procs"//delimiter
          END IF
          lPtr => list%get(std%oTS,"Verbose")
          lPtr => list%get(wrn%oTS,"Warning")
@@ -225,6 +225,8 @@
          END IF
          IF (eq(iEq)%phys .EQ. phys_CMM) THEN
             IF (iEq .NE. 1) err = "CMM equation must come first"
+            IF (mvMsh) err = "Both CMM and ALE cannot be solved "//
+     2         "together"
          END IF
          IF (eq(iEq)%phys .EQ. phys_FSI) THEN
             IF (iEq .NE. 1) err = "FSI equation must come first"
@@ -242,10 +244,9 @@
      2         "More than one mesh is needed to apply contact model"
          END IF
          lPtr => list%get(ctmp,"Add equation",1)
-         IF ((eq(iEq)%phys .EQ. phys_BBO) .OR.
-     2       (eq(iEq)%phys .EQ. phys_heatF)) THEN
+         IF (eq(iEq)%phys .EQ. phys_heatF) THEN
             IF (ctmp.NE."fluid" .AND. ctmp.NE."FSI") THEN
-               err = "BBO/heatF equation has to be specified after"//
+               err = "heatF equation has to be specified after"//
      2            " fluid/FSI equation"
             END IF
          END IF
@@ -317,11 +318,11 @@
 
       INTEGER, PARAMETER :: maxOutput = 17
 
-      INTEGER fid, iBc, phys(3), propL(maxNProp,10),
+      INTEGER fid, iBc, iBf, iM, phys(3), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
 
-      TYPE(listType), POINTER :: lPtr, lPBC
+      TYPE(listType), POINTER :: lPtr, lPBC, lPBF
       TYPE(fileType) fTmp
 
       lPtr => list%get(lEq%coupled,"Coupled")
@@ -420,6 +421,7 @@
 
          propL(1,1) = conductivity
          propL(2,1) = source_term
+         propL(3,1) = solid_density
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/2,1,2,0/)
@@ -476,6 +478,7 @@
 !     VMS-stabilized nonlinear STRUCTURAL mechanics solver ---
       CASE ('vms_struct')
          lEq%phys = phys_vms_struct
+         sstEq    = .TRUE.
 
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
@@ -505,6 +508,8 @@
 !     PRESTRESS equation solver---------------------
       CASE ('prestress')
          lEq%phys = phys_preSt
+         pstEq    = .TRUE.
+
          propL(1,1) = solid_density
          propL(2,1) = damping
          propL(3,1) = elasticity_modulus
@@ -525,6 +530,7 @@
          IF (nsd .NE. 3) err = "Shell mechanics can be solved only"//
      2      " in 3-dimensions"
          lEq%phys = phys_shell
+         shlEq    = .TRUE.
 
          propL(1,1) = solid_density
          propL(2,1) = damping
@@ -545,33 +551,71 @@
 
 !     COUPLED MOMENTUM FLUID STRUCTURE INTERACTION equation solver---
       CASE ('CMM')
+         IF (nsd .NE. 3) err = "CMM eq. is not implemented for 2D "//
+     2      "domains"
          lEq%phys = phys_CMM
 
-         propL(1,1) = fluid_density
-         propL(2,1) = viscosity
-         propL(3,1) = permeability
-         propL(4,1) = backflow_stab
-         propL(5,1) = solid_density
-         propL(6,1) = elasticity_modulus
-         propL(7,1) = poisson_ratio
-         propL(8,1) = damping
-         propL(9,1) = shell_thickness
-         propL(10,1) = initialization_pressure
-         propL(11,1) = f_x
-         propL(12,1) = f_y
-         IF (nsd .EQ. 3) propL(13,1) = f_z
-         CALL READDOMAIN(lEq, propL, list)
+         ALLOCATE(cmmBdry(gtnNo))
+         cmmBdry = 0
+         lPtr => list%get(ctmp, "Initialize")
+         IF (ASSOCIATED(lPtr)) THEN
+            cmmInit = .TRUE.
+            IF (nEq .GT. 1) err = "More than one eqn. is not allowed"//
+     2         "while initializing CMM"
+            CALL TO_LOWER(ctmp)
+            SELECT CASE (TRIM(ctmp))
+            CASE ('inflate', 'inf')
+               pstEq = .FALSE.
+            CASE ('prestress', 'prest')
+               pstEq = .TRUE.
+            CASE DEFAULT
+               err = " Unknown CMM initialization option"
+            END SELECT
 
-         nDOP = (/9,2,4,0/)
-         outPuts(1) = out_velocity
-         outPuts(2) = out_pressure
-         outPuts(3) = out_energyFlux
-         outPuts(4) = out_absVelocity
-         outPuts(5) = out_acceleration
-         outPuts(6) = out_WSS
-         outPuts(7) = out_vorticity
-         outPuts(8) = out_displacement
-         outPuts(9) = out_strainInv
+!           Set cmmBdry vector to be edge nodes of the wall
+            DO iM=1, nMsh
+               CALL SETCMMBDRY(msh(iM), cmmBdry)
+            END DO
+         END IF
+
+         IF (.NOT.cmmInit) THEN
+            propL(1,1) = fluid_density
+            propL(2,1) = viscosity
+            propL(3,1) = permeability
+            propL(4,1) = backflow_stab
+            propL(5,1) = solid_density
+            propL(6,1) = elasticity_modulus
+            propL(7,1) = poisson_ratio
+            propL(8,1) = damping
+            propL(9,1) = shell_thickness
+
+            nDOP = (/9,2,4,0/)
+            outPuts(1) = out_velocity
+            outPuts(2) = out_pressure
+            outPuts(3) = out_energyFlux
+            outPuts(4) = out_absVelocity
+            outPuts(5) = out_acceleration
+            outPuts(6) = out_WSS
+            outPuts(7) = out_vorticity
+            outPuts(8) = out_displacement
+            outPuts(9) = out_strainInv
+         ELSE
+            propL(1,1) = elasticity_modulus
+            propL(2,1) = poisson_ratio
+            propL(3,1) = shell_thickness
+
+            IF (pstEq) THEN
+               nDOP = (/2,2,0,0/)
+               outPuts(1) = out_displacement
+               outPuts(2) = out_stress
+            ELSE
+               nDOP = (/1,1,0,0/)
+               outPuts(1) = out_displacement
+            END IF
+         END IF
+
+         CALL READDOMAIN(lEq, propL, list)
+         IF (cmmInit) lEq%dmn(:)%prop(solid_density) = 0D0
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -657,29 +701,10 @@
          CALL READLS(LS_TYPE_CG, lEq, list)
 
 !     Basset-Boussinesq-Oseen equation solver------------------------
-      CASE ('BBO')
-         wrn = "you need to double check the equations/TAG"
-         lEq%phys = phys_BBO
-
-         propL(1,1) = fluid_density
-         propL(2,1) = viscosity
-         propL(3,1) = particle_density
-         propL(4,1) = particle_diameter
-         propL(5,1) = f_x
-         propL(6,1) = f_y
-         IF (nsd .EQ. 3) propL(7,1) = f_z
-         CALL READDOMAIN(lEq, propL, list)
-
-         nDOP = (/2,1,1,0/)
-         outPuts(1) = out_velocity
-         outPuts(2) = out_acceleration
-
-         CALL READLS(lSolver_GMRES, lEq, list)
-
 !     Cardiac Electro-Physiology equation----------------------------
       CASE ('CEP')
-         cepEq    = .TRUE.
          lEq%phys = phys_CEP
+         cepEq    = .TRUE.
 
          lPtr => list%get(ctmp, "Coupling with mechanics")
          IF (ASSOCIATED(lPtr)) THEN
@@ -717,6 +742,22 @@
          CALL FINDFACE(ctmp, lEq%bc(iBc)%iM, lEq%bc(iBc)%iFa)
          CALL READBC(lEq%bc(iBc), lPBC, lEq%phys)
       END DO
+!--------------------------------------------------------------------
+!     Searching for body forces
+      lEq%nBf = list%srch("Add BF")
+      ALLOCATE(lEq%bf(lEq%nBf))
+      DO iBf=1, lEq%nBf
+         lPBF => list%get(ctmp,"Add BF",iBf)
+         CALL FINDMSH(ctmp, lEq%bf(iBf)%iM)
+         CALL READBF(lEq%bf(iBf), lPBF)
+         IF (BTEST(lEq%bf(iBf)%bType,bType_Neu) .OR.
+     2      BTEST(lEq%bf(iBf)%bType,bType_trac)) THEN
+            IF (.NOT.shlEq .AND. .NOT.cmmInit) THEN
+               err = "Pressure or traction load can be applied only"//
+     2            " for shells or for initializing CMM"
+            END IF
+         END IF
+      END DO
 
       RETURN
       CONTAINS
@@ -737,7 +778,7 @@
       INTEGER i, iDmn, iPhys, iProp, prop, nPhys
       REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr, lPD, lSFp
+      TYPE(listType), POINTER :: lPtr, lPD
       INTEGER, ALLOCATABLE :: phys(:)
 
       IF (PRESENT(physI)) THEN
@@ -790,6 +831,7 @@
                lEq%dmn(iDmn)%phys = phys_struct
             CASE("vms_struct")
                lEq%dmn(iDmn)%phys = phys_vms_struct
+               IF (.NOT.sstEq) sstEq = .TRUE.
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
      2            "Equation must be fluid/struct/vms_struct"
@@ -810,15 +852,15 @@
                EXIT
             CASE (fluid_density)
                IF(lEq%phys .EQ. phys_CMM) THEN
-                  lPtr => lPD%get(rtmp,"Fluid Density",1,lb=0D0)
+                  lPtr => lPD%get(rtmp,"Fluid density",1,lb=0D0)
                ELSE
                   lPtr => lPD%get(rtmp,"Density",1,lb=0D0)
                END IF
             CASE (solid_density)
                IF(lEq%phys .EQ. phys_CMM) THEN
-                  lPtr => lPD%get(rtmp,"Solid Density",1,lb=0D0)
+                  lPtr => lPD%get(rtmp,"Solid density",1,ll=0D0)
                ELSE
-                  lPtr => lPD%get(rtmp,"Density",1,lb=0D0)
+                  lPtr => lPD%get(rtmp,"Density",1,ll=0D0)
                END IF
             CASE (viscosity)
                lPtr => lPD%get(rtmp,"Viscosity",1,lb=0D0)
@@ -834,12 +876,8 @@
                lPtr => lPD%get(rtmp,"Force_Y")
             CASE (f_z)
                lPtr => lPD%get(rtmp,"Force_Z")
-            CASE (particle_density)
-               lPtr => lPD%get(rtmp,"Particle density",1,lb=0D0)
-            CASE (particle_diameter)
-               lPtr => lPD%get(rtmp,"Particle diameter",1,ll=0D0)
             CASE (permeability)
-               rtmp = HUGE(lEq%dmn(iDmn)%prop)
+               rtmp = 100000000000.0D0
                lPtr => lPD%get(rtmp,"Permeability",lb=0D0)
             CASE (backflow_stab)
                rtmp = 2D-1
@@ -859,8 +897,6 @@
                lPtr => lPD%get(rtmp,
      2            "Continuity stabilization coefficient")
                IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.0D0
-            CASE (initialization_pressure)
-               lPtr => lPD%get(rtmp,"Initialization Pressure",1,lb=0D0)
             CASE DEFAULT
                err = "Undefined properties"
             END SELECT
@@ -876,461 +912,172 @@
      3       lEq%dmn(iDmn)%phys.EQ.phys_preSt) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
-
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_shell) THEN
-            lSFp => lPD%get(ctmp,"Follower pressure load")
-            IF (ASSOCIATED(lSFp)) THEN
-               ALLOCATE(lEq%dmn(iDmn)%shlFp)
-               CALL READShlFp(lSFp, lEq%dmn(iDmn)%shlFp, ctmp)
-            END IF
-         END IF
       END DO
 
       RETURN
       END SUBROUTINE READDOMAIN
 !--------------------------------------------------------------------
-      SUBROUTINE READShlFp(list, lFp, ctmp)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(listType), INTENT(INOUT) :: list
-      TYPE(shlFpType), INTENT(INOUT) :: lFp
-      CHARACTER(LEN=stdL), INTENT(IN) :: ctmp
-
-      INTEGER i, j
-      TYPE(fileType) fTmp
-
-      SELECT CASE (TRIM(ctmp))
-      CASE ("steady")
-         lFp%bType = IBSET(lFp%bType, bType_std)
-         lPtr => list%get(lFp%p,"Value",1)
-      CASE ("unsteady")
-         lFp%bType = IBSET(lFp%bType, bType_ustd)
-         ALLOCATE(lFp%pt)
-         lPtr => list%get(ftmp, "Temporal values file path")
-         IF (ASSOCIATED(lPtr)) THEN
-            fid = fTmp%open()
-            READ(fid,*) i, j
-            IF (i .LT. 2) THEN
-               std = "Enter nPnts nFCoef; nPts*(t Q)"
-               err = "Wrong format in: "//fTmp%fname
-            END IF
-            lFp%pt%n = j
-            ALLOCATE(lFp%pt%r(j))
-            ALLOCATE(lFp%pt%i(j))
-            CALL FFT(fid, i, lFp%pt)
-            CLOSE(fid)
-         ELSE
-            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
-            fid = fTmp%open()
-            READ (fid,*) lFp%pt%ti
-            READ (fid,*) lFp%pt%T
-            READ (fid,*) lFp%pt%qi
-            READ (fid,*) lFp%pt%qs
-            READ (fid,*) j
-            lFp%pt%n = j
-            ALLOCATE(lFp%pt%r(j))
-            ALLOCATE(lFp%pt%i(j))
-            DO i=1, j
-               READ (fid,*) lFp%pt%r(i), lFp%pt%i(i)
-            END DO
-            CLOSE(fid)
-         END IF
-      CASE DEFAULT
-         err = "Undefined follower load type"
-      END SELECT
-
-      RETURN
-      END SUBROUTINE READShlFp
-!--------------------------------------------------------------------
       END SUBROUTINE READEQ
 !--------------------------------------------------------------------
-!     This routine reads a BC
-      SUBROUTINE READBC(lBc, list, phys)
+!     This subroutine reads LS type, tolerance, ...
+      SUBROUTINE READLS(ilsType, lEq, list)
       USE COMMOD
-      USE ALLFUN
       USE LISTMOD
+      USE ALLFUN
       IMPLICIT NONE
 
-      TYPE(bcType), INTENT(INOUT) :: lBc
+      INTEGER, INTENT(IN) :: ilsType
+      TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(listType), INTENT(INOUT) :: list
-      INTEGER, INTENT(IN) :: phys
 
-      LOGICAL ltmp
-      INTEGER iFa, iM, a, b, fid, i, j, Ac
-      REAL(KIND=8) rtmp
+      INTEGER lSolverType, FSILSType
+      LOGICAL flag
       CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr
-      TYPE(fileType) fTmp
+      TYPE(listType), POINTER :: lPtr, lPL
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-
-!     Reading the type: Dir/Neu/Per
-      lPtr => list%get(ctmp,"Type")
-      SELECT CASE (ctmp)
-      CASE ("Dirichlet","Dir")
-         lBc%bType = IBSET(lBc%bType,bType_Dir)
-      CASE ("Neumann","Neu")
-         lBc%bType = IBSET(lBc%bType,bType_Neu)
-         IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
-     2      lBc%bType = IBSET(lBc%bType,bType_bfs)
-      CASE ("Traction","Trac")
-         lBc%bType = IBSET(lBc%bType,bType_trac)
-         lPtr => list%get(fTmp, "Traction values file path (vtp)")
-         IF (ASSOCIATED(lPtr)) THEN
-            iM  = lBc%iM
-            iFa = lBc%iFa
-            i = nsd
-            j = 2
-            a = msh(iM)%fa(iFa)%nNo
-            ALLOCATE(lBc%gm)
-            lBc%gm%nTP = j
-            lBc%gm%dof = i
-            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
-            lBc%gm%t(1) = 0D0
-            lBc%gm%t(2) = HUGE(rtmp)
-
-            CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
-            lBc%bType = IBSET(lBc%bType,bType_gen)
-            lBc%bType = IBSET(lBc%bType,bType_flat)
-
-            lPtr => list%get(rtmp, "Traction multiplier",1)
-            IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
-            lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
-
-            ALLOCATE(lBc%eDrn(nsd), lBc%h(nsd))
-            lBc%eDrn    = 0
-            lBc%h       = 0D0
-            lBc%weakDir = .FALSE.
-            RETURN
-         END IF
-      CASE ("Coupled Momentum","CMM")
-         lBc%bType = IBSET(lBc%bType,bType_CMM)
-      CASE ("Periodic","Per")
-         lBc%bType = IBSET(lBc%bType,bType_per)
-         err = "Periodic BC hasn't been implemented yet"
-      CASE DEFAULT
-         err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
-      END SELECT
-
-!     Allocate traction
-      ALLOCATE(lBc%h(nsd))
-      lBc%h = 0D0
-
-!     Weak Dirichlet BC for fluid/FSI equations
-      lBc%weakDir = .FALSE.
-      IF (BTEST(lBc%bType,bType_Dir)) THEN
-         IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
-     2      lPtr => list%get(lBc%weakDir, "Weakly applied")
-      END IF
-
-!     Read penalty values for weakly applied Dir BC
-      IF (lBc%weakDir) THEN
-         lPtr => list%get(rtmp, "Penalty parameter")
-         IF (ASSOCIATED(lPtr)) lBc%tauB = rtmp
-         lPtr => list%get(rtmp, "Penalty parameter (tangential)")
-         IF (ASSOCIATED(lPtr)) lBc%tauB(1) = rtmp
-         lPtr => list%get(rtmp, "Penalty parameter (normal)")
-         IF (ASSOCIATED(lPtr)) lBc%tauB(2) = rtmp
-      END IF
-
-!     Read BCs for shells with triangular elements. Not necessary for
-!     NURBS elements
-      lPtr => list%get(ctmp,"Shell BC type")
-      IF (ASSOCIATED(lPtr)) THEN
-         SELECT CASE (ctmp)
-         CASE ("Fixed", "fixed", "Clamped", "clamped")
-            lBc%bType = IBSET(lBc%bType,bType_fix)
-            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Fixed BC "//
-     2         "can be applied for Dirichlet boundaries only"
-         CASE ("Hinged", "hinged")
-            lBc%bType = IBSET(lBc%bType,bType_hing)
-            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Hinged BC "//
-     2         "can be applied for Dirichlet boundaries only"
-         CASE ("Free", "free")
-            lBc%bType = IBSET(lBc%bType,bType_free)
-            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Free BC "//
-     2         "can be applied for Neumann boundaries only"
-!        Symm BC needs to be verified
-c         CASE ("Symm", "symm", "Symmetric", "symmetric")
-c            lBc%bType = IBSET(lBc%bType,bType_symm)
-c            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Symm BC "//
-c     2         "can be applied for Neumann boundaries only"
+!     Default LS
+      lSolverType = ilsType
+      FSILSType   = ilsType
+      lPL => list%get(ctmp,"LS type")
+      IF (ASSOCIATED(lPL)) THEN
+         CALL TO_LOWER(ctmp)
+         SELECT CASE(TRIM(ctmp))
+         CASE('ns')
+            lSolverType = lSolver_NS
+            FSILSType   = LS_TYPE_NS
+         CASE('gmres')
+            lSolverType = lSolver_GMRES
+            FSILSType   = LS_TYPE_GMRES
+         CASE('cg')
+            lSolverType = lSolver_CG
+            FSILSType   = LS_TYPE_CG
+         CASE('bicg')
+            lSolverType = lSolver_BICGS
+            FSILSType   = LS_TYPE_BICGS
          CASE DEFAULT
-            err = TRIM(list%ping("Shell BC type",lPtr))//
-     2         " Unexpected Shell BC type"
+            err = TRIM(list%ping("LS type",lPL))//" Undefined type"
          END SELECT
       END IF
 
-      ALLOCATE(lBc%eDrn(nsd))
-      lBc%eDrn = 0
-      lPtr => list%get(lBc%eDrn,"Effective direction")
+      lEq%ls%LS_Type = lSolverType
+      CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
 
-      ctmp = "Steady"
-      lPtr => list%get(ctmp,"Time dependence")
-      SELECT CASE (ctmp)
-      CASE ('Steady')
-         lBc%bType = IBSET(lBc%bType,bType_std)
-         IF (BTEST(lBc%bType, bType_trac)) THEN
-            lPtr => list%get(lBc%h,"Value",1)
-         ELSE
-            lPtr => list%get(lBc%g,"Value",1)
-         END IF
-      CASE ('Unsteady')
-         lBc%bType = IBSET(lBc%bType,bType_ustd)
-         IF (BTEST(lBc%bType,bType_trac)) err =
-     2      "For unsteady traction, use general time dependence"
-         ALLOCATE(lBc%gt)
-         lPtr => list%get(fTmp,"Temporal values file path")
+!     Default Preconditioners
+      lEq%ls%PREC_Type = PREC_FSILS
+#ifdef WITH_TRILINOS
+      IF (FSILSType .EQ. LS_TYPE_NS) THEN
+         lEq%ls%PREC_Type = PREC_FSILS
+      ELSE
+         useTrilinosLS = .TRUE.
+         lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+      END IF
+#endif
+
+      IF (ASSOCIATED(lPL)) THEN
+         lPtr => lPL%get(ctmp, "Preconditioner")
          IF (ASSOCIATED(lPtr)) THEN
-            ltmp = .FALSE.
-            lPtr => list%get(ltmp,"Ramp function")
-            lBc%gt%lrmp = ltmp
-            fid = fTmp%open()
-            READ(fid,*) i, j
-            IF (i .LT. 2) THEN
-               std = "Enter nPnts nFCoef; nPts*(t Q)"
-               err = "Wrong format in: "//fTmp%fname
-            END IF
-            lBc%gt%n = j
-            IF (lBc%gt%lrmp) lBc%gt%n = 1
-            ALLOCATE(lBc%gt%r(lBc%gt%n))
-            ALLOCATE(lBc%gt%i(lBc%gt%n))
-            CALL FFT(fid, i, lBc%gt)
-            CLOSE(fid)
+            CALL TO_LOWER(ctmp)
+            SELECT CASE(TRIM(ctmp))
+            CASE('fsils', 'svfsi')
+               lEq%ls%PREC_Type = PREC_FSILS
+               useTrilinosLS = .FALSE.
+#ifdef WITH_TRILINOS
+            CASE('trilinos-diagonal')
+               lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+               useTrilinosLS = .TRUE.
+            CASE('trilinos-blockjacobi', 'blockjacobi')
+               lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
+               useTrilinosLS = .TRUE.
+            CASE('trilinos-ilu')
+               lEq%ls%PREC_Type = PREC_TRILINOS_ILU
+               useTrilinosLS = .TRUE.
+            CASE('trilinos-ilut')
+               lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
+               useTrilinosLS = .TRUE.
+            CASE('trilinos-ic')
+               lEq%ls%PREC_Type = PREC_TRILINOS_IC
+               useTrilinosLS = .TRUE.
+            CASE('trilinos-ict')
+               lEq%ls%PREC_Type = PREC_TRILINOS_ICT
+               useTrilinosLS = .TRUE.
+            CASE ('trilinos-ml')
+               lEq%ls%PREC_Type = PREC_TRILINOS_ML
+               useTrilinosLS = .TRUE.
+#endif
+            CASE DEFAULT
+               err = TRIM(list%ping("Preconditioner",lPtr))
+     2          //" Undefined type"
+            END SELECT
+            std = " Using preconditioner: "//TRIM(ctmp)
          ELSE
-            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
-            IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
-     2         "unsteady type BC"
-            lBc%gt%lrmp = .FALSE.
-            fid = fTmp%open()
-            READ (fid,*) lBc%gt%ti
-            READ (fid,*) lBc%gt%T
-            READ (fid,*) lBc%gt%qi
-            READ (fid,*) lBc%gt%qs
-            READ (fid,*) j
-            lBc%gt%n = j
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
-            DO i=1, j
-               READ (fid,*) lBc%gt%r(i), lBc%gt%i(i)
-            END DO
-            CLOSE(fid)
+            SELECT CASE (lEq%ls%PREC_Type)
+            CASE (PREC_FSILS)
+               std = " Using preconditioner: FSILS"
+            CASE (PREC_TRILINOS_DIAGONAL)
+               std = " Using preconditioner: Trilinos-Diagonal"
+            CASE DEFAULT
+               err = " Undefined preconditioner"
+            END SELECT
          END IF
 
-      CASE ('Coupled')
-         lBc%bType = IBSET(lBc%bType,bType_cpl)
-         cplBC%nFa = cplBC%nFa + 1
-         lBc%cplBcPtr = cplBC%nFa
-         IF (cplBC%schm .EQ. cplBC_NA) THEN
-            err = "'Couple to cplBC' must be specified before"//
-     2         " using Coupled BC"
-         END IF
-      CASE ('Resistance')
-         lBc%bType = IBSET(lBc%bType,bType_res)
-         IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Resistance"//
-     2      " is only defined for Neu BC"
-         IF (phys.NE.phys_fluid .AND.
-     2       phys.NE.phys_FSI   .AND.
-     3       phys.NE.phys_CMM) THEN
-            err = "Resistance is only defined for fluid/FSI equations"
+         IF (.NOT.useTrilinosAssemAndLS) THEN
+            lPtr => lPL%get(flag, "Use Trilinos for assembly")
+            IF (ASSOCIATED(lPtr)) useTrilinosAssemAndLS = flag
+            IF (useTrilinosAssemAndLS .AND. ibFlag) err =
+     2         "Cannnot assemble immersed boundaries using Trilinos."//
+     3         " Use Trilinos for linear solver only."
          END IF
 
-         lPtr => list%get(lBc%r,"Value",1)
-      CASE ('General')
-         lBc%bType = IBSET(lBc%bType,bType_gen)
-         lPtr =>list%get(fTmp,"Temporal and spatial values file path",1)
-         fid = fTmp%open()
-         READ (fid,*) i, j, a
-         iM  = lBc%iM
-         iFa = lBc%iFa
-         IF (a .NE. msh(iM)%fa(iFa)%nNo) THEN
-            err = "Number of nodes does not match between "//
-     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//TRIM(fTmp%fname)
-         END IF
-         IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
-     2      " is violated in "//fTmp%fname
+         lPtr => lPL%get(lEq%ls%mItr,"Max iterations",ll=1)
+         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%mItr = lEq%ls%mItr
 
-         ALLOCATE(lBc%gm)
-         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(msh(iM)%gnNo))
-!     I am seting all the nodes to zero just in case a node is not set
-         lBc%gm%d   = 0D0
-         lBc%gm%dof = i
-         lBc%gm%nTP = j
-         ptr        = 0
-!     Preparing the pointer array
-         DO a=1, msh(iM)%fa(iFa)%nNo
-            Ac = msh(iM)%fa(iFa)%gN(a)
-            Ac = msh(iM)%lN(Ac)
-            IF (Ac .EQ. 0) err = "Incorrect global node number "//
-     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
-     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
-     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
-            ptr(Ac) = a
-         END DO
-         DO i=1, j
-            READ (fid,*) rtmp
-            lBc%gm%t(i) = rtmp
-            IF (i .EQ. 1) THEN
-               IF (.NOT.ISZERO(rtmp)) err = "First time step"//
-     2            " should be zero in <"//TRIM(ctmp)//">"
-            ELSE
-               rtmp = rtmp - lBc%gm%t(i-1)
-               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-in"//
-     2            "creasing time trend is found in <"//TRIM(ctmp)//">"
-            END IF
-         END DO
-         lBc%gm%period = lBc%gm%t(j)
-         DO b=1, msh(iM)%fa(iFa)%nNo
-            READ (fid,*) Ac
-            IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
-               err = "Entry "//b//" is out of bound in "//ctmp
-            END IF
-            a = ptr(Ac)
-            IF (a .EQ. 0) THEN
-               err = "Entry "//b//" not found in face "//ctmp
-            END IF
-            DO i=1, j
-               READ (fid,*) lBc%gm%d(:,a,i)
-            END DO
-         END DO
-         CLOSE(fid)
-      CASE DEFAULT
-         err=TRIM(list%ping("Time dependence",lPtr))//" Unexpected type"
-      END SELECT
+         lPtr => lPL%get(lEq%ls%relTol,"Tolerance",lb=0D0,ub=1D0)
+         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%relTol = lEq%ls%relTol
 
-!     To impose value or flux
-      ltmp = .FALSE.
-      lPtr => list%get(ltmp,"Impose flux")
-      IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_flx)
+         lPtr => lPL%get(lEq%ls%absTol,"Absolute tolerance",
+     2      lb=0D0,ub=1D0)
+         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%absTol = lEq%ls%absTol
 
-!     To zero-out perimeter or not. Default is .true. for Dir/CMM
-      ltmp = .FALSE.
-      IF (BTEST(lBc%bType,bType_Dir) .OR.
-     2    BTEST(lBc%bType,bType_CMM)) ltmp = .TRUE.
-      lPtr => list%get(ltmp, "Zero out perimeter")
-      lBc%bType = IBCLR(lBc%bType,bType_zp)
-      IF (ltmp .OR. BTEST(lBc%bType,bType_CMM))
-     2   lBc%bType = IBSET(lBc%bType,bType_zp)
+         lPtr => lPL%get(lEq%ls%sD,"Krylov space dimension",ll=1)
+         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%sD = lEq%ls%sD
 
-!     Impose BC on the state variable or its integral
-      ltmp = .FALSE.
-      IF (phys.EQ.phys_lElas .OR. phys.EQ.phys_mesh .OR.
-     2    phys.EQ.phys_struct .OR. phys.EQ.phys_shell) ltmp = .TRUE.
-      lPtr => list%get(ltmp,"Impose on state variable integral")
-      lBc%bType = IBCLR(lBc%bType,bType_impD)
-      IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_impD)
+         IF (.NOT.useTrilinosLS) THEN
+            lPtr => lPL%get(lEq%FSILS%RI%mItr,"Max iterations",ll=1)
+            lPtr => lPL%get(lEq%FSILS%GM%mItr,"NS-GM max iterations",
+     2         ll=1)
+            lPtr => lPL%get(lEq%FSILS%CG%mItr,"NS-CG max iterations",
+     2         ll=1)
 
-!     Reading the spatial profile: flat/para/ud
-      ctmp = "Flat"
-      lPtr => list%get(ctmp,"Profile")
-      SELECT CASE (ctmp)
-      CASE ('Flat')
-         lBc%bType = IBSET(lBc%bType,bType_flat)
-      CASE ('Parabolic')
-         lBc%bType = IBSET(lBc%bType,bType_para)
-      CASE ('D_dependent')
-         lBc%bType = IBSET(lBc%bType,bType_ddep)
-      CASE ('User_defined')
-         lBc%bType = IBSET(lBc%bType,bType_ud)
-         lPtr => list%get(fTmp,"Spatial profile file path",1)
-         fid = fTmp%open()
-         iM  = lBc%iM
-         iFa = lBc%iFa
-         ALLOCATE(lBc%gx(msh(iM)%fa(iFa)%nNo), ptr(msh(iM)%gnNo))
-!     I am seting all the nodes to zero just in case a node is not set
-         ptr    = 0
-!     Preparing the pointer array
-         DO a=1, msh(iM)%fa(iFa)%nNo
-            lBc%gx(a) = 0D0
-            Ac        = msh(iM)%fa(iFa)%gN(a)
-            Ac = msh(iM)%lN(Ac)
-            IF (Ac .EQ. 0) err = "Incorrect global node number "//
-     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
-     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
-     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
-            ptr(Ac)   = a
-         END DO
-         DO b=1, msh(iM)%fa(iFa)%nNo
-            READ (fid,*) Ac, rtmp
-            IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
-               err = "Entry "//b//" is out of bound in "//fTmp%fname
-            END IF
-            a = ptr(Ac)
-            IF (a .EQ. 0) THEN
-               err = "Entry <"//b//" not found in face "//fTmp%fname
-            END IF
-            lBc%gx(a) = rtmp
-         END DO
-         CLOSE(fid)
-      CASE DEFAULT
-         err = TRIM(list%ping("Profile",lPtr))//" Unexpected profile"
-      END SELECT
+            lPtr => lPL%get(lEq%FSILS%RI%relTol,"Tolerance",
+     2         lb=0D0,ub=1D0)
+            lPtr => lPL%get(lEq%FSILS%GM%relTol,"NS-GM tolerance",
+     2         lb=0D0,ub=1D0)
+            lPtr => lPL%get(lEq%FSILS%CG%relTol,"NS-CG tolerance",
+     2         lb=0D0,ub=1D0)
 
-!     If a Neumann BC face is undeforming
-      lBc%masN = 0
-      IF (BTEST(lBc%bType,bType_Neu)) THEN
-         ltmp = .FALSE.
-         lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
-         lPtr => list%get(ltmp, "Undeforming Neu face")
-         IF (ltmp) THEN
-            IF (phys .NE. phys_vms_struct) err = "Undeforming Neu "//
-     2         "face is currently formulated for VMS_STRUCT only"
+            lPtr =>lPL%get(lEq%FSILS%RI%absTol,"Absolute tolerance",
+     2         lb=0D0,ub=1D0)
+            lEq%FSILS%GM%absTol = lEq%FSILS%RI%absTol
+            lEq%FSILS%CG%absTol = lEq%FSILS%RI%absTol
 
-            IF (BTEST(lBc%bType,bType_cpl) .OR.
-     2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//
-     2         "BC cannot be used with resistance or couple BC yet"
-
-!           Clear any BC profile
-            lBc%bType = IBCLR(lBc%bType,bType_flat)
-            lBc%bType = IBCLR(lBc%bType,bType_para)
-            lBc%bType = IBCLR(lBc%bType,bType_ddep)
-            IF (BTEST(lBc%bType,bType_ud) .OR.
-     2          BTEST(lBc%bType,bType_gen)) THEN
-               err = "General BC or user defined spatial profile "//
-     2            "cannot be imposed on an undeforming Neu face"
-            END IF
-
-!           Clear zero perimeter flag
-            lBc%bType = IBCLR(lBc%bType,bType_zp)
-
-!           Reset profile to flat and set undeforming Neumann BC flag
-            lBc%bType = IBSET(lBc%bType,bType_flat)
-            lBc%bType = IBSET(lBc%bType,bType_undefNeu)
-
-!           Set master-slave node parameters. Set a master node that
-!           is not part of any other face (not on perimeter)
-            iM  = lBc%iM
-            iFa = lBc%iFa
-            IF (ALLOCATED(ptr)) DEALLOCATE(ptr)
-            ALLOCATE(ptr(gtnNo))
-            ptr = 0
-            DO a=1, msh(iM)%fa(iFa)%nNo
-               Ac = msh(iM)%fa(iFa)%gN(a)
-               ptr(Ac) = 1
-            END DO
-
-            DO j=1, msh(iM)%nFa
-               IF (j .EQ. iFa) CYCLE
-               DO a=1, msh(iM)%fa(j)%nNo
-                  Ac = msh(iM)%fa(j)%gN(a)
-                  ptr(Ac) = 0
-               END DO
-            END DO
-
-            DO a=1, msh(iM)%fa(iFa)%nNo
-               Ac = msh(iM)%fa(iFa)%gN(a)
-               IF (ptr(Ac) .EQ. 1) THEN
-                  lBc%masN = Ac
-                  EXIT
-               END IF
-            END DO
-            DEALLOCATE(ptr)
+            lEq%FSILS%GM%sD = lEq%FSILS%RI%sD
          END IF
       END IF
 
+      std = " LS: "//STR(lEq%FSILS%RI%relTol)//" "//
+     2   STR(lEq%FSILS%RI%mItR)
+!     Check LS inputs
+      IF (useTrilinosAssemAndLS .AND. .NOT.useTrilinosLS) err =
+     2   "Error in LS inputs. Use Trilinos based LS"
+
+      IF (useTrilinosLS) THEN
+         IF (lSolverType .EQ. lSolver_NS) err =
+     2   "NS solver is not supported with Trilinos"//
+     3   "Use GMRES or BICG instead."
+      END IF
+
       RETURN
-      END SUBROUTINE READBC
+      END SUBROUTINE READLS
 !--------------------------------------------------------------------
 !     This subroutine is to read inputs of VTK files or boundaries.
 !     nDOP(1) is the total number of outputs, nDOP(2) is the default
@@ -1497,163 +1244,632 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE READOUTPUTS
 !--------------------------------------------------------------------
-!     This subroutine reads LS type, tolerance, ...
-      SUBROUTINE READLS(ilsType, lEq, list)
+!     This routine reads a BC
+      SUBROUTINE READBC(lBc, list, phys)
       USE COMMOD
-      USE LISTMOD
       USE ALLFUN
+      USE LISTMOD
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: ilsType
-      TYPE(eqType), INTENT(INOUT) :: lEq
+      TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(listType), INTENT(INOUT) :: list
+      INTEGER, INTENT(IN) :: phys
 
-      INTEGER lSolverType, FSILSType
-      LOGICAL flag
+      LOGICAL ltmp
+      INTEGER iFa, iM, a, b, fid, i, j, Ac
+      REAL(KIND=8) rtmp
       CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr, lPL
+      TYPE(listType), POINTER :: lPtr
+      TYPE(fileType) fTmp
 
-!     Default LS
-      lSolverType = ilsType
-      FSILSType   = ilsType
-      lPL => list%get(ctmp,"LS type")
-      IF (ASSOCIATED(lPL)) THEN
-         CALL TO_LOWER(ctmp)
-         SELECT CASE(TRIM(ctmp))
-         CASE('ns')
-            lSolverType = lSolver_NS
-            FSILSType   = LS_TYPE_NS
-         CASE('gmres')
-            lSolverType = lSolver_GMRES
-            FSILSType   = LS_TYPE_GMRES
-         CASE('cg')
-            lSolverType = lSolver_CG
-            FSILSType   = LS_TYPE_CG
-         CASE('bicg')
-            lSolverType = lSolver_BICGS
-            FSILSType   = LS_TYPE_BICGS
+      INTEGER, ALLOCATABLE :: ptr(:)
+
+!     Reading the type: Dir/Neu/Per
+      lPtr => list%get(ctmp,"Type")
+      SELECT CASE (ctmp)
+      CASE ("Dirichlet","Dir")
+         lBc%bType = IBSET(lBc%bType,bType_Dir)
+      CASE ("Neumann","Neu")
+         lBc%bType = IBSET(lBc%bType,bType_Neu)
+         IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
+     2      lBc%bType = IBSET(lBc%bType,bType_bfs)
+      CASE ("Traction","Trac")
+         lBc%bType = IBSET(lBc%bType,bType_trac)
+
+         lPtr => list%get(fTmp, "Traction values file path (vtp)")
+         IF (ASSOCIATED(lPtr)) THEN
+            iM  = lBc%iM
+            iFa = lBc%iFa
+            i = nsd
+            j = 2
+            a = msh(iM)%fa(iFa)%nNo
+            ALLOCATE(lBc%gm)
+            lBc%gm%nTP = j
+            lBc%gm%dof = i
+            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
+            lBc%gm%t(1) = 0D0
+            lBc%gm%t(2) = HUGE(rtmp)
+
+            CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
+            lBc%bType = IBSET(lBc%bType,bType_gen)
+            lBc%bType = IBSET(lBc%bType,bType_flat)
+
+            lPtr => list%get(rtmp, "Traction multiplier",1)
+            IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
+            lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
+
+            ALLOCATE(lBc%eDrn(nsd), lBc%h(nsd))
+            lBc%eDrn    = 0
+            lBc%h       = 0D0
+            lBc%weakDir = .FALSE.
+            RETURN
+         END IF
+      CASE ("Robin", "Rbn")
+         lBc%bType = IBSET(lBc%bType,bType_Robin)
+         lBc%bType = IBSET(lBc%bType,bType_Neu)
+      CASE ("Coupled Momentum","CMM")
+         lBc%bType = IBSET(lBc%bType,bType_CMM)
+      CASE DEFAULT
+         err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
+      END SELECT
+
+!     Allocate traction
+      ALLOCATE(lBc%h(nsd))
+      lBc%h = 0D0
+
+      ALLOCATE(lBc%eDrn(nsd))
+      lBc%eDrn = 0
+      lPtr => list%get(lBc%eDrn,"Effective direction")
+
+      ctmp = "Steady"
+      lPtr => list%get(ctmp,"Time dependence")
+      SELECT CASE (ctmp)
+      CASE ('Steady')
+         lBc%bType = IBSET(lBc%bType,bType_std)
+         IF (BTEST(lBc%bType, bType_trac)) THEN
+            lBc%h = 0D0
+            lPtr => list%get(lBc%h,"Value")
+         ELSE
+            lBc%g = 0D0
+            lPtr => list%get(lBc%g,"Value")
+         END IF
+      CASE ('Unsteady')
+         lBc%bType = IBSET(lBc%bType,bType_ustd)
+         IF (BTEST(lBc%bType,bType_trac)) err =
+     2      "For unsteady traction, use general time dependence"
+         ALLOCATE(lBc%gt)
+         lPtr => list%get(fTmp,"Temporal values file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            ltmp = .FALSE.
+            lPtr => list%get(ltmp,"Ramp function")
+            lBc%gt%lrmp = ltmp
+            fid = fTmp%open()
+            READ(fid,*) i, j
+            IF (i .LT. 2) THEN
+               std = "Enter nPnts nFCoef; nPts*(t Q)"
+               err = "Wrong format in: "//fTmp%fname
+            END IF
+            lBc%gt%n = j
+            IF (lBc%gt%lrmp) lBc%gt%n = 1
+            ALLOCATE(lBc%gt%r(lBc%gt%n))
+            ALLOCATE(lBc%gt%i(lBc%gt%n))
+            CALL FFT(fid, i, lBc%gt)
+            CLOSE(fid)
+         ELSE
+            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
+            IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
+     2         "unsteady type BC"
+            lBc%gt%lrmp = .FALSE.
+            fid = fTmp%open()
+            READ (fid,*) lBc%gt%ti
+            READ (fid,*) lBc%gt%T
+            READ (fid,*) lBc%gt%qi
+            READ (fid,*) lBc%gt%qs
+            READ (fid,*) j
+            lBc%gt%n = j
+            ALLOCATE(lBc%gt%r(j))
+            ALLOCATE(lBc%gt%i(j))
+            DO i=1, j
+               READ (fid,*) lBc%gt%r(i), lBc%gt%i(i)
+            END DO
+            CLOSE(fid)
+         END IF
+      CASE ('Coupled')
+         lBc%bType = IBSET(lBc%bType,bType_cpl)
+         cplBC%nFa = cplBC%nFa + 1
+         lBc%cplBcPtr = cplBC%nFa
+         IF (cplBC%schm .EQ. cplBC_NA) THEN
+            err = "'Couple to cplBC' must be specified before"//
+     2         " using Coupled BC"
+         END IF
+      CASE ('Resistance')
+         lBc%bType = IBSET(lBc%bType,bType_res)
+         IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Resistance"//
+     2      " is only defined for Neu BC"
+         IF (BTEST(lBc%bType,bType_Robin)) err = "Resistance"//
+     2      " is not defined for Robin BC"
+         IF (phys.NE.phys_fluid .AND.
+     2       phys.NE.phys_FSI   .AND.
+     3       phys.NE.phys_CMM) THEN
+            err = "Resistance is only defined for fluid/FSI equations"
+         END IF
+
+         lPtr => list%get(lBc%r,"Value",1)
+      CASE ('General')
+         lBc%bType = IBSET(lBc%bType,bType_gen)
+         lPtr =>list%get(fTmp,"Temporal and spatial values file path",1)
+         fid = fTmp%open()
+         READ (fid,*) i, j, a
+         iM  = lBc%iM
+         iFa = lBc%iFa
+         IF (a .NE. msh(iM)%fa(iFa)%nNo) THEN
+            err = "Number of nodes does not match between "//
+     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//TRIM(fTmp%fname)
+         END IF
+         IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
+     2      " is violated in "//fTmp%fname
+
+         ALLOCATE(lBc%gm)
+         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(msh(iM)%gnNo))
+!     I am seting all the nodes to zero just in case a node is not set
+         lBc%gm%d   = 0D0
+         lBc%gm%dof = i
+         lBc%gm%nTP = j
+         ptr        = 0
+!     Preparing the pointer array
+         DO a=1, msh(iM)%fa(iFa)%nNo
+            Ac = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%lN(Ac)
+            IF (Ac .EQ. 0) err = "Incorrect global node number "//
+     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
+     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
+     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
+            ptr(Ac) = a
+         END DO
+         DO i=1, j
+            READ (fid,*) rtmp
+            lBc%gm%t(i) = rtmp
+            IF (i .EQ. 1) THEN
+               IF (.NOT.ISZERO(rtmp)) err = "First time step"//
+     2            " should be zero in <"//TRIM(ctmp)//">"
+            ELSE
+               rtmp = rtmp - lBc%gm%t(i-1)
+               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-in"//
+     2            "creasing time trend is found in <"//TRIM(ctmp)//">"
+            END IF
+         END DO
+         lBc%gm%period = lBc%gm%t(j)
+         DO b=1, msh(iM)%fa(iFa)%nNo
+            READ (fid,*) Ac
+            IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
+               err = "Entry "//b//" is out of bound in "//ctmp
+            END IF
+            a = ptr(Ac)
+            IF (a .EQ. 0) THEN
+               err = "Entry "//b//" not found in face "//ctmp
+            END IF
+            DO i=1, j
+               READ (fid,*) lBc%gm%d(:,a,i)
+            END DO
+         END DO
+         CLOSE(fid)
+      CASE DEFAULT
+         err=TRIM(list%ping("Time dependence",lPtr))//" Unexpected type"
+      END SELECT
+
+!     Stiffness and damping parameters for Robin BC
+      IF (BTEST(lBc%bType, bType_Robin)) THEN
+         lPtr => list%get(lBc%k, "Stiffness", 1)
+         lPtr => list%get(lBc%c, "Damping", 1)
+      END IF
+
+!     To impose value or flux
+      ltmp = .FALSE.
+      lPtr => list%get(ltmp,"Impose flux")
+      IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_flx)
+
+!     To zero-out perimeter or not. Default is .true. for Dir/CMM
+      ltmp = .FALSE.
+      IF (BTEST(lBc%bType,bType_Dir)) ltmp = .TRUE.
+      lPtr => list%get(ltmp, "Zero out perimeter")
+      lBc%bType = IBCLR(lBc%bType,bType_zp)
+      IF (ltmp .OR. BTEST(lBc%bType,bType_CMM))
+     2   lBc%bType = IBSET(lBc%bType,bType_zp)
+
+!     Impose BC on the state variable or its integral
+      ltmp = .FALSE.
+      IF (phys.EQ.phys_lElas .OR. phys.EQ.phys_mesh .OR.
+     2    phys.EQ.phys_struct .OR. phys.EQ.phys_shell) ltmp = .TRUE.
+      lPtr => list%get(ltmp,"Impose on state variable integral")
+      lBc%bType = IBCLR(lBc%bType,bType_impD)
+      IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_impD)
+
+!     Reading the spatial profile: flat/para/ud
+      ctmp = "Flat"
+      lPtr => list%get(ctmp,"Profile")
+      SELECT CASE (ctmp)
+      CASE ('Flat')
+         lBc%bType = IBSET(lBc%bType,bType_flat)
+      CASE ('Parabolic')
+         lBc%bType = IBSET(lBc%bType,bType_para)
+      CASE ('User_defined')
+         lBc%bType = IBSET(lBc%bType,bType_ud)
+         lPtr => list%get(fTmp,"Spatial profile file path",1)
+         fid = fTmp%open()
+         iM  = lBc%iM
+         iFa = lBc%iFa
+         ALLOCATE(lBc%gx(msh(iM)%fa(iFa)%nNo), ptr(msh(iM)%gnNo))
+!     I am seting all the nodes to zero just in case a node is not set
+         ptr    = 0
+!     Preparing the pointer array
+         DO a=1, msh(iM)%fa(iFa)%nNo
+            lBc%gx(a) = 0D0
+            Ac        = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%lN(Ac)
+            IF (Ac .EQ. 0) err = "Incorrect global node number "//
+     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
+     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
+     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
+            ptr(Ac)   = a
+         END DO
+         DO b=1, msh(iM)%fa(iFa)%nNo
+            READ (fid,*) Ac, rtmp
+            IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
+               err = "Entry "//b//" is out of bound in "//fTmp%fname
+            END IF
+            a = ptr(Ac)
+            IF (a .EQ. 0) THEN
+               err = "Entry <"//b//" not found in face "//fTmp%fname
+            END IF
+            lBc%gx(a) = rtmp
+         END DO
+         CLOSE(fid)
+      CASE DEFAULT
+         err = TRIM(list%ping("Profile",lPtr))//" Unexpected profile"
+      END SELECT
+
+!     Weak Dirichlet BC for fluid/FSI equations
+      lBc%weakDir = .FALSE.
+      IF (BTEST(lBc%bType,bType_Dir)) THEN
+         IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
+     2      lPtr => list%get(lBc%weakDir, "Weakly applied")
+      END IF
+
+!     Read penalty values for weakly applied Dir BC
+      IF (lBc%weakDir) THEN
+         lBc%bType = IBCLR(lBc%bType,bType_zp)
+         lPtr => list%get(rtmp, "Penalty parameter")
+         IF (ASSOCIATED(lPtr)) lBc%tauB = rtmp
+         lPtr => list%get(rtmp, "Penalty parameter (tangential)")
+         IF (ASSOCIATED(lPtr)) lBc%tauB(1) = rtmp
+         lPtr => list%get(rtmp, "Penalty parameter (normal)")
+         IF (ASSOCIATED(lPtr)) lBc%tauB(2) = rtmp
+      END IF
+
+!     Read BCs for shells with triangular elements. Not necessary for
+!     NURBS elements
+      lPtr => list%get(ctmp,"Shell BC type")
+      IF (ASSOCIATED(lPtr)) THEN
+         SELECT CASE (ctmp)
+         CASE ("Fixed", "fixed", "Clamped", "clamped")
+            lBc%bType = IBSET(lBc%bType,bType_fix)
+            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Fixed BC "//
+     2         "can be applied for Dirichlet boundaries only"
+         CASE ("Hinged", "hinged")
+            lBc%bType = IBSET(lBc%bType,bType_hing)
+            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Hinged BC "//
+     2         "can be applied for Dirichlet boundaries only"
+         CASE ("Free", "free")
+            lBc%bType = IBSET(lBc%bType,bType_free)
+            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Free BC "//
+     2         "can be applied for Neumann boundaries only"
+!        Symm BC needs to be verified
+c         CASE ("Symm", "symm", "Symmetric", "symmetric")
+c            lBc%bType = IBSET(lBc%bType,bType_symm)
+c            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Symm BC "//
+c     2         "can be applied for Neumann boundaries only"
          CASE DEFAULT
-            err = TRIM(list%ping("LS type",lPL))//" Undefined type"
+            err = TRIM(list%ping("Shell BC type",lPtr))//
+     2         " Unexpected Shell BC type"
          END SELECT
       END IF
 
-      lEq%ls%LS_Type = lSolverType
-      CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
+!     If a Neumann BC face is undeforming
+      lBc%masN = 0
+      IF (BTEST(lBc%bType,bType_Neu)) THEN
+         ltmp = .FALSE.
+         lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
+         lPtr => list%get(ltmp, "Undeforming Neu face")
+         IF (ltmp) THEN
+            IF (phys .NE. phys_vms_struct) err = "Undeforming Neu "//
+     2         "face is currently formulated for VMS_STRUCT only"
 
-!     Default Preconditioners
-      lEq%ls%PREC_Type = PREC_FSILS
-#ifdef WITH_TRILINOS
-      IF (FSILSType .EQ. LS_TYPE_NS) THEN
-         lEq%ls%PREC_Type = PREC_FSILS
-      ELSE
-         useTrilinosLS = .TRUE.
-         lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+            IF (BTEST(lBc%bType,bType_cpl) .OR.
+     2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//
+     2         "BC cannot be used with resistance or couple BC yet"
+
+!           Clear any BC profile
+            lBc%bType = IBCLR(lBc%bType,bType_flat)
+            lBc%bType = IBCLR(lBc%bType,bType_para)
+            IF (BTEST(lBc%bType,bType_ud) .OR.
+     2          BTEST(lBc%bType,bType_gen)) THEN
+               err = "General BC or user defined spatial profile "//
+     2            "cannot be imposed on an undeforming Neu face"
+            END IF
+
+!           Clear zero perimeter flag
+            lBc%bType = IBCLR(lBc%bType,bType_zp)
+
+!           Reset profile to flat and set undeforming Neumann BC flag
+            lBc%bType = IBSET(lBc%bType,bType_flat)
+            lBc%bType = IBSET(lBc%bType,bType_undefNeu)
+
+!           Set master-slave node parameters. Set a master node that
+!           is not part of any other face (not on perimeter)
+            iM  = lBc%iM
+            iFa = lBc%iFa
+            IF (ALLOCATED(ptr)) DEALLOCATE(ptr)
+            ALLOCATE(ptr(gtnNo))
+            ptr = 0
+            DO a=1, msh(iM)%fa(iFa)%nNo
+               Ac = msh(iM)%fa(iFa)%gN(a)
+               ptr(Ac) = 1
+            END DO
+
+            DO j=1, msh(iM)%nFa
+               IF (j .EQ. iFa) CYCLE
+               DO a=1, msh(iM)%fa(j)%nNo
+                  Ac = msh(iM)%fa(j)%gN(a)
+                  ptr(Ac) = 0
+               END DO
+            END DO
+
+            DO a=1, msh(iM)%fa(iFa)%nNo
+               Ac = msh(iM)%fa(iFa)%gN(a)
+               IF (ptr(Ac) .EQ. 1) THEN
+                  lBc%masN = Ac
+                  EXIT
+               END IF
+            END DO
+            DEALLOCATE(ptr)
+         END IF
       END IF
-#endif
 
-      IF (ASSOCIATED(lPL)) THEN
-         lPtr => lPL%get(ctmp, "Preconditioner")
+!     For CMM BC, load wall displacements
+      IF (BTEST(lBC%bType, bType_CMM)) THEN
+         lPtr => list%get(cTmp, "Initial displacements file path (vtp)")
+         IF (.NOT.ASSOCIATED(lPtr) .AND. .NOT.ALLOCATED(Dinit)) THEN
+            lPtr => list%get(cTmp, "Prestress file path (vtp)")
+            IF (.NOT.ASSOCIATED(lPtr) .AND. .NOT.ALLOCATED(pS0)) THEN
+               err = "Either wall displacement field or prestress "//
+     2           "is required for CMM eqn"
+            END IF
+
+!           Read prestress tensor here
+            IF (ASSOCIATED(lPtr)) THEN
+               iM  = lBc%iM
+               iFa = lBc%iFa
+               IF (.NOT.ALLOCATED(msh(iM)%fa(iFa)%x)) THEN
+                  ALLOCATE(msh(iM)%fa(iFa)%x(nstd,msh(iM)%fa(iFa)%nNo))
+                  msh(iM)%fa(iFa)%x = 0D0
+               END IF
+               CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Prestress",
+     2            nstd, 1)
+               IF (.NOT.ALLOCATED(pS0)) THEN
+                  ALLOCATE(pS0(nstd,gtnNo))
+                  pS0 = 0D0
+               END IF
+               DO a=1, msh(iM)%fa(iFa)%nNo
+                  Ac = msh(iM)%fa(iFa)%gN(a)
+                  Ac = msh(iM)%gN(Ac)
+                  pS0(:,Ac) = msh(iM)%fa(iFa)%x(:,a)
+               END DO
+               DEALLOCATE(msh(iM)%fa(iFa)%x)
+               NULLIFY(lPtr)
+            END IF
+         END IF
+
+!        Read displacement field here
          IF (ASSOCIATED(lPtr)) THEN
-            CALL TO_LOWER(ctmp)
-            SELECT CASE(TRIM(ctmp))
-            CASE('fsils', 'svfsi')
-               lEq%ls%PREC_Type = PREC_FSILS
-               useTrilinosLS = .FALSE.
-#ifdef WITH_TRILINOS
-            CASE('trilinos-diagonal')
-               lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
-               useTrilinosLS = .TRUE.
-            CASE('trilinos-blockjacobi', 'blockjacobi')
-               lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
-               useTrilinosLS = .TRUE.
-            CASE('trilinos-ilu')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ILU
-               useTrilinosLS = .TRUE.
-            CASE('trilinos-ilut')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
-               useTrilinosLS = .TRUE.
-            CASE('trilinos-ic')
-               lEq%ls%PREC_Type = PREC_TRILINOS_IC
-               useTrilinosLS = .TRUE.
-            CASE('trilinos-ict')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ICT
-               useTrilinosLS = .TRUE.
-            CASE ('trilinos-ml')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ML
-               useTrilinosLS = .TRUE.
-#endif
-            CASE DEFAULT
-               err = TRIM(list%ping("Preconditioner",lPtr))
-     2          //" Undefined type"
-            END SELECT
-            std = " Using preconditioner: "//TRIM(ctmp)
-         ELSE
-            SELECT CASE (lEq%ls%PREC_Type)
-            CASE (PREC_FSILS)
-               std = " Using preconditioner: FSILS"
-            CASE (PREC_TRILINOS_DIAGONAL)
-               std = " Using preconditioner: Trilinos-Diagonal"
-            CASE DEFAULT
-               err = " Undefined preconditioner"
-            END SELECT
+            iM  = lBc%iM
+            iFa = lBc%iFa
+            IF (.NOT.ALLOCATED(msh(iM)%fa(iFa)%x)) THEN
+               ALLOCATE(msh(iM)%fa(iFa)%x(nsd,msh(iM)%fa(iFa)%nNo))
+               msh(iM)%fa(iFa)%x = 0D0
+            END IF
+            CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Displacement",
+     2         nsd, 1)
+            IF (.NOT.ALLOCATED(Dinit)) THEN
+               ALLOCATE(Dinit(nsd,gtnNo))
+               Dinit = 0D0
+            END IF
+            DO a=1, msh(iM)%fa(iFa)%nNo
+               Ac = msh(iM)%fa(iFa)%gN(a)
+               Ac = msh(iM)%gN(Ac)
+               Dinit(:,Ac) = msh(iM)%fa(iFa)%x(:,a)
+            END DO
+            DEALLOCATE(msh(iM)%fa(iFa)%x)
          END IF
 
-         IF (.NOT.useTrilinosAssemAndLS) THEN
-            lPtr => lPL%get(flag, "Use Trilinos for assembly")
-            IF (ASSOCIATED(lPtr)) useTrilinosAssemAndLS = flag
-            IF (useTrilinosAssemAndLS .AND. ibFlag) err =
-     2         "Cannnot assemble immersed boundaries using Trilinos."//
-     3         " Use Trilinos for linear solver only."
-         END IF
-
-         lPtr => lPL%get(lEq%ls%mItr,"Max iterations",ll=1)
-         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%mItr = lEq%ls%mItr
-
-         lPtr => lPL%get(lEq%ls%relTol,"Tolerance",lb=0D0,ub=1D0)
-         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%relTol = lEq%ls%relTol
-
-         lPtr => lPL%get(lEq%ls%absTol,"Absolute tolerance",
-     2      lb=0D0,ub=1D0)
-         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%absTol = lEq%ls%absTol
-
-         lPtr => lPL%get(lEq%ls%sD,"Krylov space dimension",ll=1)
-         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%sD = lEq%ls%sD
-
-         IF (.NOT.useTrilinosLS) THEN
-            lPtr => lPL%get(lEq%FSILS%RI%mItr,"Max iterations",ll=1)
-            lPtr => lPL%get(lEq%FSILS%GM%mItr,"NS-GM max iterations",
-     2         ll=1)
-            lPtr => lPL%get(lEq%FSILS%CG%mItr,"NS-CG max iterations",
-     2         ll=1)
-
-            lPtr => lPL%get(lEq%FSILS%RI%relTol,"Tolerance",
-     2         lb=0D0,ub=1D0)
-            lPtr => lPL%get(lEq%FSILS%GM%relTol,"NS-GM tolerance",
-     2         lb=0D0,ub=1D0)
-            lPtr => lPL%get(lEq%FSILS%CG%relTol,"NS-CG tolerance",
-     2         lb=0D0,ub=1D0)
-
-            lPtr =>lPL%get(lEq%FSILS%RI%absTol,"Absolute tolerance",
-     2         lb=0D0,ub=1D0)
-            lEq%FSILS%GM%absTol = lEq%FSILS%RI%absTol
-            lEq%FSILS%CG%absTol = lEq%FSILS%RI%absTol
-
-            lEq%FSILS%GM%sD = lEq%FSILS%RI%sD
-         END IF
-      END IF
-
-!     Check LS inputs
-      IF (useTrilinosAssemAndLS .AND. .NOT.useTrilinosLS) err =
-     2   "Error in LS inputs. Use Trilinos based LS"
-
-      IF (useTrilinosLS) THEN
-         IF (lSolverType .EQ. lSolver_NS) err =
-     2   "NS solver is not supported with Trilinos"//
-     3   "Use GMRES or BICG instead."
+!        Set cmmBdry vector for wall nodes
+         iM  = lBc%iM
+         iFa = lBc%iFa
+         DO a=1, msh(iM)%fa(iFa)%nNo
+            Ac = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%gN(Ac)
+            cmmBdry(Ac) = 1
+         END DO
       END IF
 
       RETURN
-      END SUBROUTINE READLS
+      END SUBROUTINE READBC
+!--------------------------------------------------------------------
+!     This routine reads a body force
+      SUBROUTINE READBF(lBf, list)
+      USE COMMOD
+      USE ALLFUN
+      USE LISTMOD
+      IMPLICIT NONE
+
+      TYPE(bfType), INTENT(INOUT) :: lBf
+      TYPE(listType), INTENT(INOUT) :: list
+
+      LOGICAL flag
+      INTEGER iM, a, i, j, Ac, fid
+      REAL(KIND=8) rtmp
+      CHARACTER(LEN=stdL) ctmp
+      TYPE(listType), POINTER :: lPtr
+      TYPE(fileType) fTmp
+
+      iM  = lBf%iM
+      lBf%dof = nsd
+
+!     Reading the type: Vol/Neu/Trac
+      lPtr => list%get(ctmp,"Type")
+      CALL TO_LOWER(ctmp)
+      SELECT CASE (ctmp)
+      CASE ("volumetric","vol","internal","int")
+         lBf%bType = IBSET(lBf%bType,bfType_vol)
+      CASE ("traction","trac")
+         lBf%bType = IBSET(lBf%bType,bfType_trac)
+      CASE ("neumann","neu","pressure")
+         lBf%bType = IBSET(lBf%bType,bfType_Neu)
+         lBf%dof   = 1
+      CASE DEFAULT
+         err = TRIM(list%ping("Type",lPtr))//" Unexpected BF type"
+      END SELECT
+
+!     Time dependence
+      ctmp = "steady"
+      lPtr => list%get(ctmp,"Time dependence")
+      CALL TO_LOWER(ctmp)
+      SELECT CASE (ctmp)
+      CASE ('steady')
+         lBf%bType = IBSET(lBf%bType,bfType_std)
+         ALLOCATE(lBf%b(lBf%dof))
+         lBf%b = 0D0
+         IF (lBf%dof .EQ. 1) THEN
+            lPtr => list%get(lBf%b(1),"Value",1)
+         ELSE
+            lPtr => list%get(lBf%b,"Value",1)
+         END IF
+
+      CASE ('unsteady')
+         lBf%bType = IBSET(lBf%bType,bfType_ustd)
+
+         ALLOCATE(lBf%bt(lBf%dof))
+         flag = .FALSE.
+         lPtr => list%get(flag,"Ramp function")
+         DO a=1, lBf%dof
+            lBf%bt(a)%lrmp = flag
+            lPtr => list%get(ftmp, "Temporal values file path", a)
+            IF (ASSOCIATED(lPtr)) THEN
+               fid = fTmp%open()
+               READ(fid,*) i, j
+               IF (i .LT. 2) THEN
+                  std = "Enter nPnts nFCoef; nPts*(t Q)"
+                  err = "Wrong format in: "//fTmp%fname
+               END IF
+               lBf%bt(a)%n = j
+               ALLOCATE(lBf%bt(a)%r(j))
+               ALLOCATE(lBf%bt(a)%i(j))
+               CALL FFT(fid, i, lBf%bt(1))
+               CLOSE(fid)
+            ELSE
+               lPtr => list%get(fTmp,"Fourier coefficients file path",a)
+               fid = fTmp%open()
+               READ (fid,*) lBf%bt(a)%ti
+               READ (fid,*) lBf%bt(a)%T
+               READ (fid,*) lBf%bt(a)%qi
+               READ (fid,*) lBf%bt(a)%qs
+               READ (fid,*) j
+               lBf%bt(a)%n = j
+               ALLOCATE(lBf%bt(a)%r(j))
+               ALLOCATE(lBf%bt(a)%i(j))
+               DO i=1, j
+                  READ (fid,*) lBf%bt(a)%r(i), lBf%bt(a)%i(i)
+               END DO
+               CLOSE(fid)
+            END IF
+         END DO
+
+      CASE ('spatial')
+         lBf%bType = IBSET(lBf%bType,bfType_spl)
+         ALLOCATE(lBf%bx(lBf%dof,gtnNo))
+         lBf%bx = 0D0
+         lPtr => list%get(cTmp,"Spatial values file path")
+
+         ALLOCATE(msh(iM)%x(lBf%dof,msh(iM)%gnNo))
+         msh(iM)%x = 0D0
+         IF (BTEST(lBf%bType,bfType_vol)) THEN
+            CALL READVTUPDATA(msh(iM), ctmp, "Body_force", lBf%dof, 1)
+         ELSE IF (BTEST(lBf%bType,bfType_trac)) THEN
+            CALL READVTUPDATA(msh(iM), ctmp, "Traction", lBf%dof, 1)
+         ELSE IF (BTEST(lBf%bType,bfType_Neu)) THEN
+            CALL READVTUPDATA(msh(iM), ctmp, "Pressure", lBf%dof, 1)
+         END  IF
+
+         DO a=1, msh(iM)%gnNo
+            Ac = msh(iM)%gN(a)
+            lBf%bx(:,Ac) = msh(iM)%x(:,a)
+         END DO
+         DEALLOCATE(msh(iM)%x)
+
+      CASE ('general')
+         lBf%bType = IBSET(lBf%bType,bfType_gen)
+
+         lPtr =>list%get(fTmp,"Temporal and spatial values file path",1)
+         fid = fTmp%open()
+
+         READ (fid,*) i, j, a
+         IF (a .GT. msh(iM)%gnNo) err = "No. of nodes out of bounds"//
+     2      " (body force for <"//TRIM(msh(iM)%name)//">)"
+         IF (i .NE. lBf%dof) THEN
+            err = "Mismatch in DOF for general type body force on <"
+     2            //TRIM(msh(iM)%name)//">"
+         END IF
+
+         ALLOCATE(lBf%bm)
+         lBf%bm%dof = lBf%dof
+         lBf%bm%nTP = j
+
+         ALLOCATE(lBf%bm%t(j), lBf%bm%d(lBf%dof,gtnNo,j))
+         lBf%bm%t = 0D0
+         lBf%bm%d = 0D0
+
+         DO j=1, lBf%bm%nTP
+            READ(fid,*) rtmp
+            lBf%bm%t(j) = rtmp
+            IF (j .EQ. 1) THEN
+               IF (.NOT.ISZERO(rtmp)) err = "First time step should "//
+     2            "be 0 (body force for <"//TRIM(msh(iM)%name)//">)"
+            ELSE
+               rtmp = rtmp - lBf%bm%t(j-1)
+               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err =
+     2            "Non-increasing time trend found (body force for <"//
+     3            TRIM(msh(iM)%name)//">)"
+            END IF
+         END DO
+         lBf%bm%period = lBf%bm%t(lBf%bm%nTP)
+
+         DO a=1, msh(iM)%gnNo
+            READ (fid,*) Ac
+            IF (Ac .GT. msh(iM)%gnNo) err =
+     2       "Entry "//Ac//" is out of bound in "//TRIM(fTmp%fname)
+            Ac = msh(iM)%gN(Ac)
+            DO j=1, lBf%bm%nTP
+               READ(fid,*) (lBf%bm%d(i,Ac,j), i=1, lBf%bm%dof)
+            END DO
+         END DO
+         CLOSE(fid)
+
+      CASE DEFAULT
+         err = TRIM(list%ping("Time dependence",lPtr))//
+     2      " Unexpected type (body force)"
+      END SELECT
+
+      RETURN
+      END SUBROUTINE READBF
 !####################################################################
 !     This subroutine reads properties of remesher (only for FSI)
       SUBROUTINE READRMSH(list)
@@ -2255,4 +2471,151 @@ c     2         "can be applied for Neumann boundaries only"
          END SUBROUTINE SETNADJ
 !--------------------------------------------------------------------
       END SUBROUTINE FACEMATCH
+!####################################################################
+!     Find boundary edge nodes for CMM initialization
+      SUBROUTINE SETCMMBDRY(lM, bNds)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER, INTENT(INOUT) :: bNds(gtnNo)
+
+      INTEGER i, j, a, a1, b, b1, e, e1, Ac, Ac1, Bc, Bc1, nAdj
+      LOGICAL flag
+
+      INTEGER, ALLOCATABLE :: incL(:), adjL(:,:), tmpI(:,:)
+
+!--------------------------------------------------------------------
+!     First, get mesh adjacency
+      ALLOCATE(incL(lM%gnNo))
+      incL = 0
+      DO e=1, lM%gnEl
+         DO a=1, lM%eNoN
+            Ac = lM%gIEN(a,e)
+            incL(Ac) = incL(Ac) + 1
+         END DO
+      END DO
+
+      nAdj = MAXVAL(incL)
+      ALLOCATE(tmpI(nAdj, lM%gnNo))
+      incL = 0
+      tmpI = 0
+      DO e=1, lM%gnEl
+         DO a=1, lM%eNoN
+            Ac = lM%gIEN(a,e)
+            incL(Ac) = incL(Ac) + 1
+            tmpI(incL(Ac), Ac) = e
+         END DO
+      END DO
+      b = 2*nAdj
+
+ 001  b = b + nAdj
+      DEALLOCATE(incL)
+      ALLOCATE(incL(lM%gnEl))
+      IF (ALLOCATED(adjL)) DEALLOCATE(adjL)
+      ALLOCATE(adjL(b, lM%gnEl))
+      adjL = 0
+      incL = 0
+      DO e=1, lM%gnEl
+         DO a=1, lM%eNoN
+            Ac = lM%gIEN(a,e)
+            DO i=1, nAdj
+               IF (tmpI(i,Ac) .EQ. 0) EXIT
+               flag = .TRUE.
+               DO j=1, incL(e)
+                  IF (adjL(j,e) .EQ. tmpI(i,Ac)) THEN
+                     flag = .FALSE.
+                     EXIT
+                  END IF
+               END DO
+               IF (flag) THEN
+                  incL(e) = incL(e) + 1
+                  IF (incL(e) .GE. b) GOTO 001
+                  adjL(incL(e),e) = tmpI(i,Ac)
+               END IF
+            END DO
+         END DO
+      END DO
+      nAdj = MAXVAL(incL)
+      DEALLOCATE(tmpI, incL)
+
+      lM%eAdj%nnz = 0
+      DO e=1, lM%gnEl
+         DO i=1, nAdj
+            IF (adjL(i,e) .NE. 0) THEN
+               lM%eAdj%nnz = lM%eAdj%nnz + 1
+            ELSE
+               EXIT
+            END IF
+         END DO
+      END DO
+
+      ALLOCATE(lM%eAdj%prow(lM%gnEl+1), lM%eAdj%pcol(lM%eAdj%nnz))
+      j = 0
+      lM%eAdj%prow(1) = j + 1
+      DO e=1, lM%gnEl
+         DO i=1, nAdj
+            IF (adjL(i,e) .NE. 0) THEN
+               j = j + 1
+               lM%eAdj%pcol(j) = adjL(i,e)
+            ELSE
+               EXIT
+            END IF
+         END DO
+         lM%eAdj%prow(e+1) = j + 1
+      END DO
+      DEALLOCATE(adjL)
+
+!--------------------------------------------------------------------
+!     Loop over all elements to find edge nodes
+      DO e=1, lM%gnEl
+!        Create a list of neighboring elements
+         nAdj = lM%eAdj%prow(e+1)-lM%eAdj%prow(e)
+         ALLOCATE(incL(nAdj))
+         i = 0
+         DO a=lM%eAdj%prow(e), lM%eAdj%prow(e+1)-1
+            i = i + 1
+            incL(i) = lM%eAdj%pcol(a)
+         END DO
+
+!        Select an edge pair
+         DO a=1, lM%eNoN
+            b = a + 1
+            IF (a .EQ. lM%eNoN) b = 1
+            Ac = lM%gIEN(a,e)
+            Bc = lM%gIEN(b,e)
+            IF (Ac .GT. Bc) CALL SWAP(Ac, Bc)
+
+!        Loop over all neighbors and check if this edge is found
+            flag = .true.
+            DO i=1, nAdj
+               e1 = incL(i)
+               IF (e1 .EQ. e) CYCLE
+               DO a1=1, lM%eNoN
+                  b1 = a1 + 1
+                  IF (a1 .EQ. lM%eNoN) b1 = 1
+                  Ac1 = lM%gIEN(a1,e1)
+                  Bc1 = lM%gIEN(b1,e1)
+                  IF (Ac1 .GT. Bc1) CALL SWAP(Ac1, Bc1)
+                  IF (Ac .EQ. Ac1 .AND. Bc .EQ. Bc1) THEN
+                     flag = .FALSE.
+                     EXIT
+                  END IF
+               END DO ! b
+               IF (.NOT.flag) EXIT
+            END DO ! i
+            IF (flag) THEN
+               Ac = lM%gN(Ac)
+               Bc = lM%gN(Bc)
+               bNds(Ac) = 1
+               bNds(Bc) = 1
+            END IF
+         END DO ! a
+         DEALLOCATE(incL)
+      END DO
+
+      CALL DESTROY(lM%eAdj)
+
+      RETURN
+      END SUBROUTINE SETCMMBDRY
 !####################################################################
