@@ -29,8 +29,11 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**************************************************
+!--------------------------------------------------------------------
+!
+!     Module to read/write VTU/VTP/VTI files.
+!
+!--------------------------------------------------------------------
 
       module vtkXMLlib
       use dataTypeParams
@@ -41,8 +44,9 @@
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
       integer(IK), parameter :: nVTKElms=5
-      integer(IK), parameter :: nPieceTyps=5
-      integer(IK), parameter :: nPieceElms=6
+      integer(IK), parameter :: nVTKDataTyps=5
+      integer(IK), parameter :: nVTKDataAtts=3
+      integer(IK), parameter :: nPieceElms=7
       integer(IK), parameter :: nPieceData=5
       integer(IK), parameter :: nPieceAtts=9
       integer(IK), parameter :: nDataElms=7
@@ -50,15 +54,16 @@
       integer(IK), parameter :: nDataFrmt=3
       integer(IK), parameter :: nDataEnc=2
 
-      character(len=strL), dimension(nVTKElms)   :: libVTKElms
-      character(len=strL), dimension(nPieceTyps) :: libVTKPcTyps
-      character(len=strL), dimension(nPieceElms) :: libPieceElms
-      character(len=strL), dimension(nPieceData) :: libPcPtClData
-      character(len=strL), dimension(nPieceAtts) :: libPieceAtts
-      character(len=strL), dimension(nDataElms)  :: libDataElms
-      character(len=strL), dimension(nDataTyps)  :: libDataTyps
-      character(len=strL), dimension(nDataFrmt)  :: libDataFrmt
-      character(len=strL), dimension(nDataFrmt)  :: libDataEnc
+      character(len=strL), dimension(nVTKElms)     :: libVTKElms
+      character(len=strL), dimension(nVTKDataTyps) :: libVTKDataTyps
+      character(len=strL), dimension(nVTKDataAtts) :: libVTKDataAtts
+      character(len=strL), dimension(nPieceElms)   :: libPieceElms
+      character(len=strL), dimension(nPieceData)   :: libPcPtClData
+      character(len=strL), dimension(nPieceAtts)   :: libPieceAtts
+      character(len=strL), dimension(nDataElms)    :: libDataElms
+      character(len=strL), dimension(nDataTyps)    :: libDataTyps
+      character(len=strL), dimension(nDataFrmt)    :: libDataFrmt
+      character(len=strL), dimension(nDataFrmt)    :: libDataEnc
 
       contains
 
@@ -66,7 +71,8 @@
          implicit none
 
          libVTKElms=""
-         libVTKPcTyps=""
+         libVTKDataTyps=""
+         libVTKDataAtts=""
          libPieceElms=""
          libPcPtClData=""
          libPieceAtts=""
@@ -81,20 +87,26 @@
          libVTKElms(4) = "header_type"
          libVTKElms(5) = "compressor"
 
-         ! libVTKPcTyps(5) !
-         libVTKPcTyps(1) = "ImageData"
-         libVTKPcTyps(2) = "RectilinearGrid"
-         libVTKPcTyps(3) = "StructuredGrid"
-         libVTKPcTyps(4) = "PolyData"
-         libVTKPcTyps(5) = "UnstructuredGrid"
+         ! libVTKDataTyps(5) !
+         libVTKDataTyps(1) = "ImageData"
+         libVTKDataTyps(2) = "RectilinearGrid"
+         libVTKDataTyps(3) = "StructuredGrid"
+         libVTKDataTyps(4) = "PolyData"
+         libVTKDataTyps(5) = "UnstructuredGrid"
 
-         ! libPieceElms(6) !
+         ! libVTKDataAtts(3) !
+         libVTKDataAtts(1) = "WholeExtent"
+         libVTKDataAtts(2) = "Origin"
+         libVTKDataAtts(3) = "Spacing"
+
+         ! libPieceElms(7) !
          libPieceElms(1) = "NumberOfPoints"
          libPieceElms(2) = "NumberOfCells"
          libPieceElms(3) = "NumberOfVerts"
          libPieceElms(4) = "NumberOfLines"
          libPieceElms(5) = "NumberOfStrips"
          libPieceElms(6) = "NumberOfPolys"
+         libPieceElms(7) = "Extent"
 
          ! libPieceData(5) !
          libPcPtClData(1)  = "Scalars"
@@ -160,19 +172,35 @@
       private
       public :: vtkXMLType
       public :: loadVTK, flushVTK
+
       public :: vtkInitWriter
       public :: vtkWriteToFile
-      public :: getVTK_nodesPerElem
+
       public :: getVTK_numElems
       public :: getVTK_numPoints
-      public :: getVTK_elemIEN
+      public :: getVTK_nodesPerElem
+      public :: putVTK_numElems
+      public :: putVTK_numPoints
+
       public :: getVTK_pointCoords
-      public :: getVTK_pointData
-      public :: getVTK_elemData
+      public :: getVTK_elemIEN
       public :: putVTK_pointCoords
       public :: putVTK_elemIEN
+
+      public :: getVTK_pointData
+      public :: getVTK_elemData
       public :: putVTK_pointData
       public :: putVTK_elemData
+
+      public :: getVTK_imageExtent
+      public :: getVTK_imageOrigin
+      public :: getVTK_imageSpacing
+      public :: getVTK_pieceExtent
+      public :: putVTK_imageExtent
+      public :: putVTK_imageOrigin
+      public :: putVTK_imageSpacing
+      public :: putVTK_pieceExtent
+
 
       interface getVTK_pointData
          module procedure getVTK_pointDataIntS, getVTK_pointDataRealS, &
@@ -196,11 +224,10 @@
 
       logical :: flag
       character(len=strL) :: rLine,stmp
-      character(len=strL) :: startKwrd,stopKwrd
       character(len=strL), dimension(maxToks) :: tokenList
       character :: c
       integer(IK) :: itok,ntoks,slen,iPos
-      integer(IK) :: rank,maxRank
+      integer(IK) :: maxRank
       integer(IK) :: pcStPos,pcEndPos
 
       type dataArrType
@@ -225,20 +252,40 @@
          type(dataArrType), dimension(:), allocatable :: dataArr
       end type pieceAttType
 
+      type vtkPcElmType
+         private
+         integer(IK) :: nPoints
+         integer(IK) :: nCells
+         integer(IK) :: nVerts
+         integer(IK) :: nLines
+         integer(IK) :: nStrips
+         integer(IK) :: nPolys
+         integer(IK) :: extent(6)
+      end type vtkPcElmType
+
+      type vtkDataType
+         private
+         character(len=strL) :: str
+         integer(IK) :: extent(6)
+         real(RK) :: origin(3)
+         real(RK) :: spacng(3)
+      end type vtkDataType
+
       type vtkXMLType
          private
          logical :: isBinApp
          character(len=strL) :: fileName
          character(len=strL) :: dataFormat
          character(len=strL) :: dataEncdng
-         character(len=strL) :: vtkPcType
          integer(IK) :: fid
          integer(IK) :: stAppendPos
          integer(IK) :: endAppendPos
          integer(IK) :: offsets(100)
 
          character(len=strL), dimension(nVTKElms)   :: vtkElms
-         integer(IK), dimension(nPieceElms) :: pieceElms
+
+         type(vtkDataType)  :: dataType
+         type(vtkPcElmType) :: pcElms
          type(pieceAttType), dimension(nPieceAtts) :: pcAtt
       end type vtkXMLType
 
@@ -255,18 +302,17 @@
          istat = 0
          inquire(file=trim(fName), exist=flag)
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: File "//trim(fName)//" does not exist"
+            write(stdout,ftab4) "ERROR: File "//trim(fName)// &
+     &         " does not exist"
             istat=-1; return
          end if
 
          slen = len(trim(fName))
          select case (fName(slen-2:slen))
-         case ("vtu","vtp")
+         case ("vtu","vtp","vti")
          case default
-            write(stdout,ftab4) &
-               "ERROR: unknown file extension &
-               &(can only be vtu or vtp)"
+            write(stdout,ftab4) "ERROR: unknown file extension "//&
+     &         "(can only be vtu or vtp or vti)"
             istat=-1; return
          end select
 
@@ -368,12 +414,26 @@
          vtk%isBinApp        = .false.
          vtk%dataFormat      = ""
          vtk%dataEncdng      = ""
-         vtk%vtkPcType       = ""
+         vtk%dataType%str    = ""
          vtk%stAppendPos     = 0
          vtk%endAppendPos    = 0
          vtk%offsets(:)      = 0
+
          vtk%vtkElms(:)      = ""
-         vtk%pieceElms(:)    = 0
+
+         vtk%dataType%str    = ""
+         vtk%dataType%extent = 0
+         vtk%dataType%origin = 0.0_RK
+         vtk%dataType%spacng = 0.0_RK
+
+         vtk%pcElms%nPoints  = 0
+         vtk%pcElms%nCells   = 0
+         vtk%pcElms%nVerts   = 0
+         vtk%pcElms%nLines   = 0
+         vtk%pcElms%nStrips  = 0
+         vtk%pcElms%nPolys   = 0
+         vtk%pcElms%extent   = 0
+
          do iatt=1, nPieceAtts
             vtk%pcAtt(iatt)%pName  = ""
             vtk%pcAtt(iatt)%ptClField(:) = ""
@@ -486,34 +546,131 @@
             vtk%vtkElms(itok) = trim(stmp)
          end do
 
-         do itok=1, nPieceTyps
-            if ( trim(vtk%vtkElms(1)).eq.trim(libVTKPcTyps(itok)) ) exit
-         end do
-         if ( itok.le.3 ) then
-            write(stdout,ftab4) &
-               "ERROR: unknown piece type"
-            write(stdout,ftab4) &
-               "Piece <"//trim(tokenList(1))//'>'
-            write(stdout,ftab4) &
-               "Piece can be <UnstructuredGrid> or <PolyData> only"
-            istat=-1; return
-         end if
-         vtk%vtkPcType = libVTKPcTyps(itok)
+         select case (trim(vtk%vtkElms(1)))
+         case ("ImageData")
+            vtk%dataType%str = libVTKDataTyps(1)
+            call loadVTKDataAtts(vtk,istat)
+
+         case ("RectilinearGrid")
+            vtk%dataType%str = libVTKDataTyps(2)
+            call loadVTKDataAtts(vtk,istat)
+
+         case ("StructuredGrid")
+            vtk%dataType%str = libVTKDataTyps(3)
+            call loadVTKDataAtts(vtk,istat)
+
+         case ("PolyData")
+            vtk%dataType%str = libVTKDataTyps(4)
+
+         case ("UnstructuredGrid")
+            vtk%dataType%str = libVTKDataTyps(5)
+         end select
+
          if ( debug .and. len(trim(vtk%vtkElms(5))).gt.0 ) &
             write(stdout,ftab2) &
                "Data compression: "//trim(vtk%vtkElms(5))
 
          ! Piece elements parser !
+         call loadVTKPieceElms(vtk,istat)
+
+         return
+         end subroutine parseVTKKernel
+
+         !==========================================
+
+         subroutine loadVTKDataAtts(vtk,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(inout) :: istat
+         integer :: i
+
+         rLine = ""
+         stmp = "<"//trim(vtk%dataType%str)
+         tokenList(:) = ""
+
+         call findKwrdXML(vtk,stmp,iPos,rLine,istat)
+         if ( istat.lt.0 ) return
+         if ( debug ) write(stdout,ftab2) trim(rLine)
+         call parseString(rLine,tokenList,ntoks)
+
+         stmp = ""
+         do i=1, 6
+            stmp = getTokenValue(tokenList,ntoks,libVTKDataAtts(1), i)
+            slen = len(trim(stmp))
+            if (slen.gt.0) then
+               read(stmp(1:slen),*) vtk%dataType%extent(i)
+            end if
+         end do
+
+         if (trim(vtk%dataType%str) .eq. libVTKDataTyps(2) .or. &
+             trim(vtk%dataType%str) .eq. libVTKDataTyps(3)) return
+
+         stmp = ""
+         do i=1, 3
+            stmp = getTokenValue(tokenList,ntoks,libVTKDataAtts(2), i)
+            slen = len(trim(stmp))
+            if (slen.gt.0) then
+               read(stmp(1:slen),*) vtk%dataType%origin(i)
+            end if
+         end do
+
+         stmp = ""
+         do i=1, 3
+            stmp = getTokenValue(tokenList,ntoks,libVTKDataAtts(3), i)
+            slen = len(trim(stmp))
+            if (slen.gt.0) then
+               read(stmp(1:slen),*) vtk%dataType%spacng(i)
+            end if
+         end do
+
+         return
+         end subroutine loadVTKDataAtts
+
+         !==========================================
+
+         subroutine loadVTKPieceElms(vtk,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(inout) :: istat
+         integer :: i
+
+         rLine = ""
+         stmp = ""
+         tokenList(:) = ""
+
          call findKwrdXML(vtk,"<Piece",iPos,rLine,istat)
          if ( istat.lt.0 ) return
          if ( debug ) write(stdout,ftab2) trim(rLine)
          call parseString(rLine,tokenList,ntoks)
 
          do itok=1, nPieceElms
-            stmp = getTokenValue(tokenList,ntoks,libPieceElms(itok))
-            slen = len(trim(stmp))
-            if ( slen.gt.0 ) then
-               read(stmp(1:slen),*) vtk%pieceElms(itok)
+            if (itok .lt. 7) then
+               stmp = getTokenValue(tokenList,ntoks,libPieceElms(itok))
+               slen = len(trim(stmp))
+               if ( slen.gt.0 ) then
+                  select case (trim(libPieceElms(itok)))
+                  case ("NumberOfPoints")
+                     read(stmp(1:slen),*) vtk%pcElms%nPoints
+                  case ("NumberOfCells")
+                     read(stmp(1:slen),*) vtk%pcElms%nCells
+                  case ("NumberOfVerts")
+                     read(stmp(1:slen),*) vtk%pcElms%nVerts
+                  case ("NumberOfLines")
+                     read(stmp(1:slen),*) vtk%pcElms%nLines
+                  case ("NumberOfStrips")
+                     read(stmp(1:slen),*) vtk%pcElms%nStrips
+                  case ("NumberOfPolys")
+                     read(stmp(1:slen),*) vtk%pcElms%nPolys
+                  end select
+               end if
+            else
+               do i=1, 6
+                  stmp = getTokenValue(tokenList,ntoks,libPieceElms(itok),i)
+                  slen = len(trim(stmp))
+                  if ( slen.gt.0 ) then
+                     read(stmp(1:slen),*) vtk%pcElms%extent(i)
+                  end if
+               end do
             end if
          end do
 
@@ -526,14 +683,14 @@
             pcEndPos = iPos - 1
          end if
 
-         call readPieceAttributes(vtk,istat)
+         call loadPieceAttributes(vtk,istat)
 
          return
-         end subroutine parseVTKKernel
+         end subroutine loadVTKPieceElms
 
          !==========================================
 
-         subroutine readPieceAttributes(vtk,istat)
+         subroutine loadPieceAttributes(vtk,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
          integer(IK), intent(inout) :: istat
@@ -690,12 +847,12 @@
                      vtk%pcAtt(iatt)%dataArr(i)%stPos
                end if
 
-            end do ! idata
+            end do ! i
          end do ! outer loop over Piece atts !
          maxRank = cntr
 
          return
-         end subroutine readPieceAttributes
+         end subroutine loadPieceAttributes
 
          !==========================================
 
@@ -706,7 +863,7 @@
          integer(IK) :: iatt,i,rank
 
          if ( debug ) write(stdout,ftab2) &
-            "Piece Type: "//trim(vtk%vtkPcType)
+            "VTK Data Type: "//trim(vtk%dataType%str)
          do iatt=1, nPieceAtts
             if ( vtk%pcAtt(iatt)%n.lt.1 .or. &
             .not.allocated(vtk%pcAtt(iatt)%dataArr) ) cycle
@@ -754,7 +911,7 @@
                   "DataArray name: "// &
                   trim(vtk%pcAtt(iatt)%dataArr(i)%dName)
 
-               call vtkXMLDataParser(vtk,vtk%pcAtt(iatt)%dataArr(i),iatt,i,istat)
+               call vtkXMLDataParser(vtk,vtk%pcAtt(iatt)%dataArr(i),iatt,istat)
                if ( istat.lt.0 ) return
             end do
             if (debug) write(stdout,ftab1) repeat("*",76)
@@ -769,11 +926,11 @@
 
          !==========================================
 
-         subroutine vtkXMLDataParser(vtk,dataArr,iatt,idata,istat)
+         subroutine vtkXMLDataParser(vtk,dataArr,iatt,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
          type(dataArrType), intent(inout), target :: dataArr
-         integer(IK), intent(in) :: iatt,idata
+         integer(IK), intent(in) :: iatt
          integer(IK), intent(inout) :: istat
          type(dataArrType), pointer :: dPtr
 
@@ -790,7 +947,7 @@
          if ( debug ) then
             write(stdout,ftab1) repeat("*",76)
             write(stdout,ftab3) &
-               "Piece Type: "//trim(vtk%vtkPcType)
+               "Piece Type: "//trim(vtk%dataType%str)
             write(stdout,ftab3) &
                "Piece Attribute: "//trim(vtk%pcAtt(iatt)%pName)
             write(stdout,ftab3) &
@@ -813,13 +970,27 @@
                "DataArray nbytes:   "//trim(STR(dPtr%nbytes))
          end if
 
-         select case (trim(vtk%vtkPcType))
+         select case (trim(vtk%dataType%str))
+         case ("ImageData")
+            call vtkParseImageData(vtk,dataArr,iatt,istat)
+            if ( istat.lt.0 ) return
+
+         case ("RectilinearGrid")
+            write(stdout,ftab4) "ERROR: Rectilinear grid parser is "//&
+     &         "not available yet.."
+!            call vtkParseRectGrid(vtk,dataArr,iatt,istat)
+            if ( istat.lt.0 ) return
+
+         case ("StructuredGrid")
+            call vtkParseStrucGrid(vtk,dataArr,iatt,istat)
+            if ( istat.lt.0 ) return
+
          case ("UnstructuredGrid")
-            call vtkParseUnstrucGrid(vtk,dataArr,iatt,idata,istat)
+            call vtkParseUnstrucGrid(vtk,dataArr,iatt,istat)
             if ( istat.lt.0 ) return
 
          case ("PolyData")
-            call vtkParsePolyData(vtk,dataArr,iatt,idata,istat)
+            call vtkParsePolyData(vtk,dataArr,iatt,istat)
             if ( istat.lt.0 ) return
 
          end select
@@ -844,19 +1015,162 @@
 
          !==========================================
 
-         subroutine vtkParseUnstrucGrid(vtk,dataArr,iatt,idata,istat)
+         subroutine vtkParseImageData(vtk,dataArr,iatt,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
          type(dataArrType), intent(inout), target :: dataArr
-         integer(IK), intent(in) :: iatt,idata
+         integer(IK), intent(in) :: iatt
          integer(IK), intent(inout) :: istat
          type(dataArrType), pointer :: dPtr
          integer(IK) :: nPoints,nCells
 
          dPtr => dataArr
 
-         nPoints = vtk%pieceElms(1)
-         nCells  = vtk%pieceElms(2)
+         dPtr%isInt = .false.
+         call selectDataType(dPtr%dType,dPtr%ikind,dPtr%isInt,istat)
+         if ( istat.lt.0 ) return
+
+         nPoints = (vtk%pcElms%extent(2)-vtk%pcElms%extent(1)+1) * &
+                   (vtk%pcElms%extent(4)-vtk%pcElms%extent(3)+1) * &
+                   (vtk%pcElms%extent(6)-vtk%pcElms%extent(5)+1)
+
+         nCells  = (vtk%pcElms%extent(2)-vtk%pcElms%extent(1)) * &
+                   (vtk%pcElms%extent(4)-vtk%pcElms%extent(3)) * &
+                   (vtk%pcElms%extent(6)-vtk%pcElms%extent(5))
+
+         select case (trim(vtk%pcAtt(iatt)%pName))
+         case ("PointData")
+            if ( nPoints.gt.0 .and. dPtr%nComps.eq.0 ) then
+               dPtr%nComps = getNumComps(vtk,dataArr,nPoints)
+               if ( .not.vtk%isBinApp ) dPtr%nComps = 1
+            end if
+            dPtr%nVals = nPoints
+            dPtr%nElms = nPoints * dPtr%nComps
+            if ( debug ) then
+               write(stdout,ftab4) &
+                  "nPoints "// trim(STR(dPtr%nVals)) //&
+                  "; nComps "// trim(STR(dPtr%nComps)) //&
+                  "; nElems "// trim(STR(dPtr%nElms))
+            end if
+
+         case ("CellData")
+            if ( nCells.gt.0 .and. dPtr%nComps.eq.0 ) then
+               dPtr%nComps = getNumComps(vtk,dataArr,nCells)
+               if ( .not.vtk%isBinApp ) dPtr%nComps = 1
+            end if
+            dPtr%nVals = nCells
+            dPtr%nElms = nCells * dPtr%nComps
+            if ( debug ) then
+               write(stdout,ftab4) &
+                  "nCells "// trim(STR(dPtr%nVals)) //&
+                  "; nComps "// trim(STR(dPtr%nComps)) //&
+                  "; nElems "// trim(STR(dPtr%nElms))
+            end if
+
+         end select
+
+         end subroutine vtkParseImageData
+
+         !==========================================
+
+!         subroutine vtkParseRectGrid(vtk,dataArr,iatt,istat)
+!         implicit none
+!         type(vtkXMLType), intent(inout) :: vtk
+!         type(dataArrType), intent(inout), target :: dataArr
+!         integer(IK), intent(in) :: iatt
+!         integer(IK), intent(inout) :: istat
+
+!         end subroutine vtkParseRectGrid
+
+         !==========================================
+
+         subroutine vtkParseStrucGrid(vtk,dataArr,iatt,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         type(dataArrType), intent(inout), target :: dataArr
+         integer(IK), intent(in) :: iatt
+         integer(IK), intent(inout) :: istat
+         type(dataArrType), pointer :: dPtr
+         integer(IK) :: nPoints,nCells
+
+         dPtr => dataArr
+
+         dPtr%isInt = .false.
+         call selectDataType(dPtr%dType,dPtr%ikind,dPtr%isInt,istat)
+         if ( istat.lt.0 ) return
+
+         nPoints = (vtk%pcElms%extent(2)-vtk%pcElms%extent(1)+1) * &
+                   (vtk%pcElms%extent(4)-vtk%pcElms%extent(3)+1) * &
+                   (vtk%pcElms%extent(6)-vtk%pcElms%extent(5)+1)
+
+         nCells  = (vtk%pcElms%extent(2)-vtk%pcElms%extent(1)) * &
+                   (vtk%pcElms%extent(4)-vtk%pcElms%extent(3)) * &
+                   (vtk%pcElms%extent(6)-vtk%pcElms%extent(5))
+
+         select case (trim(vtk%pcAtt(iatt)%pName))
+         case ("PointData")
+            if ( nPoints.gt.0 .and. dPtr%nComps.eq.0 ) then
+               dPtr%nComps = getNumComps(vtk,dataArr,nPoints)
+               if ( .not.vtk%isBinApp ) dPtr%nComps = 1
+            end if
+            dPtr%nVals = nPoints
+            dPtr%nElms = nPoints * dPtr%nComps
+            if ( debug ) then
+               write(stdout,ftab4) &
+                  "nPoints "// trim(STR(dPtr%nVals)) //&
+                  "; nComps "// trim(STR(dPtr%nComps)) //&
+                  "; nElems "// trim(STR(dPtr%nElms))
+            end if
+
+         case ("CellData")
+            if ( nCells.gt.0 .and. dPtr%nComps.eq.0 ) then
+               dPtr%nComps = getNumComps(vtk,dataArr,nCells)
+               if ( .not.vtk%isBinApp ) dPtr%nComps = 1
+            end if
+            dPtr%nVals = nCells
+            dPtr%nElms = nCells * dPtr%nComps
+            if ( debug ) then
+               write(stdout,ftab4) &
+                  "nCells "// trim(STR(dPtr%nVals)) //&
+                  "; nComps "// trim(STR(dPtr%nComps)) //&
+                  "; nElems "// trim(STR(dPtr%nElms))
+            end if
+
+         case ("Points")
+            if ( dPtr%nComps.ne.3 ) then
+               write(stdout,ftab4) "WARNING: Element "// &
+     &            "<NumberOfComponents> in <Points> attribute < 3"
+            end if
+            if ( nPoints.gt.0 .and. dPtr%nComps.eq.0 ) &
+               dPtr%nComps = getNumComps(vtk,dataArr,nPoints)
+            dPtr%nVals = nPoints
+            dPtr%nElms = nPoints * dPtr%nComps
+            if ( debug ) then
+               write(stdout,ftab4) &
+                  "nPoints "// trim(STR(dPtr%nVals)) //&
+                  "; nComps "// trim(STR(dPtr%nComps)) //&
+                  "; nElems "// trim(STR(dPtr%nElms))
+            end if
+
+         end select
+
+         end subroutine vtkParseStrucGrid
+
+         !==========================================
+
+         subroutine vtkParseUnstrucGrid(vtk,dataArr,iatt,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         type(dataArrType), intent(inout), target :: dataArr
+         integer(IK), intent(in) :: iatt
+         integer(IK), intent(inout) :: istat
+         type(dataArrType), pointer :: dPtr
+         integer(IK) :: nPoints,nCells
+
+         dPtr => dataArr
+
+         nPoints = vtk%pcElms%nPoints
+         nCells  = vtk%pcElms%nCells
          if ( nPoints.lt.1 ) then
             write(stdout,ftab4) &
             "ERROR: VTK Piece element NumberOfPoints not defined.."
@@ -904,9 +1218,8 @@
 
          case ("Points")
             if ( dPtr%nComps.ne.3 ) then
-               write(stdout,ftab4) &
-               "WARNING: Element <NumberOfComponents> in <Points> &
-                &attribute < 3"
+               write(stdout,ftab4) "WARNING: Element "// &
+     &            "<NumberOfComponents> in <Points> attribute < 3"
             end if
             if ( nPoints.gt.0 .and. dPtr%nComps.eq.0 ) &
                dPtr%nComps = getNumComps(vtk,dataArr,nPoints)
@@ -939,22 +1252,22 @@
 
          !==========================================
 
-         subroutine vtkParsePolyData(vtk,dataArr,iatt,idata,istat)
+         subroutine vtkParsePolyData(vtk,dataArr,iatt,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
          type(dataArrType), intent(inout), target :: dataArr
-         integer(IK), intent(in) :: iatt,idata
+         integer(IK), intent(in) :: iatt
          integer(IK), intent(inout) :: istat
          type(dataArrType), pointer :: dPtr
          integer(IK) :: nPoints,nVerts,nLines,nStrips,nPolys
 
          dPtr => dataArr
 
-         nPoints = vtk%pieceElms(1)
-         nVerts  = vtk%pieceElms(3)
-         nLines  = vtk%pieceElms(4)
-         nStrips = vtk%pieceElms(5)
-         nPolys  = vtk%pieceElms(6)
+         nPoints = vtk%pcElms%nPoints
+         nVerts  = vtk%pcElms%nVerts
+         nLines  = vtk%pcElms%nLines
+         nStrips = vtk%pcElms%nStrips
+         nPolys  = vtk%pcElms%nPolys
 
          if ( nPoints.lt.1 ) then
             write(stdout,ftab4) &
@@ -1006,9 +1319,8 @@
                if ( .not.vtk%isBinApp ) dPtr%nComps = 1
             end if
             if ( dPtr%nComps.ne.3 ) then
-               write(stdout,ftab4) &
-               "WARNING: Element <NumberOfComponents> in <Points> &
-                &attribute < 3"
+               write(stdout,ftab4) "WARNING: Element "// &
+     &            "<NumberOfComponents> in <Points> attribute < 3"
             end if
             dPtr%nVals = nPoints
             dPtr%nElms = nPoints * dPtr%nComps
@@ -1186,8 +1498,8 @@
             case(IK8)
                call transferBits(p2,np2,int(ikind,kind=IK8),dPtr%iarr,dPtr%nelms)
                if ( debug ) write(stdout,ftab4) &
-                  "WARNING: Typecasting from INT64 to INT32 &
-                  &could lead to errors.."
+                  "WARNING: Typecasting from INT64 to INT32 "// &
+                  "could lead to errors.."
             end select
          else
             allocate(dPtr%darr(dPtr%nelms))
@@ -1409,7 +1721,7 @@
          integer(IK1), intent(out) :: bits(:)
 
          integer(IK1) :: sixb(1:4)
-         integer(IK) :: c,e,Nb,i
+         integer(IK) :: c,e,Nb
 
          Nb = size(bits,dim=1,kind=IK)
          e = 1_IK
@@ -1684,9 +1996,8 @@
          type(vtkXMLType), intent(in) :: vtk
          integer(IK), intent(inout) :: istat
          integer(IK), intent(out) :: nn
-         integer(IK) :: i
 
-         nn = vtk%pieceElms(1)
+         nn = vtk%pcElms%nPoints
          if ( nn.eq.0 ) then
             write(stdout,ftab4) &
                "ERROR: could not find POINTS attribute"
@@ -1703,10 +2014,10 @@
          integer(IK), intent(inout) :: istat
          integer(IK), intent(out) :: ne
 
-         if ( vtk%pieceElms(2).gt.0 ) then
-            ne = vtk%pieceElms(2)
-         else if ( vtk%pieceElms(6).gt.0 ) then
-            ne = vtk%pieceElms(6)
+         if ( vtk%pcElms%nCells.gt.0 ) then
+            ne = vtk%pcElms%nCells
+         else if ( vtk%pcElms%nPolys.gt.0 ) then
+            ne = vtk%pcElms%nPolys
          end if
 
          if ( ne.eq.0 ) then
@@ -1726,9 +2037,9 @@
          integer(IK), intent(out) :: eNoN
          integer(IK) :: iatt,i,itmp
 
-         if ( vtk%pieceElms(2).gt.0 ) then   ! nCells !
+         if ( vtk%pcElms%nCells.gt.0 ) then   ! nCells !
             iatt = 9
-         else if (vtk%pieceElms(6).gt.0 ) then ! nPolys !
+         else if (vtk%pcElms%nPolys.gt.0 ) then ! nPolys !
             iatt = 8
          else
             write(stdout,ftab4) &
@@ -1760,67 +2071,6 @@
 
          !==========================================
 
-         subroutine getVTK_elemIEN(vtk,ien,istat)
-         implicit none
-         type(vtkXMLType), intent(inout) :: vtk
-         integer(IK), intent(out) :: ien(:,:)
-         integer(IK), intent(inout) :: istat
-         integer(IK) :: iatt,ne,eNoN,i,j,k,l
-
-         eNoN = size(ien,1)
-         ne   = size(ien,2)
-         if ( vtk%pieceElms(2).gt.0 ) then   ! nCells !
-            iatt = 9
-         else if (vtk%pieceElms(6).gt.0 ) then ! nPolys !
-            iatt = 8
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find CELLS or POLYS attributes"
-            istat=-1; return
-         end if
-
-         do i=1, vtk%pcAtt(iatt)%n
-            if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
-               "connectivity" ) then
-               if ( vtk%pcAtt(iatt)%dataArr(i)%nElms .ne. &
-                   (eNoN*ne) ) then
-                  write(stdout,ftab4) &
-                     "ERROR: mismatch in IEN params.."
-                  write(stdout,ftab4) &
-                     trim(STR(vtk%pcAtt(iatt)%dataArr(i)%nElms))
-                  write(stdout,ftab4) &
-                     trim(STR(eNoN))//" "//trim(STR(ne))
-                  istat=-1; return
-               end if
-               if ( .not.allocated(vtk%pcAtt(iatt)%dataArr(i)%iarr) ) then
-                  write(stdout,ftab4) &
-                     "ERROR: connectivity array unallocated.."
-                  istat=-1; return
-               end if
-
-               l = 0
-               do j=1, ne
-                  do k=1, eNoN
-                     l = l+1
-                     ien(k,j) = &
-                        vtk%pcAtt(iatt)%dataArr(i)%iarr(l)
-                  end do
-               end do
-               exit
-            end if
-         end do
-
-         if ( i.gt.vtk%pcAtt(iatt)%n ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find connectivity in Cells or &
-               &Polys attributes"
-            istat=-1; return
-         end if
-
-         end subroutine getVTK_elemIEN
-
-         !==========================================
-
          subroutine getVTK_pointCoords(vtk,x,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
@@ -1830,7 +2080,7 @@
 
          nd = size(x,1)
          nn = size(x,2)
-         if ( vtk%pieceElms(1).eq.nn ) then   ! nPoints !
+         if ( vtk%pcElms%nPoints.eq.nn ) then   ! nPoints !
             iatt = 3
          else
             write(stdout,ftab4) &
@@ -1873,6 +2123,149 @@
 
          !==========================================
 
+         subroutine getVTK_elemIEN(vtk,ien,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(out) :: ien(:,:)
+         integer(IK), intent(inout) :: istat
+         integer(IK) :: iatt,ne,eNoN,i,j,k,l
+
+         eNoN = size(ien,1)
+         ne   = size(ien,2)
+         if ( vtk%pcElms%nCells.gt.0 ) then   ! nCells !
+            iatt = 9
+         else if (vtk%pcElms%nPolys.gt.0 ) then ! nPolys !
+            iatt = 8
+         else
+            write(stdout,ftab4) &
+               "ERROR: could not find CELLS or POLYS attributes"
+            istat=-1; return
+         end if
+
+         do i=1, vtk%pcAtt(iatt)%n
+            if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
+               "connectivity" ) then
+               if ( vtk%pcAtt(iatt)%dataArr(i)%nElms .ne. &
+                   (eNoN*ne) ) then
+                  write(stdout,ftab4) &
+                     "ERROR: mismatch in IEN params.."
+                  write(stdout,ftab4) &
+                     trim(STR(vtk%pcAtt(iatt)%dataArr(i)%nElms))
+                  write(stdout,ftab4) &
+                     trim(STR(eNoN))//" "//trim(STR(ne))
+                  istat=-1; return
+               end if
+               if ( .not.allocated(vtk%pcAtt(iatt)%dataArr(i)%iarr) ) then
+                  write(stdout,ftab4) &
+                     "ERROR: connectivity array unallocated.."
+                  istat=-1; return
+               end if
+
+               l = 0
+               do j=1, ne
+                  do k=1, eNoN
+                     l = l+1
+                     ien(k,j) = &
+                        vtk%pcAtt(iatt)%dataArr(i)%iarr(l)
+                  end do
+               end do
+               exit
+            end if
+         end do
+
+         if ( i.gt.vtk%pcAtt(iatt)%n ) then
+            write(stdout,ftab4) &
+               "ERROR: could not find connectivity in "// &
+               "Cells or Polys attributes"
+            istat=-1; return
+         end if
+
+         end subroutine getVTK_elemIEN
+
+         !==========================================
+
+         subroutine getVTK_imageExtent(vtk,iLims,istat)
+         implicit none
+         type(vtkXMLType), intent(in) :: vtk
+         integer(IK), intent(inout) :: istat
+         integer(IK), intent(out) :: iLims(2,3)
+         integer(IK) :: i
+         logical :: l1
+
+         l1 = .true.
+         do i=1, 6
+            if (vtk%dataType%extent(i) .ne. 0) then
+               l1 = .false.
+               exit
+            end if
+         end do
+         if (l1) then
+            write(stdout,ftab4) &
+               "ERROR: could not find WholeExtent attribute"
+            istat=-1; return
+         end if
+         iLims = reshape(vtk%dataType%extent,(/2,3/))
+
+         return
+         end subroutine getVTK_imageExtent
+
+         !==========================================
+
+         subroutine getVTK_imageOrigin(vtk,orig,istat)
+         implicit none
+         type(vtkXMLType), intent(in) :: vtk
+         integer(IK), intent(inout) :: istat
+         real(RK), intent(out) :: orig(maxNSD)
+
+         istat = 0
+         orig = vtk%dataType%origin
+
+         return
+         end subroutine getVTK_imageOrigin
+
+         !==========================================
+
+         subroutine getVTK_imageSpacing(vtk,dx,istat)
+         implicit none
+         type(vtkXMLType), intent(in) :: vtk
+         integer(IK), intent(inout) :: istat
+         real(RK), intent(out) :: dx(maxNSD)
+
+         istat = 0
+         dx = vtk%dataType%spacng
+
+         return
+         end subroutine getVTK_imageSpacing
+
+         !==========================================
+
+         subroutine getVTK_pieceExtent(vtk,pLims,istat)
+         implicit none
+         type(vtkXMLType), intent(in) :: vtk
+         integer(IK), intent(inout) :: istat
+         integer(IK), intent(out) :: pLims(2,3)
+         integer(IK) :: i
+         logical :: l1
+
+         l1 = .true.
+         do i=1, 6
+            if (vtk%pcElms%extent(i) .ne. 0) then
+               l1 = .false.
+               exit
+            end if
+         end do
+         if (l1) then
+            write(stdout,ftab4) &
+               "ERROR: could not find WholeExtent attribute"
+            istat=-1; return
+         end if
+         pLims = reshape(vtk%pcElms%extent,(/2,3/))
+
+         return
+         end subroutine getVTK_pieceExtent
+
+         !==========================================
+
          subroutine getVTK_pointDataIntS(vtk,kwrd,u,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
@@ -1882,15 +2275,8 @@
          integer(IK) :: iatt,i,n
          logical :: flag
 
-         n = size(u)
-         if ( vtk%pieceElms(1).gt.0 ) then   ! nPoints !
-            iatt = 1
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find POINTS attribute to read &
-               &PointData"
-            istat=-1; return
-         end if
+         iatt = 1
+         n    = size(u)
 
          flag = .false.
          do i=1, vtk%pcAtt(iatt)%n
@@ -1919,8 +2305,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in PointData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in PointData attribute"
             istat=-1; return
          end if
 
@@ -1937,20 +2323,12 @@
          integer(IK) :: iatt,i,j,k,m,n
          logical :: flag
 
-         m = size(u,1)
+         iatt = 1
+         m    = size(u,1)
+         n    = size(u,2)
          if ( m.eq.1 ) then
             call getVTK_pointDataIntS(vtk,kwrd,u(1,:),istat)
             return
-         end if
-
-         n = size(u,2)
-         if ( vtk%pieceElms(1).gt.0 ) then   ! nPoints !
-            iatt = 1
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find POINTS attribute to read &
-               &PointData"
-            istat=-1; return
          end if
 
          flag = .false.
@@ -1987,8 +2365,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in PointData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in PointData attribute"
             istat=-1; return
          end if
 
@@ -2005,15 +2383,8 @@
          integer(IK) :: iatt,i,n
          logical :: flag
 
-         n = size(u)
-         if ( vtk%pieceElms(1).gt.0 ) then   ! nPoints !
-            iatt = 1
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find POINTS attribute to read &
-               &PointData"
-            istat=-1; return
-         end if
+         iatt = 1
+         n    = size(u)
 
          flag = .false.
          do i=1, vtk%pcAtt(iatt)%n
@@ -2041,8 +2412,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in PointData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in PointData attribute"
             istat=-1; return
          end if
 
@@ -2059,20 +2430,12 @@
          integer(IK) :: iatt,i,j,k,m,n
          logical :: flag
 
-         m = size(u,1)
+         iatt = 1
+         m    = size(u,1)
+         n    = size(u,2)
          if ( m.eq.1 ) then
             call getVTK_pointDataRealS(vtk,kwrd,u(1,:),istat)
             return
-         end if
-
-         n = size(u,2)
-         if ( vtk%pieceElms(1).gt.0 ) then   ! nPoints !
-            iatt = 1
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find POINTS attribute to read &
-               &PointData"
-            istat=-1; return
          end if
 
          flag = .false.
@@ -2109,8 +2472,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in PointData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in PointData attribute"
             istat=-1; return
          end if
 
@@ -2127,15 +2490,8 @@
          integer(IK) :: iatt,i,n
          logical :: flag
 
-         n = size(u)
-         if ( vtk%pieceElms(2).gt.0 .or. vtk%pieceElms(6).gt.0 ) then
-            iatt = 2
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find either CELLS or POLYS &
-               &attributes to read CellData"
-            istat=-1; return
-         end if
+         iatt = 2
+         n    = size(u)
 
          do i=1, vtk%pcAtt(iatt)%n
             if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
@@ -2163,8 +2519,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in CellData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in CellData attribute"
             istat=-1; return
          end if
 
@@ -2181,22 +2537,15 @@
          integer(IK) :: iatt,i,j,k,m,n
          logical :: flag
 
-         m = size(u,1)
+         iatt = 2
+         m    = size(u,1)
+         n    = size(u,2)
          if ( m.eq.1 ) then
             call getVTK_elemDataIntS(vtk,kwrd,u(1,:),istat)
             return
          end if
 
-         n = size(u,2)
-         if ( vtk%pieceElms(2).gt.0 .or. vtk%pieceElms(6).gt.0 ) then
-            iatt = 2
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find either CELLS or POLYS &
-               &attributes to read CellData"
-            istat=-1; return
-         end if
-
+         flag = .false.
          do i=1, vtk%pcAtt(iatt)%n
             if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
                 trim(kwrd) ) then
@@ -2230,8 +2579,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in CellData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in CellData attribute"
             istat=-1; return
          end if
 
@@ -2248,16 +2597,10 @@
          integer(IK) :: iatt,i,n
          logical :: flag
 
-         n = size(u)
-         if ( vtk%pieceElms(2).gt.0 .or. vtk%pieceElms(6).gt.0 ) then
-            iatt = 2
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find either CELLS or POLYS &
-               &attributes to read CellData"
-            istat=-1; return
-         end if
+         iatt = 2
+         n    = size(u)
 
+         flag = .false.
          do i=1, vtk%pcAtt(iatt)%n
             if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
                 trim(kwrd) ) then
@@ -2284,8 +2627,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in CellData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in CellData attribute"
             istat=-1; return
          end if
 
@@ -2302,22 +2645,15 @@
          integer(IK) :: iatt,i,j,k,m,n
          logical :: flag
 
-         m = size(u,1)
+         iatt = 2
+         m    = size(u,1)
+         n    = size(u,2)
          if ( m.eq.1 ) then
             call getVTK_elemDataRealS(vtk,kwrd,u(1,:),istat)
             return
          end if
 
-         n = size(u,2)
-         if ( vtk%pieceElms(2).gt.0 .or. vtk%pieceElms(6).gt.0 ) then
-            iatt = 2
-         else
-            write(stdout,ftab4) &
-               "ERROR: could not find either CELLS or POLYS &
-               &attributes to read CellData"
-            istat=-1; return
-         end if
-
+         flag = .false.
          do i=1, vtk%pcAtt(iatt)%n
             if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
                 trim(kwrd) ) then
@@ -2351,8 +2687,8 @@
 
          if ( .not.flag ) then
             write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)//"> &
-               &in CellData attribute"
+               "ERROR: could not find <"//trim(kwrd)// &
+               "> in CellData attribute"
             istat=-1; return
          end if
 
@@ -2380,24 +2716,35 @@
          slen = len(trim(fName))
          select case (fName(slen-2:slen))
          case ("vtu")
-            vtk%vtkPcType = "UnstructuredGrid"
+            vtk%dataType%str = "UnstructuredGrid"
             call vtkInitUGridWriter(vtk, istat)
          case ("vtp")
-            vtk%vtkPcType = "PolyData"
+            vtk%dataType%str = "PolyData"
             call vtkInitPDataWriter(vtk, istat)
+         case ("vti")
+            vtk%dataType%str    = "ImageData"
+            vtk%dataType%extent = 0
+            vtk%dataType%origin = 0.0_RK
+            vtk%dataType%spacng = 0.0_RK
+            call vtkInitImageWriter(vtk, istat)
          case default
-            write(stdout,ftab4) &
-               "ERROR: unknown file extension &
-               &(can only be vtu or vtp)"
+            write(stdout,ftab4) "ERROR: unknown file extension "//&
+     &         "(can only be vtu or vtp or vti)"
             istat=-1; return
          end select
 
-         vtk%vtkElms(1) = vtk%vtkPcType
+         vtk%vtkElms(1) = vtk%dataType%str
          vtk%vtkElms(2) = "0.1"
          vtk%vtkElms(3) = "LittleEndian"
          vtk%vtkElms(4) = ""
          vtk%vtkElms(5) = "vtkZLibDataCompressor"
-         vtk%pieceElms(:) = 0
+         vtk%pcElms%nPoints  = 0
+         vtk%pcElms%nCells   = 0
+         vtk%pcElms%nVerts   = 0
+         vtk%pcElms%nLines   = 0
+         vtk%pcElms%nStrips  = 0
+         vtk%pcElms%nPolys   = 0
+         vtk%pcElms%extent   = 0
 
          do fid=11, 1024
             inquire(unit=fid, opened=flag)
@@ -2681,20 +3028,39 @@
 
          !==========================================
 
-         subroutine vtkWriteToFile(vtk,istat)
+         subroutine vtkInitImageWriter(vtk,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
          integer, intent(inout) :: istat
-         integer :: fid,i,iatt,ivar,tmpI(100),ios
+         integer :: iatt
+
+         istat = 0
+         do iatt=1, nPieceAtts
+            vtk%pcAtt(iatt)%pName = ""
+            vtk%pcAtt(iatt)%n = 0
+            vtk%pcAtt(iatt)%ptClField(:) = ""
+            vtk%pcAtt(iatt)%ptClFieldName(:) = ""
+         end do
+
+         end subroutine vtkInitImageWriter
+
+         !==========================================
+
+         subroutine vtkWriteToFile(vtk,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(inout) :: istat
+         integer(IK) :: fid,i,iatt,ivar,tmpI(100)
          logical, dimension(nPieceAtts) :: dAttToW
          character c
+         logical l1
 
          if ( debug )write(stdout,ftab1) &
             "<VTK XML Writer> Writing to file ----->  "// &
             trim(vtk%fileName)
 
          istat = 0
-         fid = vtk%fid
+         fid   = vtk%fid
          inquire(unit=10, opened=flag)
          if ( fid.lt.11 .OR. fid.gt.1024 .OR. .not.flag) then
             write(stdout,ftab4) "ERROR: VTK structure not properly "// &
@@ -2740,17 +3106,73 @@
          end do
          write(fid) '>'//newl
 
-         write(fid) '  <'//trim(vtk%vtkPcType)//'>'//newl
-         write(fid) '    <Piece '
-         do i=1, nPieceElms
-            if (vtk%pieceElms(i) .gt. 0) then
-               write(fid) trim(libPieceElms(i))//'="'// &
-                  trim(STR(vtk%pieceElms(i)))//'"    '
-            end if
-         end do
+         write(fid) '  <'//trim(vtk%dataType%str)
+         if (trim(vtk%dataType%str) .eq. "ImageData") then
+            write(fid) ' '//'WholeExtent="'
+            do i=1, 6
+               if (i.ne.1) write(fid) ' '
+               write(fid) trim(STR(vtk%dataType%extent(i)))
+            end do
+            write(fid) '" '//'Origin="'
+            do i=1, 3
+               if (i.ne.1) write(fid) ' '
+               write(fid) trim(STR(vtk%dataType%origin(i)))
+            end do
+            write(fid) '" '//'Spacing="'
+            do i=1, 3
+               if (i.ne.1) write(fid) ' '
+               write(fid) trim(STR(vtk%dataType%spacng(i)))
+            end do
+            write(fid) '"'
+         end if
          write(fid) '>'//newl
 
-         select case(trim(vtk%vtkPcType))
+         write(fid) '    <Piece '
+         if (vtk%pcElms%nPoints .gt. 0) then
+            write(fid) trim(libPieceElms(1))//'="'// &
+               trim(STR(vtk%pcElms%nPoints))//'"    '
+         end if
+         if (vtk%pcElms%nCells .gt. 0) then
+            write(fid) trim(libPieceElms(2))//'="'// &
+               trim(STR(vtk%pcElms%nCells))//'"    '
+         end if
+         if (vtk%pcElms%nVerts .gt. 0) then
+            write(fid) trim(libPieceElms(3))//'="'// &
+               trim(STR(vtk%pcElms%nVerts))//'"    '
+         end if
+         if (vtk%pcElms%nLines .gt. 0) then
+            write(fid) trim(libPieceElms(4))//'="'// &
+               trim(STR(vtk%pcElms%nLines))//'"    '
+         end if
+         if (vtk%pcElms%nStrips .gt. 0) then
+            write(fid) trim(libPieceElms(5))//'="'// &
+               trim(STR(vtk%pcElms%nStrips))//'"    '
+         end if
+         if (vtk%pcElms%nPolys .gt. 0) then
+            write(fid) trim(libPieceElms(6))//'="'// &
+               trim(STR(vtk%pcElms%nPolys))//'"    '
+         end if
+         l1 = .false.
+         do i=1, 6
+            if (vtk%pcElms%extent(i) .ne. 0) then
+               l1 = .true.
+               exit
+            end if
+         end do
+         if (l1) then
+            write(fid) trim(libPieceElms(7))//'="'
+            do i=1, 6
+               if (i .eq. 1) then
+                  write(fid) trim(STR(vtk%pcElms%extent(i)))
+               else
+                  write(fid) ' '//trim(STR(vtk%pcElms%extent(i)))
+               end if
+            end do
+            write(fid) '"'
+         end if
+         write(fid) '>'//newl
+
+         select case(trim(vtk%dataType%str))
          case("UnstructuredGrid")
             dAttToW = .false.
             dAttToW(1) = .true.   ! PointData
@@ -2765,9 +3187,15 @@
             dAttToW(9) = .false.  ! Cells
             call vtkWriteDataArr(vtk, dAttToW, istat)
             if (istat .lt. 0) return
+         case("ImageData")
+            dAttToW = .false.
+            dAttToW(1) = .true.   ! PointData
+            dAttToW(2) = .true.   ! CellData
+            call vtkWriteDataArr(vtk, dAttToW, istat)
+            if (istat .lt. 0) return
          end select
          write(fid) '    </Piece>'//newl
-         write(fid) '  </'//trim(vtk%vtkPcType)//'>'//newl
+         write(fid) '  </'//trim(vtk%dataType%str)//'>'//newl
 
          rewind(10)
          do
@@ -2976,7 +3404,7 @@
          nd = size(x,1)
          nn = size(x,2)
 
-         vtk%pieceElms(1) = nn     ! NumberOfPoints
+         vtk%pcElms%nPoints = nn     ! NumberOfPoints
          iatt = 3                  ! Points
 
          vtk%pcAtt(iatt)%n = 1
@@ -3026,7 +3454,7 @@
          end if
 
          allocate(vtk%pcAtt(iatt)%dataArr(i)%darr(vtk%pcAtt(iatt)%dataArr(i)%nElms))
-         vtk%pcAtt(iatt)%dataArr(i)%darr = 0D0
+         vtk%pcAtt(iatt)%dataArr(i)%darr = 0.0_RK
          do j=1, nn
             do k=1, nd
                ind = (j-1)*maxNSD + k
@@ -3052,13 +3480,13 @@
          eNoN = size(ien,1)
          ne   = size(ien,2)
 
-         select case(trim(vtk%vtkPcType))
+         select case(trim(vtk%dataType%str))
          case("UnstructuredGrid")
             iatt = 9
             allocate(ioff(vtk%pcAtt(iatt)%n))
             ioff = 0
-            if ( vtk%pieceElms(2).eq.0 ) then
-               vtk%pieceElms(2) = ne
+            if ( vtk%pcElms%nCells.eq.0 ) then
+               vtk%pcElms%nCells = ne
                vtk%pcAtt(iatt)%dataArr(1)%nVals  = ne*eNoN
                vtk%pcAtt(iatt)%dataArr(2)%nVals  = ne
                vtk%pcAtt(iatt)%dataArr(3)%nVals  = ne
@@ -3068,7 +3496,7 @@
                   allocate(vtk%pcAtt(iatt)%dataArr(i)%iarr(n))
                end do
             else
-               vtk%pieceElms(2) = vtk%pieceElms(2) + ne
+               vtk%pcElms%nCells = vtk%pcElms%nCells + ne
                vtk%pcAtt(iatt)%dataArr(1)%nVals  = ne*eNoN + &
                   vtk%pcAtt(iatt)%dataArr(1)%nVals
                vtk%pcAtt(iatt)%dataArr(2)%nVals  = ne + &
@@ -3094,8 +3522,8 @@
             iatt = 8
             allocate(ioff(vtk%pcAtt(iatt)%n))
             ioff = 0
-            if ( vtk%pieceElms(6).eq.0 ) then
-               vtk%pieceElms(6) = ne
+            if ( vtk%pcElms%nPolys.eq.0 ) then
+               vtk%pcElms%nPolys = ne
                vtk%pcAtt(iatt)%n = 2
                vtk%pcAtt(iatt)%pName = "Polys"
                vtk%pcAtt(iatt)%dataArr(1)%nVals  = ne*eNoN
@@ -3106,7 +3534,7 @@
                   allocate(vtk%pcAtt(iatt)%dataArr(i)%iarr(n))
                end do
             else
-               vtk%pieceElms(6) = vtk%pieceElms(6) + ne
+               vtk%pcElms%nPolys = vtk%pcElms%nPolys + ne
                vtk%pcAtt(iatt)%dataArr(1)%nVals = ne*eNoN + &
                   vtk%pcAtt(iatt)%dataArr(1)%nVals
                vtk%pcAtt(iatt)%dataArr(2)%nVals = ne + &
@@ -3166,6 +3594,94 @@
 
          !==========================================
 
+         subroutine putVTK_numPoints(vtk,nn,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(in) :: nn
+         integer(IK), intent(inout) :: istat
+
+         istat = 0
+         vtk%pcElms%nPoints = nn
+
+         end subroutine putVTK_numPoints
+
+         !==========================================
+
+         subroutine putVTK_numElems(vtk,ne,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(in) :: ne
+         integer(IK), intent(inout) :: istat
+
+         istat = 0
+         select case(trim(vtk%dataType%str))
+         case("UnstructuredGrid")
+            vtk%pcElms%nCells = ne
+
+         case("PolyData")
+            vtk%pcElms%nPolys = ne
+         end select
+
+         end subroutine putVTK_numElems
+
+         !==========================================
+
+         subroutine putVTK_imageExtent(vtk,iLims,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(in) :: iLims(2,3)
+         integer(IK), intent(inout) :: istat
+
+         istat = 0
+         vtk%dataType%extent(:) = reshape(iLims,(/6/))
+
+         return
+         end subroutine putVTK_imageExtent
+
+         !==========================================
+
+         subroutine putVTK_imageOrigin(vtk,orig,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         real(RK), intent(in) :: orig(maxNSD)
+         integer(IK), intent(inout) :: istat
+
+         istat = 0
+         vtk%dataType%origin = orig
+
+         return
+         end subroutine putVTK_imageOrigin
+
+         !==========================================
+
+         subroutine putVTK_imageSpacing(vtk,dx,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         real(RK), intent(in) :: dx(maxNSD)
+         integer(IK), intent(inout) :: istat
+
+         istat = 0
+         vtk%dataType%spacng = dx
+
+         return
+         end subroutine putVTK_imageSpacing
+
+         !==========================================
+
+         subroutine putVTK_pieceExtent(vtk,pLims,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(in) :: pLims(2,3)
+         integer(IK), intent(inout) :: istat
+
+         istat = 0
+         vtk%pcElms%extent = reshape(pLims,(/6/))
+
+         return
+         end subroutine putVTK_pieceExtent
+
+         !==========================================
+
          subroutine putVTK_pointDataIntS(vtk,dName,u,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
@@ -3177,19 +3693,8 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         n = size(u)
-         if ( vtk%pieceElms(1).eq.0 ) then
-            vtk%pieceElms(1) = n
-         else if ( vtk%pieceElms(1).gt.0 .and. &
-                   vtk%pieceElms(1).ne.n ) then
-            write(stdout,ftab4) "ERROR: Inconsistent numPoints "// &
-               "between POINTS attribute and "//trim(dName)
-            istat=-1
-            inquire(unit=10, opened=flag)
-            if (flag) close(10)
-            return
-         end if
-         iatt = 1
+         iatt  = 1
+         n     = size(u)
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3260,7 +3765,6 @@
          vtk%pcAtt(iatt)%dataArr(i)%iarr(:) = u(:)
 
          return
-
          end subroutine putVTK_pointDataIntS
 
          !==========================================
@@ -3276,25 +3780,14 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         m = size(u,1)
+         iatt  = 1
+         m     = size(u,1)
+         n     = size(u,2)
+
          if (m .eq. 1) then
             call putVTK_pointDataIntS(vtk,dName,u(1,:),istat)
             return
          end if
-
-         n = size(u,2)
-         if ( vtk%pieceElms(1).eq.0 ) then
-            vtk%pieceElms(1) = n
-         else if ( vtk%pieceElms(1).gt.0 .and. &
-                   vtk%pieceElms(1).ne.n ) then
-            write(stdout,ftab4) "ERROR: Inconsistent numPoints "// &
-               "between POINTS attribute and "//trim(dName)
-            istat=-1
-            inquire(unit=10, opened=flag)
-            if (flag) close(10)
-            return
-         end if
-         iatt = 1
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3367,13 +3860,12 @@
          vtk%pcAtt(iatt)%dataArr(i)%iarr = 0
          do j=1, n
             do k=1, m
-               ind = (j-1)*maxNSD + k
+               ind = (j-1)*vtk%pcAtt(iatt)%dataArr(i)%nComps + k
                vtk%pcAtt(iatt)%dataArr(i)%iarr(ind) = u(k,j)
             end do
          end do
 
          return
-
          end subroutine putVTK_pointDataIntV
 
          !==========================================
@@ -3389,19 +3881,8 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         n = size(u)
-         if ( vtk%pieceElms(1).eq.0 ) then
-            vtk%pieceElms(1) = n
-         else if ( vtk%pieceElms(1).gt.0 .and. &
-                   vtk%pieceElms(1).ne.n ) then
-            write(stdout,ftab4) "ERROR: Inconsistent numPoints "// &
-               "between POINTS attribute and "//trim(dName)
-            istat=-1
-            inquire(unit=10, opened=flag)
-            if (flag) close(10)
-            return
-         end if
-         iatt = 1
+         iatt  = 1
+         n     = size(u)
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3472,7 +3953,6 @@
          vtk%pcAtt(iatt)%dataArr(i)%darr(:) = u(:)
 
          return
-
          end subroutine putVTK_pointDataRealS
 
          !==========================================
@@ -3488,25 +3968,14 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         m = size(u,1)
+         iatt  = 1
+         m     = size(u,1)
+         n     = size(u,2)
+
          if (m .eq. 1) then
             call putVTK_pointDataRealS(vtk,dName,u(1,:),istat)
             return
          end if
-
-         n = size(u,2)
-         if ( vtk%pieceElms(1).eq.0 ) then
-            vtk%pieceElms(1) = n
-         else if ( vtk%pieceElms(1).gt.0 .and. &
-                   vtk%pieceElms(1).ne.n ) then
-            write(stdout,ftab4) "ERROR: Inconsistent numPoints "// &
-               "between POINTS attribute and "//trim(dName)
-            istat=-1
-            inquire(unit=10, opened=flag)
-            if (flag) close(10)
-            return
-         end if
-         iatt = 1
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3576,16 +4045,15 @@
          end if
 
          allocate(vtk%pcAtt(iatt)%dataArr(i)%darr(vtk%pcAtt(iatt)%dataArr(i)%nElms))
-         vtk%pcAtt(iatt)%dataArr(i)%darr = 0D0
+         vtk%pcAtt(iatt)%dataArr(i)%darr = 0.0_RK
          do j=1, n
             do k=1, m
-               ind = (j-1)*maxNSD + k
+               ind = (j-1)*vtk%pcAtt(iatt)%dataArr(i)%nComps + k
                vtk%pcAtt(iatt)%dataArr(i)%darr(ind) = u(k,j)
             end do
          end do
 
          return
-
          end subroutine putVTK_pointDataRealV
 
          !==========================================
@@ -3601,35 +4069,8 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         n = size(u)
-
-         select case(trim(vtk%vtkPcType))
-         case("UnstructuredGrid")
-            if ( vtk%pieceElms(2).eq.0 ) then
-               vtk%pieceElms(2) = n
-            else if ( vtk%pieceElms(2).gt.0 .and. &
-                      vtk%pieceElms(2).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numCells "// &
-                  "between CELLS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         case("PolyData")
-            if ( vtk%pieceElms(6).eq.0 ) then
-               vtk%pieceElms(6) = n
-            else if ( vtk%pieceElms(6).gt.0 .and. &
-                      vtk%pieceElms(6).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numPolys "// &
-                  "between POLYS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         end select
-         iatt = 2
+         iatt  = 2
+         n     = size(u)
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3716,40 +4157,14 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         m = size(u,1)
+         iatt  = 2
+         m     = size(u,1)
+         n     = size(u,2)
+
          if (m .eq. 1) then
             call putVTK_elemDataIntS(vtk,dName,u(1,:),istat)
             return
          end if
-
-         n = size(u,2)
-         select case(trim(vtk%vtkPcType))
-         case("UnstructuredGrid")
-            if ( vtk%pieceElms(2).eq.0 ) then
-               vtk%pieceElms(2) = n
-            else if ( vtk%pieceElms(2).gt.0 .and. &
-                      vtk%pieceElms(2).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numCells "// &
-                  "between CELLS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         case("PolyData")
-            if ( vtk%pieceElms(6).eq.0 ) then
-               vtk%pieceElms(6) = n
-            else if ( vtk%pieceElms(6).gt.0 .and. &
-                      vtk%pieceElms(6).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numPolys "// &
-                  "between POLYS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         end select
-         iatt = 2
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3822,13 +4237,12 @@
          vtk%pcAtt(iatt)%dataArr(i)%iarr = 0
          do j=1, n
             do k=1, m
-               ind = (j-1)*maxNSD + k
+               ind = (j-1)*vtk%pcAtt(iatt)%dataArr(i)%nComps + k
                vtk%pcAtt(iatt)%dataArr(i)%iarr(ind) = u(k,j)
             end do
          end do
 
          return
-
          end subroutine putVTK_elemDataIntV
 
          !==========================================
@@ -3844,35 +4258,8 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         n = size(u)
-
-         select case(trim(vtk%vtkPcType))
-         case("UnstructuredGrid")
-            if ( vtk%pieceElms(2).eq.0 ) then
-               vtk%pieceElms(2) = n
-            else if ( vtk%pieceElms(2).gt.0 .and. &
-                      vtk%pieceElms(2).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numCells "// &
-                  "between CELLS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         case("PolyData")
-            if ( vtk%pieceElms(6).eq.0 ) then
-               vtk%pieceElms(6) = n
-            else if ( vtk%pieceElms(6).gt.0 .and. &
-                      vtk%pieceElms(6).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numPolys "// &
-                  "between POLYS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         end select
-         iatt = 2
+         iatt  = 2
+         n     = size(u)
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -3943,7 +4330,6 @@
          vtk%pcAtt(iatt)%dataArr(i)%darr(:) = u(:)
 
          return
-
          end subroutine putVTK_elemDataRealS
 
          !==========================================
@@ -3959,40 +4345,13 @@
          type(dataArrType), dimension(:), allocatable :: dArr
 
          istat = 0
-         m = size(u,1)
+         iatt  = 2
+         m     = size(u,1)
+         n     = size(u,2)
          if (m .eq. 1) then
             call putVTK_elemDataRealS(vtk,dName,u(1,:),istat)
             return
          end if
-
-         n = size(u,2)
-         select case(trim(vtk%vtkPcType))
-         case("UnstructuredGrid")
-            if ( vtk%pieceElms(2).eq.0 ) then
-               vtk%pieceElms(2) = n
-            else if ( vtk%pieceElms(2).gt.0 .and. &
-                      vtk%pieceElms(2).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numCells "// &
-                  "between CELLS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         case("PolyData")
-            if ( vtk%pieceElms(6).eq.0 ) then
-               vtk%pieceElms(6) = n
-            else if ( vtk%pieceElms(6).gt.0 .and. &
-                      vtk%pieceElms(6).ne.n ) then
-               write(stdout,ftab4) "ERROR: Inconsistent numPolys "// &
-                  "between POLYS attribute and "//trim(dName)
-               istat=-1
-               inquire(unit=10, opened=flag)
-               if (flag) close(10)
-               return
-            end if
-         end select
-         iatt = 2
 
          if ( allocated(vtk%pcAtt(iatt)%dataArr) ) then
             allocate(dArr(vtk%pcAtt(iatt)%n))
@@ -4062,16 +4421,15 @@
          end if
 
          allocate(vtk%pcAtt(iatt)%dataArr(i)%darr(vtk%pcAtt(iatt)%dataArr(i)%nElms))
-         vtk%pcAtt(iatt)%dataArr(i)%darr = 0D0
+         vtk%pcAtt(iatt)%dataArr(i)%darr = 0.0_RK
          do j=1, n
             do k=1, m
-               ind = (j-1)*maxNSD + k
+               ind = (j-1)*vtk%pcAtt(iatt)%dataArr(i)%nComps + k
                vtk%pcAtt(iatt)%dataArr(i)%darr(ind) = u(k,j)
             end do
          end do
 
          return
-
          end subroutine putVTK_elemDataRealV
 
          !==========================================

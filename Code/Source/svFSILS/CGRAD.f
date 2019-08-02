@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,18 +31,18 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
-!      
+!
 !--------------------------------------------------------------------
 !     Conjugate-gradient algorithm for scaler, vector and Schur
 !     complement cases.
@@ -58,19 +58,19 @@
       REAL(KIND=8), INTENT(IN) :: D(dof,lhs%nnz), G(dof,lhs%nnz),       &
      &   L(lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
- 
+
       INTEGER nNo, mynNo, i
       REAL(KIND=8) errO, err, alpha, eps, time
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
       REAL(KIND=8), ALLOCATABLE :: X(:), P(:), SP(:), DGP(:), GP(:,:),  &
      &   unCondU(:,:)
-      
+
       nNo = lhs%nNo
       mynNo = lhs%mynNo
 
       ALLOCATE(X(nNo), P(nNo), SP(nNo), DGP(nNo), GP(dof,nNo),          &
      &   unCondU(dof,nNo))
- 
+
       time     = FSILS_CPUT()
       ls%suc   = .FALSE.
       ls%iNorm = FSILS_NORMS(mynNo, lhs%commu, R)
@@ -92,9 +92,9 @@
             CALL ADDBCMUL(lhs, BCOP_TYPE_PRE, dof, unCondU, GP)
          END IF
          CALL FSILS_SPARMULVS(lhs, lhs%rowPtr, lhs%colPtr,dof, D,GP,DGP)
-         
+
          CALL FSILS_SPARMULSS(lhs, lhs%rowPtr, lhs%colPtr, L, P, SP)
-       
+
          CALL OMPSUMS(nNo, -1D0, SP, DGP)
          !SP    = SP - DGP
          alpha = errO/FSILS_DOTS(mynNo, lhs%commu, P, SP)
@@ -117,14 +117,14 @@
       ELSE
          ls%dB = 5D0*LOG(err/errO)
       END IF
-      
+
       DEALLOCATE(X, P, SP, DGP, GP)
-      
+
       RETURN
       END SUBROUTINE CGRAD_SCHUR
 
 !====================================================================
-       
+
       SUBROUTINE CGRADS(lhs, ls, K, R)
       
       INCLUDE "FSILS_STD.h"
@@ -133,17 +133,17 @@
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
       REAL(KIND=8), INTENT(IN) :: K(lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
-     
+
       INTEGER nNo, mynNo, i
       REAL(KIND=8) errO, err, alpha, eps
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
       REAL(KIND=8), ALLOCATABLE :: P(:), KP(:), X(:)
-      
+
       nNo = lhs%nNo
       mynNo = lhs%mynNo
 
       ALLOCATE(P(nNo), KP(nNo), X(nNo))
-      
+
       ls%callD = FSILS_CPUT()
       ls%suc   = .FALSE.
       ls%iNorm = FSILS_NORMS(mynNo, lhs%commu, R)
@@ -186,7 +186,7 @@
       END SUBROUTINE CGRADS
 
 !====================================================================
-       
+
       SUBROUTINE CGRADV(lhs, ls, dof, K, R)
       
       INCLUDE "FSILS_STD.h"
@@ -196,17 +196,17 @@
       INTEGER, INTENT(IN) :: dof
       REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
-     
+
       INTEGER nNo, mynNo, i
       REAL(KIND=8) errO, err, alpha, eps
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV
       REAL(KIND=8), ALLOCATABLE :: P(:,:), KP(:,:), X(:,:)
-      
+
       nNo = lhs%nNo
       mynNo = lhs%mynNo
 
       ALLOCATE(P(dof,nNo), KP(dof,nNo), X(dof,nNo))
-      
+
       ls%callD = FSILS_CPUT()
       ls%suc   = .FALSE.
       ls%iNorm = FSILS_NORMV(dof, mynNo, lhs%commu, R)

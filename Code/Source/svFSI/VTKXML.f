@@ -29,20 +29,22 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**********************************************************************
+!--------------------------------------------------------------------
+!
+!     Here data (mesh, solution) input/output is handled interfacing
+!     with fortran-based VTK module.
+!
+!--------------------------------------------------------------------
 
       SUBROUTINE READVTU(lM, fName)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
       USE vtkXMLMod
-
       IMPLICIT NONE
 
-      TYPE(MSHTYPE), INTENT(INOUT) :: lM
-      CHARACTER(LEN=STDL) :: fName
+      TYPE(mshType), INTENT(INOUT) :: lM
+      CHARACTER(LEN=stdL) :: fName
 
       TYPE(vtkXMLType) :: vtu
       INTEGER :: iStat
@@ -62,43 +64,36 @@
       CALL getVTK_nodesPerElem(vtu, lM%eNoN, iStat)
       IF (iStat .LT. 0) err = "VTU file read error (nodes per cell)"
 
-      CALL SELECTELE(lM)
-
-      ALLOCATE(x(nsd,lM%gnNo),tmpX(maxNSD,lM%gnNo))
+      ALLOCATE(lM%x(nsd,lM%gnNo),tmpX(maxNSD,lM%gnNo))
       CALL getVTK_pointCoords(vtu, tmpX, iStat)
       IF (iStat .LT. 0) err = "VTU file read error (coords)"
-      x(:,:) = tmpX(1:nsd,:)
-      deALLOCATE(tmpX)
-      
+      lM%x(:,:) = tmpX(1:nsd,:)
+      DEALLOCATE(tmpX)
+
       ALLOCATE(lM%gIEN(lM%eNoN,lM%gnEl))
       CALL getVTK_elemIEN(vtu, lM%gIEN, iStat)
       IF (iStat .LT. 0) err = "VTU file read error (ien)"
       lM%gIEN = lM%gIEN + 1
-      
-      IF (ichckIEN) CALL CHECKIEN(lM, .FALSE.)
 
       CALL flushVTK(vtu)
-      
+
       RETURN
       END SUBROUTINE READVTU
-
-!**********************************************************************
-
-      SUBROUTINE READVTP(lM, lFa, fName)
-
+!--------------------------------------------------------------------
+      SUBROUTINE READVTP(lFa, fName)
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
       USE vtkXMLMod
-
       IMPLICIT NONE
 
-      TYPE(MSHTYPE), INTENT(INOUT) :: lM
-      TYPE(FACETYPE), INTENT(INOUT) :: lFa
-      CHARACTER(LEN=STDL) :: fName
+      TYPE(faceType), INTENT(INOUT) :: lFa
+      CHARACTER(LEN=stdL) :: fName
 
       TYPE(vtkXMLType) :: vtp
       INTEGER :: iStat, a, e, Ac
+
+      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:)
 
       iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
@@ -114,7 +109,11 @@
       CALL getVTK_nodesPerElem(vtp, lFa%eNoN, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (nodes per cell)"
 
-      CALL SELECTELEB(lM, lFa)
+      ALLOCATE(lFa%x(nsd,lFa%nNo), tmpX(maxNSD,lFa%nNo))
+      CALL getVTK_pointCoords(vtp, tmpX, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (coords)"
+      lFa%x(:,:) = tmpX(1:nsd,:)
+      DEALLOCATE(tmpX)
 
       ALLOCATE(lFa%IEN(lFa%eNoN,lFa%nEl))
       CALL getVTK_elemIEN(vtp, lFa%IEN, iStat)
@@ -122,78 +121,252 @@
 
       ALLOCATE(lFa%gN(lFa%nNo))
       CALL getVTK_pointData(vtp, "GlobalNodeID", lFa%gN, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (point data)"
-
-      DO e=1, lFa%nEl
-         DO a=1, lFa%eNoN
-            Ac = lFa%IEN(a,e)+1
-            Ac = lFa%gN(Ac)
-            lFa%IEN(a,e) = Ac
+      IF (iStat .LT. 0) THEN
+         DEALLOCATE(lFa%gN)
+      ELSE
+         DO e=1, lFa%nEl
+            DO a=1, lFa%eNoN
+               Ac = lFa%IEN(a,e)+1
+               Ac = lFa%gN(Ac)
+               lFa%IEN(a,e) = Ac
+            END DO
          END DO
-      END DO
+      END IF
 
       ALLOCATE(lFa%gE(lFa%nEl))
       CALL getVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (cell data)"
+      IF (iStat .LT. 0) THEN
+         DEALLOCATE(lFa%gE)
+      ELSE
+         lFa%gnEl = lFa%nEl
+         ALLOCATE(lFa%gebc(1+lFa%eNoN,lFa%gnEl))
+         lFa%gebc(1,:) = lFa%gE(:)
+         lFa%gebc(2:1+lFa%eNoN,:) = lFa%IEN(:,:)
+      END IF
 
       CALL flushVTK(vtp)
-      
-      lFa%gnEl = lFa%nEl
-      ALLOCATE(lFa%gebc(1+lFa%eNoN,lFa%gnEl))
-      lFa%gebc(1,:) = lFa%gE(:)
-      lFa%gebc(2:1+lFa%eNoN,:) = lFa%IEN(:,:)
-      
+
       RETURN
       END SUBROUTINE READVTP
+!--------------------------------------------------------------------
+      SUBROUTINE READVTUS(lA, lY, lD, fName)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
 
-!**********************************************************************
+      REAL(KIND=8), INTENT(INOUT) :: lA(tDof,gtnNo), lY(tDof,gtnNo),
+     2   lD(tDof,gtnNo)
+      CHARACTER(LEN=STDL) :: fName
 
+      TYPE(vtkXMLType) :: vtu
+
+      INTEGER :: iStat, iEq, iOut, iM, l, s, e, a, b, Ac, nNo, oGrp
+      CHARACTER(LEN=stdL) :: varName
+      REAL(KIND=8), ALLOCATABLE :: tmpS(:,:), tmpGS(:,:)
+
+      iStat = 0
+      CALL loadVTK(vtu, fName, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error (init)"
+
+      CALL getVTK_numPoints(vtu, nNo, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error (num points)"
+      IF (nNo .NE. SUM(msh(:)%gnNo))
+     2   err = "Incompatible mesh and "//TRIM(fName)
+
+      DO iEq=1, nEq
+         DO iOut=1, eq(iEq)%nOutput
+            IF (.NOT.eq(iEq)%output(iOut)%wtn(1)) CYCLE
+            l = eq(iEq)%output(iOut)%l
+            s = eq(iEq)%s + eq(iEq)%output(iOut)%o
+            e = s + l - 1
+            varName = eq(iEq)%sym//"_"//TRIM(eq(iEq)%output(iOut)%name)
+
+            oGrp = eq(iEq)%output(iOut)%grp
+            SELECT CASE(oGrp)
+            CASE (outGrp_A, outGrp_Y, outGrp_D)
+               IF (l .GT. 1) THEN
+                  ALLOCATE(tmpGS(maxNSD,nNo))
+               ELSE
+                  ALLOCATE(tmpGS(1,nNo))
+               END IF
+               CALL getVTK_pointData(vtu, TRIM(varName), tmpGS, iStat)
+               IF (iStat .LT. 0) err ="VTU file read error (point data)"
+
+               IF (nNo .NE. gtnNo) THEN
+                  IF (l .GT. 1) THEN
+                     ALLOCATE(tmpS(maxNSD,gtnNo))
+                  ELSE
+                     ALLOCATE(tmpS(1,gtnNo))
+                  END IF
+                  IF (.NOT.ALLOCATED(msh(1)%gpN)) err = "Unexpected "//
+     2               "behavior. VTU file read error"
+                  b = 0
+                  DO iM=1, nMsh
+                     DO a=1, msh(iM)%gnNo
+                        b = b + 1
+                        Ac = msh(iM)%gpN(a)
+                        tmpS(:,Ac) = tmpGS(:,b)
+                     END DO
+                  END DO
+                  DEALLOCATE(tmpGS)
+                  ALLOCATE(tmpGS(SIZE(tmpS,1),gtnNo))
+                  tmpGS = tmpS
+                  DEALLOCATE(tmpS)
+               END IF
+            CASE DEFAULT
+               CYCLE
+            END SELECT
+
+            SELECT CASE(oGrp)
+            CASE (outGrp_A)
+               lA(s:e,:) = tmpGS(1:l,:)
+            CASE (outGrp_Y)
+               lY(s:e,:) = tmpGS(1:l,:)
+            CASE (outGrp_D)
+               lD(s:e,:) = tmpGS(1:l,:)
+            END SELECT
+            DEALLOCATE(tmpGS)
+         END DO
+      END DO
+
+      CALL flushVTK(vtu)
+
+      RETURN
+      END SUBROUTINE READVTUS
+!--------------------------------------------------------------------
+!     Read a particular point dataset from a vtu file. Point data will
+!     be read and stored in lM%x array
+      SUBROUTINE READVTUPDATA(lM, fName, kwrd, m, idx)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+      CHARACTER(LEN=*) :: fName, kwrd
+      INTEGER, INTENT(IN) :: m, idx
+
+      TYPE(vtkXMLType) :: vtu
+      INTEGER :: iStat, a
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      iStat = 0;
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtu, fName, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error (init)"
+
+      CALL getVTK_numPoints(vtu, a, iStat)
+      IF (a .NE. lM%gnNo) err = "Mismatch in num points for "//
+     2   TRIM(kwrd)
+
+      IF (m .EQ. nsd) THEN
+         ALLOCATE(tmpR(maxNSD,lM%gnNo))
+         tmpR = 0D0
+         CALL getVTK_pointData(vtu, TRIM(kwrd), tmpR, iStat)
+         IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+         DO a=1, lM%gnNo
+            lM%x((idx-1)*nsd+1:idx*nsd,a) = tmpR(1:nsd,a)
+         END DO
+         DEALLOCATE(tmpR)
+      ELSE
+         CALL getVTK_pointData(vtu, TRIM(kwrd), lM%x, iStat)
+         IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+      END IF
+
+      CALL flushVTK(vtu)
+
+      RETURN
+      END SUBROUTINE READVTUPDATA
+!--------------------------------------------------------------------
+!     Read a particular point dataset from a vtp file. Point data will
+!     be read and stored in lFa%x array
+      SUBROUTINE READVTPPDATA(lFa, fName, kwrd, m, idx)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(faceType), INTENT(INOUT) :: lFa
+      CHARACTER(LEN=*) :: fName, kwrd
+      INTEGER, INTENT(IN) :: m, idx
+
+      TYPE(vtkXMLType) :: vtp
+      INTEGER :: iStat, a
+
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      iStat = 0;
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtp, fName, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (init)"
+
+      CALL getVTK_numPoints(vtp, a, iStat)
+      IF (a .NE. lFa%nNo) err = "Mismatch in num points for "//
+     2   TRIM(kwrd)
+
+      IF (m .EQ. nsd) THEN
+         ALLOCATE(tmpR(maxNSD,lFa%nNo))
+         tmpR = 0D0
+         CALL getVTK_pointData(vtp, TRIM(kwrd), tmpR, iStat)
+         IF (iStat .LT. 0) err = "VTP file read error "//TRIM(kwrd)
+         DO a=1, lFa%nNo
+            lFa%x((idx-1)*nsd+1:idx*nsd,a) = tmpR(1:nsd,a)
+         END DO
+         DEALLOCATE(tmpR)
+      ELSE
+         CALL getVTK_pointData(vtp, TRIM(kwrd), lFa%x, iStat)
+         IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+      END IF
+
+      CALL flushVTK(vtp)
+
+      RETURN
+      END SUBROUTINE READVTPPDATA
+!####################################################################
       SUBROUTINE WRITEVTU(lM, fName)
-      
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
-      
       IMPLICIT NONE
-      
+
       TYPE(mshType), INTENT(IN) :: lM
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
-      
+
       TYPE(vtkXMLType) :: vtu
       INTEGER :: iStat
-      
+
       CALL vtkInitWriter(vtu, TRIM(fName), iStat)
       IF (iStat .LT. 0) err = "VTU file write error (init)"
-      
+
       CALL putVTK_pointCoords(vtu, lM%x, iStat)
       IF (iStat .LT. 0) err = "VTU file write error (coords)"
-      
+
       CALL putVTK_elemIEN(vtu, lM%gIEN, lM%vtkType, iStat)
       IF (iStat .LT. 0) err = "VTU file write error (ien)"
-      
+
       CALL vtkWriteToFile(vtu, iStat)
       IF (iStat .LT. 0) err = "VTU file write error"
       CALL flushVTK(vtu)
-      
+
       RETURN
       END SUBROUTINE WRITEVTU
-      
-!**********************************************************************
-
+!--------------------------------------------------------------------
       SUBROUTINE WRITEVTP(lFa, fName)
-      
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
-      
       IMPLICIT NONE
-      
+
       TYPE(faceType), INTENT(IN) :: lFa
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
-      
+
       TYPE(vtkXMLType) :: vtp
       INTEGER :: iStat, vtkType
-      
+
       IF (nsd .EQ. 3) THEN
          SELECT CASE (lFa%eNoN)
          CASE (3)
@@ -209,64 +382,98 @@
             vtkType = 21
          END SELECT
       END IF
-      
+
       CALL vtkInitWriter(vtp, TRIM(fName), iStat)
       IF (iStat .LT. 0) err = "VTP file write error (init)"
-      
+
       CALL putVTK_pointCoords(vtp, lFa%x, iStat)
       IF (iStat .LT. 0) err = "VTP file write error (coords)"
-      
+
       CALL putVTK_elemIEN(vtp, lFa%IEN, vtkType, iStat)
       IF (iStat .LT. 0) err = "VTP file write error (ien)"
-      
-      CALL putVTK_pointData(vtp, "GlobalNodeID", lFa%gN, iStat)
-      IF (iStat .LT. 0) err = "VTP file write error (point data)"
-      
-      CALL putVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
-      IF (iStat .LT. 0) err = "VTP file write error (cell data)"
-      
+
+      IF (ALLOCATED(lFa%gN)) THEN
+         CALL putVTK_pointData(vtp, "GlobalNodeID", lFa%gN, iStat)
+         IF (iStat .LT. 0) err = "VTP file write error (point data)"
+      END IF
+
+      IF (ALLOCATED(lFa%gE)) THEN
+         CALL putVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
+         IF (iStat .LT. 0) err = "VTP file write error (cell data)"
+      END IF
+
       CALL vtkWriteToFile(vtp, iStat)
       IF (iStat .LT. 0) err = "VTP file write error"
       CALL flushVTK(vtp)
-      
+
       RETURN
       END SUBROUTINE WRITEVTP
-      
-!**********************************************************************
-
+!--------------------------------------------------------------------
       SUBROUTINE WRITEVTUS(lA, lY, lD)
-      
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
-      
       IMPLICIT NONE
-      
-      REAL(KIND=8), INTENT(IN) :: lA(tDof, tnNo), lY(tDof, tnNo),
-     2   lD(tDof, tnNo)
-      
+
+      REAL(KIND=8), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
+     2   lD(tDof,tnNo)
+
       TYPE(dataType) :: d(nMsh)
       TYPE(vtkXMLType) :: vtu
-      
+
       CHARACTER(LEN=stdL) :: fName
-      INTEGER :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo, nEl
-      INTEGER :: s, l, ie, is, nSh, oGrp, outDof, nOut, cOut
-      
+      INTEGER :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo, nEl, s, l, ie,
+     2   is, nSh, oGrp, outDof, nOut, cOut, itmp, ne, iFn, nFn
+      LOGICAL :: l1, l2
+
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
       INTEGER, ALLOCATABLE :: outS(:), tmpI(:,:)
       REAL(KIND=8), ALLOCATABLE :: tmpV(:,:)
-      
+
+      l1 = .FALSE.
+      itmp = SUM(iblank(:))
+      itmp = cm%reduce(itmp)
+      IF (itmp .GT. 0) l1 = .TRUE.
+
+      l2 = .FALSE.
+      itmp = SUM(ighost(:))
+      itmp = cm%reduce(itmp)
+      IF (itmp .GT. 0) l2 = .TRUE.
+
       nOut   = 1
       outDof = nsd
       DO iEq=1, nEq
          DO iOut=1, eq(iEq)%nOutput
             IF (.NOT.eq(iEq)%output(iOut)%wtn(1)) CYCLE
-            nOut   = nOut + 1
-            outDof = outDof + eq(iEq)%output(iOut)%l
+            oGrp   = eq(iEq)%output(iOut)%grp
+            IF (oGrp .EQ. outGrp_fN) THEN
+               nFn = 1
+               DO iM=1, nMsh
+                  nFn = MAX(nFn, msh(iM)%nFn)
+               END DO
+               nOut   = nOut + nFn
+               outDof = outDof + eq(iEq)%output(iOut)%l * nFn
+            ELSE
+               nOut   = nOut + 1
+               outDof = outDof + eq(iEq)%output(iOut)%l
+            END IF
          END DO
       END DO
+
+!     iblank array for immersed solids
+      IF (l1) THEN
+         nOut   = nOut + 1
+         outDof = outDof + 1
+      END IF
+
+!     ighost array for immersed solids/shells
+      IF (l2) THEN
+         nOut   = nOut + 1
+         outDof = outDof + 1
+      END IF
+
       ALLOCATE(outNames(nOut), outS(nOut+1))
-      
+
 !     Prepare all solultions in to dataType d
       DO iM=1, nMsh
          IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -291,10 +498,18 @@
                is   = outS(cOut)
                ie   = is + l - 1
                outS(cOut+1)   = ie + 1
-               outNames(cOut) = eq(iEq)%sym//"_"//
-     2            TRIM(eq(iEq)%output(iOut)%name)
 
                oGrp = eq(iEq)%output(iOut)%grp
+               IF(eq(iEq)%phys.EQ.phys_CMM .AND. cmmInit) THEN
+                  IF(oGrp .EQ. outGrp_D) outNames(cOut) =
+     2               TRIM(eq(iEq)%output(iOut)%name)
+                  IF(oGrp .EQ. outGrp_stress) outNames(cOut) =
+     2               "PS_"//TRIM(eq(iEq)%output(iOut)%name)
+               ELSE
+                  outNames(cOut) = eq(iEq)%sym//"_"//
+     2               TRIM(eq(iEq)%output(iOut)%name)
+               END IF
+
                SELECT CASE (oGrp)
                   CASE (outGrp_NA)
                   err = "Undefined output grp in VTK"
@@ -316,9 +531,34 @@
                CASE (outGrp_WSS)
                   CALL BPOST(msh(iM), tmpV, lY, lD, oGrp)
                   DO a=1, msh(iM)%nNo
-                     d(iM)%x(is:ie,a) = tmpV(1:l,a) 
+                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
-               CASE (outGrp_vort, outGrp_eFlx, outGrp_hFlx, 
+               CASE (outGrp_trac)
+                  CALL BPOST(msh(iM), tmpV, lY, lD, oGrp)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
+                  END DO
+               CASE (outGrp_stress)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(nstd,msh(iM)%nNo))
+                  IF (eq(iEq)%phys .EQ. phys_struct .OR.
+     2                eq(iEq)%phys .EQ. phys_vms_struct) THEN
+                     tmpV = 0D0
+                  ELSE IF (pstEq) THEN
+                     DO a=1, msh(iM)%nNo
+                        Ac = msh(iM)%gN(a)
+                        tmpV(:,a) = pS0(:,Ac)
+                     END DO
+                  END IF
+                  IF (.NOT.cmmInit) THEN
+                     CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  END IF
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is:ie,a) = tmpV(:,a)
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_vort, outGrp_eFlx, outGrp_hFlx,
      2            outGrp_stInv, outGrp_vortex)
                   CALL POST(msh(iM), tmpV, lY, lD, oGrp, iEq)
                   DO a=1, msh(iM)%nNo
@@ -327,16 +567,92 @@
                CASE (outGrp_absV)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
-                     d(iM)%x(is:ie,a) = lY(1:nsd,Ac) 
+                     d(iM)%x(is:ie,a) = lY(1:nsd,Ac)
      2                                - lY(nsd+2:2*nsd+1,Ac)
                   END DO
+               CASE (outGrp_fN)
+                  cOut = cOut - 1
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(nFn*nsd,msh(iM)%nNo))
+                  tmpV = 0D0
+                  IF (msh(iM)%nFn .NE. 0)
+     2               CALL FIBDIRPOST(msh(iM), nFn, tmpV, lD, iEq)
+                  DO iFn=1, nFn
+                     cOut = cOut + 1
+                     is   = outS(cOut)
+                     ie   = is + l - 1
+                     outS(cOut+1)   = ie + 1
+                     outNames(cOut) = eq(iEq)%sym//"_"//
+     2                  TRIM(eq(iEq)%output(iOut)%name)//STR(iFn)
+                     DO a=1, msh(iM)%nNo
+                        d(iM)%x(is:ie,a) =
+     2                     tmpV((iFn-1)*nsd+1:iFn*nsd,a)
+                     END DO
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_fA)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(1,msh(iM)%nNo))
+                  tmpV = 0D0
+                  IF (msh(iM)%nFn .EQ. 2)
+     2               CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is,a) = tmpV(1,a)
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_J)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(1,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is,a) = tmpV(1,a)
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_F)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(nsd*nsd,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is:ie,a) = tmpV(:,a)
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE DEFAULT
                   err = "Undefined output"
                END SELECT
             END DO
          END DO
+
+         IF (l1) THEN
+            cOut = cOut + 1
+            is   = outS(cOut)
+            ie   = is
+            outS(cOut+1)   = ie + 1
+            outNames(cOut) = "IBLANK"
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               d(iM)%x(is:ie,a) = REAL(iblank(Ac), KIND=8)
+            END DO
+         END IF
+
+         IF (l2) THEN
+            cOut = cOut + 1
+            is   = outS(cOut)
+            ie   = is
+            outS(cOut+1)   = ie + 1
+            outNames(cOut) = "IGHOST"
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               d(iM)%x(is:ie,a) = REAL(ighost(Ac), KIND=8)
+            END DO
+         END IF
       END DO
-      
+
 !     Integrate data from all processors
       nNo = 0
       nEl = 0
@@ -353,24 +669,24 @@
          savedOnce = .TRUE.
          RETURN
       END IF
-      
+
       DEALLOCATE(tmpV)
       ALLOCATE(tmpV(maxnsd, nNo))
-      
+
 !     Writing to vtu file (master only)
       IF (cTS .GE. 1000) THEN
          fName = STR(cTS)
       ELSE
          WRITE(fName,'(I3.3)') cTS
       END IF
-      
+
       fName = TRIM(saveName)//"_"//TRIM(ADJUSTL(fName))//".vtu"
       dbg = "Writing VTU"
 
       CALL vtkInitWriter(vtu, TRIM(fName), iStat)
       IF (iStat .LT. 0) err = "VTU file write error (init)"
 
-!     Writing the position data      
+!     Writing the position data
       iOut = 1
       s   = outS(iOut)
       e   = outS(iOut+1)-1
@@ -384,7 +700,7 @@
       END DO
       CALL putVTK_pointCoords(vtu, tmpV(1:nsd,:), iStat)
       IF (iStat .LT. 0) err = "VTU file write error (coords)"
-      
+
 !     Writing the connectivity data
       nSh = -1
       DO iM=1, nMsh
@@ -397,7 +713,7 @@
          DEALLOCATE(tmpI)
          nSh = nSh + d(iM)%nNo
       END DO
-      
+
 !     Writing all solutions
       DO iOut=2, nOut
          IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -415,23 +731,29 @@
          CALL putVTK_pointData(vtu, outNames(iOut), tmpV, iStat)
          IF (iStat .LT. 0) err = "VTU file write error (point data)"
       END DO
-      
+
 !     Write element-based variables
-      IF (.NOT.savedOnce .OR. mvMsh) THEN
-         savedOnce = .TRUE.
+      ne = 1
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
          ALLOCATE(tmpI(1,nEl))
-         
-!     Write partition data
-         IF (.NOT.cm%seq()) THEN
-            Ec = 0
-            DO iM=1, nMsh
-               DO e=1, d(iM)%nEl
-                  Ec = Ec + 1
-                  tmpI(1,Ec) = d(iM)%xe(e,1)
+         IF (.NOT.savedOnce) THEN
+            savedOnce = .TRUE.
+            ne = ne + 2
+
+!        Write partition data
+            IF (.NOT.cm%seq()) THEN
+               Ec = 0
+               DO iM=1, nMsh
+                  DO e=1, d(iM)%nEl
+                     Ec = Ec + 1
+                     tmpI(1,Ec) = d(iM)%xe(e,2)
+                  END DO
                END DO
-            END DO
-            CALL putVTK_elemData(vtu, 'Proc_ID', tmpI, iStat)
-            IF (iStat .LT. 0) err = "VTU file write error (cell data)"
+               CALL putVTK_elemData(vtu, 'Proc_ID', tmpI, iStat)
+               IF (iStat .LT. 0) err = "VTU file write error (proc id)"
+            END IF
+         ELSE
+            ne = ne + 1
          END IF
 
 !     Write the domain ID
@@ -440,11 +762,11 @@
             DO iM=1, nMsh
                DO e=1, d(iM)%nEl
                   Ec = Ec + 1
-                  tmpI(1,Ec) = d(iM)%xe(e,2)
+                  tmpI(1,Ec) = d(iM)%xe(e,1)
                END DO
             END DO
             CALL putVTK_elemData(vtu, 'Domain_ID', tmpI, iStat)
-            IF (iStat .LT. 0) err = "VTU file write error (cell data)"
+            IF (iStat .LT. 0) err = "VTU file write error (dom id)"
          END IF
 
 !     Write the mesh ID
@@ -457,30 +779,49 @@
                END DO
             END DO
             CALL putVTK_elemData(vtu, 'Mesh_ID', tmpI, iStat)
-            IF (iStat .LT. 0) err = "VTU file write error (cell data)"
+            IF (iStat .LT. 0) err = "VTU file write error (mesh id)"
          END IF
          DEALLOCATE(tmpI)
       END IF
-      
+
+!     Write element ghost cells if necessary
+      IF (l1 .OR. l2) THEN
+         ALLOCATE(tmpI(1,nEl))
+         Ec = 0
+         DO iM=1, nMsh
+            DO e=1, d(iM)%nEl
+               Ec = Ec + 1
+               tmpI(1,Ec) = d(iM)%xe(e,ne)
+            END DO
+         END DO
+         CALL putVTK_elemData(vtu, 'EGHOST', tmpI, iStat)
+         IF (iStat .LT. 0) err = "VTU file write error (EGHOST)"
+         DEALLOCATE(tmpI)
+      END IF
+
+      DO iM=1, nMsh
+         CALL DESTROY(d(iM))
+      END DO
+
       CALL vtkWriteToFile(vtu, iStat)
       IF (iStat .LT. 0) err = "VTU file write error"
-      
+
       CALL flushVTK(vtu)
-      
+
       RETURN
       END SUBROUTINE WRITEVTUS
-      
-!**********************************************************************
+!####################################################################
 !     This routine prepares data array of a regular mesh
       SUBROUTINE INTMSHDATA(lM, d, outDof)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(dataType), INTENT(INOUT) :: d
       INTEGER, INTENT(IN) :: outDof
 
-      INTEGER e, i, ierr, Ec
+      INTEGER :: e, i, ierr, Ec, m
       INTEGER, ALLOCATABLE :: sCount(:)
 
       d%eNoN    = lM%eNoN
@@ -495,8 +836,9 @@
       END IF
       ALLOCATE(d%IEN(d%eNoN,d%nEl), d%gx(outDof,d%nNo))
 
-      d%gx = GLOBAL(lM,d%x)
+      d%gx = GLOBAL(lM, d%x)
       DEALLOCATE(d%x)
+
       IF (cm%mas()) THEN
          DO e=1, lM%gnEl
             Ec = lM%otnIEN(e)
@@ -504,82 +846,115 @@
          END DO
       END IF
 
-      IF (.NOT.savedOnce .OR. mvMsh) THEN
-         ALLOCATE(d%xe(d%nEl,2))
-         IF (cm%mas()) THEN
-            IF (.NOT.cm%seq()) THEN
-               i = 0
-               DO e=1, lM%gnEl
-                  IF (e .GT. lM%eDist(i)) THEN
-                     DO
-                        i = i + 1
-                        IF (e .LE. lM%eDist(i)) EXIT
-                     END DO
-                  END IF
-                  d%xe(e,1) = i
-               END DO
+      m = 1
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
+         IF (.NOT.savedOnce) THEN
+            m = m + 2
+         ELSE
+            m = m + 1
+         END IF
+         ALLOCATE(d%xe(d%nEl,m))
+         IF (ALLOCATED(dmnId)) THEN
+            ALLOCATE(sCount(cm%np()))
+            DO i=1, cm%np()
+               sCount(i) = lM%eDist(i) - lM%eDist(i-1)
+            END DO
+            CALL MPI_GATHERV(lM%eId, lM%nEl, mpint, d%xe(:,1), sCount,
+     2         lM%eDist, mpint, master, cm%com(), ierr)
+
+            IF (cm%mas()) THEN
+               DEALLOCATE(sCount)
                ALLOCATE(sCount(lM%gnEl))
                sCount = d%xe(:,1)
                DO e=1, lM%gnEl
                   Ec = lM%otnIEN(e)
                   d%xe(e,1) = sCount(Ec)
                END DO
-               DEALLOCATE(sCount)
             END IF
-         END IF
-         IF (ALLOCATED(dmnId)) THEN
-            ALLOCATE(sCount(cm%np()))
-            DO i=1, cm%np()
-               sCount(i) = lM%eDist(i) - lM%eDist(i-1)
-            END DO
-            CALL MPI_GATHERV(lM%eId, lM%nEl, mpint, d%xe(:,2), sCount, 
-     2         lM%eDist, mpint, master, cm%com(), ierr)
-            
-            IF (cm%mas()) THEN
-               DEALLOCATE(sCount)
-               ALLOCATE(sCount(lM%gnEl))
-               sCount = d%xe(:,2)
-               DO e=1, lM%gnEl
-                  Ec = lM%otnIEN(e)
-                  d%xe(e,2) = sCount(Ec)
-               END DO
-               DEALLOCATE(sCount)
-            END IF
+            DEALLOCATE(sCount)
          ELSE
-            d%xe(:,2) = 1
+            d%xe(:,1) = 1
+         END IF
+
+         IF (.NOT.savedOnce) THEN
+            IF (cm%mas()) THEN
+               IF (.NOT.cm%seq()) THEN
+                  i = 0
+                  DO e=1, lM%gnEl
+                     IF (e .GT. lM%eDist(i)) THEN
+                        DO
+                           i = i + 1
+                           IF (e .LE. lM%eDist(i)) EXIT
+                        END DO
+                     END IF
+                     d%xe(e,2) = i
+                  END DO
+                  ALLOCATE(sCount(lM%gnEl))
+                  sCount = d%xe(:,2)
+                  DO e=1, lM%gnEl
+                     Ec = lM%otnIEN(e)
+                     d%xe(e,2) = sCount(Ec)
+                  END DO
+                  DEALLOCATE(sCount)
+               END IF
+            END IF
          END IF
       END IF
-      
+
+      IF (ALLOCATED(lM%iGC)) THEN
+         IF (.NOT.ALLOCATED(d%xe)) ALLOCATE(d%xe(d%nEl,m))
+         ALLOCATE(sCount(cm%np()))
+         DO i=1, cm%np()
+            sCount(i) = lM%eDist(i) - lM%eDist(i-1)
+         END DO
+         CALL MPI_GATHERV(lM%iGC, lM%nEl, mpint, d%xe(:,m), sCount,
+     2      lM%eDist, mpint, master, cm%com(), ierr)
+
+         IF (cm%mas()) THEN
+            DEALLOCATE(sCount)
+            ALLOCATE(sCount(lM%gnEl))
+            sCount = d%xe(:,m)
+            DO e=1, lM%gnEl
+               Ec = lM%otnien(e)
+               d%xe(e,m) = sCount(Ec)
+            END DO
+         END IF
+         DEALLOCATE(sCount)
+      END IF
+
       RETURN
       END SUBROUTINE INTMSHDATA
-
-!**********************************************************************
+!--------------------------------------------------------------------
 !     This routine will interpolates NURBS into a BIL/BRK mesh, so you
 !     can write it into a VTK file.
       SUBROUTINE INTNRBDATA(lM, d, outDof)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(dataType), INTENT(INOUT) :: d
       INTEGER, INTENT(IN) :: outDof
 
       LOGICAL flag, clcDmn
       INTEGER ie, e, ex, ey, ez, s, sx, sy, sz, ia, Ac, a, ax, ay, az,
-     2   jx, jy, jz, ierr, i, nShft
+     2   jx, jy, jz, ierr, i, nShft, insd
       INTEGER, ALLOCATABLE :: IEN(:,:), tDmnId(:), sCe(:), dise(:),
      2   sCn(:), disn(:)
       REAL(KIND=8), ALLOCATABLE :: N(:,:), tmpX(:,:)
 
+      insd = nsd
+      IF (lM%lShl) insd = nsd - 1
+
       jy = lM%bs(2)%nEl*(lM%bs(2)%nSl - 1) + 1
-      IF (nsd .EQ. 2) THEN
+      IF (insd .EQ. 2) THEN
          jz     = 0
          d%eNoN = 4
-      ELSE
+      ELSE IF (insd .EQ. 3) THEN
          jz     = lM%bs(3)%nEl*(lM%bs(3)%nSl - 1) + 1
          d%eNoN = 8
       END IF
-      ALLOCATE(sCe(cm%np()), dise(0:cm%np()), sCn(cm%np()), 
+      ALLOCATE(sCe(cm%np()), dise(0:cm%np()), sCn(cm%np()),
      2   disn(0:cm%np()))
 
 !     Preparing sCn, sCe for the future communications
@@ -588,10 +963,10 @@
       DO i=1, cm%np()
          e = lM%bs(1)%nEl*(lM%eDist(i) - lM%eDist(i-1))/lM%gnEl
          jx = e*(lM%bs(1)%nSl - 1) + 1
-         IF (nsd .EQ. 2) jz = 2
+         IF (insd .EQ. 2) jz = 2
          sCe(i) = (jx - 1)*(jy - 1)*(jz - 1)
 
-         IF (nsd .EQ. 2) jz = 1
+         IF (insd .EQ. 2) jz = 1
          IF (lM%eDist(i).NE.lM%gnEl .OR. e.EQ.0) jx = jx - 1
          sCn(i) = jx*jy*jz
 
@@ -605,8 +980,8 @@
          d%nEl = 0
          d%nNo = 0
       END IF
-      ALLOCATE(d%IEN(d%eNoN,d%nEl), d%gx(outDof,d%nNo), 
-     2   IEN(d%eNoN,sCe(cm%tF())), tmpX(outDof,sCn(cm%tF())), 
+      ALLOCATE(d%IEN(d%eNoN,d%nEl), d%gx(outDof,d%nNo),
+     2   IEN(d%eNoN,sCe(cm%tF())), tmpX(outDof,sCn(cm%tF())),
      3   N(lM%eNoN,lM%nSl))
 
 !     I am calculating the last column only if this is the last
@@ -648,7 +1023,7 @@
       END IF
 
       ie = 0
-      IF (nsd .EQ. 2) THEN
+      IF (insd .EQ. 2) THEN
 !     I am using d%eType = eType_BIL
          d%vtkType = 9
          DO e=1, lM%nEl
@@ -749,12 +1124,12 @@
          END DO
       END IF
       DEALLOCATE(d%x)
-      
+
       IF (cm%seq()) THEN
          d%gx  = tmpX
          d%IEN = IEN
       ELSE
-         IF (ALLOCATED(dmnId)) CALL MPI_GATHERV(tDmnId, sCe(cm%tF()), 
+         IF (ALLOCATED(tDmnId)) CALL MPI_GATHERV(tDmnId, sCe(cm%tF()),
      2      mpint, d%xe(:,2), sCe, dise, mpint, master, cm%com(), ierr)
 
 !     First collecting all the elements connectivity
@@ -762,198 +1137,83 @@
          sCn  = sCn*outDof
          dise = dise*d%eNoN
          disn = disn*outDof
-         CALL MPI_GATHERV(IEN, sCe(cm%tF()), mpint, d%IEN, sCe, dise, 
+         CALL MPI_GATHERV(IEN, sCe(cm%tF()), mpint, d%IEN, sCe, dise,
      2      mpint, master, cm%com(), ierr)
 !     Now collecting the solutions
-         CALL MPI_GATHERV(tmpX, sCn(cm%tF()), mpreal, d%gx, sCn, disn, 
+         CALL MPI_GATHERV(tmpX, sCn(cm%tF()), mpreal, d%gx, sCn, disn,
      2      mpreal, master, cm%com(), ierr)
       END IF
 
       RETURN
       END SUBROUTINE INTNRBDATA
-
-!**********************************************************************
+!####################################################################
 !     This routine calculates average of VTU files.
       SUBROUTINE CALCAVE
-      
       USE COMMOD
       USE ALLFUN
-      
       IMPLICIT NONE
-      
+
       LOGICAL :: lExist
       INTEGER :: fid, n, lTS, fTS, iTS
       CHARACTER(LEN=stdL) fName
       REAL(KIND=8) :: cntr
-      
+
       REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:),
      2   Ag(:,:), Yg(:,:), Dg(:,:)
-      
+
       fid  = 1
       fTS  = nTS
       lTS  = 0
       cntr = 0D0
       iTS  = 0
       IF (zeroAve) iTS = rsTS
-      IF (.NOT.rmsh%isReqd) THEN
-         IF (cm%mas()) THEN
-            ALLOCATE(tmpA(tDof,gtnNo), tmpY(tDof,gtnNo), 
-     2         tmpD(tDof,gtnNo))
-         ELSE
-            ALLOCATE(tmpA(0,0), tmpY(0,0), tmpD(0,0))
-         END IF
-         ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo))
-         
-         Ag   = 0D0
-         Yg   = 0D0
-         Dg   = 0D0
-         std = " Computing average quantities"
-         DO n=iTS, nTS, saveIncr
-            IF (n .LT. saveATS) CYCLE
-            IF (n .LT. fTS) fTS = n
-            IF (n .GT. lTS) lTS = n
-            cntr = cntr + 1D0
-            IF (cm%mas()) THEN
-               IF (n .GE. 1000) THEN
-                  fName = STR(n)
-               ELSE
-                  WRITE(fName,'(I3.3)') n
-               END IF
-               fName = TRIM(saveName)//"_"//TRIM(ADJUSTL(fName))//".vtu"
-               INQUIRE (FILE=TRIM(fName), EXIST=lExist)
-               IF (lExist) THEN
-                  CALL READVTUS(tmpA, tmpY, tmpD, fName)
-               ELSE
-                  err = "File "//TRIM(fName)//" is missing"
-               END IF
-            END IF
-            Ag = Ag + LOCAL(tmpA)
-            Yg = Yg + LOCAL(tmpY)
-            Dg = Dg + LOCAL(tmpD)
-         END DO
-         n = NINT(cntr)
-         IF (n .EQ. 0) RETURN
-         Ag = Ag/cntr
-         Yg = Yg/cntr
-         Dg = Dg/cntr
-         cTS = lTS
-         fName = saveName
-         saveName = TRIM(saveName)//"_ave_"//STR(fTS)//"_"//
-     2      STR(saveIncr)
-         CALL WRITEVTUS(Ag, Yg, Dg)
-         saveName = fName
+      IF (cm%mas()) THEN
+         ALLOCATE(tmpA(tDof,gtnNo), tmpY(tDof,gtnNo),
+     2      tmpD(tDof,gtnNo))
       ELSE
-         DO n=iTS, nTS, saveIncr
-            IF (n .LT. saveATS) CYCLE
-            IF (n .LT. fTS) fTS = n
-            IF (n .GT. lTS) lTS = n
-            cntr = cntr + 1D0
-         END DO
-         n = NINT(cntr)
-         IF (n.EQ.0 .OR. .NOT.ALLOCATED(rmsh%Aav)) RETURN
-         rmsh%Aav = rmsh%Aav/cntr
-         rmsh%Yav = rmsh%Yav/cntr
-         rmsh%Dav = rmsh%Dav/cntr
-         cTS = lTS
-         fName = saveName
-         saveName = TRIM(saveName)//"_ave_"//STR(fTS)//"_"//
-     2      STR(saveIncr)
-         CALL WRITEVTUS(rmsh%Aav, rmsh%Yav, rmsh%Dav)
-         saveName = fName
+         ALLOCATE(tmpA(0,0), tmpY(0,0), tmpD(0,0))
       END IF
-      
+      ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo))
+
+      Ag   = 0D0
+      Yg   = 0D0
+      Dg   = 0D0
+      std = " Computing average quantities"
+      DO n=iTS, nTS, saveIncr
+         IF (n .LT. saveATS) CYCLE
+         IF (n .LT. fTS) fTS = n
+         IF (n .GT. lTS) lTS = n
+         cntr = cntr + 1D0
+         IF (cm%mas()) THEN
+            IF (n .GE. 1000) THEN
+               fName = STR(n)
+            ELSE
+               WRITE(fName,'(I3.3)') n
+            END IF
+            fName = TRIM(saveName)//"_"//TRIM(ADJUSTL(fName))//".vtu"
+            INQUIRE (FILE=TRIM(fName), EXIST=lExist)
+            IF (lExist) THEN
+               CALL READVTUS(tmpA, tmpY, tmpD, fName)
+            ELSE
+               err = "File "//TRIM(fName)//" is missing"
+            END IF
+         END IF
+         Ag = Ag + LOCAL(tmpA)
+         Yg = Yg + LOCAL(tmpY)
+         Dg = Dg + LOCAL(tmpD)
+      END DO
+      n = NINT(cntr)
+      IF (n .EQ. 0) RETURN
+      Ag = Ag/cntr
+      Yg = Yg/cntr
+      Dg = Dg/cntr
+      cTS = lTS
+      fName = saveName
+      saveName = TRIM(saveName)//"_ave_"//STR(fTS)//"_"//
+     2   STR(saveIncr)
+      CALL WRITEVTUS(Ag, Yg, Dg)
+      saveName = fName
+
       RETURN
       END SUBROUTINE CALCAVE
-      
-!**********************************************************************
-
-      SUBROUTINE READVTUS(lA, lY, lD, fName)
-      
-      USE COMMOD
-      USE LISTMOD
-      USE ALLFUN
-      USE vtkXMLMod
-      
-      IMPLICIT NONE
-      
-      REAL(KIND=8), INTENT(INOUT) :: lA(tDof,gtnNo), lY(tDof,gtnNo),
-     2   lD(tDof,gtnNo)
-      CHARACTER(LEN=STDL) :: fName
-      
-      TYPE(vtkXMLType) :: vtu
-      
-      INTEGER :: iStat, iEq, iOut, iM, l, s, e, a, b, Ac, nNo, oGrp
-      CHARACTER(LEN=stdL) :: varName
-      REAL(KIND=8), ALLOCATABLE :: tmpS(:,:), tmpGS(:,:)
-      
-      iStat = 0
-      CALL loadVTK(vtu, fName, iStat)
-      IF (iStat .LT. 0) err = "VTU file read error (init)"
-      
-      CALL getVTK_numPoints(vtu, nNo, iStat)
-      IF (iStat .LT. 0) err = "VTU file read error (num points)"
-      IF (nNo .NE. SUM(msh(:)%gnNo)) 
-     2   err = "Incompatible mesh and "//TRIM(fName)
-      
-      DO iEq=1, nEq
-         DO iOut=1, eq(iEq)%nOutput
-            IF (.NOT.eq(iEq)%output(iOut)%wtn(1)) CYCLE
-            l = eq(iEq)%output(iOut)%l
-            s = eq(iEq)%s + eq(iEq)%output(iOut)%o
-            e = s + l - 1
-            varName = eq(iEq)%sym//"_"//TRIM(eq(iEq)%output(iOut)%name)
-            
-            oGrp = eq(iEq)%output(iOut)%grp
-            SELECT CASE(oGrp)
-            CASE (outGrp_A, outGrp_Y, outGrp_D)
-               IF (l .GT. 1) THEN
-                  ALLOCATE(tmpGS(maxNSD,nNo))
-               ELSE
-                  ALLOCATE(tmpGS(1,nNo))
-               END IF
-               CALL getVTK_pointData(vtu, TRIM(varName), tmpGS, iStat)
-               IF (iStat .LT. 0) err ="VTU file read error (point data)"
-               
-               IF (nNo .NE. gtnNo) THEN
-                  IF (l .GT. 1) THEN
-                     ALLOCATE(tmpS(maxNSD,gtnNo))
-                  ELSE
-                     ALLOCATE(tmpS(1,gtnNo))
-                  END IF
-                  IF (.NOT.ALLOCATED(msh(1)%gpN)) err = "Unexpected "//
-     2               "behavior. VTU file read error"
-                  b = 0
-                  DO iM=1, nMsh
-                     DO a=1, msh(iM)%gnNo
-                        b = b + 1
-                        Ac = msh(iM)%gpN(a)
-                        tmpS(:,Ac) = tmpGS(:,b)
-                     END DO
-                  END DO
-                  DEALLOCATE(tmpGS)
-                  ALLOCATE(tmpGS(SIZE(tmpS,1),gtnNo))
-                  tmpGS = tmpS
-                  DEALLOCATE(tmpS)
-               END IF
-            CASE DEFAULT
-               CYCLE
-            END SELECT
-            
-            SELECT CASE(oGrp)
-            CASE (outGrp_A)
-               lA(s:e,:) = tmpGS(1:l,:)
-            CASE (outGrp_Y)
-               lY(s:e,:) = tmpGS(1:l,:)
-            CASE (outGrp_D)
-               lD(s:e,:) = tmpGS(1:l,:)
-            END SELECT
-            DEALLOCATE(tmpGS)
-         END DO
-      END DO
-      
-      CALL flushVTK(vtu)
-      
-      RETURN
-      END SUBROUTINE READVTUS
-
-!**********************************************************************
+!####################################################################

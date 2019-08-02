@@ -210,7 +210,7 @@ public:
   void trilinos_solve_(double *x, const double *dirW, double &resNorm,
           double &initNorm, int &numIters, double &solverTime,
           double &dB, bool &converged, int &lsType, double &relTol,
-          int &maxIters, int &kspace, int &precondType);
+          int &maxIters, int &kspace, int &precondType, bool &isFassem);
 
   void trilinos_lhs_free_();
 

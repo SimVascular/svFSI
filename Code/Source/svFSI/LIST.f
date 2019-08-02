@@ -603,7 +603,7 @@
       END IF
       GFLS => list%sub(i)
 
-      READ(GFLS%val,*,IOSTAT=ioS) sVal
+      READ(GFLS%val,"(A)",IOSTAT=ioS) sVal
       IF (ioS .NE. 0) THEN
          list%io%e = TRIM(list%ping(cmnd,GFLS))//" Reading error"
       END IF

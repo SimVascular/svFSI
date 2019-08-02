@@ -30,35 +30,48 @@
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
 !--------------------------------------------------------------------
-!      
-!     This is to initialize or finalize svFSI variables/structures. 
-!      
+!
+!     This is to initialize or finalize svFSI variables/structures.
+!
 !--------------------------------------------------------------------
 
       SUBROUTINE INITIALIZE(timeP)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
       LOGICAL :: flag
-      INTEGER :: iEq, ierr, gnnz, nnz, iDmn
-      CHARACTER(LEN=stdL) :: fName
+      INTEGER :: i, iEq, iDmn, iM, ierr, nnz, gnnz
+      CHARACTER(LEN=stdL) :: fTmp, sTmp
       REAL(KIND=8) :: am
       TYPE(FSILS_commuType) :: communicator
 
       REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: s
 
-      INTEGER :: iM, i
-      CHARACTER(LEN=stdL) :: sTmp, fTmp
-
       tDof     = 0
       dFlag    = .FALSE.
+
+!     Set faces for linear solver
       nFacesLS = SUM(eq%nBc)
+!     Remove LS pointer for faces with weakly applied Dir. BC
+      DO iEq=1, nEq
+         DO i=1, eq(iEq)%nBc
+            IF (eq(iEq)%bc(i)%weakDir) nFacesLS = nFacesLS - 1
+         END DO
+      END DO
+!     Pointer to all immersed solid nodes (iblank=1)
+      ibLSptr  = 0
+      IF (ibFlag) THEN
+         nFacesLS = nFacesLS + 1
+         ibLSptr  = nFacesLS
+      END IF
+!     For FSI simulations, LS pointer to structure nodes
       IF (mvMsh) nFacesLS = nFacesLS + 1
+!     For initializing CMM, LS pointer to fixed edge nodes
+      IF (cmmInit) nFacesLS = nFacesLS + 1
+
       IF (ANY(eq(1)%bc%cplBCptr .NE. 0)) cplBC%coupled = .TRUE.
 
       DO iEq=1, nEq
@@ -87,6 +100,25 @@
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'ST'
+         CASE (phys_vms_struct)
+            dFlag = .TRUE.
+            eq(iEq)%dof = nsd + 1
+            eq(iEq)%sym = 'ST'
+         CASE (phys_preSt)
+            dFlag = .TRUE.
+            eq(iEq)%dof = nsd
+            eq(iEq)%am  = am
+            eq(iEq)%sym = 'PS'
+         CASE (phys_CMM)
+            dFlag = .TRUE.
+            eq(iEq)%dof = nsd + 1
+            IF (cmmInit) eq(iEq)%dof = nsd
+            eq(iEq)%sym = 'CM'
+         CASE (phys_shell)
+            dFlag = .TRUE.
+            eq(iEq)%dof = nsd
+            eq(iEq)%am  = am
+            eq(iEq)%sym = 'SH'
          CASE (phys_FSI)
             dFlag = .TRUE.
             eq(iEq)%dof = nsd + 1
@@ -96,9 +128,9 @@
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'MS'
-         CASE (phys_BBO)
-            eq(iEq)%dof = nsd
-            eq(iEq)%sym = 'BB'
+         CASE (phys_CEP)
+            eq(iEq)%dof = 1
+            eq(iEq)%sym = 'EP'
          CASE DEFAULT
             err = "Equation type "//eq(iEq)%sym//" is not defined"
          END SELECT
@@ -111,24 +143,108 @@
          eq(iEq)%e     = tDof + eq(iEq)%dof
          tDof          = eq(iEq)%e
       END DO
-      ierr = 0; IF (dFlag) ierr = 1
-      i = 0; IF (cplBC%coupled) i = cplBC%nX
+
+      ierr = 0
+      IF (dFlag) ierr = 1
+
+      i = 0
+      IF (cplBC%coupled) i = cplBC%nX
 
       stamp = (/cm%np(), nEq, nMsh, tnNo, i, tDof, ierr, version/)
 
 !     Calculating the record length
-      i = 2
-      IF (dFlag) i = 3
-      IF (rmsh%isReqd .AND. saveAve) i = 6
-      i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tDof*tnNo)
+      i = 2*tDof
+      IF (dFlag) i = 3*tDof
+      IF (pstEq) i = i + nstd
+      IF (sstEq) i = i + nsd
+      IF (cepEq) THEN
+         i = i + nXion
+         IF (cem%cpld) i = i + 1
+      END IF
+      i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tnNo)
+
+      IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
       IF (cm%seq()) THEN
          recLn = i
       ELSE
          CALL MPI_ALLREDUCE(i, recLn, 1, mpint, MPI_MAX, cm%com(), ierr)
       END IF
 
+!     Initialize shell eIEN data structure. Used later in LHSA.
+      IF (shlEq) THEN
+         DO iM=1, nMsh
+            IF (msh(iM)%lShl) THEN
+               IF (msh(iM)%eType .EQ. eType_NRB) THEN
+                  ALLOCATE(msh(iM)%eIEN(0,0))
+                  ALLOCATE(msh(iM)%sbc(msh(iM)%eNoN,msh(iM)%nEl))
+                  msh(iM)%sbc = 0
+               ELSE IF (msh(iM)%eType .EQ. eType_TRI) THEN
+                  CALL SETSHLXIEN(msh(iM))
+               END IF
+            END IF
+         END DO
+      END IF
+
+!     Initialize tensor operations
+      CALL TEN_INIT(nsd)
+
+      std = " Constructing stiffness matrix sparse structure"
+      CALL LHSA(nnz)
+
+      gnnz = nnz
+      CALL MPI_ALLREDUCE(nnz, gnnz, 1, mpint, MPI_SUM, cm%com(), ierr)
+      std = " Total number of non-zeros in the LHS matrix: "//gnnz
+
+!     Initialize FSILS structures
+      IF (resetSim) THEN
+         IF (communicator%foC) CALL FSILS_COMMU_FREE(communicator)
+         IF (lhs%foC) CALL FSILS_LHS_FREE(lhs)
+      END IF ! resetSim
+
+      dbg = "Calling FSILS_COMMU_CREATE"
+      CALL FSILS_COMMU_CREATE(communicator, cm%com())
+
+      dbg = "Calling FSILS_LHS_CREATE"
+      CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz, ltg,
+     2   rowPtr, colPtr, nFacesLS)
+
+!     Variable allocation and initialization
       ALLOCATE(Ao(tDof,tnNo), An(tDof,tnNo), Yo(tDof,tnNo),
-     2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo))
+     2   Yn(tDof,tnNo), Do(tDof,tnNo), Dn(tDof,tnNo), Bf(nsd,tnNo))
+      IF (ibFlag) CALL IB_MEMALLOC()
+
+!     Additional physics dependent variables
+!     VMS_STRUCT phys
+      IF (sstEq) THEN
+         ALLOCATE(Ad(nsd,tnNo), Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
+         Ad = 0D0
+         Rd = 0D0
+         Kd = 0D0
+      END IF
+
+!     PRESTRESS phys
+      IF (pstEq) THEN
+         IF (ALLOCATED(pS0)) err = "Prestress already allocated. "//
+     2      "Correction needed"
+         ALLOCATE(pS0(nstd,tnNo), pSn(nstd,tnNo), pSa(tnNo))
+         pS0 = 0D0
+         pSn = 0D0
+         pSa = 0D0
+      END IF
+
+!     Electrophysiology
+      IF (cepEq) THEN
+         ALLOCATE(Xion(nXion,tnNo))
+         Xion(:,:) = 0D0
+
+         CALL CEPINIT()
+
+!        Electro-Mechanics
+         IF (cem%cpld) THEN
+            ALLOCATE(cem%Ya(tnNo))
+            cem%Ya = 0D0
+         END IF
+      END IF
 
       IF (.NOT.resetSim) THEN
          IF (.NOT.ALLOCATED(rmsh%flag)) ALLOCATE(rmsh%flag(nMsh))
@@ -139,72 +255,43 @@
             ALLOCATE(rmsh%Y0(tDof,tnNo))
             ALLOCATE(rmsh%D0(tDof,tnNo))
             ALLOCATE(rmsh%iNorm(nEq))
-            IF (saveAve) THEN
-               ALLOCATE(rmsh%Aav(tDof,tnNo))
-               ALLOCATE(rmsh%Yav(tDof,tnNo))
-               ALLOCATE(rmsh%Dav(tDof,tnNo))
-            END IF
          END IF
-      END IF
 
-         std = " Constructing stiffness matrix sparse structure"
-         CALL LHSA(nnz)
-
-         gnnz = nnz
-         CALL MPI_ALLREDUCE(nnz, gnnz, 1, mpint, MPI_SUM, cm%com(),ierr)
-         std = " Total number of non-zeros in the LHS matrix: "//gnnz
-
-      IF (resetSim) THEN
-         IF (communicator%foC) CALL FSILS_COMMU_FREE(communicator)
-         IF (lhs%foC) CALL FSILS_LHS_FREE(lhs)
-      END IF ! resetSim
-
-      dbg = "Calling FSILS_COMMU_CREATE"
-      CALL FSILS_COMMU_CREATE(communicator, cm%com())
-
-      dbg = "Calling FSILS_LHS_CREATE"
-!     For now call this even in the Trilinos methods since sets up required
-!     data structures and compatibility of error checks with parallel code
-         CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz, ltg,
-     &         rowPtr, colPtr, nFacesLS)
-
-      IF (.NOT.resetSim) THEN
-         IF (stFileFlag) THEN
-            INQUIRE (FILE=iniFilePath, EXIST=flag)
-            IF (flag) THEN
-               i = LEN(TRIM(iniFilePath))
-               IF (iniFilePath(i-2:i) .EQ. "bin") THEN
-                  CALL INITFROMBIN(iniFilePath)
-               ELSE
-                  CALL INITFROMVTK(iniFilePath)
-               END IF
+         INQUIRE (FILE=iniFilePath, EXIST=flag)
+         IF (flag) THEN
+            i = LEN(TRIM(iniFilePath))
+            IF (iniFilePath(i-2:i) .EQ. "bin") THEN
+               CALL INITFROMBIN(iniFilePath)
             ELSE
-               fName = TRIM(stFileName)//"_last.bin"
-               INQUIRE (FILE=fName, EXIST=flag)
-               IF (flag) THEN
-                  CALL INITFROMBIN(fName)
-               ELSE
-                  IF (cm%mas()) wrn = TRIM(fName)//" can not be opened"
-                  CALL ZEROINIT
-               END IF
-            END IF
-            IF (rmsh%isReqd) THEN
-               rmsh%fTS = (cTS/rmsh%fTS + 1)*rmsh%freq
-               rmsh%rTS = cTS
-               rmsh%time = time
-               rmsh%iNorm(:) = eq(:)%iNorm
-               rmsh%A0(:,:) = Ao(:,:)
-               rmsh%Y0(:,:) = Yo(:,:)
-               rmsh%D0(:,:) = Do(:,:)
-               IF (saveAve .AND. zeroAve) THEN
-                  rmsh%Aav = 0D0
-                  rmsh%Yav = 0D0
-                  rmsh%Dav = 0D0
-               END IF
+               CALL INITFROMVTU(iniFilePath)
             END IF
          ELSE
-            CALL ZEROINIT
-         END IF ! stFileFlag
+            IF (stFileFlag) THEN
+               fTmp = TRIM(stFileName)//"_last.bin"
+               INQUIRE (FILE=fTmp, EXIST=flag)
+               IF (flag) THEN
+                  CALL INITFROMBIN(fTmp)
+               ELSE
+                  IF (cm%mas()) wrn = TRIM(fTmp)//" can not be opened"
+                  CALL ZEROINIT
+               END IF
+               IF (rmsh%isReqd) THEN
+                  rmsh%fTS = (cTS/rmsh%fTS + 1)*rmsh%freq
+                  rmsh%rTS = cTS
+                  rmsh%time = time
+                  rmsh%iNorm(:) = eq(:)%iNorm
+                  rmsh%A0(:,:) = Ao(:,:)
+                  rmsh%Y0(:,:) = Yo(:,:)
+                  rmsh%D0(:,:) = Do(:,:)
+               END IF
+            ELSE
+               CALL ZEROINIT
+            END IF ! stFileFlag
+         END IF
+
+!        Load any explicitly provided solution variables
+         CALL INITSOLNVAR()
+
          rsTS = cTS
       ELSE
          cTS  = rmsh%rTS
@@ -213,23 +300,16 @@
          Ao = LOCAL(rmsh%A0)
          Yo = LOCAL(rmsh%Y0)
          Do = LOCAL(rmsh%D0)
-         IF (saveAve) THEN
-            rmsh%A0 = rmsh%Aav
-            rmsh%Y0 = rmsh%Yav
-            rmsh%D0 = rmsh%Dav
-            DEALLOCATE(rmsh%Aav, rmsh%Yav, rmsh%Dav)
-            ALLOCATE(rmsh%Aav(tDof,tnNo))
-            ALLOCATE(rmsh%Yav(tDof,tnNo))
-            ALLOCATE(rmsh%Dav(tDof,tnNo))
-            rmsh%Aav = LOCAL(rmsh%A0)
-            rmsh%Yav = LOCAL(rmsh%Y0)
-            rmsh%Dav = LOCAL(rmsh%D0)
-         END IF
          DEALLOCATE(rmsh%A0,rmsh%Y0,rmsh%D0)
          ALLOCATE(rmsh%A0(tDof,tnNo)); rmsh%A0(:,:) = Ao(:,:)
          ALLOCATE(rmsh%Y0(tDof,tnNo)); rmsh%Y0(:,:) = Yo(:,:)
          ALLOCATE(rmsh%D0(tDof,tnNo)); rmsh%D0(:,:) = Do(:,:)
       END IF ! resetSim
+
+!     Initialize new variables
+      An = Ao
+      Yn = Yo
+      Dn = Do
 
       DO iM=1, nMsh
          IF (cm%mas()) THEN
@@ -245,27 +325,46 @@
          END IF
       END DO
 
+!     Initialize Immersed Boundary data structures
+      ALLOCATE(iblank(tnNo), ighost(tnNo))
+      iblank = 0
+      ighost = 0
+      IF (ibFlag) THEN
+         CALL IB_INIT(Do)
+!        For all immersed shells, reset ibLSptr and nFacesLS
+         i = SUM(iblank)
+         i = cm%reduce(i)
+         IF (i.EQ.0 .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
+            ibLSptr = 0
+            nFacesLS = nFacesLS - 1
+
+!        Reset FSILS structures as nFacesLS has been changed
+            CALL FSILS_COMMU_FREE(communicator)
+            CALL FSILS_LHS_FREE(lhs)
+            CALL FSILS_COMMU_CREATE(communicator, cm%com())
+            CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz,
+     2         ltg, rowPtr, colPtr, nFacesLS)
+         END IF
+      END IF
+
 !     Calculating the volume of each domain
       ALLOCATE(s(1,tnNo))
       s = 1D0
       DO iEq=1, nEq
          DO iDmn=1, eq(iEq)%nDmn
-            eq(iEq)%dmn(iDmn)%v = Integ(eq(iEq)%dmn(iDmn)%Id, s, 1, 1)
-            IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "Volume of "//
-     2         "domain "//iDmn//" of equation "//iEq//" is zero"
-            IF (eq(iEq)%dmn(iDmn)%phys .EQ. phys_struct) THEN
-               CALL TEN_INIT(nsd)
+            eq(iEq)%dmn(iDmn)%v =
+     2         Integ(eq(iEq)%dmn(iDmn)%Id, s, 1, 1)
+            IF (.NOT.shlEq .AND. .NOT.cmmInit) THEN
+               std = " Volume of domain "//STR(eq(iEq)%dmn(iDmn)%v)
+               IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "Volume of "//
+     2            "domain "//iDmn//" of equation "//iEq//" is zero"
             END IF
          END DO
       END DO
 
-!     Predicting new variables
-      CALL PICP
-
 !     Preparing faces and BCs
       CALL BAFINI()
 
-!     Pass in lhs%val M is formed with precond
 !     Making sure the old solution satisfies BCs
       CALL SETBCDIR(Ao, Yo, Do)
 
@@ -282,7 +381,6 @@
 !--------------------------------------------------------------------
 !     Initializing accelaration, velocity and displacement to zero
       SUBROUTINE ZEROINIT
-
       IMPLICIT NONE
 
       std = " Initializing state variables to zero"
@@ -302,38 +400,38 @@
          rmsh%A0 = 0D0
          rmsh%Y0 = 0D0
          rmsh%D0 = 0D0
-         IF (saveAve) THEN
-            rmsh%Aav = 0D0
-            rmsh%Yav = 0D0
-            rmsh%Dav = 0D0
-         END IF
+      END IF
+
+      IF (ibFlag) THEN
+         ib%R   = 0D0
+         ib%Rfb = 0D0
+         ib%Ao  = 0D0
+         ib%An  = 0D0
+         ib%Yo  = 0D0
+         ib%Yn  = 0D0
+         ib%Uo  = 0D0
+         ib%Un  = 0D0
       END IF
 
       RETURN
       END SUBROUTINE ZEROINIT
-
 !--------------------------------------------------------------------
-!     Using the saved VTK files for initialization
-      SUBROUTINE INITFROMVTK(fName)
-
+!     Using the saved VTU files for initialization
+      SUBROUTINE INITFROMVTU(fName)
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       INTEGER l
-
       REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:)
 
-      err = "Initialization from vtk is deprecated"
-
       l = LEN(TRIM(fName))
-      IF (fName(l-2:l) .NE. "vtk") err = "Format of <"//
+      IF (fName(l-2:l) .NE. "vtu") err = "Format of <"//
      2   TRIM(fName)//"> is not recognized"
 
       IF (ANY(msh%eType .EQ. eType_NRB)) err = "Only isoparametric"
-     2   //" meshes can be read from VTK files"
+     2   //" meshes can be read from VTU files"
 
-      IF (nMsh .GT. 1) wrn = "Reading from VTK will fail in"//
+      IF (nMsh .GT. 1) wrn = "Reading from VTU will fail in"//
      2   " presence of projected boundaries"
       std = " Initializing from "//fName
 
@@ -344,7 +442,7 @@
 
       IF (cm%mas()) THEN
          ALLOCATE(tmpA(tDof,gtnNo), tmpY(tDof,gtnNo), tmpD(tDof,gtnNo))
-!         CALL READVTK(fName, tmpA, tmpY, tmpD)
+         CALL READVTUS(tmpA, tmpY, tmpD, fName)
       ELSE
          ALLOCATE(tmpA(0,0), tmpY(0,0), tmpD(0,0))
       END IF
@@ -354,33 +452,79 @@
       Do = LOCAL(tmpD)
 
       RETURN
-      END SUBROUTINE INITFROMVTK
-
+      END SUBROUTINE INITFROMVTU
 !--------------------------------------------------------------------
 !     Using the svFSI specific format binary file for initialization
       SUBROUTINE INITFROMBIN(fName)
-
       IMPLICIT NONE
 
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       INTEGER, PARAMETER :: fid = 1
-
-      INTEGER tStamp(SIZE(stamp))
+      INTEGER tStamp(SIZE(stamp)), a, i
 
       std = " Initializing from "//fName
       OPEN(fid, FILE=fName, ACCESS='DIRECT', RECL=recLn)
-      IF (dFlag) THEN
-         IF (rmsh%isReqd .AND. saveAve) THEN
-            READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, Do, rmsh%Aav, rmsh%Yav, rmsh%Dav
+      IF (.NOT.ibFlag) THEN
+         IF (dFlag) THEN
+            IF (sstEq) THEN
+               IF (pstEq) THEN
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Ad
+               ELSE IF (cepEq) THEN
+                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
+     2               "combination. Cannot load restart files"
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Xion, cem%Ya
+               ELSE
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad
+               END IF
+            ELSE
+               IF (pstEq) THEN
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
+               ELSE IF (cepEq) THEN
+                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
+     2               "combination. Cannot load restart files"
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Xion, cem%Ya
+               ELSE
+                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2               eq%iNorm, cplBC%xo, Yo, Ao, Do
+               END IF
+            END IF
          ELSE
-            READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, Do
+            IF (cepEq) THEN
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2          eq%iNorm, cplBC%xo, Yo, Ao, Xion
+            ELSE
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao
+            END IF
          END IF
       ELSE
-         READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2      cplBC%xo, Yo, Ao
+         IF (dFlag) THEN
+            IF (pstEq) THEN
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
+     3            ib%Un, ib%Rfb
+            ELSE
+               READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%An, ib%Yn, ib%Un,
+     3            ib%Rfb
+            END IF
+         ELSE
+            READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
+     2         cplBC%xo, Yo, Ao, ib%An, ib%Yn, ib%Un, ib%Rfb
+         END IF
+
+!        Compute ib%Uo
+         DO a=1, ib%tnNo
+            DO i=1, nsd
+               ib%Uo(i,a) = ib%Un(i,a) - dt*ib%Yn(i,a)
+            END DO
+         END DO
       END IF
       CLOSE(fid)
 
@@ -394,22 +538,22 @@
          IF (tStamp(2).NE.stamp(2)) err = "Number of equations <"//
      2      tStamp(2)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(2)//">"
-         IF (tStamp(3).NE.stamp(3)) err = "Number of 0D unknowns"//
+         IF (tStamp(3).NE.stamp(3)) err = "Number of meshes <"//
      2      tStamp(3)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(3)//">"
-         IF (tStamp(4).NE.stamp(4)) err = "Number of total dof <"//
+         IF (tStamp(4).NE.stamp(4)) err = "Number of nodes <"//
      2      tStamp(4)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(4)//">"
-         IF (tStamp(5).NE.stamp(5)) err = "Number of variables"//
+         IF (tStamp(5).NE.stamp(5)) err = "Number of cplBC%x <"//
      2      tStamp(5)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(5)//">"
-         IF (tStamp(6).NE.stamp(6)) err = "Number of elements"//
+         IF (tStamp(6).NE.stamp(6)) err = "Number of dof <"//
      2      tStamp(6)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(6)//">"
-         IF (tStamp(7).NE.stamp(7)) err = "Number of nodes"//
-     2      tStamp(7)//"> does not match with "//
+         IF (tStamp(7).NE.stamp(7)) err = "dFlag specification"//
+     2      " <"//tStamp(7)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(7)//">"
-         IF (tStamp(8).NE.stamp(8)) err = "Version of solver"//
+         IF (tStamp(8).NE.stamp(8)) err = "Version of solver <"//
      2      tStamp(8)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(8)//">"
       END IF
@@ -420,14 +564,88 @@
 
       RETURN
       END SUBROUTINE INITFROMBIN
+!--------------------------------------------------------------------
+      SUBROUTINE INITSOLNVAR()
+      IMPLICIT NONE
 
+      INTEGER a
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+!     Transfer initial velocity field
+      flag = ALLOCATED(Vinit)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (tDof .LT. nsd) err = "Not enough dof to initialize "//
+     2      "velocity field"
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpR(nsd,gtnNo))
+            tmpR = Vinit
+            DEALLOCATE(Vinit)
+         ELSE
+            ALLOCATE(tmpR(0,0))
+         END IF
+         ALLOCATE(Vinit(nsd,tnNo))
+         Vinit = LOCAL(tmpR)
+         DEALLOCATE(tmpR)
+         DO a=1, tnNo
+            Yo(1:nsd,a) = Vinit(:,a)
+         END DO
+         DEALLOCATE(Vinit)
+      END IF
+
+!     Transfer initial pressure field
+      flag = ALLOCATED(Pinit)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (tDof .LT. nsd+1) err = "Not enough dof to initialize "//
+     2      "pressure field"
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpR(1,gtnNo))
+            tmpR(1,:) = Pinit
+            DEALLOCATE(Pinit)
+         ELSE
+            ALLOCATE(tmpR(0,0))
+         END IF
+         ALLOCATE(Pinit(tnNo))
+         tmpR = LOCAL(tmpR)
+         Pinit(:) = tmpR(1,:)
+         DEALLOCATE(tmpR)
+         DO a=1, tnNo
+            Yo(nsd+1,a) = Pinit(a)
+         END DO
+         DEALLOCATE(Pinit)
+      END IF
+
+!     Transfer initial displacement field
+      flag = ALLOCATED(Dinit)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (.NOT.dFlag) err = "Incorrect phys to initialize "//
+     2      "displacement field"
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpR(nsd,gtnNo))
+            tmpR = Dinit
+            DEALLOCATE(Dinit)
+         ELSE
+            ALLOCATE(tmpR(0,0))
+         END IF
+         ALLOCATE(Dinit(nsd,tnNo))
+         Dinit = LOCAL(tmpR)
+         DEALLOCATE(tmpR)
+         DO a=1, tnNo
+            Do(1:nsd,a) = Dinit(:,a)
+         END DO
+         DEALLOCATE(Dinit)
+      END IF
+
+      RETURN
+      END SUBROUTINE INITSOLNVAR
+!--------------------------------------------------------------------
       END SUBROUTINE INITIALIZE
 !####################################################################
       SUBROUTINE FINALIZE
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER iM, iEq
@@ -448,35 +666,88 @@
          END DO
          DEALLOCATE(eq)
       END IF
-      IF (ALLOCATED(colPtr)) DEALLOCATE(colPtr)
-      IF (ALLOCATED(rowPtr)) DEALLOCATE(rowPtr)
 
 !     Deallocating sparse matrix structures
-      IF (lhs%foc) CALL FSILS_LHS_FREE(lhs)
+      IF(lhs%foc) CALL FSILS_LHS_FREE(lhs)
 #ifdef WITH_TRILINOS
       IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-         CALL TRILINOS_LHS_FREE() !free K and R in C++
+         CALL TRILINOS_LHS_FREE()
       END IF
 #endif
-
-      IF (.NOT. useTrilinosAssemAndLS) THEN
-         IF (ALLOCATED(Val)) DEALLOCATE(Val)
+      IF (.NOT.useTrilinosAssemAndLS) THEN
+         IF (ALLOCATED(Val))   DEALLOCATE(Val)
       END IF
 
-      IF (ALLOCATED(x)) DEALLOCATE(x)
-      IF (ALLOCATED(R)) DEALLOCATE(R)
-      IF (ALLOCATED(Ao)) DEALLOCATE(Ao)
-      IF (ALLOCATED(An)) DEALLOCATE(An)
-      IF (ALLOCATED(Yo)) DEALLOCATE(Yo)
-      IF (ALLOCATED(Yn)) DEALLOCATE(Yn)
-      IF (ALLOCATED(Do)) DEALLOCATE(Do)
-      IF (ALLOCATED(Dn)) DEALLOCATE(Dn)
-      IF (ALLOCATED(ltg)) DEALLOCATE(ltg)
-      IF (ALLOCATED(dmnId)) DEALLOCATE(dmnId)
-      IF (ALLOCATED(fN)) DEALLOCATE(FN)
+      IF (ALLOCATED(colPtr))   DEALLOCATE(colPtr)
+      IF (ALLOCATED(dmnId))    DEALLOCATE(dmnId)
+      IF (ALLOCATED(ltg))      DEALLOCATE(ltg)
+      IF (ALLOCATED(rowPtr))   DEALLOCATE(rowPtr)
+      IF (ALLOCATED(idMap))    DEALLOCATE(idMap)
+      IF (ALLOCATED(cmmBdry))  DEALLOCATE(cmmBdry)
+      IF (ALLOCATED(iblank))   DEALLOCATE(iblank)
+      IF (ALLOCATED(ighost))   DEALLOCATE(ighost)
+
+      IF (ALLOCATED(Ao))       DEALLOCATE(Ao)
+      IF (ALLOCATED(An))       DEALLOCATE(An)
+      IF (ALLOCATED(Do))       DEALLOCATE(Do)
+      IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
+      IF (ALLOCATED(R))        DEALLOCATE(R)
+      IF (ALLOCATED(x))        DEALLOCATE(x)
+      IF (ALLOCATED(Yo))       DEALLOCATE(Yo)
+      IF (ALLOCATED(Yn))       DEALLOCATE(Yn)
+      IF (ALLOCATED(Bf))       DEALLOCATE(Bf)
+
+      IF (ALLOCATED(Ad))       DEALLOCATE(Ad)
+      IF (ALLOCATED(Rd))       DEALLOCATE(Rd)
+      IF (ALLOCATED(Kd))       DEALLOCATE(Kd)
+
+      IF (ALLOCATED(pS0))      DEALLOCATE(pS0)
+      IF (ALLOCATED(pSn))      DEALLOCATE(pSn)
+      IF (ALLOCATED(pSa))      DEALLOCATE(pSa)
+
+      IF (ALLOCATED(Pinit))    DEALLOCATE(Pinit)
+      IF (ALLOCATED(Vinit))    DEALLOCATE(Vinit)
+      IF (ALLOCATED(Dinit))    DEALLOCATE(Dinit)
+
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
+
+!     Electrophysiology and Electromechanics
+      IF (cepEq) THEN
+         IF (ALLOCATED(Xion))  DEALLOCATE(Xion)
+         IF (cem%cpld) THEN
+            IF (ALLOCATED(cem%Ya))  DEALLOCATE(cem%Ya)
+         END IF
+      END IF
+
+!     IB structures
+      IF (ibFlag) THEN
+         IF (ALLOCATED(ib%dmnId))  DEALLOCATE(ib%dmnId)
+         IF (ALLOCATED(ib%rowPtr)) DEALLOCATE(ib%rowPtr)
+         IF (ALLOCATED(ib%colPtr)) DEALLOCATE(ib%colPtr)
+         IF (ALLOCATED(ib%x))      DEALLOCATE(ib%x)
+         IF (ALLOCATED(ib%fN))     DEALLOCATE(ib%fN)
+         IF (ALLOCATED(ib%An))     DEALLOCATE(ib%An)
+         IF (ALLOCATED(ib%Ao))     DEALLOCATE(ib%Ao)
+         IF (ALLOCATED(ib%Yn))     DEALLOCATE(ib%Yn)
+         IF (ALLOCATED(ib%Yo))     DEALLOCATE(ib%Yo)
+         IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
+         IF (ALLOCATED(ib%Uo))     DEALLOCATE(ib%Uo)
+         IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
+         IF (ALLOCATED(ib%Rfb))    DEALLOCATE(ib%Rfb)
+         IF (ALLOCATED(ib%cm%n))   DEALLOCATE(ib%cm%n)
+         IF (ALLOCATED(ib%cm%gE))  DEALLOCATE(ib%cm%gE)
+
+         DO iM=1, ib%nMsh
+            CALL DESTROY(ib%msh(iM))
+         END DO
+         DEALLOCATE(ib%msh)
+
+         IF (ib%lhs%foc) CALL FSILS_LHS_FREE(ib%lhs)
+
+         DEALLOCATE(ib)
+      END IF
 
 !     Closing the output channels
       CALL std%close()
@@ -486,3 +757,4 @@
 
       RETURN
       END SUBROUTINE FINALIZE
+!####################################################################

@@ -28,6 +28,11 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+//--------------------------------------------------------------------
+//
+// Interface to ZLIB for data inflation and deflation.
+//
+//--------------------------------------------------------------------
 
    #include <stdio.h>
    #include <string.h>
@@ -90,8 +95,9 @@
    }
 
    int def ( unsigned char* in, int nin, unsigned char* out, int* nout, int level ) {
-      int ret, flush = 0;
+      int ret, flush;
       char c;
+
       z_stream strm;
       strm.zalloc = 0;
       strm.zfree = 0;
@@ -104,6 +110,7 @@
       strm.avail_out = *nout;
       strm.next_out = out;
 
+      flush = 0;
       while (strm.avail_in != 0)
       {
           ret = deflate(&strm, flush);
@@ -125,7 +132,7 @@
               strm.next_out = out;
           }
           ret = deflate(&strm, flush);
-	  }
+      }
       assert(ret == Z_STREAM_END);
 
       *nout = *nout - strm.avail_out;

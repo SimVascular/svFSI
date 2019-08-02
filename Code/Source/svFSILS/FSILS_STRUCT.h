@@ -54,7 +54,6 @@
       INTEGER, PARAMETER :: BC_TYPE_Dir = 0, BC_TYPE_Neu = 1
       INTEGER, PARAMETER :: BCOP_TYPE_ADD = 0, BCOP_TYPE_PRE = 1
 
-
 !     Communication structure
       TYPE FSILS_commuType
          SEQUENCE

@@ -60,7 +60,6 @@ int split_(int *nElptr, int *eNoNptr, int *eNoNbptr, int *IEN,
 
 // This is for the case one of the processors doesn't posses any
 // part of this mesh
-
    nExRanks   = 0;
    nparts     = 0;
    elmdist[0] = 0;

@@ -39,9 +39,9 @@
 !--------------------------------------------------------------------
 
       MODULE ALLFUN
-      
+
       USE MATFUN
-      
+
       IMPLICIT NONE
 
       INTERFACE Integ
@@ -55,12 +55,13 @@
       INTERFACE MKC
          MODULE PROCEDURE MKCS, MKCV
       END INTERFACE MKC
+
       INTERFACE MKCI
          MODULE PROCEDURE MKCIS, MKCIV
       END INTERFACE MKCI
 
       INTERFACE GLOBAL
-         MODULE PROCEDURE GLOBALS, GLOBALV
+         MODULE PROCEDURE GLOBALIS, GLOBALRS, GLOBALIV, GLOBALRV
       END INTERFACE GLOBAL
 
       INTERFACE LOCAL
@@ -68,12 +69,25 @@
       END INTERFACE LOCAL
 
       INTERFACE DESTROY
-         MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYEQ,
-     2      DESTROYSTACK, DESTROYQUEUE
+         MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYBF,
+     2      DESTROYDMN, DESTROYEQ, DESTROYBS, DESTROYMB, DESTROYDATA,
+     3      DESTROYADJ, DESTROYSTACK, DESTROYQUEUE, DESTROYTRACE,
+     4      DESTROYIBCM
       END INTERFACE DESTROY
 
-      CONTAINS
+      INTERFACE GETNADJCNCY
+         MODULE PROCEDURE GETNADJ_MSH, GETNADJ_FACE
+      END INTERFACE
 
+      INTERFACE GETEADJCNCY
+         MODULE PROCEDURE GETEADJ_MSH, GETEADJ_FACE
+      END INTERFACE
+
+      INTERFACE IB_SYNC
+         MODULE PROCEDURE IB_SYNCS, IB_SYNCV
+      END INTERFACE
+
+      CONTAINS
 !####################################################################
 !     This routine integrate s over the surface faId.
       FUNCTION IntegS(lFa, s)
@@ -83,19 +97,44 @@
       REAL(KIND=8), INTENT(IN) :: s(:)
       REAL(KIND=8) IntegS
 
+      LOGICAL isIB
       INTEGER a, e, g, Ac, nNo
       REAL(KIND=8) sHat, Jac, n(nsd)
 
-      nNo  = SIZE(s)
-      IF (nNo .NE. tnNo) err = "Incompatible vector size in Integ"
+      nNo = SIZE(s)
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in Integ"
+         ELSE
+            err = "Incompatible vector size in vInteg"
+         END IF
+      END IF
+
+      isIB = .FALSE.
+      IF (ibFlag) THEN
+         IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
+      END IF
 
       IntegS = 0D0
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(lFa%iM), lFa, e)
+         IF (lFa%eType .EQ. eType_NRB) THEN
+            IF (.NOT.isIB) THEN
+               CALL NRBNNXB(msh(lFa%iM), lFa, e)
+            ELSE
+               CALL NRBNNXB(ib%msh(lFa%iM), lFa, e)
+            END IF
+         END IF
+
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, n)
+            IF (.NOT.isIB) THEN
+               CALL GNNB(lFa, e, g, n)
+            ELSE
+               CALL GNNIB(lFa, e, g, n)
+            END IF
             Jac = SQRT(NORM(n))
+
 !     Calculating the function value
             sHat = 0D0
             DO a=1, lFa%eNoN
@@ -106,11 +145,12 @@
             IntegS = IntegS + Jac*lFa%w(g)*sHat
          END DO
       END DO
+
+      IF (cm%seq() .OR. isIB) RETURN
       IntegS = cm%reduce(IntegS)
 
       RETURN
       END FUNCTION IntegS
-
 !--------------------------------------------------------------------
 !     This routine integrate s over the surface faId.
       FUNCTION IntegV(lFa, s)
@@ -120,20 +160,45 @@
       REAL(KIND=8), INTENT(IN) :: s(:,:)
       REAL(KIND=8) IntegV
 
-      INTEGER a, i, e, Ac, g, ierr, nNo
+      LOGICAL isIB
+      INTEGER a, i, e, Ac, g, nNo
       REAL(KIND=8) sHat, n(nsd)
 
+      IF (SIZE(s,1) .NE. nsd) err = "Incompatible vector size in IntegV"
+
       nNo = SIZE(s,2)
-      IF (SIZE(s,1).NE.nsd .OR. nNo.NE.tnNo)
-     2   err = "Incompatible vector size in IntegV"
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in IntegV"
+         ELSE
+            err = "Incompatible vector size in IntegV"
+         END IF
+      END IF
+
+      isIB = .FALSE.
+      IF (ibFlag) THEN
+         IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
+      END IF
 
       IntegV = 0D0
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(lFa%iM), lFa, e)
+         IF (lFa%eType .EQ. eType_NRB) THEN
+            IF (.NOT.isIB) THEN
+               CALL NRBNNXB(msh(lFa%iM), lFa, e)
+            ELSE
+               CALL NRBNNXB(ib%msh(lFa%iM), lFa, e)
+            END IF
+         END IF
+
          DO g=1, lFa%nG
-!     Since sHat must be multiplied by Jac, I don't normalize it here
-            CALL GNNB(lFa, e, g, n)
+            IF (.NOT.isIB) THEN
+               CALL GNNB(lFa, e, g, n)
+            ELSE
+               CALL GNNIB(lFa, e, g, n)
+            END IF
+
 !     Calculating the function value
             sHat = 0D0
             DO a=1, lFa%eNoN
@@ -147,14 +212,11 @@
          END DO
       END DO
 
-      IF (cm%seq()) RETURN
-      CALL MPI_ALLREDUCE(IntegV, sHat, 1, mpreal, MPI_SUM, cm%com(),
-     2   ierr)
-      IntegV = sHat
+      IF (cm%seq() .OR . isIB) RETURN
+      IntegV = cm%reduce(IntegV)
 
       RETURN
       END FUNCTION IntegV
-
 !--------------------------------------------------------------------
 !     This routine integrate s(l,u,:) over the surface faId.
       FUNCTION IntegG(lFa, s, l, uo)
@@ -173,19 +235,25 @@
       IF (PRESENT(uo)) u = uo
 
       nNo = SIZE(s,2)
-      IF (nNo .NE. tnNo)
-     2   err = "Incompatible vector size in Integ"
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in IntegG"
+         ELSE
+            err = "Incompatible vector size in IntegG"
+         END  IF
+      END IF
 
       IntegG = 0D0
       IF (u-l+1 .EQ. nsd) THEN
-         ALLOCATE (vec(nsd,tnNo))
-         DO a=1, tnNo
+         ALLOCATE (vec(nsd,nNo))
+         DO a=1, nNo
             vec(:,a) = s(l:u,a)
          END DO
          IntegG = IntegV(lFa,vec)
       ELSE IF (l .EQ. u) THEN
-         ALLOCATE (sclr(tnNo))
-         DO a=1, tnNo
+         ALLOCATE (sclr(nNo))
+         DO a=1, nNo
             sclr(a) = s(l,a)
          END DO
          IntegG = IntegS(lFa,sclr)
@@ -195,7 +263,6 @@
 
       RETURN
       END FUNCTION IntegG
-
 !--------------------------------------------------------------------
 !     This routine integrate an equation over a particular domain
       FUNCTION vInteg(dId, s, l, u)
@@ -207,57 +274,140 @@
       INTEGER, INTENT(IN) :: u
       REAL(KIND=8) vInteg
 
-      INTEGER a, e, g, Ac, i, iM, eNoN
-      REAL(KIND=8) Jac, tmp(nsd,nsd), sHat, rtmp
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), Nx(:,:)
+      LOGICAL isIB
+      INTEGER a, e, g, Ac, iM, eNoN, insd, ibl, nNo
+      REAL(KIND=8) Jac, nV(nsd), sHat, tmp(nsd,nsd)
 
-      IF (SIZE(s,2) .NE. tnNo)
-     2   err = "Incompatible vector size in Integ"
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sl(:), Nxi(:,:), Nx(:,:),
+     2   tmps(:,:)
+
+      nNo = SIZE(s,2)
+      IF (nNo .NE. tnNo) THEN
+         IF (ibFlag) THEN
+            IF (nNo .NE. ib%tnNo) err =
+     2         "Incompatible vector size in vInteg"
+         ELSE
+            err = "Incompatible vector size in vInteg"
+         END IF
+      END IF
+
+      isIB = .FALSE.
+      IF (ibFlag) THEN
+         IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
+      END IF
 
       vInteg = 0D0
-      DO iM=1, nMsh
-         eNoN = msh(iM)%eNoN
-         IF (iM .NE. 1) DEALLOCATE(xl, Nx)
-         ALLOCATE(xl(nsd,eNoN), Nx(nsd,eNoN))
-         DO e=1, msh(iM)%nEl
-            IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
-               IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
-            END IF
-!     Updating the shape functions, if this is a NURB
-            IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), e)
-            DO a=1, eNoN
-               Ac      = msh(iM)%IEN(a,e)
-               xl(:,a) = x(:,Ac)
-               IF (mvMsh) xl(:,a) = xl(:,a) + Do(nsd+2:2*nsd+1,Ac)
-            END DO
+      IF (.NOT.isIB) THEN
+         DO iM=1, nMsh
+            eNoN = msh(iM)%eNoN
+            insd = nsd
+            IF (msh(iM)%lShl) insd = nsd-1
+            IF (msh(iM)%lFib) insd = 1
 
-            DO g=1, msh(iM)%nG
-               IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
-     2            CALL GNN(eNoN, msh(iM)%Nx(:,:,g), xl, Nx, Jac, tmp)
-               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
+     2         sl(eNoN), tmps(nsd,insd))
 
-               sHat = 0D0
+            DO e=1, msh(iM)%nEl
+               IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
+                  IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
+               END IF
+!           Updating the shape functions, if this is a NURB
+               IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), e)
+               ibl = 0
                DO a=1, eNoN
-                  Ac = msh(iM)%IEN(a,e)
+                  Ac      = msh(iM)%IEN(a,e)
+                  xl(:,a) = x(:,Ac)
+                  IF (mvMsh) xl(:,a) = xl(:,a) + Do(nsd+2:2*nsd+1,Ac)
                   IF (l .EQ. u) THEN
-                     rtmp = s(l,Ac)
-                  ELSE
-                     rtmp = SQRT(NORM(s(l:u,Ac)))
+                     sl(a) = s(l,Ac)
+                   ELSE
+                     sl(a) = SQRT(NORM(s(l:u,Ac)))
                   END IF
-                  sHat = sHat + rtmp*msh(iM)%N(a,g)
+                  ibl = ibl + iblank(Ac)
                END DO
-               vInteg = vInteg + msh(iM)%w(g)*Jac*sHat
-            END DO
-         END DO
-      END DO
+               IF (ibl .EQ. eNoN) CYCLE
 
-      IF (cm%seq()) RETURN
-      CALL MPI_ALLREDUCE(vInteg, sHat, 1, mpreal, MPI_SUM, cm%com(), i)
-      vInteg = sHat
+               DO g=1, msh(iM)%nG
+                  Nxi(:,:) = msh(iM)%Nx(:,:,g)
+                  IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF) THEN
+                     IF (msh(iM)%lShl) THEN
+                        CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
+                        Jac = SQRT(NORM(nV))
+                     ELSE
+                        CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
+                     END IF
+                  END IF
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+
+                  sHat = 0D0
+                  DO a=1, eNoN
+                     Ac = msh(iM)%IEN(a,e)
+                     sHat = sHat + sl(a)*msh(iM)%N(a,g)
+                  END DO
+                  vInteg = vInteg + msh(iM)%w(g)*Jac*sHat
+               END DO
+            END DO
+
+            DEALLOCATE(xl, Nxi, Nx, sl, tmps)
+         END DO
+      ELSE
+         DO iM=1, ib%nMsh
+            eNoN = ib%msh(iM)%eNoN
+            insd = nsd
+            IF (ib%msh(iM)%lShl) insd = nsd-1
+            IF (ib%msh(iM)%lFib) insd = 1
+
+            ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
+     2         sl(eNoN), tmps(nsd,insd))
+
+            DO e=1, ib%msh(iM)%nEl
+               IF (dId.GT.0 .AND. ALLOCATED(ib%msh(iM)%eId)) THEN
+                  IF (.NOT.BTEST(ib%msh(iM)%eId(e),dId)) CYCLE
+               END IF
+
+!           Updating the shape functions, if this is a NURB
+               IF (ib%msh(iM)%eType .EQ. eType_NRB)
+     2            CALL NRBNNX(ib%msh(iM), e)
+               DO a=1, eNoN
+                  Ac      = ib%msh(iM)%IEN(a,e)
+                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                  IF (l .EQ. u) THEN
+                     sl(a) = s(l,Ac)
+                   ELSE
+                     sl(a) = SQRT(NORM(s(l:u,Ac)))
+                  END IF
+               END DO
+
+               DO g=1, ib%msh(iM)%nG
+                  Nxi(:,:) = ib%msh(iM)%Nx(:,:,g)
+                  IF (g.EQ.1 .OR. .NOT.ib%msh(iM)%lShpF) THEN
+                     IF (ib%msh(iM)%lShl) THEN
+                        CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
+                        Jac = SQRT(NORM(nV))
+                     ELSE
+                        CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
+                     END IF
+                  END IF
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+
+                  sHat = 0D0
+                  DO a=1, eNoN
+                     Ac = ib%msh(iM)%IEN(a,e)
+                     sHat = sHat + sl(a)*ib%msh(iM)%N(a,g)
+                  END DO
+                  vInteg = vInteg + ib%msh(iM)%w(g)*Jac*sHat
+               END DO
+            END DO
+
+            DEALLOCATE(xl, Nxi, Nx, sl, tmps)
+         END DO
+      END IF
+
+      IF (cm%seq() .OR. isIB) RETURN
+      vInteg = cm%reduce(vInteg)
 
       RETURN
       END FUNCTION vInteg
-
 !####################################################################
 !     This a both way communication with three main part:
       SUBROUTINE COMMUS(U)
@@ -297,9 +447,7 @@
 
       RETURN
       END SUBROUTINE COMMUV
-
 !####################################################################
-
       FUNCTION MKCS(U)
       USE COMMOD
       IMPLICIT NONE
@@ -393,15 +541,70 @@
 
       RETURN
       END SUBROUTINE MKCIV
-
 !####################################################################
+      FUNCTION GLOBALIS(lM, U)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER, INTENT(IN) :: U(:)
+      INTEGER, ALLOCATABLE :: GLOBALIS(:)
 
-      FUNCTION GLOBALS(lM, U)
+      INTEGER Ac, a, e, i, ierr
+      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
+      INTEGER, ALLOCATABLE :: ienU(:,:), gienU(:,:)
+
+      ALLOCATE(sCount(cm%np()), disp(cm%np()))
+      IF (SIZE(U,1) .NE. lM%nNo) THEN
+         err = "GLOBAL is only specified for vector with size nNo"
+      END IF
+
+      IF (cm%seq()) THEN
+         ALLOCATE(GLOBALIS(lM%gnNo))
+         GLOBALIS = U
+         RETURN
+      END IF
+
+      ALLOCATE(ienU(lM%eNoN,lM%nEl))
+      IF (cm%mas()) THEN
+         ALLOCATE(gienU(lM%eNoN,lM%gnEl), GLOBALIS(lM%gnNo))
+      ELSE
+         ALLOCATE(gienU(0,0), GLOBALIS(0))
+      END IF
+
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            ienU(a,e) = U(Ac)
+         END DO
+      END DO
+
+      DO i=1, cm%np()
+         disp(i)   = lM%eDist(i-1)*lM%eNoN
+         sCount(i) = lM%eDist(i)*lM%eNoN - disp(i)
+      END DO
+
+      CALL MPI_GATHERV(ienU, lM%nEl*lM%eNoN, mpint, gienU, sCount,
+     2   disp, mpint, master, cm%com(), ierr)
+
+      IF (cm%slv()) RETURN
+
+      DO e=1, lM%gnEl
+         DO a=1, lM%eNoN
+            Ac = lM%gIEN(a,e)
+            GLOBALIS(Ac) = gienU(a,e)
+         END DO
+      END DO
+
+      RETURN
+      END FUNCTION GLOBALIS
+!--------------------------------------------------------------------
+      FUNCTION GLOBALRS(lM, U)
       USE COMMOD
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
       REAL(KIND=8), INTENT(IN) :: U(:)
-      REAL(KIND=8), ALLOCATABLE :: GLOBALS(:)
+      REAL(KIND=8), ALLOCATABLE :: GLOBALRS(:)
 
       INTEGER Ac, a, e, i, ierr
       INTEGER, ALLOCATABLE :: sCount(:), disp(:)
@@ -413,16 +616,16 @@
       END IF
 
       IF (cm%seq()) THEN
-         ALLOCATE(GLOBALS(lM%gnNo))
-         GLOBALS = U
+         ALLOCATE(GLOBALRS(lM%gnNo))
+         GLOBALRS = U
          RETURN
       END IF
 
       ALLOCATE(ienU(lM%eNoN,lM%nEl))
       IF (cm%mas()) THEN
-         ALLOCATE(gienU(lM%eNoN,lM%gnEl), GLOBALS(lM%gnNo))
+         ALLOCATE(gienU(lM%eNoN,lM%gnEl), GLOBALRS(lM%gnNo))
       ELSE
-         ALLOCATE(gienU(0,0), GLOBALS(0))
+         ALLOCATE(gienU(0,0), GLOBALRS(0))
       END IF
 
       DO e=1, lM%nEl
@@ -446,19 +649,82 @@
       DO e=1, lM%gnEl
          DO a=1, lM%eNoN
             Ac = lM%gIEN(a,e)
-            GLOBALS(Ac) = gienU(a,e)
+            GLOBALRS(Ac) = gienU(a,e)
          END DO
       END DO
 
       RETURN
-      END FUNCTION GLOBALS
+      END FUNCTION GLOBALRS
 !--------------------------------------------------------------------
-      FUNCTION GLOBALV(lM, U)
+      FUNCTION GLOBALIV(lM, U)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER, INTENT(IN) :: U(:,:)
+      INTEGER, ALLOCATABLE :: GLOBALIV(:,:)
+
+      INTEGER m, Ac, a, e, i, ierr
+      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
+      INTEGER, ALLOCATABLE :: ienU(:,:), gienU(:,:)
+
+      ALLOCATE(sCount(cm%np()), disp(cm%np()))
+      m = SIZE(U,1)
+      IF (SIZE(U,2) .NE. lM%nNo) THEN
+         err = "GLOBAL is only specified for vector with size nNo"
+      END IF
+
+      IF (cm%seq()) THEN
+         ALLOCATE(GLOBALIV(m,lM%gnNo))
+         GLOBALIV = U
+         RETURN
+      END IF
+
+      ALLOCATE(ienU(m*lM%eNoN,lM%nEl))
+      IF (cm%mas()) THEN
+         ALLOCATE(gienU(m*lM%eNoN,lM%gnEl), GLOBALIV(m,lM%gnNo))
+      ELSE
+         ALLOCATE(gienU(0,0), GLOBALIV(0,0))
+      END IF
+
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            DO i=1, m
+               ienU(m*(a-1)+i,e) = U(i,Ac)
+            END DO
+         END DO
+      END DO
+
+      a = lM%eNoN*m
+      DO i=1, cm%np()
+         disp(i)   = lM%eDist(i-1)*a
+         sCount(i) = lM%eDist(i)*a - disp(i)
+      END DO
+
+      CALL MPI_GATHERV(ienU, lM%nEl*a, mpint, gienU, sCount, disp,
+     2   mpint, master, cm%com(), ierr)
+
+      IF (cm%slv()) RETURN
+
+      DO e=1, lM%gnEl
+         DO a=1, lM%eNoN
+            Ac = lM%gIEN(a,e)
+            DO i=1, m
+               GLOBALIV(i,Ac) = gienU(m*(a-1)+i,e)
+            END DO
+         END DO
+      END DO
+
+      RETURN
+      END FUNCTION GLOBALIV
+!--------------------------------------------------------------------
+      FUNCTION GLOBALRV(lM, U)
       USE COMMOD
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
       REAL(KIND=8), INTENT(IN) :: U(:,:)
-      REAL(KIND=8), ALLOCATABLE :: GLOBALV(:,:)
+      REAL(KIND=8), ALLOCATABLE :: GLOBALRV(:,:)
 
       INTEGER m, Ac, a, e, i, ierr
       INTEGER, ALLOCATABLE :: sCount(:), disp(:)
@@ -471,16 +737,16 @@
       END IF
 
       IF (cm%seq()) THEN
-         ALLOCATE(GLOBALV(m,lM%gnNo))
-         GLOBALV = U
+         ALLOCATE(GLOBALRV(m,lM%gnNo))
+         GLOBALRV = U
          RETURN
       END IF
 
       ALLOCATE(ienU(m*lM%eNoN,lM%nEl))
       IF (cm%mas()) THEN
-         ALLOCATE(gienU(m*lM%eNoN,lM%gnEl), GLOBALV(m,lM%gnNo))
+         ALLOCATE(gienU(m*lM%eNoN,lM%gnEl), GLOBALRV(m,lM%gnNo))
       ELSE
-         ALLOCATE(gienU(0,0), GLOBALV(0,0))
+         ALLOCATE(gienU(0,0), GLOBALRV(0,0))
       END IF
 
       DO e=1, lM%nEl
@@ -508,14 +774,13 @@
          DO a=1, lM%eNoN
             Ac = lM%gIEN(a,e)
             DO i=1, m
-               GLOBALV(i,Ac) = gienU(m*(a-1)+i,e)
+               GLOBALRV(i,Ac) = gienU(m*(a-1)+i,e)
             END DO
          END DO
       END DO
 
       RETURN
-      END FUNCTION GLOBALV
-
+      END FUNCTION GLOBALRV
 !####################################################################
 !     These routine use ltg to go from gtnNo to tnNo
       FUNCTION LOCALIS(U)
@@ -592,9 +857,9 @@
 
       RETURN
       END FUNCTION LOCALRV
-
 !####################################################################
-!     This function returns the domain that a set of nodes belongs to
+!     This function returns the domain that an element of a mesh
+!     belongs to
       FUNCTION DOMAIN(lM, iEq, e)
       USE COMMOD
       IMPLICIT NONE
@@ -616,11 +881,12 @@
          DOMAIN = iDmn
          IF (BTEST(lM%eId(e),eq(iEq)%dmn(iDmn)%Id)) RETURN
       END DO
-      err = "Unable to find the domain ID of element "//e
+      DOMAIN = 0
+!      err = "Unable to find the domain ID of element "//e//", mesh <"//
+!     2   TRIM(lM%name)//"> and equation "//iEq
 
       RETURN
       END FUNCTION DOMAIN
-
 !--------------------------------------------------------------------
 !     This function is true if "phys" is solved on "node"
       PURE FUNCTION ISDOMAIN(iEq, node, phys)
@@ -644,12 +910,69 @@
       ELSE
 !     No domain partitioning exists, so single domain is assumed and we
 !     only need to check that
-            IF (eq(iEq)%dmn(1)%phys .EQ. phys) ISDOMAIN = .TRUE.
+         IF (eq(iEq)%dmn(1)%phys .EQ. phys) ISDOMAIN = .TRUE.
       END IF
 
       RETURN
       END FUNCTION ISDOMAIN
+!####################################################################
+!     This function returns the IB domain that an element of an IB mesh
+!     belongs to
+      FUNCTION IB_DOMAIN(lM, iEq, e)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: iEq, e
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER IB_DOMAIN
 
+      INTEGER iDmn
+
+      IB_DOMAIN = 0
+!     Domain Id of -1 counts for the entire domain
+      DO iDmn=1, eq(iEq)%nDmnIB
+         IB_DOMAIN = iDmn
+         IF (eq(iEq)%dmnIB(iDmn)%Id .EQ. -1) RETURN
+      END DO
+      IF (.NOT. ALLOCATED(lM%eId)) err = "eId is not allocated,"//
+     2   " while Id.NE.-1"
+      DO iDmn=1, eq(iEq)%nDmnIB
+         IB_DOMAIN = iDmn
+         IF (BTEST(lM%eId(e),eq(iEq)%dmnIB(iDmn)%Id)) RETURN
+      END DO
+      IB_DOMAIN = 0
+!      err = "Unable to find the domain ID of element "//e//", mesh <"//
+!     2   TRIM(lM%name)//"> and equation "//iEq
+
+      RETURN
+      END FUNCTION IB_DOMAIN
+!--------------------------------------------------------------------
+!     This function is true if "phys" is solved on "node"
+      PURE FUNCTION IB_ISDOMAIN(iEq, node, phys)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER, INTENT(IN) :: iEq, node, phys
+      LOGICAL IB_ISDOMAIN
+
+      INTEGER iDmn
+
+      IB_ISDOMAIN = .FALSE.
+      IF (ALLOCATED(ib%dmnId)) THEN
+         DO iDmn=1, eq(iEq)%nDmnIB
+            IF (eq(iEq)%dmnIB(iDmn)%phys .EQ. phys) THEN
+               IF (BTEST(ib%dmnId(node),eq(iEq)%dmnIB(iDmn)%Id)) THEN
+                  IB_ISDOMAIN = .TRUE.
+                  RETURN
+               END IF
+            END IF
+         END DO
+      ELSE
+!     No domain partitioning exists, so single domain is assumed and we
+!     only need to check that
+            IF (eq(iEq)%dmnIB(1)%phys .EQ. phys) IB_ISDOMAIN = .TRUE.
+      END IF
+
+      RETURN
+      END FUNCTION IB_ISDOMAIN
 !####################################################################
 !     This routine (get to block) searches for "kwd" in file "fid"
 !     and returns the position at the next line. If "m" and/or "n"
@@ -677,7 +1000,6 @@
  001  err = "Block with keyword <"//kwd//"> was not found"
 
       END SUBROUTINE GTBLK
-
 !####################################################################
 !     These set of routines destroy an object.
       PURE SUBROUTINE DESTROYFACE(lFa)
@@ -685,15 +1007,22 @@
       IMPLICIT NONE
       TYPE(faceType), INTENT(OUT) :: lFa
 
-      IF (ALLOCATED(lFa%IEN))  DEALLOCATE(lFa%IEN)
-      IF (ALLOCATED(lFa%nV))   DEALLOCATE(lFa%nV)
-      IF (ALLOCATED(lFa%gN))   DEALLOCATE(lFa%gN)
-      IF (ALLOCATED(lFa%gE))   DEALLOCATE(lFa%gE)
-      IF (ALLOCATED(lFa%Nx))   DEALLOCATE(lFa%Nx)
-      IF (ALLOCATED(lFa%w))    DEALLOCATE(lFa%w)
-      IF (ALLOCATED(lFa%N))    DEALLOCATE(lFa%N)
-      IF (ALLOCATED(lFa%gebc)) DEALLOCATE(lFa%gebc)
-      IF (ALLOCATED(lFa%x))    DEALLOCATE(lFa%x)
+      IF (ALLOCATED(lFa%gE))     DEALLOCATE(lFa%gE)
+      IF (ALLOCATED(lFa%gN))     DEALLOCATE(lFa%gN)
+      IF (ALLOCATED(lFa%lN))     DEALLOCATE(lFa%lN)
+      IF (ALLOCATED(lFa%IEN))    DEALLOCATE(lFa%IEN)
+      IF (ALLOCATED(lFa%gebc))   DEALLOCATE(lFa%gebc)
+      IF (ALLOCATED(lFa%w))      DEALLOCATE(lFa%w)
+      IF (ALLOCATED(lFa%x))      DEALLOCATE(lFa%x)
+      IF (ALLOCATED(lFa%xi))     DEALLOCATE(lFa%xi)
+      IF (ALLOCATED(lFa%N))      DEALLOCATE(lFa%N)
+      IF (ALLOCATED(lFa%nV))     DEALLOCATE(lFa%nV)
+      IF (ALLOCATED(lFa%Nx))     DEALLOCATE(lFa%Nx)
+      IF (ALLOCATED(lFa%Nxx))    DEALLOCATE(lFa%Nxx)
+
+      CALL DESTROYADJ(lFa%nAdj)
+      CALL DESTROYADJ(lFa%eAdj)
+      CALL DESTROYTRACE(lFa%trc)
 
       lFa%eType = eType_NA
       lFa%nEl   = 0
@@ -708,23 +1037,41 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(OUT) :: lM
 
-      INTEGER iFa
+      INTEGER iFa, i, insd
 
-      IF (ALLOCATED(lM%eDist))  DEALLOCATE(lM%eDist)
-      IF (ALLOCATED(lM%eId))    DEALLOCATE(lM%eId)
-      IF (ALLOCATED(lM%gIEN))   DEALLOCATE(lM%gIEN)
-      IF (ALLOCATED(lM%IEN))    DEALLOCATE(lM%IEN)
-      IF (ALLOCATED(lM%INN))    DEALLOCATE(lM%INN)
-      IF (ALLOCATED(lM%gN))     DEALLOCATE(lM%gN)
-      IF (ALLOCATED(lM%lN))     DEALLOCATE(lM%lN)
-      IF (ALLOCATED(lM%Nx))     DEALLOCATE(lM%Nx)
-      IF (ALLOCATED(lM%nW))     DEALLOCATE(lM%nW)
-      IF (ALLOCATED(lM%bs))     DEALLOCATE(lM%bs)
-      IF (ALLOCATED(lM%w))      DEALLOCATE(lM%w)
-      IF (ALLOCATED(lM%N))      DEALLOCATE(lM%N)
-      IF (ALLOCATED(lM%x))      DEALLOCATE(lM%x)
-      IF (ALLOCATED(lM%otnIEN)) DEALLOCATE(lM%otnIEN)
-      IF (ALLOCATED(lM%gpN))    DEALLOCATE(lM%gpN)
+      insd = nsd
+      IF (lM%lShl) insd = nsd - 1
+
+      IF (ALLOCATED(lM%eDist))   DEALLOCATE(lM%eDist)
+      IF (ALLOCATED(lM%eId))     DEALLOCATE(lM%eId)
+      IF (ALLOCATED(lM%gN))      DEALLOCATE(lM%gN)
+      IF (ALLOCATED(lM%gpN))     DEALLOCATE(lM%gpN)
+      IF (ALLOCATED(lM%gIEN))    DEALLOCATE(lM%gIEN)
+      IF (ALLOCATED(lM%IEN))     DEALLOCATE(lM%IEN)
+      IF (ALLOCATED(lM%otnIEN))  DEALLOCATE(lM%otnIEN)
+      IF (ALLOCATED(lM%INN))     DEALLOCATE(lM%INN)
+      IF (ALLOCATED(lM%lN))      DEALLOCATE(lM%lN)
+      IF (ALLOCATED(lM%eIEN))    DEALLOCATE(lM%eIEN)
+      IF (ALLOCATED(lM%sbc))     DEALLOCATE(lM%sbc)
+      IF (ALLOCATED(lM%iGC))     DEALLOCATE(lM%iGC)
+      IF (ALLOCATED(lM%nW))      DEALLOCATE(lM%nW)
+      IF (ALLOCATED(lM%w))       DEALLOCATE(lM%w)
+      IF (ALLOCATED(lM%xiL))     DEALLOCATE(lM%xiL)
+      IF (ALLOCATED(lM%xi))      DEALLOCATE(lM%xi)
+      IF (ALLOCATED(lM%x))       DEALLOCATE(lM%x)
+      IF (ALLOCATED(lM%N))       DEALLOCATE(lM%N)
+      IF (ALLOCATED(lM%nV))      DEALLOCATE(lM%nV)
+      IF (ALLOCATED(lM%fN))      DEALLOCATE(lM%fN)
+      IF (ALLOCATED(lM%Nx))      DEALLOCATE(lM%Nx)
+      IF (ALLOCATED(lM%Nxx))     DEALLOCATE(lM%Nxx)
+
+      IF (ALLOCATED(lM%bs)) THEN
+         DO i=1, insd
+            CALL DESTROY(lM%bs(i))
+         END DO
+         DEALLOCATE(lM%bs)
+      END IF
+
       IF (ALLOCATED(lM%fa)) THEN
          DO iFa=1, lM%nFa
             CALL DESTROYFACE(lM%fa(iFa))
@@ -732,12 +1079,18 @@
          DEALLOCATE(lM%fa)
       END IF
 
+      CALL DESTROYADJ(lM%nAdj)
+      CALL DESTROYADJ(lM%eAdj)
+      CALL DESTROYTRACE(lM%trc)
+
+      lM%lShl  = .FALSE.
       lM%eType = eType_NA
       lM%gnEl  = 0
       lM%gnNo  = 0
       lM%nEl   = 0
       lM%nFa   = 0
       lM%nNo   = 0
+      lM%nFn   = 0
 
       RETURN
       END SUBROUTINE DESTROYMSH
@@ -747,34 +1100,108 @@
       IMPLICIT NONE
       TYPE(bcType), INTENT(OUT) :: lBc
 
+      IF (ALLOCATED(lBc%eDrn))   DEALLOCATE(lBc%eDrn)
+      IF (ALLOCATED(lBc%h))      DEALLOCATE(lBc%h)
+      IF (ALLOCATED(lBc%gx))     DEALLOCATE(lBc%gx)
+
       IF (ALLOCATED(lBc%gt)) THEN
          IF (ALLOCATED(lBc%gt%r)) DEALLOCATE(lBc%gt%r)
          IF (ALLOCATED(lBc%gt%i)) DEALLOCATE(lBc%gt%i)
          DEALLOCATE(lBc%gt)
       END IF
+
       IF (ALLOCATED(lBc%gm)) THEN
-         IF (ALLOCATED(lBc%gm%t))    DEALLOCATE(lBc%gm%t)
-         IF (ALLOCATED(lBc%gm%d))    DEALLOCATE(lBc%gm%d)
+         CALL DESTROYMB(lBc%gm)
          DEALLOCATE(lBc%gm)
       END IF
-      IF (ALLOCATED(lBc%gx))    DEALLOCATE(lBc%gx)
-      IF (ALLOCATED(lBc%eDrn)) DEALLOCATE(lBc%eDrn)
-      
+
+      lBc%weakDir  = .FALSE.
+      lBc%fbN      = .FALSE.
       lBc%bType    = 0
       lBc%cplBCptr = 0
-      lBc%eDrn     = 0
       lBc%g        = 0D0
       lBc%r        = 0D0
+      lBc%k        = 0D0
+      lBc%k        = 0D0
+      lBc%tauB     = 0D0
+      lBc%tauF     = 0D0
 
       RETURN
       END SUBROUTINE DESTROYBC
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYBF(lBf)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(bfType), INTENT(OUT) :: lBf
+
+      INTEGER i
+
+      IF (ALLOCATED(lBf%b))  DEALLOCATE(lBf%b)
+      IF (ALLOCATED(lBf%bx)) DEALLOCATE(lBf%bx)
+      IF (ALLOCATED(lBf%bt)) THEN
+         DO i=1, lBf%dof
+            IF (ALLOCATED(lBf%bt(i)%r)) DEALLOCATE(lBf%bt(i)%r)
+            IF (ALLOCATED(lBf%bt(i)%i)) DEALLOCATE(lBf%bt(i)%i)
+         END DO
+         DEALLOCATE(lBf%bt)
+      END IF
+      IF (ALLOCATED(lBf%bm)) THEN
+         CALL DESTROYMB(lBf%bm)
+         DEALLOCATE(lBf%bm)
+      END IF
+      lBf%bType    = 0
+
+      RETURN
+      END SUBROUTINE DESTROYBF
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYDMN(lDmn)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(OUT) :: lDmn
+
+      lDmn%Id   = -1
+      lDmn%v    = 0D0
+      lDmn%prop = 0D0
+
+      ! lDmn%stM
+      lDmn%stM%volType = stVol_NA
+      lDmn%stM%Kpen    = 0D0
+      lDmn%stM%isoType = stIso_NA
+      lDmn%stM%C10     = 0D0
+      lDmn%stM%C01     = 0D0
+      lDmn%stM%a       = 0D0
+      lDmn%stM%b       = 0D0
+      lDmn%stM%aff     = 0D0
+      lDmn%stM%bff     = 0D0
+      lDmn%stM%ass     = 0D0
+      lDmn%stM%bss     = 0D0
+      lDmn%stM%afs     = 0D0
+      lDmn%stM%bfs     = 0D0
+
+      ! lDmn%cep
+      lDmn%cep%cepType  = cepModel_NA
+      lDmn%cep%Diso     = 0D0
+      IF (ALLOCATED(lDmn%cep%Dani)) DEALLOCATE(lDmn%cep%Dani)
+
+      lDmn%cep%Istim%Ts = 0D0
+      lDmn%cep%Istim%Td = 0D0
+      lDmn%cep%Istim%CL = 0D0
+      lDmn%cep%Istim%A  = 0D0
+
+      lDmn%cep%odeS%tIntType = tIntType_NA
+      lDmn%cep%odeS%maxItr   = 5
+      lDmn%cep%odeS%absTol   = 1D-8
+      lDmn%cep%odeS%relTol   = 1D-4
+
+      RETURN
+      END SUBROUTINE DESTROYDMN
 !--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYEQ(lEq)
       USE COMMOD
       IMPLICIT NONE
       TYPE(eqType), INTENT(OUT) :: lEq
 
-      INTEGER iBc
+      INTEGER iBc, iBf, iDmn
 
       IF (ALLOCATED(lEq%bc)) THEN
          DO iBc=1, lEq%nBc
@@ -782,23 +1209,99 @@
          END DO
          DEALLOCATE(lEq%bc)
       END IF
-      IF (ALLOCATED(lEq%output)) DEALLOCATE(lEq%output)
-      IF (ALLOCATED(lEq%dmn))    DEALLOCATE(lEq%dmn)
+      IF (ALLOCATED(lEq%bcIB)) THEN
+         DO iBc=1, lEq%nBcIB
+            CALL DESTROYBC(lEq%bcIB(iBc))
+         END DO
+         DEALLOCATE(lEq%bcIB)
+      END IF
+      IF (ALLOCATED(lEq%dmn)) THEN
+         DO iDmn=1, lEq%nDmn
+            CALL DESTROYDMN(lEq%dmn(iDmn))
+         END DO
+      END IF
+      IF (ALLOCATED(lEq%dmnIB)) THEN
+         DO iDmn=1, lEq%nDmnIB
+            CALL DESTROYDMN(lEq%dmnIB(iDmn))
+         END DO
+      END IF
+      IF (ALLOCATED(lEq%bf)) THEN
+         DO iBf=1, lEq%nBf
+            CALL DESTROYBF(lEq%bf(iBf))
+         END DO
+         DEALLOCATE(lEq%bf)
+      END IF
+      IF (ALLOCATED(lEq%dmn))      DEALLOCATE(lEq%dmn)
+      IF (ALLOCATED(lEq%dmnIB))    DEALLOCATE(lEq%dmnIB)
+      IF (ALLOCATED(lEq%output))   DEALLOCATE(lEq%output)
+      IF (ALLOCATED(lEq%outIB))    DEALLOCATE(lEq%outIB)
 
       lEq%coupled = .TRUE.
       lEq%dof     = 0
       lEq%maxItr  = 5
       lEq%minItr  = 1
-      lEq%nBc     = 0
-      lEq%nDmn    = 0
       lEq%nOutput = 0
+      lEq%nOutIB  = 0
+      lEq%nDmn    = 0
+      lEq%nDmnIB  = 0
+      lEq%nBc     = 0
+      lEq%nBcIB   = 0
+      lEq%nBf     = 0
       lEq%dBr     = -4D1
       lEq%tol     = 1D64
 
       RETURN
       END SUBROUTINE DESTROYEQ
 !--------------------------------------------------------------------
-      SUBROUTINE DESTROYSTACK(stk)
+      PURE SUBROUTINE DESTROYMB(lMB)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(MBType), INTENT(OUT) :: lMB
+
+      IF (ALLOCATED(lMB%t)) DEALLOCATE(lMB%t)
+      IF (ALLOCATED(lMB%d)) DEALLOCATE(lMB%d)
+
+      lMB%nTP = 0
+
+      RETURN
+      END SUBROUTINE DESTROYMB
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYBS(bs)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(bsType), INTENT(OUT) :: bs
+
+      IF (ALLOCATED(bs%xi)) DEALLOCATE(bs%xi)
+
+      RETURN
+      END SUBROUTINE DESTROYBS
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYDATA(d)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dataType), INTENT(OUT) :: d
+
+      IF (ALLOCATED(d%IEN))   DEALLOCATE(d%IEN)
+      IF (ALLOCATED(d%xe))    DEALLOCATE(d%xe)
+      IF (ALLOCATED(d%gx))    DEALLOCATE(d%gx)
+      IF (ALLOCATED(d%x))     DEALLOCATE(d%x)
+
+      RETURN
+      END SUBROUTINE DESTROYDATA
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYADJ(adj)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(adjType), INTENT(OUT) :: adj
+
+      IF (ALLOCATED(adj%prow)) DEALLOCATE(adj%prow)
+      IF (ALLOCATED(adj%pcol)) DEALLOCATE(adj%pcol)
+      adj%nnz = 0
+
+      RETURN
+      END SUBROUTINE DESTROYADJ
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYSTACK(stk)
       USE COMMOD
       IMPLICIT NONE
       TYPE(stackType), INTENT(OUT) :: stk
@@ -811,7 +1314,7 @@
       RETURN
       END SUBROUTINE DESTROYSTACK
 !--------------------------------------------------------------------
-      SUBROUTINE DESTROYQUEUE(que)
+      PURE SUBROUTINE DESTROYQUEUE(que)
       USE COMMOD
       IMPLICIT NONE
       TYPE(queueType), INTENT(OUT) :: que
@@ -823,7 +1326,29 @@
 
       RETURN
       END SUBROUTINE DESTROYQUEUE
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYTRACE(trc)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(traceType), INTENT(OUT) :: trc
 
+      IF (ALLOCATED(trc%gE))  DEALLOCATE(trc%gE)
+      IF (ALLOCATED(trc%ptr)) DEALLOCATE(trc%ptr)
+      trc%n = 0
+
+      RETURN
+      END SUBROUTINE DESTROYTRACE
+!--------------------------------------------------------------------
+      PURE SUBROUTINE DESTROYIBCM(ibCm)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(ibCommType), INTENT(OUT) :: ibCm
+
+      IF (ALLOCATED(ibCm%n))  DEALLOCATE(ibCm%n)
+      IF (ALLOCATED(ibCm%gE)) DEALLOCATE(ibCm%gE)
+
+      RETURN
+      END SUBROUTINE DESTROYIBCM
 !####################################################################
 !     Spliting "m" jobs between "n" workers. "b" contains amount of jobs
 !     and "A" will store the distribution of jobs
@@ -929,7 +1454,6 @@
 
       RETURN
       END SUBROUTINE SPLITJOBS
-
 !####################################################################
 !     Set domain ID to a given number for the entire or a range of
 !     elements in a mesh
@@ -955,13 +1479,27 @@
          lM%eId = 0
       END IF
       DO e=first, last
-         lM%eId(e) = IBSET(lM%eId(e),iDmn)
+         lM%eId(e) = IBSET(lM%eId(e), iDmn)
       END DO
 
       RETURN
       END SUBROUTINE SETDMNID
-
 !####################################################################
+!     Finding the mesh ID based on the mesh name
+      SUBROUTINE FINDMSH(mshName, iM)
+      USE COMMOD
+      IMPLICIT NONE
+      CHARACTER(LEN=stdL) :: mshName
+      INTEGER, INTENT(OUT) :: iM
+
+      DO iM=1, nMsh
+         IF (msh(iM)%name .EQ. mshName) EXIT
+      END DO
+      IF (iM .GT. nMsh) err="Unable to find msh <"//TRIM(mshName)//">"
+
+      RETURN
+      END SUBROUTINE FINDMSH
+!--------------------------------------------------------------------
 !     Finding the face ID and mesh ID based on the face name
       SUBROUTINE FINDFACE(faceName, iM, iFa)
       USE COMMOD
@@ -975,17 +1513,15 @@
             IF (msh(iM)%fa(iFa)%name .EQ. faceName) EXIT MY_LOOP
          END DO
       END DO MY_LOOP
-
       IF (iM .GT. nMsh) err="Unable to find face <"//TRIM(faceName)//">"
 
       RETURN
       END SUBROUTINE FINDFACE
-
 !####################################################################
 !     Computes the JACOBIAN of an element
-      FUNCTION JACOBIAN(nDim,eNoN,x,Nxi) result(Jac)
+      FUNCTION JACOBIAN(nDim, eNoN, x, Nxi) result(Jac)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nDim,eNoN
+      INTEGER, INTENT(IN) :: nDim, eNoN
       REAL(KIND=8), INTENT(IN) :: x(nDim,eNoN), Nxi(nDim,eNoN)
 
       INTEGER :: a
@@ -1003,12 +1539,11 @@
 
       RETURN
       END FUNCTION JACOBIAN
-
-!####################################################################
+!--------------------------------------------------------------------
 !     Computes the Skewness of an element
-      FUNCTION SKEWNESS(nDim,eNoN,x) result(SkF)
+      FUNCTION SKEWNESS(nDim, eNoN, x) result(SkF)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nDim,eNoN
+      INTEGER, INTENT(IN) :: nDim, eNoN
       REAL(KIND=8), INTENT(IN) :: x(nDim,eNoN)
 
       INTEGER :: i,j,a,cnt
@@ -1056,10 +1591,9 @@
 
       RETURN
       END FUNCTION SKEWNESS
-
-!####################################################################
+!--------------------------------------------------------------------
 !     Computes the Aspect Ratio of an element
-      FUNCTION ASPECTRATIO(nDim,eNoN,x) result(AR)
+      FUNCTION ASPECTRATIO(nDim, eNoN, x) result(AR)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: nDim,eNoN
       REAL(KIND=8), INTENT(IN) :: x(nDim,eNoN)
@@ -1068,7 +1602,7 @@
       INTEGER :: rowM(eNoN,eNoN-1), colM(nDim,nDim-1)
       REAL(KIND=8) :: AR, s(eNoN)
       REAL(KIND=8) :: Dsub(nDim,nDim), detD(nDim)
-      
+
       IF (nDim .EQ. 2) THEN
          s(:) = 0D0
          DO a=1, eNoN
@@ -1098,13 +1632,713 @@
             s(a) = 5D-1 * SQRT( sum( detD(:)**2 ) )
          END DO ! a
       END IF
-      
+
       AR = MAXVAL(s)/MINVAL(s)
 
       RETURN
       END FUNCTION ASPECTRATIO
-
 !####################################################################
-      
-      END MODULE ALLFUN
+!     Find nodal adjacency of a given mesh. Computes list of all nodes
+!     around a given node of a mesh.
+      SUBROUTINE GETNADJ_MSH(lM)
+      USE COMMOD
+      IMPLICIT NONE
 
+      TYPE(mshType),  INTENT(INOUT) :: lM
+
+      INTEGER :: a, b, e, Ac, Bc, i, j, maxAdj
+      LOGICAL :: flag
+
+      INTEGER, ALLOCATABLE :: incNd(:), adjL(:,:)
+
+      ALLOCATE(incNd(lM%nNo))
+      incNd = 0
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            DO b=1, lM%eNoN
+               IF (b .EQ. a) CYCLE
+               incNd(Ac) = incNd(Ac) + 1
+            END DO
+         END DO
+      END DO
+
+      maxAdj = MAXVAL(incNd)
+      ALLOCATE(adjL(maxAdj, lM%nNo))
+      incNd = 0
+      adjL  = 0
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            DO b=1, lM%eNoN
+               IF (b .EQ. a) CYCLE
+               Bc = lM%IEN(b,e)
+               Bc = lM%lN(Bc)
+               flag = .TRUE.
+               DO i=1, incNd(Ac)
+                  IF (adjL(i,Ac) .EQ. Bc) THEN
+                     flag = .FALSE.
+                     EXIT
+                  END IF
+               END DO
+               IF (flag) THEN
+                  incNd(Ac) = incNd(Ac) + 1
+                  adjL(incNd(Ac),Ac) = Bc
+               END IF
+            END DO
+         END DO
+      END DO
+      DEALLOCATE(incNd)
+
+      lM%nAdj%nnz = 0
+      DO a=1, lM%nNo
+         DO i=1, maxAdj
+            b = adjL(i,a)
+            IF (b .EQ. 0) EXIT
+            lM%nAdj%nnz = lM%nAdj%nnz + 1
+         END DO
+      END DO
+
+      ALLOCATE(lM%nAdj%prow(lM%nNo+1), lM%nAdj%pcol(lM%nAdj%nnz))
+      j = 0
+      lM%nAdj%prow(1) = j + 1
+      DO a=1, lM%nNo
+         DO i=1, maxAdj
+            b = adjL(i,a)
+            IF (b .EQ. 0) EXIT
+            j = j + 1
+            lM%nAdj%pcol(j) = adjL(i,a)
+         END DO
+         lM%nAdj%prow(a+1) = j + 1
+      END DO
+      DEALLOCATE(adjL)
+
+      RETURN
+      END SUBROUTINE GETNADJ_MSH
+!--------------------------------------------------------------------
+!     Find nodal adjacency of a given face. Computes list of all nodes
+!     around a given node of a face.
+      SUBROUTINE GETNADJ_FACE(lFa)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(faceType),  INTENT(INOUT) :: lFa
+
+      INTEGER :: a, b, e, Ac, Bc, i, j, maxAdj
+      LOGICAL :: flag
+
+      INTEGER, ALLOCATABLE :: incNd(:), adjL(:,:)
+
+      ALLOCATE(incNd(lFa%nNo))
+      incNd = 0
+      DO e=1, lFa%nEl
+         DO a=1, lFa%eNoN
+            Ac = lFa%IEN(a,e)
+            Ac = lFa%lN(Ac)
+            DO b=1, lFa%eNoN
+               IF (b .EQ. a) CYCLE
+               incNd(Ac) = incNd(Ac) + 1
+            END DO
+         END DO
+      END DO
+
+      maxAdj = MAXVAL(incNd)
+      ALLOCATE(adjL(maxAdj, lFa%nNo))
+      incNd = 0
+      adjL  = 0
+      DO e=1, lFa%nEl
+         DO a=1, lFa%eNoN
+            Ac = lFa%IEN(a,e)
+            Ac = lFa%lN(Ac)
+            DO b=1, lFa%eNoN
+               IF (b .EQ. a) CYCLE
+               Bc = lFa%IEN(b,e)
+               Bc = lfa%lN(Bc)
+               flag = .TRUE.
+               DO i=1, incNd(Ac)
+                  IF (adjL(i,Ac) .EQ. Bc) THEN
+                     flag = .FALSE.
+                     EXIT
+                  END IF
+               END DO
+               IF (flag) THEN
+                  incNd(Ac) = incNd(Ac) + 1
+                  adjL(incNd(Ac),Ac) = Bc
+               END IF
+            END DO
+         END DO
+      END DO
+      DEALLOCATE(incNd)
+
+      lFa%nAdj%nnz = 0
+      DO a=1, lFa%nNo
+         DO i=1, maxAdj
+            b = adjL(i,a)
+            IF (b .EQ. 0) EXIT
+            lFa%nAdj%nnz = lFa%nAdj%nnz + 1
+         END DO
+      END DO
+
+      ALLOCATE(lFa%nAdj%prow(lFa%nNo+1), lFa%nAdj%pcol(lFa%nAdj%nnz))
+      j = 0
+      lFa%nAdj%prow(1) = j + 1
+      DO a=1, lFa%nNo
+         DO i=1, maxAdj
+            b = adjL(i,a)
+            IF (b .EQ. 0) EXIT
+            j = j + 1
+            lFa%nAdj%pcol(j) = adjL(i,a)
+         END DO
+         lFa%nAdj%prow(a+1) = j + 1
+      END DO
+      DEALLOCATE(adjL)
+
+      RETURN
+      END SUBROUTINE GETNADJ_FACE
+!####################################################################
+!     Find element adjacency of a given mesh. Computes list of all
+!     elements around a given element of a mesh.
+      SUBROUTINE GETEADJ_MSH(lM)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(mshType),  INTENT(INOUT) :: lM
+
+      INTEGER :: a, b, e, Ac, i, j, maxAdj
+      LOGICAL :: flag
+
+      INTEGER, ALLOCATABLE :: incNd(:), adjList(:,:), tmpI(:,:)
+
+      ALLOCATE(incNd(lM%nNo))
+      incNd = 0
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            incNd(Ac) = incNd(Ac) + 1
+         END DO
+      END DO
+
+      maxAdj = MAXVAL(incNd)
+      ALLOCATE(tmpI(maxAdj, lM%nNo))
+      incNd = 0
+      tmpI  = 0
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            incNd(Ac) = incNd(Ac) + 1
+            tmpI(incNd(Ac), Ac) = e
+         END DO
+      END DO
+      b = 2*maxAdj
+
+ 001  b = b + maxAdj
+      DEALLOCATE(incNd)
+      ALLOCATE(incNd(lM%nEl))
+      IF (ALLOCATED(adjList)) DEALLOCATE(adjList)
+      ALLOCATE(adjList(b, lM%nEl))
+      adjList = 0
+      incNd   = 0
+      DO e=1, lM%nEl
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,e)
+            Ac = lM%lN(Ac)
+            DO i=1, maxAdj
+               IF (tmpI(i,Ac) .EQ. 0) EXIT
+               flag = .TRUE.
+               DO j=1, incNd(e)
+                  IF (adjList(j,e) .EQ. tmpI(i,Ac)) THEN
+                     flag = .FALSE.
+                     EXIT
+                  END IF
+               END DO
+               IF (flag) THEN
+                  incNd(e) = incNd(e) + 1
+                  IF (incNd(e) .GE. b) GOTO 001
+                  adjList(incNd(e),e) = tmpI(i,Ac)
+               END IF
+            END DO
+         END DO
+      END DO
+      maxAdj = MAXVAL(incNd)
+      DEALLOCATE(tmpI, incNd)
+
+      lM%eAdj%nnz = 0
+      DO e=1, lM%nEl
+         DO i=1, maxAdj
+            IF (adjList(i,e) .NE. 0) THEN
+               lM%eAdj%nnz = lM%eAdj%nnz + 1
+            ELSE
+               EXIT
+            END IF
+         END DO
+      END DO
+
+      ALLOCATE(lM%eAdj%prow(lM%nEl+1), lM%eAdj%pcol(lM%eAdj%nnz))
+      j = 0
+      lM%eAdj%prow(1) = j + 1
+      DO e=1, lM%nEl
+         DO i=1, maxAdj
+            IF (adjList(i,e) .NE. 0) THEN
+               j = j + 1
+               lM%eAdj%pcol(j) = adjList(i,e)
+            ELSE
+               EXIT
+            END IF
+         END DO
+         lM%eAdj%prow(e+1) = j + 1
+      END DO
+      DEALLOCATE(adjList)
+
+      RETURN
+      END SUBROUTINE GETEADJ_MSH
+!--------------------------------------------------------------------
+!     Find element adjacency of a given face. Computes list of all
+!     elements around a given element of a face.
+      SUBROUTINE GETEADJ_FACE(lFa)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(faceType),  INTENT(INOUT) :: lFa
+
+      INTEGER :: a, b, e, Ac, i, j, maxAdj
+      LOGICAL :: flag
+
+      INTEGER, ALLOCATABLE :: incNd(:), adjList(:,:), tmpI(:,:)
+
+      ALLOCATE(incNd(lFa%nNo))
+      incNd = 0
+      DO e=1, lFa%nEl
+         DO a=1, lFa%eNoN
+            Ac = lFa%IEN(a,e)
+            Ac = lFa%lN(Ac)
+            incNd(Ac) = incNd(Ac) + 1
+         END DO
+      END DO
+
+      maxAdj = MAXVAL(incNd)
+      ALLOCATE(tmpI(maxAdj, lFa%nNo))
+      incNd = 0
+      tmpI  = 0
+      DO e=1, lFa%nEl
+         DO a=1, lFa%eNoN
+            Ac = lFa%IEN(a,e)
+            Ac = lFa%lN(Ac)
+            incNd(Ac) = incNd(Ac) + 1
+            tmpI(incNd(Ac), Ac) = e
+         END DO
+      END DO
+      b = 2*maxAdj
+
+ 001  b = b + maxAdj
+      DEALLOCATE(incNd)
+      ALLOCATE(incNd(lFa%nEl))
+      IF (ALLOCATED(adjList)) DEALLOCATE(adjList)
+      ALLOCATE(adjList(b, lFa%nEl))
+      adjList = 0
+      incNd   = 0
+      DO e=1, lFa%nEl
+         DO a=1, lFa%eNoN
+            Ac = lFa%IEN(a,e)
+            Ac = lFa%lN(Ac)
+            DO i=1, maxAdj
+               IF (tmpI(i,Ac) .EQ. 0) EXIT
+               flag = .TRUE.
+               DO j=1, incNd(e)
+                  IF (adjList(j,e) .EQ. tmpI(i,Ac)) THEN
+                     flag = .FALSE.
+                     EXIT
+                  END IF
+               END DO
+               IF (flag) THEN
+                  incNd(e) = incNd(e) + 1
+                  IF (incNd(e) .GE. b) GOTO 001
+                  adjList(incNd(e),e) = tmpI(i,Ac)
+               END IF
+            END DO
+         END DO
+      END DO
+      maxAdj = MAXVAL(incNd)
+      DEALLOCATE(tmpI, incNd)
+
+      lFa%eAdj%nnz = 0
+      DO e=1, lFa%nEl
+         DO i=1, maxAdj
+            IF (adjList(i,e) .NE. 0) THEN
+               lFa%eAdj%nnz = lFa%eAdj%nnz + 1
+            ELSE
+               EXIT
+            END IF
+         END DO
+      END DO
+
+      ALLOCATE(lFa%eAdj%prow(lFa%nEl+1), lFa%eAdj%pcol(lFa%eAdj%nnz))
+      j = 0
+      lFa%eAdj%prow(1) = j + 1
+      DO e=1, lFa%nEl
+         DO i=1, maxAdj
+            IF (adjList(i,e) .NE. 0) THEN
+               j = j + 1
+               lFa%eAdj%pcol(j) = adjList(i,e)
+            ELSE
+               EXIT
+            END IF
+         END DO
+         lFa%eAdj%prow(e+1) = j + 1
+      END DO
+      DEALLOCATE(adjList)
+
+      RETURN
+      END SUBROUTINE GETEADJ_FACE
+!####################################################################
+!     Finds an element of a mesh for any probe. Returns 0 if not found.
+!     Uses Newton method to compute the parametric coordinate (xi) of
+!     the probe with respect to an element for the given physical
+!     coordinate (xp). Elements are searched prescribed by eList.
+      SUBROUTINE FINDE(xp, lM, xg, Dg, nNo, ne, eList, Ec, xi, lDebug)
+      USE COMMOD
+      IMPLICIT NONE
+
+      INTEGER, INTENT(IN) :: nNo, ne, eList(ne)
+      REAL(KIND=8), INTENT(IN) :: xp(nsd), xg(nsd,nNo), Dg(nsd,nNo)
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER, INTENT(OUT) :: Ec
+      REAL(KIND=8), INTENT(OUT) :: xi(nsd)
+      LOGICAL, INTENT(IN), OPTIONAL :: lDebug
+
+      LOGICAL :: ldbg, l1, l2, l3, l4
+      INTEGER :: a, e, i, Ac, eNoN
+      REAL(KIND=8) :: rt, xi0(nsd), xib(2), Nb(2)
+
+      LOGICAL, ALLOCATABLE :: eChck(:)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:)
+
+      IF (lM%lShl) err = " Finding traces is not applicable for shells"
+
+      ldbg = .FALSE.
+      IF (PRESENT(lDebug)) ldbg = lDebug
+      Ec   = 0
+      eNoN = lM%eNoN
+      ALLOCATE(eChck(lM%nEl), xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN))
+
+!     Initialize parameteric coordinate for Newton's iterations
+      xi0 = 0D0
+      DO i=1, lM%nG
+         xi0 = xi0 + lM%xi(:,i)
+      END DO
+      xi0 = xi0 / REAL(lM%nG,KIND=8)
+
+!     Set bounds on the parameteric coordinates
+      xib(1) = -1.0001D0
+      xib(2) =  1.0001D0
+      IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
+         xib(1) = -0.0001D0
+      END IF
+
+!     Set bounds on shape functions
+      Nb(1) = -0.0001D0
+      Nb(2) =  1.0001d0
+      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
+         Nb(1) = -0.1251D0
+         Nb(2) =  1.0001D0
+      END IF
+
+      IF (ldbg) THEN
+         WRITE(1000+cm%tF(),'(A)') "=================================="
+         WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') "Finding trace for xp: "
+         DO i=1,  nsd
+            WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xp(i))
+         END DO
+         WRITE(1000+cm%tF(),'(A)')
+         WRITE(1000+cm%tF(),'(A)')
+         WRITE(1000+cm%tF(),'(A)') "List of elems: <"//STR(ne)//">"
+         DO e=1, ne
+            WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(eList(e))
+         END DO
+         WRITE(1000+cm%tF(),'(A)')
+         WRITE(1000+cm%tF(),'(A)') "=================================="
+      END IF
+
+      eChck = .FALSE.
+      DO e=1, ne
+         Ec = eList(e)
+         IF (Ec .EQ. 0) CYCLE
+         IF (eChck(Ec)) CYCLE
+         eChck(Ec) = .TRUE.
+
+         DO a=1, eNoN
+            Ac = lM%IEN(a,Ec)
+            xi(:) = xi(:) + lM%xi(:,a)
+            xl(:,a) = xg(:,Ac) + Dg(:,Ac)
+         END DO
+
+         IF (ldbg) THEN
+            WRITE(1000+cm%tF(),'(A)') "----------------------------"
+            WRITE(1000+cm%tF(),'(A)') "Probe el: "//STR(Ec)
+            DO a=1, eNoN
+               Ac = lM%IEN(a,Ec)
+               WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') STR(Ac)
+               DO i=1, nsd
+                  WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//
+     2               STR(xl(i,a))
+               END DO
+               WRITE(1000+cm%tF(),'(A)')
+            END DO
+         END IF
+
+         xi = xi0
+         CALL GETXI(lM%eType, eNoN, xl, xp, xi, l1)
+
+         IF (ldbg) THEN
+            WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "xi: "
+            DO i=1, nsd
+               WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xi(i))
+            END DO
+            WRITE(1000+cm%tF(),'(A)')
+         END IF
+
+!        Check if parameteric coordinate is within bounds
+         a = 0
+         DO i=1, nsd
+            IF (xi(i).GE.xib(1) .AND. xi(i).LE.xib(2)) a = a + 1
+         END DO
+         l2 = a .EQ. nsd
+
+!        Check for shape function even if the Newton's method returns OK
+         CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
+
+         IF (ldbg) THEN
+            WRITE(1000+cm%tF(),'(4X,A)',ADVANCE='NO') "N: "
+            DO a=1, eNoN
+               WRITE(1000+cm%tF(),'(A)',ADVANCE='NO') " "//STR(N(a))
+            END DO
+            WRITE(1000+cm%tF(),'(A)')
+            CALL FLUSH(1000+cm%tF())
+         END IF
+
+!        Check if shape functions are within bounds and sum to unity
+         i  = 0
+         rt = 0D0
+         DO a=1, eNoN
+            rt = rt + N(a)
+            IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) i = i + 1
+         END DO
+         l3 = i .EQ. eNoN
+         l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+
+         l1 = ALL((/l1, l2, l3, l4/))
+         IF (l1) RETURN
+      END DO
+
+      Ec = 0
+      xi = 0D0
+
+      RETURN
+      END SUBROUTINE FINDE
+!####################################################################
+      SUBROUTINE IB_SYNCS(U)
+      USE COMMOD
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(INOUT) :: U(:)
+
+      INTEGER i, a, e, Ac, iM, iFa, nl, ng, ierr, tag
+
+      INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
+
+      IF (cm%seq()) RETURN
+
+      IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
+     2   "to synchronize IB data"
+
+      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+     2   "initialized. Correction necessary"
+
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
+            DO i=1, ib%msh(iM)%trc%n
+               e = ib%msh(iM)%trc%gE(1,i)
+               DO a=1, ib%msh(iM)%eNoN
+                  Ac = ib%msh(iM)%IEN(a,e)
+                  incNd(Ac) = 1
+               END DO
+            END DO
+         ELSE
+            DO iFa=1, ib%msh(iM)%nFa
+               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
+                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
+                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
+                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
+                     incNd(Ac) = 1
+                  END DO
+               END DO
+            END DO
+         END IF
+      END DO
+
+      nl = SUM(incNd)
+      ALLOCATE(lU(nl))
+      nl = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .EQ. 1) THEN
+            nl = nl + 1
+            lU(nl) = U(a)
+         END IF
+      END DO
+      DEALLOCATE(incNd)
+
+      ng = SUM(ib%cm%n)
+      ALLOCATE(gU(ng))
+      IF (cm%mas()) THEN
+         ALLOCATE(rReq(cm%np()))
+         rReq = 0
+         gU   = 0D0
+         ng   = 0
+         DO i=1, cm%np()
+            nl = ib%cm%n(i)
+            IF (nl .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               gU(ng+1:ng+nl) = lU(1:nl)
+            ELSE
+               tag = i * 100
+               CALL MPI_IRECV(gU(ng+1:ng+nl), nl, mpreal, i-1, tag,
+     2            cm%com(), rReq(i), ierr)
+            END IF
+            ng = ng + nl
+         END DO
+
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%n(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
+
+         U = 0D0
+         DO a=1, ng
+            Ac    = ib%cm%gE(a)
+            U(Ac) = U(Ac) + gU(a)
+         END DO
+      ELSE IF (nl .NE. 0) THEN
+         tag = cm%tF() * 100
+         CALL MPI_SEND(lU, nl, mpreal, master, tag, cm%com(), ierr)
+      END IF
+
+      DEALLOCATE(lU, gU)
+
+      CALL cm%bcast(U)
+
+      RETURN
+      END SUBROUTINE IB_SYNCS
+!--------------------------------------------------------------------
+      SUBROUTINE IB_SYNCV(U)
+      USE COMMOD
+      IMPLICIT NONE
+
+      REAL(KIND=8), INTENT(INOUT) :: U(:,:)
+
+      INTEGER m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag
+
+      INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
+
+      IF (cm%seq()) RETURN
+
+      m = SIZE(U,1)
+      IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//
+     2   "to synchronize IB data"
+
+      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+     2   "initialized. Correction necessary"
+
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
+            DO i=1, ib%msh(iM)%trc%n
+               e = ib%msh(iM)%trc%gE(1,i)
+               DO a=1, ib%msh(iM)%eNoN
+                  Ac = ib%msh(iM)%IEN(a,e)
+                  incNd(Ac) = 1
+               END DO
+            END DO
+         ELSE
+            DO iFa=1, ib%msh(iM)%nFa
+               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
+                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
+                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
+                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
+                     incNd(Ac) = 1
+                  END DO
+               END DO
+            END DO
+         END IF
+      END DO
+
+      nl = SUM(incNd)
+      ALLOCATE(lU(m*nl))
+      nl = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .EQ. 1) THEN
+            nl = nl + 1
+            s  = (nl-1)*m + 1
+            e  = (nl-1)*m + m
+            lU(s:e) = U(1:m,a)
+         END IF
+      END DO
+      DEALLOCATE(incNd)
+
+      ng = SUM(ib%cm%n)
+      ALLOCATE(gU(m*ng))
+      IF (cm%mas()) THEN
+         ALLOCATE(rReq(cm%np()))
+         rReq = 0
+         gU   = 0D0
+         ng   = 0
+         DO i=1, cm%np()
+            nl = ib%cm%n(i)
+            IF (nl .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               s = 1
+               e = nl*m
+               gU(s:e) = lU(:)
+            ELSE
+               tag = i * 100
+               s = ng*m + 1
+               e = ng*m + nl*m
+               CALL MPI_IRECV(gU(s:e), nl*m, mpreal, i-1, tag,
+     2            cm%com(), rReq(i), ierr)
+            END IF
+            ng = ng + nl
+         END DO
+
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%n(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
+
+         U = 0D0
+         DO a=1, ng
+            Ac = ib%cm%gE(a)
+            s  = (a-1)*m + 1
+            e  = (a-1)*m + m
+            U(1:m,Ac) = U(1:m,Ac) + gU(s:e)
+         END DO
+      ELSE IF (nl .NE. 0) THEN
+         tag = cm%tF() * 100
+         CALL MPI_SEND(lU, nl*m, mpreal, master, tag, cm%com(), ierr)
+      END IF
+
+      DEALLOCATE(lU, gU)
+
+      CALL cm%bcast(U)
+
+      RETURN
+      END SUBROUTINE IB_SYNCV
+!####################################################################
+      END MODULE ALLFUN
+!####################################################################

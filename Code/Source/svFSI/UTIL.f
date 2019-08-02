@@ -32,7 +32,7 @@
 !--------------------------------------------------------------------
 !
 !     This module contains a set of routine that are handy, such as
-!     string manupulation, file handeling, and norm
+!     string manupulation, file handeling, and norm.
 !
 !--------------------------------------------------------------------
 
@@ -105,13 +105,15 @@
          MODULE PROCEDURE :: CONVI, CONVR
       END INTERFACE CONV
 
+      INTERFACE SWAP
+         MODULE PROCEDURE :: SWAPI, SWAPR
+      END INTERFACE SWAP
+
       CONTAINS
 
 !####################################################################
       FUNCTION OPENFILE(f) RESULT(fid)
-
       IMPLICIT NONE
-
       CLASS(fileType), INTENT(INOUT) :: f
       INTEGER fid
 
@@ -135,13 +137,10 @@
 
       RETURN
       END FUNCTION OPENFILE
-
 !####################################################################
 !     This function will compute second NORM of a vector
       PURE FUNCTION NORMS(U, V)
-
       IMPLICIT NONE
-
       REAL(KIND=8), INTENT(IN) :: U(:)
       REAL(KIND=8), INTENT(IN), OPTIONAL :: V(:)
       REAL(KIND=8) NORMS
@@ -164,9 +163,7 @@
       END FUNCTION NORMS
 !--------------------------------------------------------------------
       PURE FUNCTION NORMV(U, V)
-
       IMPLICIT NONE
-
       REAL(KIND=8), INTENT(IN) :: U(:,:)
       REAL(KIND=8), INTENT(IN), OPTIONAL :: V(:,:)
       REAL(KIND=8) NORMV
@@ -232,7 +229,6 @@
 
       RETURN
       END FUNCTION NORMV
-
 !####################################################################
 !     This routine does the cross product for a two given vector of
 !     V1 and V2.
@@ -254,20 +250,17 @@
 
       RETURN
       END FUNCTION CROSS
-
 !####################################################################
 !     This function removes the leading spaces and tabs
       PURE FUNCTION ADJUSTC(str)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: str
       CHARACTER(LEN=LEN(str)) ADJUSTC
 
       INTEGER i
 
       DO i=1, LEN(str)
-         IF (str(i:i) .NE. " " .AND. str(i:i) .NE. "	") EXIT
+         IF (str(i:i) .NE. " " .AND. str(i:i) .NE. "  ") EXIT
       END DO
       IF (i .GT. LEN(str)) THEN
          ADJUSTC = ""
@@ -282,9 +275,7 @@
 !     removes the readed part from "strg". Valid charecters to read are
 !     defined in "valS"
       SUBROUTINE GETSTR(strg, rVal, valS)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(INOUT) :: strg
       CHARACTER(LEN=stdL), INTENT(OUT) :: rVal
       CHARACTER(LEN=*), INTENT(IN) :: valS
@@ -319,14 +310,11 @@
 
       RETURN
       END SUBROUTINE GETSTR
-
 !--------------------------------------------------------------------
 !     This reads a Hexadecimal number from the begining of "str" and
 !     returns the results in "r" and removes the readed part from "str"
       SUBROUTINE GETHEX(str, r)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(INOUT) :: str
       INTEGER(KIND=8), INTENT(OUT) :: r
 
@@ -338,14 +326,11 @@
 
       RETURN
       END SUBROUTINE GETHEX
-
 !--------------------------------------------------------------------
 !     This reads an integer from the begining of "str" and returns
 !     the results in "r" and removes the readed part from "str"
       SUBROUTINE GETINT(str, r)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(INOUT) :: str
       INTEGER, INTENT(OUT) :: r
 
@@ -357,13 +342,10 @@
 
       RETURN
       END SUBROUTINE GETINT
-
 !####################################################################
 !     This function will return the current time in sec
       PURE FUNCTION SGN(u)
-
       IMPLICIT NONE
-
       REAL(KIND=8), INTENT(IN) :: u
       INTEGER SGN
 
@@ -377,13 +359,10 @@
 
       RETURN
       END FUNCTION SGN
-
 !####################################################################
 !      Returning number of data/words in a string
       PURE FUNCTION CheckNoNumbers(sTmp)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(IN) :: sTmp
 
       LOGICAL isBnk
@@ -406,13 +385,10 @@
 
       RETURN
       END FUNCTION CheckNoNumbers
-
 !####################################################################
 !     Pushing and pulling values to stack variables
       PURE SUBROUTINE PUSHSTACKS(stk, iVal)
-
       IMPLICIT NONE
-
       TYPE(stackType), INTENT(INOUT) :: stk
       INTEGER, INTENT(IN) :: iVal
 
@@ -442,9 +418,7 @@
       END SUBROUTINE PUSHSTACKS
 !--------------------------------------------------------------------
       PURE SUBROUTINE PUSHSTACKV(stk, iVal)
-
       IMPLICIT NONE
-
       TYPE(stackType), INTENT(INOUT) :: stk
       INTEGER, INTENT(IN) :: iVal(:)
 
@@ -458,9 +432,7 @@
       END SUBROUTINE PUSHSTACKV
 !--------------------------------------------------------------------
       FUNCTION PULLSTACK(stk, iVal) RESULT(flag)
-
       IMPLICIT NONE
-
       TYPE(stackType), INTENT(INOUT) :: stk
       INTEGER, INTENT(OUT) :: iVal
       LOGICAL flag
@@ -476,15 +448,15 @@
 
       RETURN
       END FUNCTION PULLSTACK
-
 !####################################################################
 !     Pushing and pulling values to queue variables
       PURE SUBROUTINE ENQUEUES(que, iVal)
-
       IMPLICIT NONE
-
       TYPE(queueType), INTENT(INOUT) :: que
       INTEGER, INTENT(IN) :: iVal
+
+      LOGICAL flag
+      INTEGER i
 
       INTEGER, ALLOCATABLE :: tmp(:)
 
@@ -503,6 +475,15 @@
             ALLOCATE(que%v(que%maxN))
             que%v(1:que%n) = tmp
          END IF
+!     Check if the new val to be added is already a member of the queue
+         flag = .TRUE.
+         DO i=1, que%n
+            IF (que%v(i) .EQ. iVal) THEN
+               flag = .FALSE.
+               EXIT
+            END IF
+         END DO
+         IF (.NOT.flag) RETURN
          que%n = que%n + 1
          que%v(que%n) = iVal
       END IF
@@ -527,9 +508,7 @@
       END SUBROUTINE ENQUEUEV
 !--------------------------------------------------------------------
       FUNCTION DEQUEUE(que, iVal) RESULT(flag)
-
       IMPLICIT NONE
-
       TYPE(queueType), INTENT(INOUT) :: que
       INTEGER, INTENT(OUT) :: iVal
 
@@ -550,14 +529,11 @@
 
       RETURN
       END FUNCTION DEQUEUE
-
 !####################################################################
 !     These functions produce string from numbers. Following is for
 !     doubles
       PURE FUNCTION DTSTR(dVal) RESULT(string)
-
       IMPLICIT NONE
-
       INTEGER, PARAMETER :: l = 8
 
       REAL(KIND=8), INTENT(IN) :: dVal
@@ -570,9 +546,7 @@
 !--------------------------------------------------------------------
 !     Similar to last one, but with a specified length
       PURE FUNCTION NDTSTR(dVal,l) RESULT(string)
-
       IMPLICIT NONE
-
       INTEGER, INTENT(IN) :: l
       REAL(KIND=8), INTENT(IN) :: dVal
       CHARACTER(LEN=l) string
@@ -709,9 +683,7 @@
 !--------------------------------------------------------------------
 !     This is for real numbers
       PURE FUNCTION RTSTR(rVal) RESULT(string)
-
       IMPLICIT NONE
-
       INTEGER, PARAMETER :: l = 7
 
       REAL, INTENT(IN) :: rVal
@@ -724,9 +696,7 @@
 !--------------------------------------------------------------------
 !     This is for real numbers with specified length
       PURE FUNCTION NRTSTR(rVal,l) RESULT(string)
-
       IMPLICIT NONE
-
       INTEGER, INTENT(IN) :: l
       REAL, INTENT(IN) :: rVal
       CHARACTER(LEN=l) string
@@ -738,9 +708,7 @@
 !--------------------------------------------------------------------
 !     This is for integers
       PURE FUNCTION ITSTR(iVal) RESULT(string)
-
       IMPLICIT NONE
-
       INTEGER, INTENT(IN) :: iVal
       INTEGER n
       CHARACTER(LEN=2 - MAX(0,SIGN(1,ival)) +
@@ -766,9 +734,7 @@
 !--------------------------------------------------------------------
 !     Similar to last one, but with minimum length of l
       PURE FUNCTION NITSTR(iVal, l) RESULT(string)
-
       IMPLICIT NONE
-
       INTEGER, INTENT(IN) :: iVal, l
       INTEGER n
       CHARACTER(LEN=MAX(2 - MAX(0,SIGN(1,ival)) +
@@ -779,16 +745,14 @@
 
       RETURN
       END FUNCTION NITSTR
-
 !####################################################################
 !     Produces a color
       PURE FUNCTION CLR(iStr,clId) RESULT(oStr)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: iStr
       INTEGER, INTENT(IN), OPTIONAL :: clId
       CHARACTER(LEN=LEN(TRIM(iStr))+9) oStr
+
 !     Colors are: 1: White, 2: Red, 3: Green, 4: Yellow, 5: Blue,
 !     6: Magenta, 7: Cyan
       CHARACTER(LEN=2),PARAMETER :: clCdL(7) = (/"29","31","32","33",
@@ -813,9 +777,7 @@
 !--------------------------------------------------------------------
 !     This is for removing color
       PURE FUNCTION RMCLR(iStr) RESULT(oStr)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: iStr
       CHARACTER(LEN=LEN(iStr)) oStr
 
@@ -850,9 +812,7 @@
       END FUNCTION RMCLR
 !####################################################################
       FUNCTION CNCSL(sVal,lVal)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: sVal
       LOGICAL, INTENT(IN) :: lVal
 
@@ -869,9 +829,7 @@
 !--------------------------------------------------------------------
 !     Attaches strings and integer
       FUNCTION CNCSI(sVal,iVal)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: sVal
       INTEGER, INTENT(IN) :: iVal
 
@@ -885,9 +843,7 @@
       END FUNCTION CNCSI
 !--------------------------------------------------------------------
       FUNCTION CNCIS(iVal,sVal)
-
       IMPLICIT NONE
-
       INTEGER, INTENT(IN) :: iVal
       CHARACTER(LEN=*), INTENT(IN) :: sVal
 
@@ -901,9 +857,7 @@
       END FUNCTION CNCIS
 !--------------------------------------------------------------------
       FUNCTION CNCSR(sVal,rVal)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: sVal
       REAL(KIND=8), INTENT(IN) :: rVal
 
@@ -913,16 +867,12 @@
 
       RETURN
       END FUNCTION CNCSR
-
 !####################################################################
 !     This routine compares two doubles and returns .TRUE. if their
 !     difference is less than "eps". If one argument is mising, it
 !     will compare against 0D0
-
       PURE FUNCTION ISZERO(ia, ib)
-
       IMPLICIT NONE
-
       REAL(KIND=8), INTENT(IN) :: ia
       REAL(KIND=8), INTENT(IN), OPTIONAL :: ib
       LOGICAL ISZERO
@@ -946,11 +896,8 @@
 
       RETURN
       END FUNCTION ISZERO
-
 !####################################################################
-
       FUNCTION CPUT()
-
       IMPLICIT NONE
 
       INTEGER timeArray(8), i
@@ -970,9 +917,7 @@
 
       RETURN
       END FUNCTION CPUT
-
 !####################################################################
-
       PURE FUNCTION CONVI(s) RESULT(r)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: s(:)
@@ -1016,7 +961,7 @@
 
       RETURN
       END FUNCTION CONVR
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE RSEED(s)
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: s
@@ -1033,7 +978,7 @@
 
       RETURN
       END SUBROUTINE RSEED
-!--------------------------------------------------------------------
+!####################################################################
       FUNCTION SEARCHARG(arg, exist) RESULT(r)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: arg
@@ -1068,7 +1013,7 @@
 
       RETURN
       END FUNCTION SEARCHARG
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE parseString(strng, toks, ntoks)
       IMPLICIT NONE
       CHARACTER(len=*), INTENT(IN) :: strng
@@ -1140,6 +1085,63 @@
 
       RETURN
       END FUNCTION STRTOK
-!--------------------------------------------------------------------
+!####################################################################
+      SUBROUTINE TO_UPPER(strng)
+      IMPLICIT NONE
+      CHARACTER(len=*), INTENT(INOUT) :: strng
 
+      INTEGER i
+
+      DO i=1, LEN(strng)
+         SELECT CASE(strng(i:i))
+         CASE("a":"z")
+            strng(i:i) = ACHAR(IACHAR(strng(i:i))-32)
+         END SELECT
+      END DO
+
+      RETURN
+      END SUBROUTINE TO_UPPER
+!--------------------------------------------------------------------
+      SUBROUTINE TO_LOWER(strng)
+      IMPLICIT NONE
+      CHARACTER(len=*), INTENT(INOUT) :: strng
+
+      INTEGER i
+
+      DO i=1, LEN(strng)
+         SELECT CASE(strng(i:i))
+         CASE("A":"Z")
+            strng(i:i) = ACHAR(IACHAR(strng(i:i))+32)
+         END SELECT
+      END DO
+
+      RETURN
+      END SUBROUTINE TO_LOWER
+!####################################################################
+      SUBROUTINE SWAPI(a, b)
+      IMPLICIT NONE
+      INTEGER, INTENT(INOUT) :: a, b
+
+      INTEGER c
+
+      c = a
+      a = b
+      b = c
+
+      RETURN
+      END SUBROUTINE SWAPI
+!--------------------------------------------------------------------
+      SUBROUTINE SWAPR(a, b)
+      IMPLICIT NONE
+      REAL(KIND=8), INTENT(INOUT) :: a, b
+
+      REAL(KIND=8) c
+
+      c = a
+      a = b
+      b = c
+
+      RETURN
+      END SUBROUTINE SWAPR
+!####################################################################
       END MODULE UTILMOD

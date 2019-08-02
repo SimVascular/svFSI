@@ -29,8 +29,11 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**************************************************
+!--------------------------------------------------------------------
+!
+!     Module to read a legacy VTK file.
+!
+!--------------------------------------------------------------------
 
       module vtkLegacyMod
       use dataTypeParams
@@ -47,7 +50,7 @@
          integer(IK), dimension(maxPtDOF) :: ndof,ioff,ikind
          character(len=strL), dimension(maxPtDOF) :: varName
          character(len=strL), dimension(maxPtDOF) :: varType
-         real(RK4), dimension(:), allocatable :: arr
+         real(RK), dimension(:), allocatable :: arr
       end type vtkPtData
 
       type vtkElData
@@ -55,7 +58,7 @@
          integer(IK), dimension(maxElDOF) :: ndof,ioff,ikind
          character(len=strL), dimension(maxElDOF) :: varName
          character(len=strL), dimension(maxElDOF) :: varType
-         real(RK4), dimension(:), allocatable :: arr
+         real(RK), dimension(:), allocatable :: arr
       end type vtkElData
 
       type vtkUnstrucGridType
@@ -65,7 +68,7 @@
          integer(IK) :: nNo, nEl, eNoN
          integer(IK) :: scalarDOF,vectorDOF,nFields
          integer(IK), dimension(:,:), allocatable :: ien
-         real(RK4), dimension(:,:), allocatable :: x
+         real(RK), dimension(:,:), allocatable :: x
          type(vtkPtData) :: ptData
          type(vtkElData) :: elData
       end type vtkUnstrucGridType
@@ -89,9 +92,9 @@
          character(len=strL), dimension(maxToks) :: tokenList
          character :: c
 
-         integer(IK) :: i,j,fid,iPos,n1,n2
+         integer(IK) :: i,j,k,fid,iPos,n1,n2
          integer(IK) :: itmp,ntoks,slen
-         real(RK4)   :: r4tmp
+         real(RK)    :: rtmp
 
          istat = 0
          inquire(file=trim(fName), exist=flag)
@@ -100,9 +103,6 @@
                "ERROR: File "//trim(fName)//" does not exist"
             istat=-1; return
          end if
-
-         write(stdout,ftab1) &
-            "Reading file: <"//trim(fName)//">"
 
          vtk%isBinary = .false.
          rLine = ''
@@ -125,12 +125,6 @@
          end if
          rewind(fid)
 
-         if (vtk%isBinary) then
-            write(stdout,ftab2) "Data format: <BINARY>"
-         else
-            write(stdout,ftab2) "Data format: <ASCII>"
-         end if
-
          call findKwrd(vtk,fid,"POINTS",iPos,rLine,istat)
          if (istat .eq. -1) return
          call parseString(rLine,tokenList,ntoks)
@@ -138,11 +132,11 @@
          slen = len(trim(stmp))
          read(stmp(1:slen),*) vtk%nNo
 
-         allocate(vtk%x(maxNSD,vtk%nNo)); vtk%x = 0.0
+         allocate(vtk%x(maxNSD,vtk%nNo)); vtk%x = 0D0
          if (vtk%isBinary) then
             do i=1, vtk%nNo
                read(fid,pos=iPos) vtk%x(:,i)
-               iPos = iPos + maxNSD*kind(r4tmp)
+               iPos = iPos + maxNSD*kind(rtmp)
             end do
          else
             do i=1, vtk%nNo
@@ -224,14 +218,14 @@
             if (rLine(1:10) .eq. "POINT_DATA") then
                if (.not.allocated(vtk%ptData%arr)) then
                   allocate(vtk%ptData%arr(nn*maxPtDOF))
-                  vtk%ptData%arr = 0.0
+                  vtk%ptData%arr = 0D0
                end if
                vtk%dAtt = "POINT_DATA"
                cycle
             else if (rLine(1:9) .eq. "CELL_DATA") then
                if (.not.allocated(vtk%elData%arr)) then
                   allocate(vtk%elData%arr(ne*maxElDOF))
-                  vtk%elData%arr = 0.0
+                  vtk%elData%arr = 0D0
                end if
                vtk%dAtt = "CELL_DATA"
                cycle
@@ -250,8 +244,8 @@
                   select case (trim(vtk%ptData%varType(ivar)))
                   case ("int")
                      vtk%ptData%ikind(ivar) = kind(itmp)
-                  case ("float")
-                     vtk%ptData%ikind(ivar) = kind(r4tmp)
+                  case ("float", "double")
+                     vtk%ptData%ikind(ivar) = kind(rtmp)
                   end select
 
                   write(stdout,ftab3) "Data Attribute: "//trim(vtk%dAtt)
@@ -272,8 +266,8 @@
                   select case (trim(vtk%ptData%varType(ivar)))
                   case ("int")
                      vtk%ptData%ikind(ivar) = kind(itmp)
-                  case ("float")
-                     vtk%ptData%ikind(ivar) = kind(r4tmp)
+                  case ("float", "double")
+                     vtk%ptData%ikind(ivar) = kind(rtmp)
                   end select
 
                   write(stdout,ftab3) "Data Attribute: "//trim(vtk%dAtt)
@@ -297,8 +291,8 @@
                   select case (trim(vtk%elData%varType(ivar)))
                   case ("int")
                      vtk%elData%ikind(ivar) = kind(itmp)
-                  case ("float")
-                     vtk%elData%ikind(ivar) = kind(r4tmp)
+                  case ("float", "double")
+                     vtk%elData%ikind(ivar) = kind(rtmp)
                   end select
 
                   write(stdout,ftab3) "Data Attribute: "//trim(vtk%dAtt)
@@ -319,8 +313,8 @@
                   select case (trim(vtk%elData%varType(ivar)))
                   case ("int")
                      vtk%elData%ikind(ivar) = kind(itmp)
-                  case ("float")
-                     vtk%elData%ikind(ivar) = kind(r4tmp)
+                  case ("float", "double")
+                     vtk%elData%ikind(ivar) = kind(rtmp)
                   end select
 
                   write(stdout,ftab3) "Data Attribute: "//trim(vtk%dAtt)
@@ -374,7 +368,7 @@
                   if (n2 .eq. nn) then
                      if (.not.allocated(vtk%ptData%arr)) then
                         allocate(vtk%ptData%arr(nn*maxPtDOF))
-                        vtk%ptData%arr = 0.0
+                        vtk%ptData%arr = 0D0
                      end if
                      vtk%dAtt = "POINT_DATA"
                      vtk%ptData%nvar = vtk%ptData%nvar + 1
@@ -385,8 +379,8 @@
                      select case (trim(vtk%ptData%varType(ivar)))
                      case ("int")
                         vtk%ptData%ikind(ivar) = kind(itmp)
-                     case ("float")
-                        vtk%ptData%ikind(ivar) = kind(r4tmp)
+                     case ("float", "double")
+                        vtk%ptData%ikind(ivar) = kind(rtmp)
                      end select
 
                      if ( n1.eq.scalarDOF ) then
@@ -414,7 +408,7 @@
                   else if (n2 .eq. ne) then
                      if (.not.allocated(vtk%elData%arr)) then
                         allocate(vtk%elData%arr(ne*maxElDOF))
-                        vtk%elData%arr = 0.0
+                        vtk%elData%arr = 0D0
                      end if
                      vtk%dAtt = "CELL_DATA"
                      vtk%elData%nvar = vtk%elData%nvar + 1
@@ -425,8 +419,8 @@
                      select case (trim(vtk%elData%varType(ivar)))
                      case ("int")
                         vtk%elData%ikind(ivar) = kind(itmp)
-                     case ("float")
-                        vtk%elData%ikind(ivar) = kind(r4tmp)
+                     case ("float", "double")
+                        vtk%elData%ikind(ivar) = kind(rtmp)
                      end select
 
                      if ( n1.eq.scalarDOF ) then
@@ -463,8 +457,21 @@
 
          !==========================================
 
+         subroutine flushLegacyVTK(vtk)
+         implicit none
+         type(vtkUnstrucGridType), intent(inout) :: vtk
+
+         if (allocated(vtk%x)) deallocate(vtk%x)
+         if (allocated(vtk%ien)) deallocate(vtk%ien)
+         if (allocated(vtk%ptData%arr)) deallocate(vtk%ptData%arr)
+         if (allocated(vtk%elData%arr)) deallocate(vtk%elData%arr)
+
+         return
+         end subroutine flushLegacyVTK
+
+         !==========================================
+
          subroutine findKwrd(vtk,fileId,sKwrd,iPos,sLine,istat)
-         use genUtils
          implicit none
          type(vtkUnstrucGridType), intent(in) :: vtk
          integer, intent(in) :: fileId
@@ -472,19 +479,32 @@
          character(len=*), intent(in) :: sKwrd
          character(len=strL), intent(out) :: sLine
 
-         integer :: i,kwrdL
+         integer :: i,kwrdL,cnt
          character :: c
 
          kwrdL = len(trim(sKwrd))
          do
             if (vtk%isBinary) then
                sLine = ''
-               do i=1, strL
-                  read(fileId,pos=iPos,end=001) c
-                  iPos = iPos + 1
-                  if(c .eq. newl) exit
-                  sLine(i:i) = c
-               end do
+               read(fileId,pos=iPos,end=001) c
+               iPos = iPos + 1
+               if (c .eq. sKwrd(1:1)) then
+                  sLine(1:1) = c
+                  do cnt=2, kwrdL
+                     read(fileId,pos=iPos,end=001) c
+                     iPos = iPos + 1
+                     sLine(cnt:cnt) = c
+                  end do
+                  if (sLine(1:kwrdL) .eq. trim(sKwrd)) then
+                     do cnt=kwrdL+1, strL
+                        read(fileId,pos=iPos,end=001) c
+                        iPos = iPos + 1
+                        if (c .eq. newl) exit
+                        sLine(cnt:cnt) = c
+                     end do
+                     return
+                  end if
+               end if
             else
                read(fileId,'(A)',end=001) sLine
             end if
@@ -508,7 +528,7 @@
          integer, intent(inout) :: fid,iPos,istat
          character(len=*), intent(inout) :: rLine
 
-         integer :: i,j
+         integer :: i,j,k
          integer :: ist,iend,vecl
          character(len=strL) :: vType
          integer, dimension(:), allocatable :: tmpI
@@ -535,8 +555,8 @@
                   allocate(tmpI(vecl))
                   read(fid,pos=iPos,end=001) tmpI(1:vecl)
                   vtk%ptData%arr(ist:iend) = &
-                     real(tmpI(1:vecl))
-               else if (trim(vType) .eq. "float") then
+                     real(tmpI(1:vecl), kind=RK)
+               else if (trim(vType).eq."float" .or. trim(vType).eq."double") then
                   read(fid,pos=iPos,end=001) &
                      vtk%ptData%arr(ist:iend)
                else
@@ -577,8 +597,8 @@
                   allocate(tmpI(vecl))
                   read(fid,pos=iPos,end=001) tmpI(1:vecl)
                   vtk%elData%arr(ist:iend) = &
-                     real(tmpI(1:vecl))
-               else if (trim(vType) .eq. "float") then
+                     real(tmpI(1:vecl), kind=RK)
+               else if (trim(vType).eq."float" .or. trim(vtype).eq."double") then
                   read(fid,pos=iPos,end=001) &
                      vtk%elData%arr(ist:iend)
                else

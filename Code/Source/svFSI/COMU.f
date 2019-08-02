@@ -30,9 +30,9 @@
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
 !--------------------------------------------------------------------
-!      
+!
 !     Communicator related module
-!      
+!
 !--------------------------------------------------------------------
 
       MODULE CMMOD
@@ -60,12 +60,12 @@
          INTEGER nThreads
 !        Number of processors
          INTEGER nProcs
-      CONTAINS 
+      CONTAINS
 !        Create a new Communicator
          PROCEDURE, PUBLIC :: new => NEWCM
 !        Returns commu handle
          PROCEDURE, PUBLIC :: com
-!        Returns processor ID 
+!        Returns processor ID
          PROCEDURE, PUBLIC :: id => IDCM
 !        Returns number of processors
          PROCEDURE, PUBLIC :: np => NUMPROC
@@ -86,12 +86,14 @@
          PROCEDURE :: BCASTLV
          PROCEDURE :: BCASTIS
          PROCEDURE :: BCASTIV
+         PROCEDURE :: BCASTIA2
          PROCEDURE :: BCASTRS
          PROCEDURE :: BCASTRV
+         PROCEDURE :: BCASTRA2
          PROCEDURE :: BCASTSS
          PROCEDURE :: BCASTSV
-         GENERIC :: bcast => BCASTLS, BCASTLV, BCASTIS, BCASTIV, 
-     2      BCASTRS, BCASTRV, BCASTSS, BCASTSV
+         GENERIC :: bcast => BCASTLS, BCASTLV, BCASTIS, BCASTIV,
+     2      BCASTIA2, BCASTRS, BCASTRV, BCASTRA2, BCASTSS, BCASTSV
 !        Blocking MPI send
          PROCEDURE :: send => SENDRV
 !        Blocking MPI recv
@@ -118,10 +120,9 @@
          MODULE PROCEDURE cmAssignCm
       END INTERFACE ASSIGNMENT(=)
 
-      CONTAINS 
+      CONTAINS
 
 !####################################################################
-      
       SUBROUTINE NEWCM(cm, comHandle)
       IMPLICIT NONE
       CLASS(cmType) cm
@@ -135,9 +136,7 @@
       cm%nProcs = 1
       CALL MPI_COMM_RANK(comHandle, cm%taskId, ierr)
       CALL MPI_COMM_SIZE(comHandle, cm%nProcs, ierr)
-!$OMP PARALLEL 
-      cm%nThreads = 1!OMP_GET_NUM_THREADS()
-!$OMP END PARALLEL
+      cm%nThreads = 1
 
       IF (cm%nProcs .EQ. 1) RETURN
 
@@ -248,14 +247,12 @@
       CLASS(cmType), INTENT(IN) :: cm
 
       LOGICAL ierr
-      
+
       CALL MPI_ABORT(cm, MPI_ERR_OTHER, ierr)
 
       RETURN
       END SUBROUTINE FSTOP
-
 !####################################################################
-      
       SUBROUTINE BCASTLS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -307,6 +304,20 @@
       RETURN
       END SUBROUTINE BCASTIV
 !--------------------------------------------------------------------
+      SUBROUTINE BCASTIA2(cm, u)
+      IMPLICIT NONE
+      CLASS(cmType), INTENT(IN) :: cm
+      INTEGER, INTENT(INOUT) :: u(:,:)
+
+      INTEGER m, n, ierr
+
+      m = SIZE(u,1)
+      n = SIZE(u,2)
+      CALL MPI_BCAST(u, m*n, mpint, master, cm%com(), ierr)
+
+      RETURN
+      END SUBROUTINE BCASTIA2
+!--------------------------------------------------------------------
       SUBROUTINE BCASTRS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -332,6 +343,20 @@
       RETURN
       END SUBROUTINE BCASTRV
 !--------------------------------------------------------------------
+      SUBROUTINE BCASTRA2(cm, u)
+      IMPLICIT NONE
+      CLASS(cmType), INTENT(IN) :: cm
+      REAL(KIND=8), INTENT(INOUT) :: u(:,:)
+
+      INTEGER m, n, ierr
+
+      m = SIZE(u,1)
+      n = SIZE(u,2)
+      CALL MPI_BCAST(u, m*n, mpreal, master, cm%com(), ierr)
+
+      RETURN
+      END SUBROUTINE BCASTRA2
+!--------------------------------------------------------------------
       SUBROUTINE BCASTSS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -351,16 +376,14 @@
       CHARACTER(LEN=*), INTENT(INOUT) :: u(:)
 
       INTEGER m, l, ierr
-      
+
       m = SIZE(u)
       l = LEN(u)
       CALL MPI_BCAST(u, l*m, mpchar, master, cm%com(), ierr)
 
       RETURN
       END SUBROUTINE BCASTSV
-
 !####################################################################
-      
       SUBROUTINE SENDRV(cm, u, to, tag)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -398,7 +421,7 @@
 
       IF (from .EQ. cm%id()) RETURN
       m = SIZE(u)
-      CALL MPI_RECV(u, m, mpreal, from, ftag, cm%com(), 
+      CALL MPI_RECV(u, m, mpreal, from, ftag, cm%com(),
      2   MPI_STATUS_IGNORE, ierr)
 
       RETURN
@@ -476,9 +499,7 @@
 
       RETURN
       END SUBROUTINE WAITV
-
 !####################################################################
-      
       FUNCTION REDUCERS(cm, u, iOp) RESULT(gU)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -566,9 +587,7 @@
 
       RETURN
       END FUNCTION REDUCERV
-
 !####################################################################
-      
       FUNCTION createCH(cm, pid) RESULT(ch)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -586,9 +605,7 @@
 
       RETURN
       END FUNCTION createCH
-
 !####################################################################
-      
       SUBROUTINE cmAssignCm(s,r)
       IMPLICIT NONE
       CLASS(cmType), INTENT(OUT) :: s
@@ -603,3 +620,4 @@
       END SUBROUTINE cmAssignCm
 
       END MODULE CMMOD
+!####################################################################

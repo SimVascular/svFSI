@@ -29,8 +29,12 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**************************************************
+!--------------------------------------------------------------------
+!
+!     Module defining generic data types in Fortran. This is interaced
+!     with custom VTK module.
+!
+!--------------------------------------------------------------------
 
         module dataTypeParams
         integer, parameter :: IK1 = selected_int_kind(2)                  ! integer 8 bits
@@ -69,7 +73,7 @@
 
             intK1 = transfer(p1,intK1)
             res = int(intK1, kind=IK)
-            
+
             end subroutine trBitsIK1
 
             !==========================================
@@ -84,7 +88,7 @@
 
             intK2 = transfer(p1,intK2)
             res = int(intK2, kind=IK)
-            
+
             end subroutine trBitsIK2
 
             !==========================================
@@ -99,7 +103,7 @@
 
             intK4 = transfer(p1,intK4)
             res = int(intK4, kind=IK)
-            
+
             end subroutine trBitsIK4
 
             !==========================================
@@ -114,7 +118,7 @@
 
             intK8 = transfer(p1,intK8)
             res = int(intK8, kind=IK)
-            
+
             end subroutine trBitsIK8
 
             !==========================================
@@ -129,7 +133,7 @@
 
             realK4 = transfer(p1,realK4)
             res = real(realK4, kind=RK)
-            
+
             end subroutine trBitsRK4
 
             !==========================================
@@ -144,7 +148,7 @@
 
             realK8 = transfer(p1,realK8)
             res = real(realK8, kind=RK)
-            
+
             end subroutine trBitsRK8
 
             !==========================================
@@ -162,7 +166,7 @@
             intK1 = transfer(p1,intK1)
             res = int(intK1, kind=IK)
             deallocate(intK1)
-            
+
             end subroutine trBitsIK1A
 
             !==========================================
@@ -180,7 +184,7 @@
             intK2 = transfer(p1,intK2)
             res = int(intK2, kind=IK)
             deallocate(intK2)
-            
+
             end subroutine trBitsIK2A
 
             !==========================================
@@ -216,7 +220,7 @@
             intK8 = transfer(p1,intK8)
             res = int(intK8, kind=IK)
             deallocate(intK8)
-            
+
             end subroutine trBitsIK8A
 
             !==========================================
@@ -234,7 +238,7 @@
             realK4 = transfer(p1,realK4)
             res = real(realK4, kind=RK)
             deallocate(realK4)
-            
+
             end subroutine trBitsRK4A
 
             !==========================================
@@ -252,7 +256,7 @@
             realK8 = transfer(p1,realK8)
             res = real(realK8, kind=RK)
             deallocate(realK8)
-            
+
             end subroutine trBitsRK8A
 
             !==========================================
