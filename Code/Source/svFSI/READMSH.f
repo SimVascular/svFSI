@@ -59,14 +59,14 @@
       REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), gX(:,:), tmpA(:,:),
      2   tmpY(:,:), tmpD(:,:)
 
+      minX  =  HUGE(minX)
+      maxX  = -HUGE(minX)
       IF (.NOT.resetSim) THEN
          nMsh  = list%srch("Add mesh",ll=1)
          std = " Number of meshes: "//nMsh
          ALLOCATE (msh(nMsh), gX(0,0))
 
          gtnNo = 0
-         minX  =  HUGE(minX)
-         maxX  = -HUGE(minX)
          DO iM=1, nMsh
             lPM => list%get(msh(iM)%name,"Add mesh",iM)
             lPtr => lPM%get(msh(iM)%lShl,"Set mesh as shell")

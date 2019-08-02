@@ -657,6 +657,7 @@
          END DO
          DEALLOCATE(msh)
       END IF
+      IF (ALLOCATED(rmsh%flag)) DEALLOCATE(rmsh%flag)
 
 !     Deallocating equations
       IF (ALLOCATED(eq)) THEN
@@ -681,17 +682,19 @@
       IF (ALLOCATED(dmnId))    DEALLOCATE(dmnId)
       IF (ALLOCATED(ltg))      DEALLOCATE(ltg)
       IF (ALLOCATED(rowPtr))   DEALLOCATE(rowPtr)
+      IF (ALLOCATED(idMap))    DEALLOCATE(idMap)
+      IF (ALLOCATED(cmmBdry))  DEALLOCATE(cmmBdry)
       IF (ALLOCATED(iblank))   DEALLOCATE(iblank)
       IF (ALLOCATED(ighost))   DEALLOCATE(ighost)
-      IF (ALLOCATED(idMap))   DEALLOCATE(idMap)
 
       IF (ALLOCATED(Ao))       DEALLOCATE(Ao)
       IF (ALLOCATED(An))       DEALLOCATE(An)
-      IF (ALLOCATED(Yo))       DEALLOCATE(Yo)
-      IF (ALLOCATED(Yn))       DEALLOCATE(Yn)
       IF (ALLOCATED(Do))       DEALLOCATE(Do)
       IF (ALLOCATED(Dn))       DEALLOCATE(Dn)
       IF (ALLOCATED(R))        DEALLOCATE(R)
+      IF (ALLOCATED(x))        DEALLOCATE(x)
+      IF (ALLOCATED(Yo))       DEALLOCATE(Yo)
+      IF (ALLOCATED(Yn))       DEALLOCATE(Yn)
       IF (ALLOCATED(Bf))       DEALLOCATE(Bf)
 
       IF (ALLOCATED(Ad))       DEALLOCATE(Ad)
@@ -702,8 +705,8 @@
       IF (ALLOCATED(pSn))      DEALLOCATE(pSn)
       IF (ALLOCATED(pSa))      DEALLOCATE(pSa)
 
-      IF (ALLOCATED(Vinit))    DEALLOCATE(Vinit)
       IF (ALLOCATED(Pinit))    DEALLOCATE(Pinit)
+      IF (ALLOCATED(Vinit))    DEALLOCATE(Vinit)
       IF (ALLOCATED(Dinit))    DEALLOCATE(Dinit)
 
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
