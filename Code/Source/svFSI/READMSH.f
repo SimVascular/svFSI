@@ -50,7 +50,7 @@
       LOGICAL :: flag
       INTEGER :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
       REAL(KIND=8) :: maxX(nsd), minX(nsd), scaleF, fibN(nsd), rtmp
-      CHARACTER(LEN=stdL) :: ctmp
+      CHARACTER(LEN=stdL) :: ctmp, fExt
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(stackType) :: avNds
       TYPE(fileType) :: fTmp
@@ -299,15 +299,22 @@ c               END IF
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
+         lPtr => lPM%get(i,"Domain",ll=0,ul=BIT_SIZE(dmnId)-1)
+         IF (ASSOCIATED(lPtr)) CALL SETDMNID(msh(iM),i)
+
          lPtr => lPM%get(fTmp,"Domain file path")
          IF (ASSOCIATED(lPtr)) THEN
             IF (rmsh%isReqd) err = "Variable domain properties is not"//
      2         " allowed with remeshing"
-            CALL SETDMNIDFF(msh(iM), fTmp%open())
+            i = LEN(TRIM(fTmp%fname))
+            fExt = fTmp%fname(i-2:i)
+            IF (TRIM(fExt).EQ."vtp" .OR. TRIM(fExt).EQ."vtu") THEN
+               CALL SETDMNIDVTK(msh(iM), fTmp%fname, "DOMAIN_ID")
+            ELSE
+               CALL SETDMNIDFF(msh(iM), fTmp%open())
+            END IF
          END IF
 
-         lPtr => lPM%get(i,"Domain",ll=0,ul=BIT_SIZE(dmnId)-1)
-         IF (ASSOCIATED(lPtr)) CALL SETDMNID(msh(iM),i)
          IF (ALLOCATED(msh(iM)%eId)) flag = .TRUE.
       END DO
       IF (flag) THEN
@@ -704,7 +711,67 @@ c               END IF
 
       END SUBROUTINE MATCHFACES
 !####################################################################
-!     Read domain from a file
+!     Read mesh domains from a vtu/vtp file
+      SUBROUTINE SETDMNIDVTK(lM, fName, kwrd)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+      CHARACTER(LEN=*) :: fName, kwrd
+
+      TYPE(vtkXMLType) :: vtu
+      INTEGER :: e, iDmn, iStat, btSiz
+      CHARACTER(LEN=stdL) ctmp
+
+      INTEGER, ALLOCATABLE :: eId(:)
+
+      btSiz = BIT_SIZE(dmnId)
+      IF (btSiz .NE. BIT_SIZE(lM%eId))
+     2   err = "Use same type for dmnId and lM%eId"
+
+      ctmp = "Domain ID exceeds BIT_SIZE(dmnId). Reduce the number"//
+     2   " of domains or increase BIT_SIZE(dmnId)."
+
+!     Check to see if I need to increase the size of dmnId
+      IF (.NOT.ALLOCATED(lM%eId)) THEN
+         ALLOCATE(lM%eId(lM%gnEl))
+         lM%eId = 0
+      END IF
+
+      iStat = 0
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtu, fName, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error (init)"
+
+      CALL getVTK_numElems(vtu, e, iStat)
+      IF (e .NE. lM%gnEl) err = "Mismatch in num elems for "//
+     2   TRIM(kwrd)
+
+      ALLOCATE(eId(lM%gnEl))
+      eId = -1
+      CALL getVTK_elemData(vtu, TRIM(kwrd), eId, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+
+      CALL flushVTK(vtu)
+
+      DO e=1, lM%gnEl
+         iDmn = eId(e)
+         IF (iDmn .GE. btSiz) THEN
+            err = TRIM(ctmp)
+         ELSE IF (iDmn .LT. 0) THEN
+            CYCLE
+         END IF
+         lM%eId(e) = IBSET(lM%eId(e), iDmn)
+      END DO
+      DEALLOCATE(eId)
+
+      RETURN
+      END SUBROUTINE SETDMNIDVTK
+!--------------------------------------------------------------------
+!     Read domain from a dat file
       SUBROUTINE SETDMNIDFF(lM, fid)
       USE COMMOD
       USE LISTMOD

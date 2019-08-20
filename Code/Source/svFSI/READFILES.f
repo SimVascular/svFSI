@@ -1064,8 +1064,6 @@
          END IF
       END IF
 
-      std = " LS: "//STR(lEq%FSILS%RI%relTol)//" "//
-     2   STR(lEq%FSILS%RI%mItR)
 !     Check LS inputs
       IF (useTrilinosAssemAndLS .AND. .NOT.useTrilinosLS) err =
      2   "Error in LS inputs. Use Trilinos based LS"
@@ -1995,7 +1993,7 @@ c     2         "can be applied for Neumann boundaries only"
          CASE ("epi", "epicardium")
             lDmn%cep%imyo = 1
 
-         CASE ("endo", "endocardium")
+         CASE ("endo", "endocardium", "pfib", "purkinje")
             lDmn%cep%imyo = 2
 
          CASE ("myo", "mid-myo", "myocardium")
