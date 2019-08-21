@@ -2169,8 +2169,8 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("HO", "Holzapfel")
       ! Holzapefel and Ogden model for myocardium !
          lDmn%stM%isoType = stIso_HO
-         lPtr => lSt%get(lDmn%stM%aff, "a")
-         lPtr => lSt%get(lDmn%stM%bff, "b")
+         lPtr => lSt%get(lDmn%stM%a  , "a")
+         lPtr => lSt%get(lDmn%stM%b  , "b")
          lPtr => lSt%get(lDmn%stM%aff, "a4f")
          lPtr => lSt%get(lDmn%stM%bff, "b4f")
          lPtr => lSt%get(lDmn%stM%ass, "a4s")

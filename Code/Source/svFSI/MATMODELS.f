@@ -282,14 +282,13 @@
          Efs  = Inv8
 
          g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
-         Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
-     2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+         g2   = 2D0 * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Hfs
 
          Efs  = Efs * Efs
          g1   = 2D0*J4d*stM%b*g1
-         g2   = 2D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
+         g2   = 4D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -299,12 +298,12 @@
              Sb  = Sb + g1*Hff
 
              Eff = Eff * Eff
-             g1  = stM%aff*(1D0 + 2D0*stM%bff*Eff)*EXP(stM%bff*Eff)*
-     2          4D0*J4d
+             g1  = 4D0*J4d*stM%aff*(1D0 + 2D0*stM%bff*Eff)*
+     2          EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
          END IF
 
-         IF (Eff .GT. 0D0) THEN
+         IF (Ess .GT. 0D0) THEN
              g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
@@ -379,15 +378,15 @@
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev(stM, F, nfd, fl, S, CC)
+      SUBROUTINE GETPK2CCdev(stM, F, nfd, fl, ya, S, CC, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(stModelType), INTENT(IN) :: stM
       INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd)
-      REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd), Ja
 
       REAL(KIND=8) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,Inv8,
      2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
@@ -398,15 +397,29 @@
       ! HGO, HO !
       REAL(KIND=8) :: kap, Eff, Ess, Efs, Hff(nsd,nsd), Hss(nsd,nsd),
      2   Hfs(nsd,nsd)
+!     Active strain for electromechanics
+      REAL(KIND=8) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
 !     Some preliminaries
       nd   = REAL(nsd, KIND=8)
-      J    = MAT_DET(F, nsd)
+
+!     Electromechanics coupling based on active strain
+      Fe   = F
+      Fa   = MAT_ID(nsd)
+      Fai  = Fa
+      IF (cem%aStrain) THEN
+         CALL ACTVSTRAIN(ya, nfd, fl, Fa)
+         Fai  = MAT_INV(Fa, nsd)
+         Fe   = MATMUL(F, Fai)
+      END IF
+
+      Ja   = MAT_DET(Fa, nsd)
+      J    = MAT_DET(Fe, nsd)
       J2d  = J**(-2D0/nd)
       J4d  = J2d*J2d
 
       IDm  = MAT_ID(nsd)
-      C    = MATMUL(TRANSPOSE(F), F)
+      C    = MATMUL(TRANSPOSE(Fe), Fe)
       E    = 5D-1 * (C - IDm)
       Ci   = MAT_INV(C, nsd)
 
@@ -580,14 +593,13 @@
          Efs  = Inv8
 
          g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
-         Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
-     2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+         g2   = 2D0 * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Hfs
 
          Efs  = Efs * Efs
          g1   = 2D0*J4d*stM%b*g1
-         g2   = 2D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
+         g2   = 4D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -597,12 +609,12 @@
              Sb  = Sb + g1*Hff
 
              Eff = Eff * Eff
-             g1  = stM%aff*(1D0 + 2D0*stM%bff*Eff)*EXP(stM%bff*Eff)*
-     2          4D0*J4d
+             g1  = 4D0*J4d*stM%aff*(1D0 + 2D0*stM%bff*Eff)*
+     2          EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
          END IF
 
-         IF (Eff .GT. 0D0) THEN
+         IF (Ess .GT. 0D0) THEN
              g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
@@ -624,6 +636,16 @@
      2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
      3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
+
+         IF (cem%aStrain) THEN
+            S = MATMUL(Fai, S)
+            S = MATMUL(S, TRANSPOSE(Fai))
+            CCb = 0D0
+            CCb = TEN_DYADPROD(Fai, Fai, nsd)
+            CC  = TEN_DDOT_3424(CC, CCb, nsd)
+            CC  = TEN_DDOT_2412(CCb, CC, nsd)
+         END IF
+
          RETURN
 
       CASE DEFAULT
@@ -635,18 +657,18 @@
 !====================================================================
 !     Compute rho and beta depending on the Gibb's free-energy based
 !     volumetric penalty model
-      SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt)
+      SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(stModelType), INTENT(IN) :: stM
-      REAL(KIND=8), INTENT(IN) :: p
+      REAL(KIND=8), INTENT(IN) :: p, Ja
       REAL(KIND=8), INTENT(OUT) :: ro, bt, dro, dbt
 
       REAL(KIND=8) :: Kp, nu, r1, r2
 
-      ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)
+      ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)/Ja
       nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       bt  = 0D0
       dbt = 0D0
@@ -784,8 +806,8 @@
       as  = fl(:,2)
       an  = CROSS(fl)
 
-      gs  = 4.0D0*gf
-      gn  = 1.0D0/((1.0D0+gf)*(1.0D0+gs)) - 1.0D0
+      gn  = 4.0D0*gf
+      gs  = 1.0D0/((1.0D0+gf)*(1.0D0+gn)) - 1.0D0
 
       IDm = MAT_ID(nsd)
       Hf  = MAT_DYADPROD(af, af, nsd)
