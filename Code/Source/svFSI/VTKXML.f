@@ -559,7 +559,7 @@
                   DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_vort, outGrp_eFlx, outGrp_hFlx,
-     2            outGrp_stInv, outGrp_vortex)
+     2            outGrp_stInv, outGrp_vortex, outGrp_Visc)
                   CALL POST(msh(iM), tmpV, lY, lD, oGrp, iEq)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)

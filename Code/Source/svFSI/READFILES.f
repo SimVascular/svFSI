@@ -316,7 +316,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 17
+      INTEGER, PARAMETER :: maxOutput = 18
 
       INTEGER fid, iBc, iBf, iM, phys(3), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
@@ -389,18 +389,20 @@
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/9,2,3,0/)
-         outPuts(1) = out_velocity
-         outPuts(2) = out_pressure
-         outPuts(3) = out_energyFlux
-         outPuts(4) = out_acceleration
-         outPuts(5) = out_WSS
-         outPuts(6) = out_vorticity
-         outPuts(7) = out_strainInv
-         outPuts(8) = out_vortex
-         outPuts(9) = out_traction
+         nDOP = (/10,2,3,0/)
+         outPuts(1)  = out_velocity
+         outPuts(2)  = out_pressure
+         outPuts(3)  = out_energyFlux
+         outPuts(4)  = out_acceleration
+         outPuts(5)  = out_WSS
+         outPuts(6)  = out_vorticity
+         outPuts(7)  = out_strainInv
+         outPuts(8)  = out_vortex
+         outPuts(9)  = out_traction
+         outPuts(10) = out_viscosity
 
          CALL READLS(lSolver_NS, lEq, list)
+
 !     HEAT FLUID advection diffusion solver -------------------------
       CASE ('heatF')
          lEq%phys = phys_heatF
@@ -414,6 +416,7 @@
          outPuts(2) = out_heatFlux
 
          CALL READLS(lSolver_GMRES, lEq, list)
+
 !     HEAT SOLID Laplac equation solver------------------------------
       CASE ('heatS')
          lEq%phys = phys_heatS
@@ -428,6 +431,7 @@
          outPuts(2) = out_heatFlux
 
          CALL READLS(lSolver_GMRES, lEq, list)
+
 !     LINEAR ELASTICITY equation solver------------------------------
       CASE ('lElas')
          lEq%phys = phys_lElas
@@ -447,6 +451,7 @@
          outPuts(4) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
+
 !     STRUCTURAL with nonlinear displacement equation solver---------
       CASE ('struct')
          lEq%phys = phys_struct
@@ -587,16 +592,17 @@
             propL(7,1) = damping
             propL(8,1) = shell_thickness
 
-            nDOP = (/9,2,4,0/)
-            outPuts(1) = out_velocity
-            outPuts(2) = out_pressure
-            outPuts(3) = out_energyFlux
-            outPuts(4) = out_absVelocity
-            outPuts(5) = out_acceleration
-            outPuts(6) = out_WSS
-            outPuts(7) = out_vorticity
-            outPuts(8) = out_displacement
-            outPuts(9) = out_strainInv
+            nDOP = (/10,2,4,0/)
+            outPuts(1)  = out_velocity
+            outPuts(2)  = out_pressure
+            outPuts(3)  = out_energyFlux
+            outPuts(4)  = out_absVelocity
+            outPuts(5)  = out_acceleration
+            outPuts(6)  = out_WSS
+            outPuts(7)  = out_vorticity
+            outPuts(8)  = out_displacement
+            outPuts(9)  = out_strainInv
+            outPuts(10) = out_viscosity
          ELSE
             propL(1,1) = elasticity_modulus
             propL(2,1) = poisson_ratio
@@ -656,7 +662,7 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/17,3,2,0/)
+         nDOP = (/18,3,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
@@ -674,6 +680,7 @@
          outPuts(15) = out_integ
          outPuts(16) = out_jacobian
          outPuts(17) = out_defGrad
+         outPuts(18) = out_viscosity
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1204,6 +1211,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd*nsd
             lEq%output(iOut)%name = "Deformation_gradient"
+         CASE (out_viscosity)
+            lEq%output(iOut)%grp  = outGrp_Visc
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Viscosity"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT

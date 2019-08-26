@@ -147,7 +147,8 @@
      3   outGrp_WSS = 505, outGrp_vort = 506, outGrp_eFlx = 507,
      4   outGrp_hFlx = 508, outGrp_absV = 509, outGrp_stInv = 510,
      5   outGrp_vortex = 511, outGrp_trac = 512, outGrp_stress = 513,
-     6   outGrp_fN = 514, outGrp_fA = 515, outGrp_J = 516, outGrp_F=517
+     6   outGrp_fN = 514, outGrp_fA = 515, outGrp_J = 516, outGrp_F=517,
+     7   outGrp_Visc = 518
 
       INTEGER, PARAMETER :: out_velocity = 599, out_pressure = 598,
      2   out_acceleration = 597, out_temperature = 596, out_WSS = 595,
@@ -155,7 +156,8 @@
      4   out_energyFlux = 591, out_heatFlux = 590, out_strainInv = 589,
      5   out_absVelocity = 588, out_vortex = 587, out_traction = 586,
      6   out_stress = 585, out_fibDir = 584, out_fibAlign = 583,
-     7   out_actionPotential = 582, out_jacobian = 581, out_defGrad=580
+     7   out_actionPotential = 582, out_jacobian = 581, out_defGrad=580,
+     8   out_viscosity = 579
 
 !     Mesher choice for remeshing for moving wall problems
       INTEGER, PARAMETER :: RMSH_TETGEN = 1, RMSH_MESHSIM = 2

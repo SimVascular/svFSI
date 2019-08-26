@@ -843,7 +843,7 @@ c     2         nu*(N(a)*Nx(2,b)*nV(1) + Nx(2,a)*N(b)*nV(1))
          n    = lDmn%visc%n
 
          T1   = 1.0D0 + (lam*gamma)**a
-         T2   = T1**(n-1.0D0)/a
+         T2   = T1**((n-1.0D0)/a)
          mu   = mu_i + (mu_o-mu_i)*T2
          mu_s = mu_i
 

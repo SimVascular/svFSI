@@ -81,7 +81,7 @@
       LOGICAL FSIeq
       INTEGER a, Ac, e, i, j, eNoN, g, insd
       REAL(KIND=8) rho, kappa, w, Jac, ksix(nsd,nsd), lRes(maxnsd),
-     2   q(nsd), u(nsd), p, T, ux(nsd,nsd)
+     2   q(nsd), u(nsd), p, T, ux(nsd,nsd), gam, mu, mu_s
       COMPLEX*16 :: eig(nsd)
 
       REAL(KIND=8), ALLOCATABLE :: sA(:), sF(:,:), xl(:,:), yl(:,:),
@@ -106,8 +106,8 @@
 
 !     Other outputs require more calculations
       eNoN  = lM%eNoN
-      ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), xl(nsd,eNoN),
-     2   yl(tDof,eNoN), Nx(nsd,eNoN), N(eNoN))
+      ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), xl(nsd,eNoN), yl(tDof,eNoN),
+     2   Nx(nsd,eNoN), N(eNoN))
       sA   = 0D0
       sF   = 0D0
       lRes = 0D0
@@ -138,9 +138,10 @@
             w = lM%w(g)*Jac
             N = lM%N(:,g)
 
+            lRes(:) = 0D0
+
 !     Vorticity calculation   ---------------------------------------
             IF (outGrp .EQ. outGrp_vort) THEN
-               lRes = 0D0
                DO a=1, eNoN
                   IF (nsd .EQ. 2) THEN
                      lRes(3) = lRes(3)+ Nx(1,a)*yl(2,a)- Nx(2,a)*yl(1,a)
@@ -153,7 +154,6 @@
 !     Vortex Identification Criterion (lamda_ci)
             ELSE IF (outGrp .EQ. outGrp_vortex) THEN
                ux   = 0D0
-               lRes = 0D0
                DO a=1, eNoN
                   DO i=1, nsd
                      DO j=1, nsd
@@ -229,6 +229,28 @@
      5                    - ksix(2,1)*ksix(2,1)*ksix(3,3)
                END IF
                lRes = ABS(lRes)
+!     Viscosity
+            ELSE IF (outGrp .EQ. outGrp_Visc) THEN
+               ux = 0D0
+               DO a=1, eNoN
+                  DO i=1, nsd
+                     DO j=1, nsd
+                        ux(i,j) = ux(i,j) + Nx(i,a)*yl(j,a)
+                     END DO
+                  END DO
+               END DO
+
+!              Shear rate, gam := (2*e_ij*e_ij)^0.5
+               gam = 0D0
+               DO i=1, nsd
+                  DO j=1, nsd
+                     gam = gam + (ux(i,j)+ux(j,i))*(ux(i,j)+ux(j,i))
+                  END DO
+               END DO
+               gam = SQRT(0.5D0*gam)
+!              Compute viscosity
+               CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu, mu_s, mu_s)
+               lRes(1) = mu
             ELSE
                err = "Correction is required in POST"
             END IF
