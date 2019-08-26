@@ -53,10 +53,9 @@
       REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
      2  amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3), ua(3),
      3  ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3), rM(3,3),
-     4  NxdNx
+     4  NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      nu   = eq(cEq)%dmn(cDmn)%prop(viscosity)/rho
       s    = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -108,6 +107,41 @@
          END DO
       END IF
 
+!     Strain rate tensor 2*e_ij := (u_ij + u_ji)
+      es(1,1) = ux(1,1) + ux(1,1)
+      es(2,2) = ux(2,2) + ux(2,2)
+      es(3,3) = ux(3,3) + ux(3,3)
+
+      es(1,2) = ux(1,2) + ux(2,1)
+      es(1,3) = ux(1,3) + ux(3,1)
+      es(2,3) = ux(2,3) + ux(3,2)
+
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+      DO a=1, eNoN
+        es_x(1,a) = es(1,1)*Nx(1,a) + es(1,2)*Nx(2,a) + es(1,3)*Nx(3,a)
+        es_x(2,a) = es(2,1)*Nx(1,a) + es(2,2)*Nx(2,a) + es(2,3)*Nx(3,a)
+        es_x(3,a) = es(3,1)*Nx(1,a) + es(3,2)*Nx(2,a) + es(3,3)*Nx(3,a)
+      END DO
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5D0*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
+      nu   = nu/rho
+      nu_s = nu_s/rho
+      IF (ISZERO(gam)) THEN
+         nu_x = 0D0
+      ELSE
+         nu_x = nu_x/rho/gam
+      END IF
+
       kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2)
      3   + u(2)*u(2)*ksix(2,2) + u(3)*u(2)*ksix(3,2)
@@ -120,7 +154,8 @@
      4   + ksix(1,3)*ksix(1,3) + ksix(2,3)*ksix(2,3)
      5   + ksix(3,3)*ksix(3,3)
 
-      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU + ct(2)*nu*nu*kS + s*s)
+      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU +
+     2   ct(2)*nu_s*nu_s*kS + s*s)
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
      2      + u(3)*ux(3,1) + s*u(1))
@@ -151,20 +186,20 @@
       rV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2) + up(3)*ux(3,2))
       rV(3) = tauB*(up(1)*ux(1,3) + up(2)*ux(2,3) + up(3)*ux(3,3))
 
-      rM(1,1) = nu*(ux(1,1) + ux(1,1)) - up(1)*ua(1) + rV(1)*up(1)
-     2        + divU*tauC - p/rho
-      rM(2,1) = nu*(ux(2,1) + ux(1,2)) - up(2)*ua(1) + rV(2)*up(1)
-      rM(3,1) = nu*(ux(3,1) + ux(1,3)) - up(3)*ua(1) + rV(3)*up(1)
+      rM(1,1) = nu*es(1,1) - up(1)*ua(1) + rV(1)*up(1) + divU*tauC
+     2        - p/rho
+      rM(2,1) = nu*es(2,1) - up(2)*ua(1) + rV(2)*up(1)
+      rM(3,1) = nu*es(3,1) - up(3)*ua(1) + rV(3)*up(1)
 
-      rM(1,2) = nu*(ux(1,2) + ux(2,1)) - up(1)*ua(2) + rV(1)*up(2)
-      rM(2,2) = nu*(ux(2,2) + ux(2,2)) - up(2)*ua(2) + rV(2)*up(2)
-     2        + divU*tauC - p/rho
-      rM(3,2) = nu*(ux(3,2) + ux(2,3)) - up(3)*ua(2) + rV(3)*up(2)
+      rM(1,2) = nu*es(1,2) - up(1)*ua(2) + rV(1)*up(2)
+      rM(2,2) = nu*es(2,2) - up(2)*ua(2) + rV(2)*up(2) + divU*tauC
+     2        - p/rho
+      rM(3,2) = nu*es(3,2) - up(3)*ua(2) + rV(3)*up(2)
 
-      rM(1,3) = nu*(ux(1,3) + ux(3,1)) - up(1)*ua(3) + rV(1)*up(3)
-      rM(2,3) = nu*(ux(2,3) + ux(3,2)) - up(2)*ua(3) + rV(2)*up(3)
-      rM(3,3) = nu*(ux(3,3) + ux(3,3)) - up(3)*ua(3) + rV(3)*up(3)
-     2        + divU*tauC - p/rho
+      rM(1,3) = nu*es(1,3) - up(1)*ua(3) + rV(1)*up(3)
+      rM(2,3) = nu*es(2,3) - up(2)*ua(3) + rV(2)*up(3)
+      rM(3,3) = nu*es(3,3) - up(3)*ua(3) + rV(3)*up(3) + divU*tauC
+     2        - p/rho
 
       rV(1) = ud(1) + ua(1)*(s+ux(1,1)) + ua(2)*ux(2,1) + ua(3)*ux(3,1)
       rV(2) = ud(2) + ua(1)*ux(1,2) + ua(2)*(s+ux(2,2)) + ua(3)*ux(3,2)
@@ -208,17 +243,27 @@
             T2 = tauM*udNx(a)
             T3 = tauM*(amd*N(b) + udNx(b))
 !           dM/dU
-            lK(1,a,b)  = lK(1,a,b)  + wrl*((nu + tauC)*rM(1,1) + T1)
-            lK(2,a,b)  = lK(2,a,b)  + wrl*(nu*rM(2,1) + tauC*rM(1,2))
-            lK(3,a,b)  = lK(3,a,b)  + wrl*(nu*rM(3,1) + tauC*rM(1,3))
+            lK(1,a,b)  = lK(1,a,b)  + wrl*((nu + tauC)*rM(1,1) + T1 +
+     2         nu_x*es_x(1,a)*es_x(1,b))
+            lK(2,a,b)  = lK(2,a,b)  + wrl*(nu*rM(2,1) + tauC*rM(1,2) +
+     2         nu_x*es_x(1,a)*es_x(2,b))
+            lK(3,a,b)  = lK(3,a,b)  + wrl*(nu*rM(3,1) + tauC*rM(1,3) +
+     2         nu_x*es_x(1,a)*es_x(3,b))
 
-            lK(5,a,b)  = lK(5,a,b)  + wrl*(nu*rM(1,2) + tauC*rM(2,1))
-            lK(6,a,b)  = lK(6,a,b)  + wrl*((nu + tauC)*rM(2,2) + T1)
-            lK(7,a,b)  = lK(7,a,b)  + wrl*(nu*rM(3,2) + tauC*rM(2,3))
+            lK(5,a,b)  = lK(5,a,b)  + wrl*(nu*rM(1,2) + tauC*rM(2,1) +
+     2         nu_x*es_x(2,a)*es_x(1,b))
+            lK(6,a,b)  = lK(6,a,b)  + wrl*((nu + tauC)*rM(2,2) + T1 +
+     2         nu_x*es_x(2,a)*es_x(2,b))
+            lK(7,a,b)  = lK(7,a,b)  + wrl*(nu*rM(3,2) + tauC*rM(2,3) +
+     2         nu_x*es_x(2,a)*es_x(3,b))
 
-            lK(9,a,b)  = lK(9,a,b)  + wrl*(nu*rM(1,3) + tauC*rM(3,1))
-            lK(10,a,b) = lK(10,a,b) + wrl*(nu*rM(2,3) + tauC*rM(3,2))
-            lK(11,a,b) = lK(11,a,b) + wrl*((nu + tauC)*rM(3,3) + T1)
+            lK(9,a,b)  = lK(9,a,b)  + wrl*(nu*rM(1,3) + tauC*rM(3,1) +
+     2         nu_x*es_x(3,a)*es_x(1,b))
+            lK(10,a,b) = lK(10,a,b) + wrl*(nu*rM(2,3) + tauC*rM(3,2) +
+     2         nu_x*es_x(3,a)*es_x(2,b))
+            lK(11,a,b) = lK(11,a,b) + wrl*((nu + tauC)*rM(3,3) + T1 +
+     2         nu_x*es_x(3,a)*es_x(3,b))
+
 !           dM/dP
             lK(4,a,b)  = lK(4,a,b)  - wl*(Nx(1,a)*N(b) - Nx(1,b)*T2)
             lK(8,a,b)  = lK(8,a,b)  - wl*(Nx(2,a)*N(b) - Nx(2,b)*T2)
@@ -251,10 +296,9 @@
       REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
      2  amd, wl, wr, wrl, s, p, u(2), ud(2), px(2), f(2), up(2), ua(2),
      3  ux(2,2), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(2), rM(2,2),
-     4  NxdNx
+     4  NxdNx, nu_s, es(2,2), gam, nu_x, es_x(2,eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      nu   = eq(cEq)%dmn(cDmn)%prop(viscosity)/rho
       s    = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -296,13 +340,37 @@
          END DO
       END IF
 
+!     Strain rate tensor 2*e_ij := (u_ij + u_ji)
+      es(1,1) = ux(1,1) + ux(1,1)
+      es(2,2) = ux(2,2) + ux(2,2)
+
+      es(1,2) = ux(1,2) + ux(2,1)
+      es(2,1) = es(1,2)
+
+      DO a=1, eNoN
+        es_x(1,a) = es(1,1)*Nx(1,a) + es(1,2)*Nx(2,a)
+        es_x(2,a) = es(2,1)*Nx(1,a) + es(2,2)*Nx(2,a)
+      END DO
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
+     2    + es(2,2)*es(2,2)
+      gam = SQRT(0.5D0*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
+      nu   = nu/rho
+      nu_s = nu_s/rho
+      nu_x = nu_x/rho/gam
+
       kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(1)*u(2)*ksix(1,2) + u(2)*u(2)*ksix(2,2)
 
       kS = ksix(1,1)*ksix(1,1) + ksix(2,1)*ksix(2,1)
      2   + ksix(1,2)*ksix(1,2) + ksix(2,2)*ksix(2,2)
 
-      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU + ct(2)*nu*nu*kS + s*s)
+      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU +
+     2   ct(2)*nu_s*nu_s*kS + s*s)
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
      2      + s*u(1))
@@ -326,13 +394,13 @@
       rV(1) = tauB*(up(1)*ux(1,1) + up(2)*ux(2,1))
       rV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2))
 
-      rM(1,1) = nu*(ux(1,1) + ux(1,1)) - up(1)*ua(1) + rV(1)*up(1)
-     2        + divU*tauC - p/rho
-      rM(2,1) = nu*(ux(2,1) + ux(1,2)) - up(2)*ua(1) + rV(2)*up(1)
+      rM(1,1) = nu*es(1,1) - up(1)*ua(1) + rV(1)*up(1) + divU*tauC
+     2        - p/rho
+      rM(2,1) = nu*es(2,1) - up(2)*ua(1) + rV(2)*up(1)
 
-      rM(1,2) = nu*(ux(1,2) + ux(2,1)) - up(1)*ua(2) + rV(1)*up(2)
-      rM(2,2) = nu*(ux(2,2) + ux(2,2)) - up(2)*ua(2) + rV(2)*up(2)
-     2        + divU*tauC - p/rho
+      rM(1,2) = nu*es(1,2) - up(1)*ua(2) + rV(1)*up(2)
+      rM(2,2) = nu*es(2,2) - up(2)*ua(2) + rV(2)*up(2) + divU*tauC
+     2        - p/rho
 
       rV(1) = ud(1) + ua(1)*(s + ux(1,1)) + ua(2)*ux(2,1)
       rV(2) = ud(2) + ua(1)*ux(1,2) + ua(2)*(s + ux(2,2))
@@ -366,18 +434,26 @@
 
             T2 = tauM*udNx(a)
             T3 = tauM*(amd*N(b) + udNx(b))
-!           dM/dU
-            lK(1,a,b)  = lK(1,a,b) + wrl*((nu + tauC)*rM(1,1) + T1)
-            lK(2,a,b)  = lK(2,a,b) + wrl*(nu*rM(2,1) + tauC*rM(1,2))
 
-            lK(4,a,b)  = lK(4,a,b) + wrl*(nu*rM(1,2) + tauC*rM(2,1))
-            lK(5,a,b)  = lK(5,a,b) + wrl*((nu + tauC)*rM(2,2) + T1)
+!           dM/dU
+            lK(1,a,b)  = lK(1,a,b) + wrl*((nu + tauC)*rM(1,1) + T1 +
+     2         nu_x*es_x(1,a)*es_x(1,b))
+            lK(2,a,b)  = lK(2,a,b) + wrl*(nu*rM(2,1) + tauC*rM(1,2) +
+     2         nu_x*es_x(1,a)*es_x(2,b))
+
+            lK(4,a,b)  = lK(4,a,b) + wrl*(nu*rM(1,2) + tauC*rM(2,1) +
+     2         nu_x*es_x(2,a)*es_x(1,b))
+            lK(5,a,b)  = lK(5,a,b) + wrl*((nu + tauC)*rM(2,2) + T1 +
+     2         nu_x*es_x(2,a)*es_x(2,b))
+
 !           dM/dP
             lK(3,a,b)  = lK(3,a,b) - wl*(Nx(1,a)*N(b) - Nx(1,b)*T2)
             lK(6,a,b)  = lK(6,a,b) - wl*(Nx(2,a)*N(b) - Nx(2,b)*T2)
+
 !           dC/dU
             lK(7,a,b) = lK(7,a,b)  + wl*(Nx(1,b)*N(a) + Nx(1,a)*T3)
             lK(8,a,b) = lK(8,a,b)  + wl*(Nx(2,b)*N(a) + Nx(2,a)*T3)
+
 !           dC/dP
             lK(9,a,b) = lK(9,a,b)  + wl*tauM*NxdNx/rho
          END DO
@@ -444,8 +520,7 @@
       RETURN
       END SUBROUTINE BFLUID
 !####################################################################
-      PURE SUBROUTINE BWFLUID3D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR,
-     2   lK)
+      SUBROUTINE BWFLUID3D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
@@ -456,10 +531,10 @@
 
       INTEGER :: a, b
       REAL(KIND=8) :: rho, nu, T1, wr, wl, wrl, tauT, tauN, p, uhn, ubn,
-     2   u(3), uh(3), ux(3,3), sigman(3), Nxn(eNoN), rV(3), rM(3,3)
+     2   u(3), uh(3), ux(3,3), sigman(3), Nxn(eNoN), rV(3), rM(3,3),
+     3   nu_s, es(3,3), gam, nu_x
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      nu   = eq(cEq)%dmn(cDmn)%prop(viscosity) / rho
       T1   = eq(cEq)%af * eq(cEq)%gam * dt
       wr   = w * rho
       wl   = w * T1
@@ -502,12 +577,35 @@
       uhn = (u(1)-uh(1))*nV(1) + (u(2)-uh(2))*nV(2) + (u(3)-uh(3))*nV(3)
       uhn = (ABS(uhn) - uhn) / 2D0
 
-      sigman(1) = -(p/rho)*nV(1) + nu*( 2D0*ux(1,1)*nV(1) +
-     2   (ux(2,1)+ux(1,2))*nV(2) + (ux(3,1)+ux(1,3))*nV(3) )
-      sigman(2) = -(p/rho)*nV(2) + nu*( 2D0*ux(2,2)*nV(2) +
-     2   (ux(3,2)+ux(2,3))*nV(3) + (ux(1,2)+ux(2,1))*nV(1) )
-      sigman(3) = -(p/rho)*nV(3) + nu*( 2D0*ux(3,3)*nV(3) +
-     2   (ux(1,3)+ux(3,1))*nV(1) + (ux(2,3)+ux(3,2))*nV(2) )
+!     Strain rate tensor 2*e_ij := (u_ij + u_ji)
+      es(1,1) = ux(1,1) + ux(1,1)
+      es(2,2) = ux(2,2) + ux(2,2)
+      es(3,3) = ux(3,3) + ux(3,3)
+
+      es(1,2) = ux(1,2) + ux(2,1)
+      es(1,3) = ux(1,3) + ux(3,1)
+      es(2,3) = ux(2,3) + ux(3,2)
+
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5D0*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
+      nu = nu/rho
+
+      sigman(1) = nu*(es(1,1)*nV(1) + es(1,2)*nV(2) + es(1,3)*nV(3))
+     2   - (p/rho)*nV(1)
+      sigman(2) = nu*(es(2,1)*nV(1) + es(2,2)*nV(2) + es(2,3)*nV(3))
+     2   - (p/rho)*nV(2)
+      sigman(3) = nu*(es(3,1)*nV(1) + es(3,2)*nV(2) + es(3,3)*nV(3))
+     2   - (p/rho)*nV(3)
 
       rV(1) = -sigman(1) + (tauT + uhn)*(u(1)-ub(1))
       rV(2) = -sigman(2) + (tauT + uhn)*(u(2)-ub(2))
@@ -597,8 +695,7 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
       RETURN
       END SUBROUTINE BWFLUID3D
 !--------------------------------------------------------------------
-      PURE SUBROUTINE BWFLUID2D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR,
-     2   lK)
+      SUBROUTINE BWFLUID2D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
@@ -609,10 +706,10 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
 
       INTEGER :: a, b
       REAL(KIND=8) :: rho, nu, T1, wr, wl, wrl, tauT, tauN, p, uhn, ubn,
-     2   u(2), uh(2), ux(2,2), sigman(2), Nxn(eNoN), rV(2), rM(2,2)
+     2   u(2), uh(2), ux(2,2), sigman(2), Nxn(eNoN), rV(2), rM(2,2),
+     3   nu_s, es(2,2), gam, nu_x
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      nu   = eq(cEq)%dmn(cDmn)%prop(viscosity) / rho
       T1   = eq(cEq)%af * eq(cEq)%gam * dt
       wr   = w*rho
       wl   = w  * T1
@@ -648,10 +745,24 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
       ubn = (u(1)-ub(1))*nV(1) + (u(2)-ub(2))*nV(2)
       uhn = (ABS(uhn) - uhn) / 2D0
 
-      sigman(1) = -(p/rho)*nV(1) + nu*( 2D0*ux(1,1)*nV(1) +
-     2   (ux(2,1)+ux(1,2))*nV(2) )
-      sigman(2) = -(p/rho)*nV(2) + nu*( 2D0*ux(2,2)*nV(2) +
-     2   (ux(1,2)+ux(2,1))*nV(1) )
+!     Strain rate tensor 2*e_ij := (u_ij + u_ji)
+      es(1,1) = ux(1,1) + ux(1,1)
+      es(2,2) = ux(2,2) + ux(2,2)
+
+      es(1,2) = ux(1,2) + ux(2,1)
+      es(2,1) = es(1,2)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
+     2    + es(2,2)*es(2,2)
+      gam = SQRT(0.5D0*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
+      nu = nu/rho
+
+      sigman(1) = -(p/rho)*nV(1) + nu*(es(1,1)*nV(1) + es(1,2)*nV(2))
+      sigman(2) = -(p/rho)*nV(2) + nu*(es(2,1)*nV(1) + es(2,2)*nV(2))
 
       rV(1) = -sigman(1) + (tauT + uhn)*(u(1)-ub(1))
       rV(2) = -sigman(2) + (tauT + uhn)*(u(2)-ub(2))
@@ -707,4 +818,56 @@ c     2         nu*(N(a)*Nx(2,b)*nV(1) + Nx(2,a)*N(b)*nV(1))
 
       RETURN
       END SUBROUTINE BWFLUID2D
+!####################################################################
+      SUBROUTINE GETVISCOSITY(lDmn, gamma, mu, mu_s, mu_x)
+      USE COMMOD
+      IMPLICIT NONE
+
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      REAL(KIND=8), INTENT(INOUT)  :: gamma
+      REAL(KIND=8), INTENT(OUT) :: mu, mu_s, mu_x
+
+      REAL(KIND=8) :: mu_i, mu_o, lam, a, n, Hcrt, T1, T2
+
+      SELECT CASE (lDmn%visc%viscType)
+      CASE (viscType_Const)
+         mu   = lDmn%visc%mu_i
+         mu_s = mu
+         mu_x = 0D0
+
+      CASE (viscType_CY)
+         mu_i = lDmn%visc%mu_i
+         mu_o = lDmn%visc%mu_o
+         lam  = lDmn%visc%lam
+         a    = lDmn%visc%a
+         n    = lDmn%visc%n
+
+         T1   = 1.0D0 + (lam*gamma)**a
+         T2   = T1**(n-1.0D0)/a
+         mu   = mu_i + (mu_o-mu_i)*T2
+         mu_s = mu_i
+
+         T1   = T2/T1
+         T2   = lam**a * gamma**(a-1.0D0) * T1
+         mu_x = (mu_o-mu_i)*(n-1.0D0)*T2
+
+      CASE (viscType_Cass)
+         mu_i = lDmn%visc%mu_i
+         mu_o = lDmn%visc%mu_o
+         lam  = lDmn%visc%lam
+
+         IF (gamma .LT. lam) THEN
+            mu_o  = mu_o/SQRT(lam)
+            gamma = lam
+         ELSE
+            mu_o = mu_o/SQRT(gamma)
+         END IF
+         mu   = (mu_i + mu_o) * (mu_i + mu_o)
+         mu_s = mu_i*mu_i
+         mu_x = 2.0D0*mu_o*(mu_o + mu_i)/gamma
+
+      END SELECT
+
+      RETURN
+      END SUBROUTINE GETVISCOSITY
 !####################################################################

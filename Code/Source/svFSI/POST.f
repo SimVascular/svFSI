@@ -269,7 +269,7 @@
       LOGICAL FSIeq
       INTEGER a, Ac, e, Ec, i, j, iEq, iFa, eNoN, g
       REAL(KIND=8) Tdn(nsd), ndTdn, taue(nsd), ux(nsd,nsd), mu, w,
-     2   nV(nsd), Jac, ksix(nsd,nsd), lRes(maxnsd), p
+     2   nV(nsd), Jac, ks(nsd,nsd), lRes(maxnsd), p, gam, mu_s
       REAL(KIND=8), ALLOCATABLE :: sA(:), sF(:,:), gnV(:,:), lnV(:,:),
      2   xl(:,:), ul(:,:), Nx(:,:), N(:), pl(:)
 
@@ -306,7 +306,6 @@
 !     those that don't belong to this face, which will be inerpolated
 !     from the nodes of the face
             nV = 0D0
-            mu = eq(iEq)%dmn(cDmn)%prop(viscosity)
             DO a=1, eNoN
                Ac       = lM%IEN(a,Ec)
                lnV(:,a) = gnV(:,Ac)
@@ -326,7 +325,7 @@
             END DO
             DO g=1, lM%nG
                IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-                  CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+                  CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ks)
                END IF
                w = lM%w(g)*Jac
                N = lM%N(:,g)
@@ -344,6 +343,17 @@
                      END DO
                   END DO
                END DO
+
+!              Shear rate, gam := (2*e_ij*e_ij)^0.5
+               gam = 0D0
+               DO i=1, nsd
+                  DO j=1, nsd
+                     gam = gam + (ux(i,j)+ux(j,i))*(ux(i,j)+ux(j,i))
+                  END DO
+               END DO
+               gam = SQRT(0.5D0*gam)
+!              Compute viscosity
+               CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu, mu_s, mu_s)
 
 !     Now finding grad(u).n and n.grad(u).n
                Tdn   = 0D0

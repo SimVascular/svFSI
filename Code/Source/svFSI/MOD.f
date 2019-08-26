@@ -74,13 +74,13 @@
 
 !     Possible physical properties. Current maxNPror is 20.
 !     When adding more properties, remember to increase maxNProp
-!     Density of fluid, viscosity of fluid, density of solid, elasticity
+!     Density of fluid, density of solid, viscosity of solid, elasticity
 !     modulus, Poisson's ratio, conductivity, internal force (X, Y, Z),
 !     permeability, stabilization coeff. for backflow divergence,
 !     external source, damping, shell thickness, stabilization coeffs.
 !     for VMS_STRUCT (mom., cont.)
       INTEGER, PARAMETER :: prop_NA = 0, fluid_density = 1,
-     2   viscosity = 2, solid_density = 3, elasticity_modulus = 4,
+     2   solid_density = 2, solid_viscosity = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
      4   permeability = 10, backflow_stab = 11, source_term = 12,
      5   damping = 13, shell_thickness = 14, ctau_M = 15, ctau_C = 16
@@ -175,6 +175,11 @@
       INTEGER, PARAMETER :: stVol_NA = 650, stVol_Quad = 651,
      2   stVol_ST91 = 652, stVol_M94 = 653
 
+!     Type of fluid viscosity: constant, Carreau-Yasuda shear-thinning
+!     model, Cassons non-Newtonian model
+      INTEGER, PARAMETER :: viscType_NA = 699, viscType_Const = 698,
+     2   viscType_CY = 697, viscType_Cass = 696
+
 !     Preconditioner definitions
       INTEGER, PARAMETER :: PREC_NONE = 700, PREC_FSILS = 701,
      2   PREC_TRILINOS_DIAGONAL = 702, PREC_TRILINOS_BLOCK_JACOBI = 703,
@@ -237,6 +242,21 @@
 !        Collagen fiber dispersion parameter (Holzapfel model)
          REAL(KIND=8) :: kap = 0D0
       END TYPE stModelType
+
+      TYPE viscModelType
+!        Type of constitutive model for fluid viscosity
+         INTEGER :: viscType = viscType_NA
+!        Limiting zero shear-rate viscosity value
+         REAL(KIND=8) :: mu_o = 0D0
+!        Limiting high shear-rate viscosity (asymptotic) value
+         REAL(KIND=8) :: mu_i = 0D0
+!        Strain-rate tensor multiplier
+         REAL(KIND=8) :: lam = 0D0
+!        Strain-rate tensor exponent
+         REAL(KIND=8) :: a = 0D0
+!        Power-law exponent
+         REAL(KIND=8) :: n = 0D0
+      END TYPE viscModelType
 
 !     Fourier coefficients that are used to specify unsteady BCs
       TYPE fcType
@@ -341,12 +361,14 @@
          INTEGER :: phys
 !        The volume of this domain
          REAL(KIND=8) :: v = 0D0
-!        General physical properties, such as viscosity, density, ...
+!        General physical properties such as density, elastic modulus...
          REAL(KIND=8) :: prop(maxNProp) = 0D0
 !        Electrophysiology model
          TYPE(cepModelType) :: cep
 !        Structure material model
          TYPE(stModelType) :: stM
+!        Viscosity model for fluids
+         TYPE(viscModelType) :: visc
       END TYPE dmnType
 
 !     Mesh adjacency (neighboring element for each element)

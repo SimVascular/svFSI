@@ -382,7 +382,7 @@
             propL(1) = solid_density
             propL(2) = elasticity_modulus
             propL(3) = poisson_ratio
-            propL(4) = viscosity
+            propL(4) = solid_viscosity
             propL(5) = ctau_M
             propL(6) = ctau_C
             propL(7) = f_x
@@ -414,7 +414,7 @@
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
             CASE (poisson_ratio)
                lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ul=5D-1)
-            CASE (viscosity)
+            CASE (solid_viscosity)
                lPtr => lPD%get(rtmp,"Viscosity",ll=0D0)
             CASE (f_x)
                lPtr => lPD%get(rtmp,"Force_X")
@@ -4034,7 +4034,7 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Fluid domain parameters
       REAL(KIND=8) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f, tauB,
-     2   vp_f(3), va_f(3)
+     2   gam, vp_f(3), va_f(3), es(3,3), mu_x
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4043,15 +4043,13 @@ c     2         "can be applied for Neumann boundaries only"
       rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
       eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
       nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(viscosity)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
 
       incompFlag = .FALSE.
       IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
 
 !     Define fluid parameters
       rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      mu_f   = eq(iEq)%dmn(cDmn)%prop(viscosity)
-      nu_f   = mu_f/rho_f
 
 !     Body force
       fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
@@ -4154,6 +4152,29 @@ c     2         "can be applied for Neumann boundaries only"
       vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
       vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
 
+!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
+      es(1,1) = vx(1,1) + vx(1,1)
+      es(2,2) = vx(2,2) + vx(2,2)
+      es(3,3) = vx(3,3) + vx(3,3)
+
+      es(1,2) = vx(1,2) + vx(2,1)
+      es(1,3) = vx(1,3) + vx(3,1)
+      es(2,3) = vx(2,3) + vx(3,2)
+
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5D0*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, nu_f, mu_x)
+      nu_f = nu_f/rho_f
+
 !     First compute all fluid contribution including stabilization
       kU = v(1)*v(1)*Gm(1,1) + v(1)*v(2)*Gm(1,2) + v(1)*v(3)*Gm(1,3)
      2   + v(2)*v(1)*Gm(2,1) + v(2)*v(2)*Gm(2,2) + v(2)*v(3)*Gm(2,3)
@@ -4230,25 +4251,25 @@ c     2         "can be applied for Neumann boundaries only"
       rV(2) = tauB*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2) + vp_f(3)*vx(2,3))
       rV(3) = tauB*(vp_f(1)*vx(3,1) + vp_f(2)*vx(3,2) + vp_f(3)*vx(3,3))
 
-      rM(1,1) = (mu_f-mu_s)*Jac*(vx(1,1) + vx(1,1)) - PFt(1,1) +
+      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1) +
      2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
-      rM(1,2) = (mu_f-mu_s)*Jac*(vx(1,2) + vx(2,1)) - PFt(1,2) +
+      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2) +
      2   rho_f*Jac*(rV(1)*vp_f(2) - vp_f(1)*va_f(2))
-      rM(1,3) = (mu_f-mu_s)*Jac*(vx(1,3) + vx(3,1)) - PFt(1,3) +
+      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3) +
      2   rho_f*Jac*(rV(1)*vp_f(3) - vp_f(1)*va_f(3))
 
-      rM(2,1) = (mu_f-mu_s)*Jac*(vx(2,1) + vx(1,2)) - PFt(2,1) +
+      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1) +
      2   rho_f*Jac*(rV(2)*vp_f(1) - vp_f(2)*va_f(1))
-      rM(2,2) = (mu_f-mu_s)*Jac*(vx(2,2) + vx(2,2)) - PFt(2,2) +
+      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2) +
      2   rho_f*Jac*(rV(2)*vp_f(2) - vp_f(2)*va_f(2) + tauC_f*divV)
-      rM(2,3) = (mu_f-mu_s)*Jac*(vx(2,3) + vx(3,2)) - PFt(2,3) +
+      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3) +
      2   rho_f*Jac*(rV(2)*vp_f(3) - vp_f(2)*va_f(3))
 
-      rM(3,1) = (mu_f-mu_s)*Jac*(vx(3,1) + vx(1,3)) - PFt(3,1) +
+      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1) +
      2   rho_f*Jac*(rV(3)*vp_f(1) - vp_f(3)*va_f(1))
-      rM(3,2) = (mu_f-mu_s)*Jac*(vx(3,2) + vx(2,3)) - PFt(3,2) +
+      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2) +
      2   rho_f*Jac*(rV(3)*vp_f(2) - vp_f(3)*va_f(2))
-      rM(3,3) = (mu_f-mu_s)*Jac*(vx(3,3) + vx(3,3)) - PFt(3,3) +
+      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3) +
      2   rho_f*Jac*(rV(3)*vp_f(3) - vp_f(3)*va_f(3) + tauC_f*divV)
 
       rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1)) +
@@ -4325,7 +4346,7 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Fluid domain parameters
       REAL(KIND=8) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f, tauB,
-     2   vp_f(2), va_f(2)
+     2   gam, vp_f(2), va_f(2), es(2,2), mu_x
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4334,15 +4355,13 @@ c     2         "can be applied for Neumann boundaries only"
       rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
       eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
       nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(viscosity)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
 
       incompFlag = .FALSE.
       IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
 
 !     Define fluid parameters
       rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-      mu_f   = eq(iEq)%dmn(cDmn)%prop(viscosity)
-      nu_f   = mu_f/rho_f
 
 !     Body force
       fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
@@ -4416,6 +4435,22 @@ c     2         "can be applied for Neumann boundaries only"
       vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2)
       vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2)
 
+!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
+      es(1,1) = vx(1,1) + vx(1,1)
+      es(2,2) = vx(2,2) + vx(2,2)
+
+      es(1,2) = vx(1,2) + vx(2,1)
+      es(2,1) = es(1,2)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
+     2    + es(2,2)*es(2,2)
+      gam = SQRT(0.5D0*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, nu_f, mu_x)
+      nu_f = nu_f/rho_f
+
 !     First compute all fluid contribution including stabilization
       kU = v(1)*v(1)*Gm(1,1) + v(1)*v(2)*Gm(1,2)
      2   + v(2)*v(1)*Gm(2,1) + v(2)*v(2)*Gm(2,2)
@@ -4467,14 +4502,14 @@ c     2         "can be applied for Neumann boundaries only"
       rV(1) = tauB * (vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
       rV(2) = tauB * (vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
 
-      rM(1,1) = (mu_f-mu_s)*Jac*(vx(1,1) + vx(1,1)) - PFt(1,1) +
+      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1) +
      2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
-      rM(1,2) = (mu_f-mu_s)*Jac*(vx(1,2) + vx(2,1)) - PFt(1,2) +
+      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2) +
      2   rho_f*Jac*(rV(1)*vp_f(2) - vp_f(1)*va_f(2))
 
-      rM(2,1) = (mu_f-mu_s)*Jac*(vx(2,1) + vx(1,2)) - PFt(2,1) +
+      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1) +
      2   rho_f*Jac*(rV(2)*vp_f(1) - vp_f(2)*va_f(1))
-      rM(2,2) = (mu_f-mu_s)*Jac*(vx(2,2) + vx(2,2)) - PFt(2,2) +
+      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2) +
      2   rho_f*Jac*(rV(2)*vp_f(2) - vp_f(2)*va_f(2) + tauC_f*divV)
 
       rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1)) +

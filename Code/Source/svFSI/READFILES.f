@@ -382,12 +382,11 @@
          lEq%phys = phys_fluid
 
          propL(1,1) = fluid_density
-         propL(2,1) = viscosity
-         propL(3,1) = permeability
-         propL(4,1) = backflow_stab
-         propL(5,1) = f_x
-         propL(6,1) = f_y
-         IF (nsd .EQ. 3) propL(7,1) = f_z
+         propL(2,1) = permeability
+         propL(3,1) = backflow_stab
+         propL(4,1) = f_x
+         propL(5,1) = f_y
+         IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/9,2,3,0/)
@@ -580,14 +579,13 @@
 
          IF (.NOT.cmmInit) THEN
             propL(1,1) = fluid_density
-            propL(2,1) = viscosity
-            propL(3,1) = permeability
-            propL(4,1) = backflow_stab
-            propL(5,1) = solid_density
-            propL(6,1) = elasticity_modulus
-            propL(7,1) = poisson_ratio
-            propL(8,1) = damping
-            propL(9,1) = shell_thickness
+            propL(2,1) = permeability
+            propL(3,1) = backflow_stab
+            propL(4,1) = solid_density
+            propL(5,1) = elasticity_modulus
+            propL(6,1) = poisson_ratio
+            propL(7,1) = damping
+            propL(8,1) = shell_thickness
 
             nDOP = (/9,2,4,0/)
             outPuts(1) = out_velocity
@@ -631,12 +629,11 @@
 
 !        fluid properties
          propL(1,1) = fluid_density
-         propL(2,1) = viscosity
-         propL(3,1) = permeability
-         propL(4,1) = backflow_stab
-         propL(5,1) = f_x
-         propL(6,1) = f_y
-         IF (nsd .EQ. 3) propL(7,1) = f_z
+         propL(2,1) = permeability
+         propL(3,1) = backflow_stab
+         propL(4,1) = f_x
+         propL(5,1) = f_y
+         IF (nsd .EQ. 3) propL(6,1) = f_z
 
 !        struct properties
          propL(1,2) = solid_density
@@ -862,8 +859,6 @@
                ELSE
                   lPtr => lPD%get(rtmp,"Density",1,ll=0D0)
                END IF
-            CASE (viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",1,lb=0D0)
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
             CASE (poisson_ratio)
@@ -911,6 +906,11 @@
      2       lEq%dmn(iDmn)%phys.EQ.phys_vms_struct .OR.
      3       lEq%dmn(iDmn)%phys.EQ.phys_preSt) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
+         END IF
+
+         IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
+     2       lEq%dmn(iDmn)%phys .EQ. phys_CMM) THEN
+            CALL READVISCMODEL(lEq%dmn(iDmn), lPD)
          END IF
       END DO
 
@@ -2209,6 +2209,65 @@ c     2         "can be applied for Neumann boundaries only"
 
       RETURN
       END SUBROUTINE READMATMODEL
+!####################################################################
+!     This subroutine reads parameters of non-Newtonian viscosity model
+      SUBROUTINE READVISCMODEL(lDmn, lPD)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(dmnType), INTENT(INOUT) :: lDmn
+      TYPE(listType), INTENT(INOUT) :: lPD
+
+      TYPE(listType), POINTER :: lPtr, lVis
+      CHARACTER(LEN=stdL) ctmp
+      REAL(KIND=8) :: mu, rtmp
+
+      lVis => lPD%get(ctmp,"Viscosity",1)
+
+      CALL TO_LOWER(ctmp)
+      SELECT CASE (TRIM(ctmp))
+      CASE ("constant", "const", "newtonian")
+         lDmn%visc%viscType = viscType_Const
+         lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0D0)
+         RETURN
+
+      CASE ("carreau-yasuda", "cy")
+         lDmn%visc%viscType = viscType_CY
+         lPtr => lVis%get(lDmn%visc%mu_i,
+     2      "Limiting high shear-rate viscosity",1,lb=0D0)
+         lPtr => lVis%get(lDmn%visc%mu_o,
+     2      "Limiting low shear-rate viscosity",1,lb=0D0)
+         lPtr => lVis%get(lDmn%visc%lam,
+     2      "Shear-rate tensor multiplier (lamda)",1,lb=0D0)
+         lPtr => lVis%get(lDmn%visc%a,
+     2      "Shear-rate tensor exponent (a)",1,lb=0D0)
+         lPtr => lVis%get(lDmn%visc%n,"Power-law index (n)",1,lb=0D0)
+         IF (lDmn%visc%mu_i .GT. lDmn%visc%mu_o) THEN
+            err = "Unexpected inputs for Carreau-Yasuda model. "//
+     2         "High shear-rate viscosity value should be higher than"//
+     3         " low shear-rate value"
+         END IF
+         RETURN
+
+      CASE ("cassons", "cass")
+         lDmn%visc%viscType = viscType_Cass
+         lPtr => lVis%get(lDmn%visc%mu_i,
+     2      "Asymptotic viscosity parameter",1,lb=0D0)
+         lPtr => lVis%get(lDmn%visc%mu_o,
+     2      "Yield stress parameter",1,lb=0D0)
+         lDmn%visc%lam = 0.5D0
+         lPtr => lVis%get(rtmp,"Low shear-rate threshold")
+         IF (ASSOCIATED(lPtr)) lDmn%visc%lam = rtmp
+         RETURN
+
+      CASE DEFAULT
+         err = "Undefined constitutive model for viscosity used"
+      END SELECT
+
+      RETURN
+      END SUBROUTINE READVISCMODEL
 !####################################################################
 !     This subroutine reads traction data from a vtp file and stores
 !     in moving BC data structure

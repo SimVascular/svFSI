@@ -504,6 +504,11 @@
      3       lEq%dmn(iDmn)%phys .EQ. phys_preSt) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
+
+         IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
+     2       lEq%dmn(iDmn)%phys .EQ. phys_CMM) THEN
+            CALL DIST_VISCMODEL(lEq%dmn(iDmn)%visc)
+         END IF
       END DO
 
 !     Distribute cardiac electromechanics parameters
@@ -955,6 +960,25 @@
 
       RETURN
       END SUBROUTINE DIST_MATCONSTS
+!--------------------------------------------------------------------
+!     This subroutine distributes constants and parameters of the
+!     constitutive model to all processes
+      SUBROUTINE DIST_VISCMODEL(lVis)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(viscModelType), INTENT(INOUT) :: lVis
+
+      CALL cm%bcast(lVis%viscType)
+      CALL cm%bcast(lVis%mu_i)
+      CALL cm%bcast(lVis%mu_o)
+      CALL cm%bcast(lVis%lam)
+      CALL cm%bcast(lVis%a)
+      CALL cm%bcast(lVis%n)
+
+      RETURN
+      END SUBROUTINE DIST_VISCMODEL
 !####################################################################
 !     This is for partitioning a single mesh
       SUBROUTINE PARTMSH(lM, gmtl, nP, wgt)
