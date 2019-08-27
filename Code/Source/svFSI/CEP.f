@@ -106,7 +106,8 @@
 
 !        Compute fiber stretch
          DO i=1, nFn
-            Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
+            fl(:,i) = MATMUL(F, fN(:,i))
+            Ls(i)   = SQRT(NORM(fl(:,i),fl(:,i)))
             fl(:,i) = fl(:,i) / Ls(i)
          END DO
          IF (Ls(1) .LE. 1D0) Ls(1) = 1D0
@@ -233,7 +234,8 @@
 
 !        Compute fiber stretch
          DO i=1, nFn
-            Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
+            fl(:,i) = MATMUL(F, fN(:,i))
+            Ls(i)   = SQRT(NORM(fl(:,i),fl(:,i)))
             fl(:,i) = fl(:,i) / Ls(i)
          END DO
          IF (Ls(1) .LE. 1D0) Ls(1) = 1D0
