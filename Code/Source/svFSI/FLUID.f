@@ -56,7 +56,6 @@
      4  NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      s    = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -141,6 +140,7 @@
       ELSE
          nu_x = nu_x/rho/gam
       END IF
+      s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
 
       kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2)
@@ -299,7 +299,6 @@
      4  NxdNx, nu_s, es(2,2), gam, nu_x, es_x(2,eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      s    = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
 
@@ -361,7 +360,12 @@
       CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
       nu   = nu/rho
       nu_s = nu_s/rho
-      nu_x = nu_x/rho/gam
+      IF (ISZERO(gam)) THEN
+         nu_x = 0D0
+      ELSE
+         nu_x = nu_x/rho/gam
+      END IF
+      s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
 
       kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(1)*u(2)*ksix(1,2) + u(2)*u(2)*ksix(2,2)
