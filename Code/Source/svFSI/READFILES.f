@@ -75,6 +75,8 @@
          mvMsh        = .FALSE.
          stFileFlag   = .FALSE.
          stFileRepl   = .FALSE.
+         saveVTK      = .FALSE.
+         bin2VTK      = .FALSE.
          saveAve      = .FALSE.
          sepOutput    = .FALSE.
          saveATS      = 1
@@ -116,6 +118,7 @@
             saveName = ""
             appPath = STR(cm%np())//"-procs"//delimiter
          END IF
+
          lPtr => list%get(std%oTS,"Verbose")
          lPtr => list%get(wrn%oTS,"Warning")
          lPtr => list%get(dbg%oTS,"Debug")
@@ -172,22 +175,32 @@
          stopTrigName = TRIM(appPath)//stopTrigName
          lPtr => list%get(ichckIEN, "Check IEN order")
 
-         lPtr => list%get(saveIncr,"Increment in saving files",ll=1)
-         lPtr => list%get(saveATS,"Start saving after time step",
-     2         ll=1)
-         lPtr => list%get(saveAve,"Save averaged results")
-         lPtr => list%get(zeroAve,"Start averaging from zero")
-         lPtr => list%get(saveName,"Name prefix of saved files",1)
+         lPtr => list%get(saveVTK, "Save results to VTK format")
+         lPtr => list%get(saveName,"Name prefix of saved VTK files",1)
+         lPtr => list%get(saveIncr,"Increment in saving VTK files",ll=1)
+         lPtr => list%get(saveATS,"Start saving after time step",ll=1)
          saveName = TRIM(appPath)//saveName
 
+         lPtr => list%get(saveAve,"Save averaged results")
+         lPtr => list%get(zeroAve,"Start averaging from zero")
+
          lPtr => list%get(stFileRepl,"Overwrite restart file")
+         IF (.NOT.saveVTK .AND. stFileRepl) wrn = " Overwriting "//
+     2      "restart files is not a good idea when not saving to VTK"
          lPtr => list%get(stFileName,"Restart file name")
          stFileName = TRIM(appPath)//stFileName
 
          stFileIncr = saveIncr
          lPtr => list%get(stFileIncr,
      2      "Increment in saving restart files",ll=0)
+         lPtr => list%get(bin2VTK,"Convert BIN to VTK format")
+
          lPtr => list%get(rmsh%isReqd, "Simulation requires remeshing")
+         IF (rmsh%isReqd) THEN
+            saveVTK = .TRUE.
+            IF (bin2VTK) err = "BIN to VTK conversion is not allowed"//
+     2         " with dynamic remeshing"
+         END IF
       END IF ! resetSim
 
 !--------------------------------------------------------------------
@@ -2234,7 +2247,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       TYPE(listType), POINTER :: lPtr, lVis
       CHARACTER(LEN=stdL) ctmp
-      REAL(KIND=8) :: mu, rtmp
+      REAL(KIND=8) :: rtmp
 
       lVis => lPD%get(ctmp,"Viscosity",1)
 

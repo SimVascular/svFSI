@@ -57,14 +57,14 @@
       fid = 1
       tmp = CPUT()
 
-      sepLine = REPEAT("-", 67)
+      sepLine = REPEAT("-", 69)
 
       IF (co .EQ. 1) THEN
          timeP(1) = tmp - timeP(1)
          timeP(2) = 0D0
          std = " "
          std = TRIM(sepLine)
-         std = "Eq     N-i     T       dB  Ri/R1   Ri/R0    R/Ri  "//
+         std = " Eq     N-i     T       dB  Ri/R1   Ri/R0    R/Ri  "//
      2      "   lsIt   dB  %t"
          IF (nEq .EQ. 1) std = TRIM(sepLine)
          RETURN
@@ -77,8 +77,8 @@
       c1 = " "
       IF (co .EQ. 3) c1 = "s"
       timeP(3) = tmp - timeP(1)
-      sOut = eq(iEq)%sym//" "//STR(cTS,5)//"-"//STR(eq(iEq)%itr)//c1//
-     2   " "//STR(timeP(3),6)
+      sOut = " "//eq(iEq)%sym//" "//STR(cTS,5)//"-"//STR(eq(iEq)%itr)//
+     2   c1//" "//STR(timeP(3),6)
 
       IF (ISZERO(eq(iEq)%iNorm)) THEN
          tmp  = 1D0

@@ -50,8 +50,8 @@
 
       REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: s
 
-      tDof     = 0
-      dFlag    = .FALSE.
+      tDof  = 0
+      dFlag = .FALSE.
 
 !     Set faces for linear solver
       nFacesLS = SUM(eq%nBc)
@@ -261,19 +261,19 @@
          IF (flag) THEN
             i = LEN(TRIM(iniFilePath))
             IF (iniFilePath(i-2:i) .EQ. "bin") THEN
-               CALL INITFROMBIN(iniFilePath)
+               CALL INITFROMBIN(iniFilePath, timeP)
             ELSE
-               CALL INITFROMVTU(iniFilePath)
+               CALL INITFROMVTU(iniFilePath, timeP)
             END IF
          ELSE
             IF (stFileFlag) THEN
                fTmp = TRIM(stFileName)//"_last.bin"
                INQUIRE (FILE=fTmp, EXIST=flag)
                IF (flag) THEN
-                  CALL INITFROMBIN(fTmp)
+                  CALL INITFROMBIN(fTmp, timeP)
                ELSE
                   IF (cm%mas()) wrn = TRIM(fTmp)//" can not be opened"
-                  CALL ZEROINIT
+                  CALL ZEROINIT(timeP)
                END IF
                IF (rmsh%isReqd) THEN
                   rmsh%fTS = (cTS/rmsh%fTS + 1)*rmsh%freq
@@ -285,7 +285,7 @@
                   rmsh%D0(:,:) = Do(:,:)
                END IF
             ELSE
-               CALL ZEROINIT
+               CALL ZEROINIT(timeP)
             END IF ! stFileFlag
          END IF
 
@@ -313,10 +313,10 @@
 
       DO iM=1, nMsh
          IF (cm%mas()) THEN
-            fTmp = TRIM(appPath)//".partitioning_"//
-     2         TRIM(msh(iM)%name)//".bin"
-            sTmp = TRIM(appPath)//".partitioning_"//
-     2         TRIM(msh(iM)%name)//"_"//STR(cTS)//".bin"
+            fTmp = TRIM(appPath)//".partitioning_"//TRIM(msh(iM)%name)//
+     2         ".bin"
+            sTmp = TRIM(appPath)//".partitioning_"//TRIM(msh(iM)%name)//
+     2         "_"//STR(cTS)//".bin"
             INQUIRE(FILE=TRIM(fTmp), EXIST=flag)
             IF (flag) THEN
                sTmp = "cp  "//TRIM(fTmp)//" "//TRIM(sTmp)
@@ -365,6 +365,9 @@
 !     Preparing faces and BCs
       CALL BAFINI()
 
+!     As all the arrays are allocated, call BIN to VTK for conversion
+      IF (bin2VTK) CALL PPBIN2VTK()
+
 !     Making sure the old solution satisfies BCs
       CALL SETBCDIR(Ao, Yo, Do)
 
@@ -377,11 +380,13 @@
       resetSim = .FALSE.
 
       RETURN
-      CONTAINS
+      END SUBROUTINE INITIALIZE
 !--------------------------------------------------------------------
 !     Initializing accelaration, velocity and displacement to zero
-      SUBROUTINE ZEROINIT
+      SUBROUTINE ZEROINIT(timeP)
+      USE COMMOD
       IMPLICIT NONE
+      REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
       std = " Initializing state variables to zero"
 
@@ -417,9 +422,13 @@
       END SUBROUTINE ZEROINIT
 !--------------------------------------------------------------------
 !     Using the saved VTU files for initialization
-      SUBROUTINE INITFROMVTU(fName)
+      SUBROUTINE INITFROMVTU(fName, timeP)
+      USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
+
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
+      REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
       INTEGER l
       REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:)
@@ -455,15 +464,21 @@
       END SUBROUTINE INITFROMVTU
 !--------------------------------------------------------------------
 !     Using the svFSI specific format binary file for initialization
-      SUBROUTINE INITFROMBIN(fName)
+      SUBROUTINE INITFROMBIN(fName, timeP)
+      USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
+      REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
       INTEGER, PARAMETER :: fid = 1
       INTEGER tStamp(SIZE(stamp)), a, i
 
-      std = " Initializing from "//fName
+      i = 0
+      IF (.NOT.bin2VTK) THEN
+         std = " Initializing from "//fName
+      END IF
+
       OPEN(fid, FILE=fName, ACCESS='DIRECT', RECL=recLn)
       IF (.NOT.ibFlag) THEN
          IF (dFlag) THEN
@@ -532,43 +547,47 @@
 !     other processor data will be shifted due to any change on the
 !     sizes
       IF (cm%mas()) THEN
-         IF (tStamp(1).NE.stamp(1)) err = "Number of processors <"//
+         IF (tStamp(1) .NE. stamp(1)) err = "Number of processors <"//
      2      tStamp(1)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(1)//">"
-         IF (tStamp(2).NE.stamp(2)) err = "Number of equations <"//
+         IF (tStamp(2) .NE. stamp(2)) err = "Number of equations <"//
      2      tStamp(2)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(2)//">"
-         IF (tStamp(3).NE.stamp(3)) err = "Number of meshes <"//
+         IF (tStamp(3) .NE. stamp(3)) err = "Number of meshes <"//
      2      tStamp(3)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(3)//">"
-         IF (tStamp(4).NE.stamp(4)) err = "Number of nodes <"//
+         IF (tStamp(4) .NE. stamp(4)) err = "Number of nodes <"//
      2      tStamp(4)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(4)//">"
-         IF (tStamp(5).NE.stamp(5)) err = "Number of cplBC%x <"//
+         IF (tStamp(5) .NE. stamp(5)) err = "Number of cplBC%x <"//
      2      tStamp(5)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(5)//">"
-         IF (tStamp(6).NE.stamp(6)) err = "Number of dof <"//
+         IF (tStamp(6) .NE. stamp(6)) err = "Number of dof <"//
      2      tStamp(6)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(6)//">"
-         IF (tStamp(7).NE.stamp(7)) err = "dFlag specification"//
+         IF (tStamp(7) .NE. stamp(7)) err = "dFlag specification"//
      2      " <"//tStamp(7)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(7)//">"
-         IF (tStamp(8).NE.stamp(8)) err = "Version of solver <"//
+         IF (tStamp(8) .NE. stamp(8)) err = "Version of solver <"//
      2      tStamp(8)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(8)//">"
       END IF
 
-      CALL MPI_BARRIER(cm%com(), ierr)
-      IF (ANY(tStamp.NE.stamp)) err = "Simulation stamp"//
+      CALL cm%bcast(i)
+      IF (ANY(tStamp .NE. stamp)) err = "Simulation stamp"//
      2   " does not match with "//fName
 
       RETURN
       END SUBROUTINE INITFROMBIN
 !--------------------------------------------------------------------
       SUBROUTINE INITSOLNVAR()
+      USE COMMOD
+      USE ALLFUN
       IMPLICIT NONE
 
       INTEGER a
+      LOGICAL flag
+
       REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
 
 !     Transfer initial velocity field
@@ -640,8 +659,6 @@
 
       RETURN
       END SUBROUTINE INITSOLNVAR
-!--------------------------------------------------------------------
-      END SUBROUTINE INITIALIZE
 !####################################################################
       SUBROUTINE FINALIZE
       USE COMMOD

@@ -110,7 +110,7 @@
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
      2   xl(3,eNoN), bfl(3,eNoN), pS0l(6)
 
-      INTEGER a, g, Ac
+      INTEGER g
       REAL(KIND=8) :: w, Jac, nV(3), pSl(6)
 
       REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)

@@ -228,19 +228,20 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          CALL cm%bcast(l1)
          l2 = cTS .GE. nTS
          l3 = MOD(cTS,stFileIncr) .EQ. 0
-!     Saving the result to restart simulation in the future
+!     Saving the result to restart bin file
          IF (l1 .OR. l2 .OR. l3) CALL WRITERESTART(timeP)
 
-         l3 = MOD(cTS,saveIncr) .EQ. 0
-         l4 = cTS .GE. saveATS
 !     Writing results into the disk with VTU format
-         IF (l3 .AND. l4) THEN
-            CALL OUTRESULT(timeP, 3, iEqOld)
-            CALL WRITEVTUS(An, Yn, Dn)
-            IF (ibFlag) CALL IB_WRITEVTUS(ib%An, ib%Yn, ib%Un)
-         ELSE
-            CALL OUTRESULT(timeP, 2, iEqOld)
+         IF (saveVTK) THEN
+            l3 = MOD(cTS,saveIncr) .EQ. 0
+            l4 = cTS .GE. saveATS
+            IF (l3 .AND. l4 .AND. saveVTK) THEN
+               CALL OUTRESULT(timeP, 3, iEqOld)
+               CALL WRITEVTUS(An, Yn, Dn)
+               IF (ibFlag) CALL IB_WRITEVTUS(ib%An, ib%Yn, ib%Un)
+            END IF
          END IF
+         CALL OUTRESULT(timeP, 2, iEqOld)
          IF (pstEq) CALL OUTDNORM()
 
          IF (ibFlag) CALL IB_OUTR()

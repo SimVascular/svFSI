@@ -888,3 +888,50 @@
       RETURN
       END SUBROUTINE FIBSTRETCH
 !####################################################################
+!     Postprocessing function - used to convert restart bin files
+!     into VTK format.
+      SUBROUTINE PPBIN2VTK()
+      USE COMMOD
+      IMPLICIT NONE
+
+      LOGICAL :: flag
+      INTEGER :: iTS, ierr
+      REAL(KIND=8) :: rtmp(3)
+      CHARACTER(LEN=stdL) :: stmp, fName, sepLine
+
+      sepLine = REPEAT("-", 50)
+      std  = TRIM(sepLine)
+      std  = CLR(" Post-process conversion from bin to vtk files",3)
+
+      DO iTS=1, nTS
+         IF (MOD(iTS,stFileIncr) .EQ. 0) THEN
+            WRITE(stmp,'(I3.3)') iTS
+            IF (iTS .GE. 1000) stmp = STR(iTS)
+
+!           Ignore if vtu file already exists
+            IF (cm%mas()) THEN
+               fName = TRIM(saveName)//"_"//TRIM(ADJUSTL(stmp))//".vtu"
+               INQUIRE(FILE=TRIM(fName), EXIST=flag)
+            END IF
+            CALL cm%bcast(flag)
+            IF (flag) CYCLE
+
+!           Ignore if bin file does not exist
+            fName = TRIM(stFileName)//"_"//TRIM(ADJUSTL(stmp))//".bin"
+            INQUIRE(FILE=TRIM(fName), EXIST=flag)
+            IF (.NOT.flag) CYCLE
+
+            std = TRIM(sepLine)
+            std = " "//CLR("<< BIN ---> VTK >>")//"    "//TRIM(fName)
+            CALL INITFROMBIN(fName, rtmp)
+            CALL WRITEVTUS(Ao, Yo, Do)
+         END IF
+      END DO
+      std = TRIM(sepLine)
+
+      CALL FINALIZE
+      CALL MPI_FINALIZE(ierr)
+      STOP
+
+      END SUBROUTINE PPBIN2VTK
+!####################################################################

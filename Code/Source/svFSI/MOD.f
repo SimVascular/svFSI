@@ -849,6 +849,8 @@
       LOGICAL mvMsh
 !     Whether to averaged results
       LOGICAL saveAve
+!     Whether to save to VTK files
+      LOGICAL saveVTK
 !     Whether any file being saved
       LOGICAL savedOnce
 !     Whether to use separator in output
@@ -879,6 +881,8 @@
       LOGICAL useTrilinosLS
 !     Use C++ Trilinos framework for assembly and for linear solvers
       LOGICAL useTrilinosAssemAndLS
+!     Postprocess step - convert bin to vtk
+      LOGICAL bin2VTK
 
 !     INTEGER VARIABLES
 !     Current domain

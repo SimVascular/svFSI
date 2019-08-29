@@ -831,7 +831,7 @@ c     2         nu*(N(a)*Nx(2,b)*nV(1) + Nx(2,a)*N(b)*nV(1))
       REAL(KIND=8), INTENT(INOUT)  :: gamma
       REAL(KIND=8), INTENT(OUT) :: mu, mu_s, mu_x
 
-      REAL(KIND=8) :: mu_i, mu_o, lam, a, n, Hcrt, T1, T2
+      REAL(KIND=8) :: mu_i, mu_o, lam, a, n, T1, T2
 
       SELECT CASE (lDmn%visc%viscType)
       CASE (viscType_Const)

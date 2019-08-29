@@ -172,6 +172,8 @@
          CALL cm%bcast(saveIncr)
          CALL cm%bcast(saveATS)
          CALL cm%bcast(saveAve)
+         CALL cm%bcast(saveVTK)
+         CALL cm%bcast(bin2VTK)
          CALL cm%bcast(mvMsh)
          CALL cm%bcast(nITS)
          CALL cm%bcast(nTS)
