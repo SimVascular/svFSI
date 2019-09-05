@@ -53,22 +53,35 @@
 
 !     Writing data related to cplBC
       IF (.NOT.resetSim) THEN
-         IF (cm%mas() .AND. cplBC%coupled) THEN
-            IF (flag) THEN
-               INQUIRE(FILE=cplBC%saveName, EXIST=ltmp)
-               IF (cTS.EQ.0 .OR. .NOT.ltmp) THEN
-                  OPEN(fid, FILE=cplBC%saveName)
-                  CLOSE(fid, STATUS='DELETE')
+         IF (cplBC%coupled) THEN
+            IF (.NOT.flag) THEN
+               IF (cplBC%useGenBC) THEN
+                  CALL genBC_Integ_X('L')
                ELSE
-                  CALL TRIMFILE(cTS,cplBC%saveName)
+                  CALL cplBC_Integ_X('L')
                END IF
-            ELSE
-               OPEN(fid, FILE=cplBC%saveName, POSITION='APPEND')
-               DO i=1, cplBC%nX
-                  WRITE(fid,'(A)',ADVANCE='NO') STR(cplBC%xo(i))//" "
-               END DO
-               WRITE(fid,*)
-               CLOSE(fid)
+            END IF
+
+            IF (cm%mas() .AND. .NOT.cplBC%useGenBC) THEN
+               IF (flag) THEN
+                  INQUIRE(FILE=cplBC%saveName, EXIST=ltmp)
+                  IF (cTS.EQ.0 .OR. .NOT.ltmp) THEN
+                     OPEN(fid, FILE=cplBC%saveName)
+                     CLOSE(fid, STATUS='DELETE')
+                  ELSE
+                     CALL TRIMFILE(cTS,cplBC%saveName)
+                  END IF
+               ELSE
+                  OPEN(fid, FILE=cplBC%saveName, POSITION='APPEND')
+                  DO i=1, cplBC%nX
+                     WRITE(fid,'(ES14.6E2)',ADVANCE='NO') cplBC%xo(i)
+                  END DO
+                  DO i=1, cplBC%nXp
+                     WRITE(fid,'(ES14.6E2)',ADVANCE='NO') cplBC%xp(i)
+                  END DO
+                  WRITE(fid,*)
+                  CLOSE(fid)
+               END IF
             END IF
          END IF
       END IF ! resetSim

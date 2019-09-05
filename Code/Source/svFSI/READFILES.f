@@ -84,6 +84,7 @@
          nITs         = 0
          roInf        = 2D-1
          stFileName   = "stFile"
+         saveName     = "result"
          iniFilePath  = ""
          stopTrigName = "STOP_SIM"
          rmsh%isReqd  = .FALSE.
@@ -137,7 +138,7 @@
          std = " ----------------------------------------------"
          std = "                                               "
          std = "    SimVascular Fluid-Structure Interaction    "
-         std = "                  (svFSI v"//version//")       "
+         std = "                   (svFSI)                     "
          std = "                                               "
          std = " ----------------------------------------------"
          std = "                                               "
@@ -176,7 +177,7 @@
          lPtr => list%get(ichckIEN, "Check IEN order")
 
          lPtr => list%get(saveVTK, "Save results to VTK format")
-         lPtr => list%get(saveName,"Name prefix of saved VTK files",1)
+         lPtr => list%get(saveName,"Name prefix of saved VTK files")
          lPtr => list%get(saveIncr,"Increment in saving VTK files",ll=1)
          lPtr => list%get(saveATS,"Start saving after time step",ll=1)
          saveName = TRIM(appPath)//saveName
@@ -269,6 +270,12 @@
          END IF
       END DO
 
+      IF (useTrilinosLS .AND. cplBC%schm.NE.cplBC_NA) THEN
+         IF (cplBC%schm .NE. cplBC_E) err = "Using Trilinos with "//
+     2      "semi-implicit or implicit CPLBC can lead to NaNs. "//
+     3      "Try Explicit coupling or NS solver instead."
+      END IF
+
       IF (cem%cpld) THEN
          IF (nEq .EQ. 1) err = "Min equations (2) not solved for"//
      2      " electro-mechanics coupling"
@@ -347,7 +354,12 @@
 !     Coupled BC stuff
 !     Initializing coupled BC if neccessary
       IF (.NOT.ALLOCATED(cplBC%xo)) THEN
-         lPBC => list%get(ctmp,"Couple to cplBC")
+         lPBC => list%get(ctmp,"Couple to genBC")
+         IF (ASSOCIATED(lPBC)) THEN
+            cplBC%useGenBC = .TRUE.
+         ELSE
+            lPBC => list%get(ctmp,"Couple to cplBC")
+         END IF
          IF (ASSOCIATED(lPBC)) THEN
             SELECT CASE(ctmp)
             CASE('N')
@@ -366,8 +378,11 @@
 !     This pointing to the section containing BC info under fluid eqn
             lPtr => lPBC%get(cplBC%nX,"Number of unknowns",1,ll=0)
             ALLOCATE(cplBC%xo(cplBC%nX))
-
             cplBC%xo = 0D0
+
+            lPtr => lPBC%get(fTmp,"0D code file path",1)
+            cplBC%binPath = fTmp%fname
+
             lPtr => lPBC%get(fTmp,"Unknowns initialization file path")
             IF (ASSOCIATED(lPtr)) THEN
                fid = fTmp%open()
@@ -383,8 +398,13 @@
      2         "File name for saving unknowns")
             cplBC%saveName = TRIM(appPath)//cplBC%saveName
 
-            lPtr => lPBC%get(fTmp,"0D code file path",1)
-            cplBC%binPath = fTmp%fname
+            lPtr => lPBC%get(cplBC%nXp,"Number of user-defined outputs")
+            ALLOCATE(cplBC%xp(cplBC%nXp))
+
+            IF (cplBC%useGenBC) THEN
+               cplBC%xo = 0D0
+               cplBC%commuName = "GenBC.int"
+            END IF
          END IF
       END IF
 

@@ -144,7 +144,6 @@
          DO faIn=1, lhs%nFaces
             IF (incL(faIn) .EQ. 0) lhs%face(faIn)%incFlag = .FALSE.
          END DO
-         flag = ANY(lhs%face%bGrp.EQ.BC_TYPE_Neu)
          DO faIn=1, lhs%nFaces
             lhs%face(faIn)%coupledFlag = .FALSE.
             IF (.NOT.lhs%face(faIn)%incFlag) CYCLE

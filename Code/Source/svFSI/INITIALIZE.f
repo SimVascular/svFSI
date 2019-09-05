@@ -150,7 +150,7 @@
       i = 0
       IF (cplBC%coupled) i = cplBC%nX
 
-      stamp = (/cm%np(), nEq, nMsh, tnNo, i, tDof, ierr, version/)
+      stamp = (/cm%np(), nEq, nMsh, tnNo, i, tDof, ierr/)
 
 !     Calculating the record length
       i = 2*tDof
@@ -568,9 +568,6 @@
          IF (tStamp(7) .NE. stamp(7)) err = "dFlag specification"//
      2      " <"//tStamp(7)//"> does not match with "//
      3      TRIM(fName)//" <"//stamp(7)//">"
-         IF (tStamp(8) .NE. stamp(8)) err = "Version of solver <"//
-     2      tStamp(8)//"> does not match with "//
-     3      TRIM(fName)//" <"//stamp(8)//">"
       END IF
 
       CALL cm%bcast(i)
@@ -729,6 +726,7 @@
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
+      IF (ALLOCATED(cplBC%xp)) DEALLOCATE(cplBC%xp)
 
 !     Electrophysiology and Electromechanics
       IF (cepEq) THEN

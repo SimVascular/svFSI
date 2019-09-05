@@ -256,6 +256,7 @@
       RETURN
       END SUBROUTINE SETBCNEU
 !--------------------------------------------------------------------
+!     Set Neumann BC
       SUBROUTINE SETBCNEUL(lBc, lFa, Yg, Dg)
       USE COMMOD
       USE ALLFUN
@@ -318,6 +319,7 @@
       RETURN
       END SUBROUTINE SETBCNEUL
 !--------------------------------------------------------------------
+!     Set Traction BC
       SUBROUTINE SETBCTRACL(lBc, lFa)
       USE COMMOD
       USE ALLFUN
@@ -407,6 +409,7 @@
       RETURN
       END SUBROUTINE SETBCTRACL
 !--------------------------------------------------------------------
+!     Set Robin BC
       SUBROUTINE SETBCRBNL(lFa, ks, cs, Yg, Dg)
       USE COMMOD
       USE ALLFUN
@@ -432,16 +435,12 @@
       eNoN = lFa%eNoN
 
       ALLOCATE(N(eNoN), xl(nsd,eNoN), yl(nsd,eNoN), dl(nsd,eNoN),
-     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN), ptr(eNoN))
-
-      IF (cPhys .EQ. phys_vms_struct) ALLOCATE(lKd(nsd*dof,eNoN,eNoN))
+     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN), lKd(nsd*dof,eNoN,eNoN),
+     3   ptr(eNoN))
 
       DO e=1, lFa%nEl
          cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
          cPhys = eq(cEq)%dmn(cDmn)%phys
-
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
-
 
          DO a=1, eNoN
             Ac      = lFa%IEN(a,e)
@@ -450,10 +449,11 @@
             yl(:,a) = Yg(s:s+nsd-1,Ac)
             dl(:,a) = Dg(s:s+nsd-1,Ac)
          END DO
+         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
-         lK = 0D0
-         lR = 0D0
-         IF (cPhys .EQ. phys_vms_struct) lKd = 0D0
+         lK  = 0D0
+         lR  = 0D0
+         lKd = 0D0
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nV)
             w  = lFa%w(g) * SQRT(NORM(nV))
@@ -869,14 +869,22 @@
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                   cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
+                  cplBC%fa(ptr)%Po = 0D0
+                  cplBC%fa(ptr)%Pn = 0D0
                ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
                   tmp = msh(iM)%fa(iFa)%area
                   cplBC%fa(ptr)%Po = Integ(msh(iM)%fa(iFa),Yo,nsd+1)/tmp
                   cplBC%fa(ptr)%Pn = Integ(msh(iM)%fa(iFa),Yn,nsd+1)/tmp
+                  cplBC%fa(ptr)%Qo = 0D0
+                  cplBC%fa(ptr)%Qn = 0D0
                END IF
             END IF
          END DO
-         CALL cplBC_Integ_X
+         IF (cplBC%useGenBC) THEN
+            CALL genBC_Integ_X('T')
+         ELSE
+            CALL cplBC_Integ_X('T')
+         END IF
       END IF
 
       DO iBc=1, eq(iEq)%nBc
@@ -910,14 +918,23 @@
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
+               cplBC%fa(ptr)%Po = 0D0
+               cplBC%fa(ptr)%Pn = 0D0
             ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
                area = msh(iM)%fa(iFa)%area
                cplBC%fa(ptr)%Po = Integ(msh(iM)%fa(iFa),Yo,nsd+1)/area
                cplBC%fa(ptr)%Pn = Integ(msh(iM)%fa(iFa),Yn,nsd+1)/area
+               cplBC%fa(ptr)%Qo = 0D0
+               cplBC%fa(ptr)%Qn = 0D0
             END IF
          END IF
       END DO
-      CALL cplBC_Integ_X
+
+      IF (cplBC%useGenBC) THEN
+         CALL genBC_Integ_X('D')
+      ELSE
+         CALL cplBC_Integ_X('D')
+      END IF
 
       j    = 0
       diff = 0D0
@@ -942,7 +959,11 @@
             orgQ = cplBC%fa(i)%Qn
             cplBC%fa(i)%Qn = cplBC%fa(i)%Qn + diff
 
-            CALL cplBC_Integ_X
+            IF (cplBC%useGenBC) THEN
+               CALL genBC_Integ_X('D')
+            ELSE
+               CALL cplBC_Integ_X('D')
+            END IF
 
             eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY)/diff
 
@@ -954,23 +975,26 @@
       RETURN
       END SUBROUTINE CALCDERCPLBC
 !--------------------------------------------------------------------
-!     Interface to call 0D code
-      SUBROUTINE cplBC_Integ_X
+!     Interface to call 0D code (cplBC)
+      SUBROUTINE cplBC_Integ_X(genFlag)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      CHARACTER, INTENT(IN) :: genFlag
 
-      INTEGER fid, iFa, ios
+      INTEGER fid, iFa, istat
       REAL(KIND=8), ALLOCATABLE :: y(:)
 
+      istat = 0
       IF (cm%mas()) THEN
          fid = 1
          OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
-         WRITE(fid) version
+         WRITE(fid) genFlag
          WRITE(fid) cplBC%nFa
          WRITE(fid) cplBC%nX
+         WRITE(fid) cplBC%nXp
          WRITE(fid) dt
-         WRITE(fid) time-dt
+         WRITE(fid) MAX(time-dt, 0D0)
          WRITE(fid) cplBC%xo
          DO iFa=1, cplBC%nFa
             WRITE(fid) cplBC%fa(iFa)%bGrp
@@ -985,15 +1009,19 @@
          CALL SYSTEM(TRIM(cplBC%binPath)//" "//TRIM(cplBC%commuName))
 
          OPEN(fid,FILE=cplBC%commuName,STATUS='OLD',FORM='UNFORMATTED')
-         READ(fid,IOSTAT=ios) cplBC%xn
+         READ(fid) istat
+         READ(fid) cplBC%xn
+         READ(fid) cplBC%xp
          DO iFa=1, cplBC%nFa
-            IF (ios .GT. 0) EXIT
-            READ(fid,IOSTAT=ios) cplBC%fa(iFa)%y
+            READ(fid) cplBC%fa(iFa)%y
          END DO
          CLOSE(fid)
-         IF (ios .GT. 0) err = "Issue with reading "//
-     2      TRIM(cplBC%commuName)//" possibly due to an issue with "//
-     3      TRIM(cplBC%binPath)
+      END IF
+
+      CALL cm%bcast(istat)
+      IF (istat .NE. 0) THEN
+         std = "CPLBC Error detected, Aborting!"
+         CALL STOPSIM()
       END IF
 
       IF (.NOT.cm%seq()) THEN

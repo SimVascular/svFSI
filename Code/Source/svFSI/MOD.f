@@ -41,18 +41,12 @@
       USE CEPMOD
 
       INCLUDE "FSILS.h"
-      INCLUDE "cplBC.h"
 
 !--------------------------------------------------------------------
 !     Constants and upperbounds
 
-!     maximum possible nsd, standard length for strings,
-!     random for history file handel, maximum possible number
-!     of output variables, size of blocks for openMP communications,
-!     master is assumed to have zero ID, version, maximum number of
-!     properties, License expiration date
-      INTEGER, PARAMETER :: maxnsd = 3, version = 8, maxNProp = 20,
-     3   expDate(3)=(/2020,1,1/)
+!     maximum possible nsd, maximum number of properties
+      INTEGER, PARAMETER :: maxnsd = 3, maxNProp = 20
 
 !     Gauss points and their corresponding weights, upto 5 points
       REAL(KIND=8), PARAMETER :: gW(5,5)=RESHAPE((/2D0,0D0,0D0,0D0,0D0,
@@ -109,6 +103,10 @@
 !     Not-available, implicit, semi-implicit, and explicit
       INTEGER, PARAMETER :: cplBC_NA = 400, cplBC_I = 401,
      2   cplBC_SI = 402, cplBC_E = 403
+
+!     cplBC type of coupling to between 3D and OD-LPN models:
+!     Dirichlet type coupling, Neumann type coupling
+      INTEGER, PARAMETER :: cplBC_Dir = 66112, cplBC_Neu = 66113
 
 !     boundary conditions types. Items of this list can be combined
 !     BCs from imposing perspective can be Neu/Dir/per
@@ -520,14 +518,39 @@
 !     All the subTypes are defined, now defining the major types that
 !     will be directly allocated
 
+      TYPE cplFaceType
+!        GenBC_Dir/GenBC_Neu
+         INTEGER :: bGrp
+!        Pointer to X
+         INTEGER :: Xptr
+!        Internal genBC use
+         INTEGER :: eqv = 0
+!        Flow rates at t
+         REAL(KIND=8) Qo
+!        Flow rates at t+dt
+         REAL(KIND=8) Qn
+!        Pressures at t
+         REAL(KIND=8) Po
+!        Pressures at t+dt
+         REAL(KIND=8) Pn
+!        Imposed flow/pressure
+         REAL(KIND=8) y
+!        Name of the face
+         CHARACTER(LEN=128) name
+      END TYPE cplFaceType
+
 !     For coupled 0D-3D problems
       TYPE cplBCType
 !        Is multi-domain active
          LOGICAL :: coupled = .FALSE.
+!        Whether to use genBC
+         LOGICAL :: useGenBC = .FALSE.
 !        Number of coupled faces
          INTEGER :: nFa = 0
 !        Number of unknowns in the 0D domain
          INTEGER :: nX = 0
+!        Number of output variables addition to nX
+         INTEGER :: nXp = 0
 !        Implicit/Explicit/Semi-implicit schemes
          INTEGER :: schm = cplBC_NA
 !        Path to the 0D code binary file
@@ -540,6 +563,8 @@
          REAL(KIND=8), ALLOCATABLE :: xn(:)
 !        Old time step unknowns in the 0D domain
          REAL(KIND=8), ALLOCATABLE :: xo(:)
+!        Output variables to be printed
+         REAL(KIND=8), ALLOCATABLE :: xp(:)
 !        Data structure used for communicating with 0D code
          TYPE(cplFaceType), ALLOCATABLE :: fa(:)
       END TYPE cplBCType
@@ -914,7 +939,7 @@
 !     Increment in saving solutions
       INTEGER saveIncr
 !     Stamp ID to make sure simulation is compatible with stFiles
-      INTEGER stamp(8)
+      INTEGER stamp(7)
 !     Increment in saving restart file
       INTEGER stFileIncr
 !     Total number of degrees of freedom per node

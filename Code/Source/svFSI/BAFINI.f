@@ -91,6 +91,7 @@
                END IF
             END IF
          END DO
+         IF (cplBC%useGenBC) CALL genBC_Integ_X('I')
          IF (cplBC%schm .NE. cplBC_E) CALL CALCDERCPLBC
       END IF
 

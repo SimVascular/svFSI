@@ -281,9 +281,18 @@
 !     Communicating cplBC data
       CALL cm%bcast(cplBC%nFa)
       CALL cm%bcast(cplBC%nX)
-      IF (.NOT. cm%mas() .AND. .NOT.ALLOCATED(cplBC%xo))
-     2   ALLOCATE(cplBC%xo(cplBC%nX))
-      IF (cplBC%nX .NE. 0) CALL cm%bcast(cplBC%xo)
+      CALL cm%bcast(cplBC%schm)
+      CALL cm%bcast(cplBC%useGenBC)
+      IF (cplBC%useGenBC) THEN
+         IF (cm%slv()) THEN
+            ALLOCATE(cplBC%xo(cplBC%nX))
+            cplBC%xo = 0D0
+         END IF
+      ELSE
+         IF (.NOT.cm%mas() .AND. .NOT.ALLOCATED(cplBC%xo))
+     2      ALLOCATE(cplBC%xo(cplBC%nX))
+         IF (cplBC%nX .NE. 0) CALL cm%bcast(cplBC%xo)
+      END IF
 
       DO iM=1, nMsh
          CALL DESTROY(tMs(iM))
