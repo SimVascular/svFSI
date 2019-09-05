@@ -975,6 +975,94 @@
       RETURN
       END SUBROUTINE CALCDERCPLBC
 !--------------------------------------------------------------------
+!     Interface to call 0D code (genBC/gcode)
+      SUBROUTINE genBC_Integ_X(genFlag)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      CHARACTER, INTENT(IN) :: genFlag
+
+      INTEGER fid, i, iFa, nDir, nNeu
+      REAL(KIND=8) rt
+      REAL(KIND=8), ALLOCATABLE :: y(:)
+
+      nDir  = 0
+      nNeu  = 0
+      IF (cm%mas()) THEN
+         DO iFa=1, cplBC%nFa
+            IF (cplBC%fa(iFa)%bGrp .EQ. cplBC_Dir) THEN
+               nDir = nDir + 1
+            ELSE IF (cplBC%fa(iFa)%bGrp .EQ. cplBC_Neu) THEN
+               nNeu = nNeu + 1
+            END IF
+         END DO
+         fid = 1
+         OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
+         WRITE(fid) genFlag
+         WRITE(fid) dt
+         WRITE(fid) nDir
+         WRITE(fid) nNeu
+         DO iFa=1, cplBC%nFa
+            IF (cplBC%fa(iFa)%bGrp .EQ. cplBC_Dir) THEN
+               WRITE(fid) cplBC%fa(iFa)%Po, cplBC%fa(iFa)%Pn
+            END IF
+         END DO
+         DO iFa=1, cplBC%nFa
+            IF (cplBC%fa(iFa)%bGrp .EQ. cplBC_Neu) THEN
+               WRITE(fid) cplBC%fa(iFa)%Qo, cplBC%fa(iFa)%Qn
+            END IF
+         END DO
+         CLOSE(fid)
+
+         CALL SYSTEM(TRIM(cplBC%binPath)//" "//TRIM(cplBC%commuName))
+
+         OPEN(fid,FILE=cplBC%commuName,STATUS='OLD',FORM='UNFORMATTED')
+         DO iFa=1, cplBC%nFa
+            IF (cplBC%fa(iFa)%bGrp .EQ. cplBC_Dir) THEN
+               READ(fid) cplBC%fa(iFa)%y
+            END IF
+         END DO
+         DO iFa=1, cplBC%nFa
+            IF (cplBC%fa(iFa)%bGrp .EQ. cplBC_Neu) THEN
+               READ(fid) cplBC%fa(iFa)%y
+            END IF
+         END DO
+         CLOSE(fid)
+
+         IF (genFlag .EQ. 'I') THEN
+            OPEN(fid,FILE='InitialData',STATUS='OLD',FORM='UNFORMATTED')
+            READ(fid) rt
+            DO i=1, cplBC%nX
+               READ(fid) cplBC%xo(i)
+            END DO
+            CLOSE(fid)
+
+         ELSE IF (genFlag .EQ. 'L') THEN
+            OPEN(fid,FILE='InitialData',STATUS='OLD',FORM='UNFORMATTED')
+            READ(fid) rt
+            DO i=1, cplBC%nX
+               READ(fid) cplBC%xn(i)
+            END DO
+            CLOSE(fid)
+
+         END IF
+      END IF
+
+      IF (.NOT.cm%seq()) THEN
+         ALLOCATE(y(cplBC%nFa))
+         IF (cm%mas()) y = cplBC%fa%y
+         CALL cm%bcast(y)
+         IF (cm%slv()) cplBC%fa%y = y
+         IF (genFlag .EQ. 'I') THEN
+            CALL cm%bcast(cplBC%xo)
+         ELSE IF (genFlag .EQ. 'L') THEN
+            CALL cm%bcast(cplBC%xn)
+         END IF
+      END IF
+
+      RETURN
+      END SUBROUTINE genBC_Integ_X
+!--------------------------------------------------------------------
 !     Interface to call 0D code (cplBC)
       SUBROUTINE cplBC_Integ_X(genFlag)
       USE COMMOD
