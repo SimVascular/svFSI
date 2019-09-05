@@ -374,36 +374,41 @@
                err = "Undefined cplBC%schm: "//ctmp
             END SELECT
          END IF
+
          IF (cplBC%schm .NE. cplBC_NA) THEN
-!     This pointing to the section containing BC info under fluid eqn
-            lPtr => lPBC%get(cplBC%nX,"Number of unknowns",1,ll=0)
-            ALLOCATE(cplBC%xo(cplBC%nX))
-            cplBC%xo = 0D0
-
-            lPtr => lPBC%get(fTmp,"0D code file path",1)
-            cplBC%binPath = fTmp%fname
-
-            lPtr => lPBC%get(fTmp,"Unknowns initialization file path")
-            IF (ASSOCIATED(lPtr)) THEN
-               fid = fTmp%open()
-               READ (fid,*) cplBC%xo
-               CLOSE (fid)
-            END IF
-
-            lPtr => lPBC%get(cplBC%commuName,
-     2         "File name for 0D-3D communication")
-            cplBC%commuName = TRIM(appPath)//cplBC%commuName
-
-            lPtr => lPBC%get(cplBC%saveName,
-     2         "File name for saving unknowns")
-            cplBC%saveName = TRIM(appPath)//cplBC%saveName
-
-            lPtr => lPBC%get(cplBC%nXp,"Number of user-defined outputs")
-            ALLOCATE(cplBC%xp(cplBC%nXp))
-
             IF (cplBC%useGenBC) THEN
-               cplBC%xo = 0D0
+               lPtr => lPBC%get(fTmp,"0D code file path",1)
+               cplBC%binPath = fTmp%fname
                cplBC%commuName = "GenBC.int"
+               cplBC%nX = 0
+               ALLOCATE(cplBC%xo(cplBC%nX))
+            ELSE
+               lPtr => lPBC%get(cplBC%nX,"Number of unknowns",1,ll=0)
+               ALLOCATE(cplBC%xo(cplBC%nX))
+               cplBC%xo = 0D0
+
+               lPtr => lPBC%get(fTmp,"0D code file path",1)
+               cplBC%binPath = fTmp%fname
+
+               lPtr => lPBC%get(fTmp,
+     2            "Unknowns initialization file path")
+               IF (ASSOCIATED(lPtr)) THEN
+                  fid = fTmp%open()
+                  READ (fid,*) cplBC%xo
+                  CLOSE (fid)
+               END IF
+
+               lPtr => lPBC%get(cplBC%commuName,
+     2            "File name for 0D-3D communication")
+               cplBC%commuName = TRIM(appPath)//cplBC%commuName
+
+               lPtr => lPBC%get(cplBC%saveName,
+     2            "File name for saving unknowns")
+               cplBC%saveName = TRIM(appPath)//cplBC%saveName
+
+               lPtr => lPBC%get(cplBC%nXp,
+     2            "Number of user-defined outputs")
+               ALLOCATE(cplBC%xp(cplBC%nXp))
             END IF
          END IF
       END IF

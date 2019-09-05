@@ -1028,24 +1028,6 @@
             END IF
          END DO
          CLOSE(fid)
-
-         IF (genFlag .EQ. 'I') THEN
-            OPEN(fid,FILE='InitialData',STATUS='OLD',FORM='UNFORMATTED')
-            READ(fid) rt
-            DO i=1, cplBC%nX
-               READ(fid) cplBC%xo(i)
-            END DO
-            CLOSE(fid)
-
-         ELSE IF (genFlag .EQ. 'L') THEN
-            OPEN(fid,FILE='InitialData',STATUS='OLD',FORM='UNFORMATTED')
-            READ(fid) rt
-            DO i=1, cplBC%nX
-               READ(fid) cplBC%xn(i)
-            END DO
-            CLOSE(fid)
-
-         END IF
       END IF
 
       IF (.NOT.cm%seq()) THEN
@@ -1053,11 +1035,7 @@
          IF (cm%mas()) y = cplBC%fa%y
          CALL cm%bcast(y)
          IF (cm%slv()) cplBC%fa%y = y
-         IF (genFlag .EQ. 'I') THEN
-            CALL cm%bcast(cplBC%xo)
-         ELSE IF (genFlag .EQ. 'L') THEN
-            CALL cm%bcast(cplBC%xn)
-         END IF
+         DEALLOCATE(y)
       END IF
 
       RETURN
@@ -1118,6 +1096,7 @@
          CALL cm%bcast(cplBC%xn)
          CALL cm%bcast(y)
          IF (cm%slv()) cplBC%fa%y = y
+         DEALLOCATE(y)
       END IF
 
       RETURN
