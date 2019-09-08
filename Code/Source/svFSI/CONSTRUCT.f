@@ -49,7 +49,7 @@
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:), dl(:,:),
-     2   dol(:,:), fN(:,:), pS0l(:,:), bfl(:,:), ya_l(:)
+     2   dol(:,:), fN(:,:), pS0l(:,:), bfl(:,:), ya_l(:), vwpl(:,:)
 
 !     For shells, consider extended patch around an element
       IF (shlEq .AND. lM%eType.EQ.eType_TRI)THEN
@@ -63,7 +63,7 @@
 
       ALLOCATE(xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),dl(tDof,eNoN),
      2   dol(nsd,eNoN), bfl(nsd,eNoN), pS0l(nstd,eNoN), fN(nsd,nFn),
-     3   ya_l(eNoN), ptr(eNoN))
+     3   vwpl(2,eNoN), ya_l(eNoN), ptr(eNoN))
 
       i = nsd + 2
       j = 2*nsd + 1
@@ -78,6 +78,7 @@
          bfl  = 0D0
          ya_l = 0D0
          ibl  = 0
+         vwpl = 0D0
          DO a=1, eNoN
             IF (a .LE. lM%eNoN) THEN
                Ac     = lM%IEN(a,e)
@@ -101,6 +102,7 @@
                END DO
             END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+            IF (cmmVarWall) vwpl(:,a) = varWallProps(:,Ac)
             IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
          END DO
          IF (ibl .EQ. lM%eNoN) THEN
@@ -109,16 +111,16 @@
 
 !     Add contribution of current equation to the LHS/RHS
          CALL CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, bfl, fN,
-     2      pS0l, ya_l, ptr)
+     2      pS0l, vwpl, ya_l, ptr)
       END DO
 
-      DEALLOCATE(xl, al, yl, dl, dol, bfl, fN, pS0l, ya_l, ptr)
+      DEALLOCATE(xl, al, yl, dl, dol, bfl, fN, pS0l, vwpl, ya_l, ptr)
 
       RETURN
       END SUBROUTINE GLOBALEQASSEM
 !####################################################################
       SUBROUTINE CONSTRUCT(lM, e, eNoN, nFn, xl, al, yl, dl, dol, bfl,
-     2   fN, pS0l, ya_l, ptr)
+     2   fN, pS0l, vwpl, ya_l, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -127,11 +129,11 @@
       INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), dol(nsd,eNoN), bfl(nsd,eNoN), fN(nsd,nFn),
-     3   pS0l(nstd,eNoN), ya_l(eNoN)
+     3   pS0l(nstd,eNoN), vwpl(2,eNoN), ya_l(eNoN)
       REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
 
       INTEGER a, g, Ac, cPhys, insd
-      REAL(KIND=8) w, Jac, ksix(nsd,nsd)
+      REAL(KIND=8) w, Jac, vwp(2), ksix(nsd,nsd)
 
       REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:),
      2   dc(:,:), pSl(:), lKd(:,:,:)
@@ -202,11 +204,14 @@
 !     CMM initialization
       IF (cmmInit) THEN
          pSl(:) = 0D0
+         vwp(:) = 0D0
          DO a=1, eNoN
             pSl(:) = pSl(:) + pS0l(:,a)
+            vwp(:) = vwp(:) + vwpl(:,a)
          END DO
          pSl(:) = pSl(:)/REAL(eNoN,KIND=8)
-         CALL CMMi(lM, eNoN, al, dl, xl, bfl, pSl, ptr)
+         vwp(:) = vwp(:)/REAL(eNoN,KIND=8)
+         CALL CMMi(lM, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)
          DEALLOCATE(lR, lK, N, Nx, dc, pSl)
          RETURN
       END IF

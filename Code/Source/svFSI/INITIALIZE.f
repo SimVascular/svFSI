@@ -728,6 +728,8 @@
       IF (ALLOCATED(cplBC%xo)) DEALLOCATE(cplBC%xo)
       IF (ALLOCATED(cplBC%xp)) DEALLOCATE(cplBC%xp)
 
+      IF (ALLOCATED(varWallProps)) DEALLOCATE(varWallProps)
+
 !     Electrophysiology and Electromechanics
       IF (cepEq) THEN
          IF (ALLOCATED(Xion))  DEALLOCATE(Xion)

@@ -982,8 +982,7 @@
       IMPLICIT NONE
       CHARACTER, INTENT(IN) :: genFlag
 
-      INTEGER fid, i, iFa, nDir, nNeu
-      REAL(KIND=8) rt
+      INTEGER fid, iFa, nDir, nNeu
       REAL(KIND=8), ALLOCATABLE :: y(:)
 
       nDir  = 0
@@ -1140,7 +1139,7 @@
       REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER a, e, Ac, iM, eNoN
-      REAL(KIND=8) :: pSl(6)
+      REAL(KIND=8) :: pSl(6), vwp(2)
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: al(:,:), dl(:,:), xl(:,:), bfl(:,:)
@@ -1157,6 +1156,7 @@
          IF (eq(cEq)%dmn(cDmn)%phys .NE. phys_CMM) CYCLE
 
          pSl = 0D0
+         vwp = 0D0
          DO a=1, eNoN
             Ac = lFa%IEN(a,e)
             ptr(a)   = Ac
@@ -1167,11 +1167,15 @@
             IF(ALLOCATED(pS0)) THEN
                pSl(:) = pSl(:) + pS0(:,Ac)
             END IF
+            IF (cmmVarWall) THEN
+               vwp(:) = vwp(:) + varWallProps(:,Ac)
+            END IF
          END DO
          pSl(:) = pSl(:) / REAL(eNoN,KIND=8)
+         vwp(:) = vwp(:) / REAL(eNoN,KIND=8)
 
 !     Add CMM BCs contributions to the LHS/RHS
-         CALL CMMb(lFa, e, eNoN, al, dl, xl, bfl, pSl, ptr)
+         CALL CMMb(lFa, e, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)
       END DO
 
       DEALLOCATE(al, dl, xl, bfl, ptr)

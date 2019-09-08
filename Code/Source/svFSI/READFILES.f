@@ -84,7 +84,6 @@
          nITs         = 0
          roInf        = 2D-1
          stFileName   = "stFile"
-         saveName     = "result"
          iniFilePath  = ""
          stopTrigName = "STOP_SIM"
          rmsh%isReqd  = .FALSE.
@@ -93,6 +92,7 @@
          useTrilinosLS         = .FALSE.
          useTrilinosAssemAndLS = .FALSE.
          cmmInit      = .FALSE.
+         cmmVarWall   = .FALSE.
          shlEq        = .FALSE.
          pstEq        = .FALSE.
          sstEq        = .FALSE.
@@ -176,6 +176,7 @@
          stopTrigName = TRIM(appPath)//stopTrigName
          lPtr => list%get(ichckIEN, "Check IEN order")
 
+         saveName = "result"
          lPtr => list%get(saveVTK, "Save results to VTK format")
          lPtr => list%get(saveName,"Name prefix of saved VTK files")
          lPtr => list%get(saveIncr,"Increment in saving VTK files",ll=1)
@@ -338,7 +339,7 @@
 
       INTEGER, PARAMETER :: maxOutput = 18
 
-      INTEGER fid, iBc, iBf, iM, phys(3), propL(maxNProp,10),
+      INTEGER fid, iBc, iBf, iM, iFa, phys(3), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
 
@@ -620,15 +621,37 @@
             END DO
          END IF
 
+         lPBC => list%get(ctmp, "Variable wall properties")
+         IF (ASSOCIATED(lPBC)) THEN
+            cmmVarWall = .TRUE.
+            IF (.NOT.ALLOCATED(varWallProps)) THEN
+               ALLOCATE(varWallProps(2,gtnNo))
+               varWallProps = 0D0
+            END IF
+
+            iM  = 0
+            iFa = 0
+            IF (cmmInit) THEN
+               CALL FINDMSH(ctmp, iM)
+            ELSE
+               CALL FINDFACE(ctmp, iM, iFa)
+            END IF
+            lPtr => lPBC%get(ctmp, "Wall properties file path", 1)
+            CALL READWALLPROPSFF(ctmp, iM, iFa)
+            NULLIFY(lPBC)
+         END IF
+
          IF (.NOT.cmmInit) THEN
             propL(1,1) = fluid_density
             propL(2,1) = permeability
             propL(3,1) = backflow_stab
             propL(4,1) = solid_density
-            propL(5,1) = elasticity_modulus
-            propL(6,1) = poisson_ratio
-            propL(7,1) = damping
-            propL(8,1) = shell_thickness
+            propL(5,1) = poisson_ratio
+            propL(6,1) = damping
+            IF (.NOT.cmmVarWall) THEN
+               propL(7,1) = shell_thickness
+               propL(8,1) = elasticity_modulus
+            END IF
 
             nDOP = (/10,2,4,0/)
             outPuts(1)  = out_velocity
@@ -642,9 +665,11 @@
             outPuts(9)  = out_strainInv
             outPuts(10) = out_viscosity
          ELSE
-            propL(1,1) = elasticity_modulus
-            propL(2,1) = poisson_ratio
-            propL(3,1) = shell_thickness
+            propL(1,1) = poisson_ratio
+            IF (.NOT.cmmVarWall) THEN
+               propL(2,1) = shell_thickness
+               propL(3,1) = elasticity_modulus
+            END IF
 
             IF (pstEq) THEN
                nDOP = (/2,2,0,0/)
@@ -954,7 +979,7 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_CMM) THEN
+     2       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
             CALL READVISCMODEL(lEq%dmn(iDmn), lPD)
          END IF
       END DO
@@ -2725,4 +2750,60 @@ c     2         "can be applied for Neumann boundaries only"
 
       RETURN
       END SUBROUTINE SETCMMBDRY
+!####################################################################
+!     Read CMM variable wall properties from file
+      SUBROUTINE READWALLPROPSFF(fname, iM, iFa)
+      USE COMMOD
+      IMPLICIT NONE
+
+      CHARACTER(LEN=stdL), INTENT(IN) :: fname
+      INTEGER, INTENT(IN) :: iM, iFa
+
+      INTEGER a, Ac
+
+      IF (cmmInit) THEN
+         IF (ALLOCATED(msh(iM)%x)) DEALLOCATE(msh(iM)%x)
+         ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
+!        Read thickness
+         msh(iM)%x = 0D0
+         CALL READVTUPDATA(msh(iM), fname, "Thickness", 1, 1)
+         DO a=1, msh(iM)%gnNo
+            Ac = msh(iM)%gN(a)
+            varWallProps(1,Ac) = msh(iM)%x(1,a)
+         END DO
+
+!        Read elasticity modulus
+         msh(iM)%x = 0D0
+         CALL READVTUPDATA(msh(iM), fname, "Elasticity_modulus", 1, 1)
+         DO a=1, msh(iM)%gnNo
+            Ac = msh(iM)%gN(a)
+            varWallProps(2,Ac) = msh(iM)%x(1,a)
+         END DO
+         DEALLOCATE(msh(iM)%x)
+      ELSE
+         IF (ALLOCATED(msh(iM)%fa(iFa)%x)) DEALLOCATE(msh(iM)%fa(iFa)%x)
+         ALLOCATE(msh(iM)%fa(iFa)%x(1,msh(iM)%fa(iFa)%nNo))
+!        Read thickness
+         msh(iM)%fa(iFa)%x = 0D0
+         CALL READVTPPDATA(msh(iM)%fa(iFa), fname, "Thickness", 1, 1)
+         DO a=1, msh(iM)%fa(iFa)%nNo
+            Ac = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%gN(Ac)
+            varWallProps(1,Ac) = msh(iM)%fa(iFa)%x(1,a)
+         END DO
+
+!        Read elasticity modulus
+         msh(iM)%fa(iFa)%x = 0D0
+         CALL READVTPPDATA(msh(iM)%fa(iFa), fname, "Elasticity_modulus",
+     2      1, 1)
+         DO a=1, msh(iM)%fa(iFa)%nNo
+            Ac = msh(iM)%fa(iFa)%gN(a)
+            Ac = msh(iM)%gN(Ac)
+            varWallProps(2,Ac) = msh(iM)%fa(iFa)%x(1,a)
+         END DO
+         DEALLOCATE(msh(iM)%fa(iFa)%x)
+      END IF
+
+      RETURN
+      END SUBROUTINE READWALLPROPSFF
 !####################################################################

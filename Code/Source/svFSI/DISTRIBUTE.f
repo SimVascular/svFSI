@@ -183,6 +183,7 @@
          CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
          CALL cm%bcast(cmmInit)
+         CALL cm%bcast(cmmVarWall)
          CALL cm%bcast(shlEq)
          CALL cm%bcast(pstEq)
          CALL cm%bcast(sstEq)
@@ -276,6 +277,22 @@
          ALLOCATE(cmmBdry(tnNo))
          cmmBdry = LOCAL(part)
          DEALLOCATE(part)
+      END IF
+
+!     For CMM variable wall properties
+      flag = ALLOCATED(varWallProps)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpX(2,gtnNo))
+            tmpX = varWallProps
+            DEALLOCATE(varWallProps)
+         ELSE
+            ALLOCATE(tmpX(0,0))
+         END IF
+         ALLOCATE(varWallProps(2,tnNo))
+         varWallProps = LOCAL(tmpX)
+         DEALLOCATE(tmpX)
       END IF
 
 !     Communicating cplBC data

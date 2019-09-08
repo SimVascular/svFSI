@@ -42,14 +42,14 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE CMMi(lM, eNoN, al, dl, xl, bfl, pS0l, ptr)
+      SUBROUTINE CMMi(lM, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER, INTENT(IN) :: eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
-     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6)
+     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
 
       INTEGER a, g, Ac
       REAL(KIND=8) :: w, Jac, nV(3), pSl(6), gC(3,2)
@@ -67,13 +67,13 @@
 
 !     Internal stresses (stiffness) contribution
       pSl = 0D0
-      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, pSl, lR, lK)
+      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
 
 !     Inertia and body forces (mass) contribution
       DO g=1, lM%nG
          N(:) = lM%N(:,g)
          w = lM%w(g)*Jac
-         CALL CMM_MASS(eNoN, w, N, al, bfl, lR, lK)
+         CALL CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
 
 !        Prestress
          IF (pstEq) THEN
@@ -101,14 +101,14 @@
       RETURN
       END SUBROUTINE CMMi
 !--------------------------------------------------------------------
-      SUBROUTINE CMMb(lFa, e, eNoN, al, dl, xl, bfl, pS0l, ptr)
+      SUBROUTINE CMMb(lFa, e, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
       USE COMMOD
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(IN) :: lFa
       INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
-     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6)
+     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
 
       INTEGER g
       REAL(KIND=8) :: w, Jac, nV(3), pSl(6)
@@ -122,7 +122,7 @@
 !     Internal stresses (stiffness) contribution
       pSl = 0D0
       Nx  = lFa%Nx(:,:,1)
-      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, pSl, lR, lK)
+      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
 
 !     Inertia and body forces (mass) contribution
       DO g=1, lFa%nG
@@ -131,7 +131,7 @@
          nV  = nV / Jac
          w   = lFa%w(g)*Jac
          N   = lFa%N(:,g)
-         CALL CMM_MASS(eNoN, w, N, al, bfl, lR, lK)
+         CALL CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
       END DO
 
 !     Now doing the assembly part
@@ -151,14 +151,14 @@
       END SUBROUTINE CMMb
 !####################################################################
 !     Contribution from internal stresses to residue and tangents
-      SUBROUTINE CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, pSl, lR, lK)
+      SUBROUTINE CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: Nx(2,eNoN), xl(3,eNoN), dl(tDof,eNoN),
-     2   pS0l(6)
+     2   pS0l(6), vwp(2)
       REAL(KIND=8), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
@@ -170,9 +170,14 @@
      3   ul(9), Bm(5,9), BmT(9,5), Dm(5,5), DBm(5,9), pSm(3,3), S0l(5),
      4   Sl(5), BtS(9), Ke(9,9)
 
-      elM = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
       nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
-      ht  = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
+      IF (cmmVarWall) THEN
+         ht  = vwp(1)
+         elM = vwp(2)
+      ELSE
+         ht  = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
+         elM = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
+      END IF
 
       lam = elM/(1D0 - nu*nu)
       mu  = 0.5D0*elM/(1D0 + nu)
@@ -370,12 +375,13 @@
 !--------------------------------------------------------------------
 !     Contribution from inertia and body forces to residue and tangent
 !     matrix
-      SUBROUTINE CMM_MASS(eNoN, w, N, al, bfl, lR, lK)
+      SUBROUTINE CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), al(tDof,eNoN), bfl(3,eNoN)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), al(tDof,eNoN),bfl(3,eNoN),
+     2   vwp(2)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
@@ -383,10 +389,15 @@
       REAL(KIND=8) rho, ht, wl, am, T1, f(3), ud(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      ht   = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
+
+      IF (cmmVarWall) THEN
+         ht = vwp(1)
+      ELSE
+         ht = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
+      END IF
 
       wl   = w * ht * rho
       am   = eq(cEq)%am

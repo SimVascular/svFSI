@@ -892,6 +892,8 @@
       LOGICAL zeroAve
 !     Whether CMM equation is initialized
       LOGICAL cmmInit
+!     Whether variable wall properties are used for CMM
+      LOGICAL cmmVarWall
 !     Whether shell equation is being solved
       LOGICAL shlEq
 !     Whether PRESTRESS equation is solved
@@ -1029,6 +1031,9 @@
       REAL(KIND=8), ALLOCATABLE :: Pinit(:)
       REAL(KIND=8), ALLOCATABLE :: Vinit(:,:)
       REAL(KIND=8), ALLOCATABLE :: Dinit(:,:)
+
+!     CMM-variable wall properties: 1-thickness, 2-Elasticity modulus
+      REAL(KIND=8), ALLOCATABLE :: varWallProps(:,:)
 
 !     DERIVED TYPE VARIABLES
 !     Coupled BCs structures used for multidomain simulations
