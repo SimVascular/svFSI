@@ -392,7 +392,7 @@
 
 !     This cTS corresponds to old variables. As soon as incrementing it
 !     by one, it will be associated to new variables.
-      cTS      = 0
+      cTS      = startTS
       time     = 0D0
       timeP(1) = 0D0
       eq%iNorm = 0D0

@@ -82,6 +82,7 @@
          saveATS      = 1
          saveIncr     = 10
          nITs         = 0
+         startTS      = 0
          roInf        = 2D-1
          stFileName   = "stFile"
          iniFilePath  = ""
@@ -165,6 +166,7 @@
          IF (nsd .EQ. 2) nstd = 3
 
          lPtr => list%get(nTs,"Number of time steps",1,ll=1)
+         lPtr => list%get(startTS,"Starting time step",ll=0)
          lPtr => list%get(dt,"Time step size",1,lb=0D0)
          lPtr => list%get(nITs,"Number of initialization time steps",
      2      ll=0)

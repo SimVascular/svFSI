@@ -918,6 +918,8 @@
       INTEGER cEq
 !     Current time step
       INTEGER cTS
+!     Starting time step
+      INTEGER startTS
 !     Current equation degrees of freedom
       INTEGER dof
 !     Global total number of nodes
