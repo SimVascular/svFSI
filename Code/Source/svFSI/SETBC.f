@@ -432,9 +432,8 @@
       eNoN = lFa%eNoN
 
       ALLOCATE(N(eNoN), xl(nsd,eNoN), yl(nsd,eNoN), dl(nsd,eNoN),
-     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN), ptr(eNoN))
-
-      IF (cPhys .EQ. phys_vms_struct) ALLOCATE(lKd(nsd*dof,eNoN,eNoN))
+     2   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN), ptr(eNoN),
+     3   lKd(nsd*dof,eNoN,eNoN))
 
       DO e=1, lFa%nEl
          cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
@@ -557,8 +556,7 @@
 #endif
       END DO
 
-      DEALLOCATE(N, xl, yl, dl, lR, lK, ptr)
-      IF (ALLOCATED(lKd)) DEALLOCATE(lKd)
+      DEALLOCATE(N, xl, yl, dl, lR, lK, ptr,lKd)
 
       RETURN
       END SUBROUTINE SETBCRBNL

@@ -107,7 +107,7 @@ c         CALL IB_SETBCPEN()
                   coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
      2               /(eq(iEq)%gam - 1D0)
                   Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
-               ELSE
+               ELSE IF (eq(cEq)%phys .NE. phys_CEP) THEN
                   err = "Undefined physics (PICP)"
                END IF
             END IF
@@ -192,7 +192,7 @@ c         CALL IB_SETBCPEN()
             Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
          END DO
 
-      ELSE IF (sstEq) THEN
+      ELSE IF (sstEq .AND. (eq(cEq)%phys .NE. phys_CEP)) THEN
 !        vms_struct, FSI (vms_struct)
          IF (eq(cEq)%phys .EQ. phys_vms_struct .OR.
      2       eq(cEq)%phys .EQ. phys_FSI) THEN
