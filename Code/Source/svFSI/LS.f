@@ -142,7 +142,10 @@
       IF (lhs%nFaces .NE. 0) THEN
          lhs%face%incFlag = .TRUE.
          DO faIn=1, lhs%nFaces
-            IF (incL(faIn) .EQ. 0) lhs%face(faIn)%incFlag = .FALSE.
+            IF (incL(faIn) .EQ. 0 .AND.
+     2         lhs%face(faIn)%bGrp .NE. BC_Type_Dir) THEN
+               lhs%face(faIn)%incFlag = .FALSE.
+            END IF
          END DO
          DO faIn=1, lhs%nFaces
             lhs%face(faIn)%coupledFlag = .FALSE.
@@ -180,7 +183,7 @@
                Ac = lhs%face(faIn)%glob(a)
                DO i=1, faDof
                   v(i,Ac) = v(i,Ac) +
-     2               SQRT(res(faIn))*lhs%face(faIn)%val(i,a)
+     2               SQRT(ABS(res(faIn)))*lhs%face(faIn)%val(i,a)
                END DO
             END DO
          END IF

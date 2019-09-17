@@ -279,12 +279,6 @@
          END IF
       END DO
 
-      IF (useTrilinosLS .AND. cplBC%schm.NE.cplBC_NA) THEN
-         IF (cplBC%schm .NE. cplBC_E) err = "Using Trilinos with "//
-     2      "semi-implicit or implicit CPLBC can lead to NaNs. "//
-     3      "Try Explicit coupling or NS solver instead."
-      END IF
-
       IF (cem%cpld) THEN
          IF (nEq .EQ. 1) err = "Min equations (2) not solved for"//
      2      " electro-mechanics coupling"
