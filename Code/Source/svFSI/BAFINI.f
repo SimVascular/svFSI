@@ -76,7 +76,8 @@
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
-            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_cpl)) THEN
+            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_cpl) .OR.
+     2          BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
                i = eq(iEq)%bc(iBc)%cplBCPtr
                cplBC%fa(i)%name = TRIM(msh(iM)%fa(iFa)%name)
                cplBC%fa(i)%y    = 0D0
@@ -86,13 +87,19 @@
                   cplBC%fa(i)%bGrp = cplBC_Neu
                   IF (cplBC%schm .NE. cplBC_E) eq(iEq)%bc(iBc)%bType=
      2               IBSET(eq(iEq)%bc(iBc)%bType,bType_res)
+
+!                 Copy RCR structure from bc() to cplBC()
+                  cplBC%fa(i)%RCR%Rp = eq(iEq)%bc(iBc)%RCR%Rp
+                  cplBC%fa(i)%RCR%C  = eq(iEq)%bc(iBc)%RCR%C
+                  cplBC%fa(i)%RCR%Rd = eq(iEq)%bc(iBc)%RCR%Rd
+                  cplBC%fa(i)%RCR%Pd = eq(iEq)%bc(iBc)%RCR%Pd
                ELSE
                   err = "Not a compatible cplBC_type"
                END IF
             END IF
          END DO
          IF (cplBC%useGenBC) CALL genBC_Integ_X('I')
-         IF (cplBC%schm .NE. cplBC_E) CALL CALCDERCPLBC
+         IF (cplBC%schm .NE. cplBC_E) CALL CALCDERCPLBC()
       END IF
 
 !     Setting up FSILS

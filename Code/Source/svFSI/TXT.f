@@ -58,7 +58,8 @@
                IF (cplBC%useGenBC) THEN
                   CALL genBC_Integ_X('L')
                ELSE
-                  CALL cplBC_Integ_X()
+                  ltmp = ANY(BTEST(eq(cEq)%bc(:)%bType,bType_RCR))
+                  CALL cplBC_Integ_X(ltmp)
                END IF
             END IF
 

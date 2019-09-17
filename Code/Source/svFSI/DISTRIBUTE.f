@@ -617,6 +617,12 @@
       CALL cm%bcast(lBc%h)
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
+      IF (BTEST(lBc%bType,bType_RCR)) THEN
+         CALL cm%bcast(lBc%RCR%Rp)
+         CALL cm%bcast(lBc%RCR%C)
+         CALL cm%bcast(lBC%RCR%Rd)
+         CALL cm%bcast(lBC%RCR%Pd)
+      END IF
 
 !     Communicating time-dependent BC data
       flag = ALLOCATED(lBc%gt)

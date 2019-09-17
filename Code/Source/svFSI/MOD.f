@@ -120,14 +120,14 @@
 !     flux, zero out perimeter, impose BC on the integral of state
 !     variable or D (instead of Y), flat profile, parabolic profile,
 !     user defined profile, backflow stabilization, BCs for shells
-!     (fixed, hinged, free, symmetric), undeforming Neu
+!     (fixed, hinged, free, symmetric), undeforming Neu, RCR-Neu
       INTEGER, PARAMETER :: bType_Dir = 0, bType_Neu = 1,
      2   bType_trac = 2, bType_CMM = 3, bType_Robin = 4, bType_std = 5,
      3   bType_ustd = 6, bType_cpl = 7, bType_gen = 8, bType_res = 9,
      4   bType_flx = 10, bType_zp = 11, bType_impD = 12, bType_flat =13,
      5   bType_para = 14, bType_ud = 15, bType_bfs = 16, bType_fix = 17,
      6   bType_hing = 18, bType_free = 19, bType_symm = 20,
-     7   bType_undefNeu = 21
+     7   bType_undefNeu = 21, bType_RCR = 22
 
 !     Body force types: volumetric (default), traction, Neumann
 !     (pressure based), time dependence (steady, unsteady, spatially
@@ -258,6 +258,17 @@
          REAL(KIND=8) :: n = 0D0
       END TYPE viscModelType
 
+      TYPE rcrType
+!        Proximal resistance
+         REAL(KIND=8) :: Rp = 0D0
+!        Capacitance
+         REAL(KIND=8) :: C  = 0D0
+!        Distance resistance
+         REAL(KIND=8) :: Rd = 0D0
+!        Distal pressure
+         REAL(KIND=8) :: Pd = 0D0
+      END TYPE rcrType
+
 !     Fourier coefficients that are used to specify unsteady BCs
       TYPE fcType
 !        If this is a ramp function
@@ -332,6 +343,8 @@
          TYPE(MBType), ALLOCATABLE :: gm
 !        Time dependant BC (Unsteady imposed value)
          TYPE(fcType), ALLOCATABLE :: gt
+!        Neu: RCR
+         TYPE(rcrType) :: RCR
       END TYPE bcType
 
 !     Body force data structure type
@@ -537,6 +550,8 @@
          REAL(KIND=8) y
 !        Name of the face
          CHARACTER(LEN=128) name
+!        RCR type BC
+         TYPE(rcrType) :: RCR
       END TYPE cplFaceType
 
 !     For coupled 0D-3D problems

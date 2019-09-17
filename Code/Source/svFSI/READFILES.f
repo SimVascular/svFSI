@@ -817,6 +817,19 @@
          CALL FINDFACE(ctmp, lEq%bc(iBc)%iM, lEq%bc(iBc)%iFa)
          CALL READBC(lEq%bc(iBc), lPBC, lEq%phys)
       END DO
+
+!     Initialize cplBC for RCR-type BC
+      IF (ANY(BTEST(lEq%bc(:)%bType,bType_RCR))) THEN
+         cplBC%schm = cplBC_SI
+         cplBC%nX   = cplBC%nFa
+         cplBC%nXp  = cplBC%nFa + 1
+         IF (ALLOCATED(cplBC%xo)) err = "ERROR: cplBC structure is "//
+     2      "already initialized. Unexpected behavior."
+         ALLOCATE(cplBc%xo(cplBc%nX), cplBC%xp(cplBC%nXp))
+         cplBC%xo = 0D0
+         cplBC%xp = 0D0
+         cplBC%saveName = TRIM(appPath)//"RCR.dat"
+      END IF
 !--------------------------------------------------------------------
 !     Searching for body forces
       lEq%nBf = list%srch("Add BF")
@@ -1355,7 +1368,7 @@
 
       LOGICAL ltmp
       INTEGER iFa, iM, a, b, fid, i, j, Ac
-      REAL(KIND=8) rtmp
+      REAL(KIND=8) rtmp, RCR(3)
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr
       TYPE(fileType) fTmp
@@ -1493,6 +1506,26 @@
          END IF
 
          lPtr => list%get(lBc%r,"Value",1)
+      CASE ('RCR', 'Windkessel')
+         lBc%bType = IBSET(lBc%bType, bType_RCR)
+         IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "RCR BC is only"//
+     2      " defined for Neu BC"
+         IF (phys.NE.phys_fluid .AND.
+     2       phys.NE.phys_FSI   .AND.
+     3       phys.NE.phys_CMM) THEN
+            err = "RCR BC is only defined for fluid/CMM/FSI equations"
+         END IF
+
+         lPtr => list%get(RCR,"RCR values",1)
+         lBc%RCR%Rp = RCR(1)
+         lBc%RCR%C  = RCR(2)
+         lBc%RCR%Rd = RCR(3)
+         lPtr => list%get(lBc%RCR%Pd, "Distal pressure")
+
+         IF (cplBC%schm.NE.cplBC_NA .OR. ALLOCATED(cplBC%xo)) err =
+     2      "RCR cannot be used in conjunction with cplBC."
+         cplBC%nFa = cplBC%nFa + 1
+         lBc%cplBcPtr = cplBC%nFa
       CASE ('General')
          iM  = lBc%iM
          iFa = lBc%iFa

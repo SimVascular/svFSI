@@ -274,7 +274,8 @@
       nNo  = lFa%nNo
 
 !     Geting the contribution of Neu BC
-      IF (BTEST(lBc%bType,bType_cpl)) THEN
+      IF (BTEST(lBc%bType,bType_cpl) .OR.
+     2    BTEST(lBc%bType,bType_RCR)) THEN
          h = lBc%g
       ELSE
          IF (BTEST(lBc%bType,bType_gen)) THEN
@@ -855,16 +856,22 @@
       IMPLICIT NONE
 
       INTEGER, PARAMETER :: iEq = 1
+
+      LOGICAL RCRflag
       INTEGER iFa, ptr, iBc, iM
       REAL(KIND=8) tmp
 
       IF (cplBC%schm .EQ. cplBC_I) THEN
          CALL CALCDERCPLBC
       ELSE
+         RCRflag = .FALSE.
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
             ptr = eq(iEq)%bc(iBc)%cplBCptr
+            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
+               IF (.NOT.RCRflag) RCRflag = .TRUE.
+            END IF
             IF (ptr .NE. 0) THEN
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
@@ -883,7 +890,7 @@
          IF (cplBC%useGenBC) THEN
             CALL genBC_Integ_X('T')
          ELSE
-            CALL cplBC_Integ_X()
+            CALL cplBC_Integ_X(RCRflag)
          END IF
       END IF
 
@@ -905,15 +912,20 @@
       INTEGER, PARAMETER :: iEq = 1
       REAL(KIND=8), PARAMETER :: absTol = 1D-8, relTol = 1D-5
 
+      LOGICAL RCRflag
       INTEGER iFa, i, j, ptr, iBc, iM
       REAL(KIND=8) orgQ, orgY, diff, area
 
       IF (ALL(cplBC%fa%bGrp.EQ.cplBC_Dir)) RETURN
 
+      RCRflag = .FALSE.
       DO iBc=1, eq(iEq)%nBc
          iFa = eq(iEq)%bc(iBc)%iFa
          iM  = eq(iEq)%bc(iBc)%iM
          ptr = eq(iEq)%bc(iBc)%cplBCptr
+         IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
+            IF (.NOT.RCRflag) RCRflag = .TRUE.
+         END IF
          IF (ptr .NE. 0) THEN
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
@@ -933,7 +945,7 @@
       IF (cplBC%useGenBC) THEN
          CALL genBC_Integ_X('D')
       ELSE
-         CALL cplBC_Integ_X()
+         CALL cplBC_Integ_X(RCRflag)
       END IF
 
       j    = 0
@@ -962,7 +974,7 @@
             IF (cplBC%useGenBC) THEN
                CALL genBC_Integ_X('D')
             ELSE
-               CALL cplBC_Integ_X()
+               CALL cplBC_Integ_X(RCRflag)
             END IF
 
             eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY)/diff
@@ -1041,49 +1053,60 @@
       END SUBROUTINE genBC_Integ_X
 !--------------------------------------------------------------------
 !     Interface to call 0D code (cplBC)
-      SUBROUTINE cplBC_Integ_X()
+      SUBROUTINE cplBC_Integ_X(RCRflag)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
 
+      LOGICAL, INTENT(IN) :: RCRflag
+
       INTEGER fid, iFa, istat
       REAL(KIND=8), ALLOCATABLE :: y(:)
 
-      istat = 0
       IF (cm%mas()) THEN
-         fid = 1
-         OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
-         WRITE(fid) cplBC%nFa
-         WRITE(fid) cplBC%nX
-         WRITE(fid) cplBC%nXp
-         WRITE(fid) dt
-         WRITE(fid) MAX(time-dt, 0D0)
-         WRITE(fid) cplBC%xo
-         DO iFa=1, cplBC%nFa
-            WRITE(fid) cplBC%fa(iFa)%bGrp
-            WRITE(fid) cplBC%fa(iFa)%Qo
-            WRITE(fid) cplBC%fa(iFa)%Qn
-            WRITE(fid) cplBC%fa(iFa)%Po
-            WRITE(fid) cplBC%fa(iFa)%Pn
-            WRITE(fid) cplBC%fa(iFa)%name
-         END DO
-         CLOSE(fid)
+         istat = 0
+         IF (RCRflag) THEN
+            CALL RCR_Integ_X(istat)
+         ELSE
+            fid = 1
+            OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
+            WRITE(fid) cplBC%nFa
+            WRITE(fid) cplBC%nX
+            WRITE(fid) cplBC%nXp
+            WRITE(fid) dt
+            WRITE(fid) MAX(time-dt, 0D0)
+            WRITE(fid) cplBC%xo
+            DO iFa=1, cplBC%nFa
+               WRITE(fid) cplBC%fa(iFa)%bGrp
+               WRITE(fid) cplBC%fa(iFa)%Qo
+               WRITE(fid) cplBC%fa(iFa)%Qn
+               WRITE(fid) cplBC%fa(iFa)%Po
+               WRITE(fid) cplBC%fa(iFa)%Pn
+               WRITE(fid) cplBC%fa(iFa)%name
+            END DO
+            CLOSE(fid)
 
-         CALL SYSTEM(TRIM(cplBC%binPath)//" "//TRIM(cplBC%commuName))
+            CALL SYSTEM(TRIM(cplBC%binPath)//" "//TRIM(cplBC%commuName))
 
-         OPEN(fid,FILE=cplBC%commuName,STATUS='OLD',FORM='UNFORMATTED')
-         READ(fid) istat
-         READ(fid) cplBC%xn
-         READ(fid) cplBC%xp
-         DO iFa=1, cplBC%nFa
-            READ(fid) cplBC%fa(iFa)%y
-         END DO
-         CLOSE(fid)
+            OPEN(fid,FILE=TRIM(cplBC%commuName),STATUS='OLD',
+     2         FORM='UNFORMATTED')
+            READ(fid) istat
+            READ(fid) cplBC%xn
+            READ(fid) cplBC%xp
+            DO iFa=1, cplBC%nFa
+               READ(fid) cplBC%fa(iFa)%y
+            END DO
+            CLOSE(fid)
+         END IF
       END IF
 
       CALL cm%bcast(istat)
       IF (istat .NE. 0) THEN
-         std = "CPLBC Error detected, Aborting!"
+         IF (RCRflag) THEN
+            std = "RCR integration error detected, Aborting!"
+         ELSE
+            std = "CPLBC Error detected, Aborting!"
+         END IF
          CALL STOPSIM()
       END IF
 
@@ -1098,6 +1121,86 @@
 
       RETURN
       END SUBROUTINE cplBC_Integ_X
+!--------------------------------------------------------------------
+      SUBROUTINE RCR_Integ_X(istat)
+      USE COMMOD, ONLY : dt, time, cplBC
+      IMPLICIT NONE
+      INTEGER, INTENT(INOUT) :: istat
+
+      INTEGER, PARAMETER :: nTS = 100
+      INTEGER i, n, nX
+      REAL(KIND=8) r, tt, dtt, trk
+
+      REAL(KIND=8), ALLOCATABLE :: Rp(:), C(:), Rd(:), Pd(:), X(:),
+     2   Xrk(:), frk(:,:), Qrk(:,:)
+
+      tt  = MAX(time-dt, 0D0)
+      dtt = dt/REAL(nTS, KIND=8)
+
+      nX  = cplBC%nFa
+      ALLOCATE(Rp(nX), C(nX), Rd(nX), Pd(nX), X(nX), Xrk(nX), frk(nX,4),
+     2   Qrk(nX,4))
+
+      DO i=1, nX
+         Rp(i) = cplBC%fa(i)%RCR%Rp
+         C (i) = cplBC%fa(i)%RCR%C
+         Rd(i) = cplBC%fa(i)%RCR%Rd
+         Pd(i) = cplBC%fa(i)%RCR%Pd
+      END DO
+      X = cplBC%xo
+
+      DO n=1, nTS
+         DO i=1, 4
+            r = REAL(i-1,KIND=8)/3.0D0
+            r = (REAL(n-1,KIND=8) + r)/REAL(nTS,KIND=8)
+            Qrk(:,i) = cplBC%fa(:)%Qo +
+     2         (cplBC%fa(:)%Qn - cplBC%fa(:)%Qo)*r
+         END DO
+
+!        RK-4 1st pass
+         trk = tt
+         Xrk = X
+         frk(:,1) = (Qrk(:,1) - (Xrk-Pd(:))/Rd(:))/C(:)
+
+!        RK-4 2nd pass
+         trk = tt + dtt/3.0D0
+         Xrk = X  + dtt*frk(:,1)/3.0D0
+         frk(:,2) = (Qrk(:,2) - (Xrk-Pd(:))/Rd(:))/C(:)
+
+!        RK-4 3rd pass
+         trk = tt + 2.0D0*dtt/3.0D0
+         Xrk = X  - dtt*frk(:,1)/3.0D0 + dtt*frk(:,2)
+         frk(:,3) = (Qrk(:,3) - (Xrk-Pd(:))/Rd(:))/C(:)
+
+!        RK-4 4th pass
+         trk = tt + dtt
+         Xrk = X  + dtt*frk(:,1) - dtt*frk(:,2) + dtt*frk(:,3)
+         frk(:,4) = (Qrk(:,4) - (Xrk-Pd(:))/Rd(:))/C(:)
+
+         r  = dtt/8.0D0
+         X  = X + r*(frk(:,1) + 3.0D0*(frk(:,2) + frk(:,3)) + frk(:,4))
+         tt = tt + dtt
+
+         DO i=1, nX
+            IF (ISNAN(X(i))) THEN
+               PRINT*, "ERROR: NaN detected in RCR integration"
+               istat = -1
+               RETURN
+            END IF
+         END DO
+      END DO
+
+      cplBC%xn = X
+      cplBC%xp(1) = tt
+      DO i=1, nX
+         cplBC%xp(i+1) = Qrk(i,4) !cplBC%fa(i)%Qn
+         cplBC%fa(i)%y = X(i) + (cplBC%fa(i)%Qn * Rp(i))
+      END DO
+
+      DEALLOCATE(Rp, C, Rd, Pd, X, Xrk, frk, Qrk)
+
+      RETURN
+      END SUBROUTINE RCR_Integ_X
 !####################################################################
 ! Below defines the SET_BC methods for the Coupled Momentum Method (CMM)
       SUBROUTINE SETBCCMM(Ag, Dg)

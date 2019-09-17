@@ -100,8 +100,8 @@
       END SELECT
 
       CALL FSILS_COMMUV(lhs, dof, W)
-!     Accounding for Dirichlet BC and inversing W = W^{-1/2}
 
+!     Accounting for Dirichlet BC and inversing W = W^{-1/2}
       DO Ac=1, nNo
          d = diagPtr(Ac)
          DO i=1, dof
