@@ -42,6 +42,7 @@
       USE LISTMOD
       IMPLICIT NONE
 
+      LOGICAL :: flag
       INTEGER :: i, iEq
       INTEGER :: tArray(8)
       REAL(KIND=8) :: roInf
@@ -99,14 +100,19 @@
          sstEq        = .FALSE.
          ibFlag       = .FALSE.
 
-         i = IARGC()
-         IF (i .EQ. 0) THEN
-            err = "Configuration file name is required as an argument"
-         ELSEIF (i .GT. 1) THEN
-            err = "Too many arguments"
+         flag  = .FALSE.
+         mfsIn = "svFSI.inp"
+         INQUIRE(FILE=mfsIn, EXIST=flag)
+         IF (.NOT.flag) THEN
+            i = IARGC()
+            IF (i .EQ. 0) THEN
+               err = "Configuration file is required as an argument"
+            ELSEIF (i .GT. 1) THEN
+               err = "Too many arguments"
+            END IF
+            CALL GETARG(1,ctmp)
+            mfsIn = ctmp
          END IF
-         CALL GETARG(1,ctmp)
-         mfsIn = ctmp
       END IF
 
       list = listType(mfsIn,io)
@@ -445,7 +451,7 @@
          CALL READLS(lSolver_NS, lEq, list)
 
 !     HEAT FLUID advection diffusion solver -------------------------
-      CASE ('heatF')
+      CASE ('heatF', 'dyeTransport', 'scalarTransport', 'AD')
          lEq%phys = phys_heatF
 
          propL(1,1) = conductivity
@@ -459,7 +465,7 @@
          CALL READLS(lSolver_GMRES, lEq, list)
 
 !     HEAT SOLID Laplac equation solver------------------------------
-      CASE ('heatS')
+      CASE ('heatS', 'laplace', 'poisson')
          lEq%phys = phys_heatS
 
          propL(1,1) = conductivity
@@ -929,7 +935,7 @@
                IF(lEq%phys .EQ. phys_CMM) THEN
                   lPtr => lPD%get(rtmp,"Solid density",1,ll=0D0)
                ELSE
-                  lPtr => lPD%get(rtmp,"Density",1,ll=0D0)
+                  lPtr => lPD%get(rtmp,"Density",ll=0D0)
                END IF
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
@@ -1164,7 +1170,7 @@
       TYPE(listType), INTENT(INOUT) :: list
 
       INTEGER nOut, iOut, i, j
-      CHARACTER(LEN=stdL) ctmp
+      CHARACTER(LEN=stdL) ctmp, stmp
       TYPE(listType), POINTER :: lPtr, lPO
 
       lEq%nOutput = nDOP(1)
@@ -1255,7 +1261,7 @@
             lEq%output(iOut)%grp  = outGrp_fN
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
-            lEq%output(iOut)%name = "Fiber"
+            lEq%output(iOut)%name = "Fiber_direction"
          CASE (out_fibAlign)
             lEq%output(iOut)%grp  = outGrp_fA
             lEq%output(iOut)%o    = 0
@@ -1298,10 +1304,12 @@
          SELECT CASE(TRIM(ctmp))
          CASE("Spatial")
             j = 1
-         CASE("B_INT")
+         CASE("B_INT", "Boundary_integral")
             j = 2
-         CASE("V_INT")
+         CASE("V_INT", "Volume_integral")
             j = 3
+         CASE ("Alias")
+            CYCLE
          CASE DEFAULT
             j = -1
             err = TRIM(list%ping("Output",lPO))//" Undefined keyword"
@@ -1314,6 +1322,21 @@
                END IF
             END IF
          END DO
+      END DO
+
+!     Read any alias names for outputs
+      DO iOut=1, nOut
+         lPO => list%get(ctmp,"Output",iOut)
+         SELECT CASE (TRIM(ctmp))
+         CASE ("Alias")
+            DO i=1, lEq%nOutput
+               lPtr => lPO%get(stmp, TRIM(lEq%output(i)%name))
+               IF (ASSOCIATED(lPtr)) lEq%output(i)%name = TRIM(stmp)
+            END DO
+            EXIT
+         CASE DEFAULT
+            CYCLE
+         END SELECT
       END DO
 
       RETURN
@@ -1471,63 +1494,72 @@
 
          lPtr => list%get(lBc%r,"Value",1)
       CASE ('General')
-         lBc%bType = IBSET(lBc%bType,bType_gen)
-         lPtr =>list%get(fTmp,"Temporal and spatial values file path",1)
-         fid = fTmp%open()
-         READ (fid,*) i, j, a
          iM  = lBc%iM
          iFa = lBc%iFa
-         IF (a .NE. msh(iM)%fa(iFa)%nNo) THEN
-            err = "Number of nodes does not match between "//
-     2         TRIM(msh(iM)%fa(iFa)%name)//" and "//TRIM(fTmp%fname)
-         END IF
-         IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
-     2      " is violated in "//fTmp%fname
+         lBc%bType = IBSET(lBc%bType,bType_gen)
+         lPtr => list%get(ftmp,"BCT file path (vtp)")
+         IF (ASSOCIATED(lPtr)) THEN
+            ALLOCATE(lBc%gm)
+            CALL READBCT(lBc%gm, msh(iM)%fa(iFa), ftmp%fname)
+         ELSE
+            lPtr =>list%get(fTmp,
+     2         "Temporal and spatial values file path")
+            IF (.NOT.ASSOCIATED(lPtr)) err = "Input file for General"//
+     2         " BC (bct.vtp) is not provided"
+            fid = fTmp%open()
+            READ (fid,*) i, j, a
+            IF (a .NE. msh(iM)%fa(iFa)%nNo) THEN
+               err = "Number of nodes does not match between "//
+     2            TRIM(msh(iM)%fa(iFa)%name)//" and "//TRIM(fTmp%fname)
+            END IF
+            IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
+     2         " is violated in "//fTmp%fname
 
-         ALLOCATE(lBc%gm)
-         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(msh(iM)%gnNo))
+            ALLOCATE(lBc%gm)
+            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(msh(iM)%gnNo))
 !     I am seting all the nodes to zero just in case a node is not set
-         lBc%gm%d   = 0D0
-         lBc%gm%dof = i
-         lBc%gm%nTP = j
-         ptr        = 0
+            lBc%gm%d   = 0D0
+            lBc%gm%dof = i
+            lBc%gm%nTP = j
+            ptr        = 0
 !     Preparing the pointer array
-         DO a=1, msh(iM)%fa(iFa)%nNo
-            Ac = msh(iM)%fa(iFa)%gN(a)
-            Ac = msh(iM)%lN(Ac)
-            IF (Ac .EQ. 0) err = "Incorrect global node number "//
-     2         "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
-     3         ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//
-     4         ", Node: "//STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
-            ptr(Ac) = a
-         END DO
-         DO i=1, j
-            READ (fid,*) rtmp
-            lBc%gm%t(i) = rtmp
-            IF (i .EQ. 1) THEN
-               IF (.NOT.ISZERO(rtmp)) err = "First time step"//
-     2            " should be zero in <"//TRIM(ctmp)//">"
-            ELSE
-               rtmp = rtmp - lBc%gm%t(i-1)
-               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-in"//
-     2            "creasing time trend is found in <"//TRIM(ctmp)//">"
-            END IF
-         END DO
-         lBc%gm%period = lBc%gm%t(j)
-         DO b=1, msh(iM)%fa(iFa)%nNo
-            READ (fid,*) Ac
-            IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
-               err = "Entry "//b//" is out of bound in "//ctmp
-            END IF
-            a = ptr(Ac)
-            IF (a .EQ. 0) THEN
-               err = "Entry "//b//" not found in face "//ctmp
-            END IF
-            DO i=1, j
-               READ (fid,*) lBc%gm%d(:,a,i)
+            DO a=1, msh(iM)%fa(iFa)%nNo
+               Ac = msh(iM)%fa(iFa)%gN(a)
+               Ac = msh(iM)%lN(Ac)
+               IF (Ac .EQ. 0) err = "Incorrect global node number "//
+     2            "detected for BC. Mesh: "//TRIM(msh(iM)%name)//
+     3            ", Face: "//TRIM(msh(iM)%fa(iFa)%name)//", Node: "//
+     4            STR(a)//" gN: "//STR(msh(iM)%fa(iFa)%gN(a))
+               ptr(Ac) = a
             END DO
-         END DO
-         CLOSE(fid)
+            DO i=1, j
+               READ (fid,*) rtmp
+               lBc%gm%t(i) = rtmp
+               IF (i .EQ. 1) THEN
+                  IF (.NOT.ISZERO(rtmp)) err = "First time step"//
+     2               " should be zero in <"//TRIM(ctmp)//">"
+               ELSE
+                  rtmp = rtmp - lBc%gm%t(i-1)
+                  IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-incre"//
+     2               "asing time trend is found in <"//TRIM(ctmp)//">"
+               END IF
+            END DO
+            lBc%gm%period = lBc%gm%t(j)
+            DO b=1, msh(iM)%fa(iFa)%nNo
+               READ (fid,*) Ac
+               IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
+                  err = "Entry "//b//" is out of bound in "//ctmp
+               END IF
+               a = ptr(Ac)
+               IF (a .EQ. 0) THEN
+                  err = "Entry "//b//" not found in face "//ctmp
+               END IF
+               DO i=1, j
+                  READ (fid,*) lBc%gm%d(:,a,i)
+               END DO
+            END DO
+            CLOSE(fid)
+         END IF
       CASE DEFAULT
          err=TRIM(list%ping("Time dependence",lPtr))//" Unexpected type"
       END SELECT
@@ -1728,8 +1760,7 @@ c     2         "can be applied for Neumann boundaries only"
                   ALLOCATE(msh(iM)%fa(iFa)%x(nstd,msh(iM)%fa(iFa)%nNo))
                   msh(iM)%fa(iFa)%x = 0D0
                END IF
-               CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Prestress",
-     2            nstd, 1)
+               CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Stress",nstd,1)
                IF (.NOT.ALLOCATED(pS0)) THEN
                   ALLOCATE(pS0(nstd,gtnNo))
                   pS0 = 0D0
@@ -2346,6 +2377,134 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE READVISCMODEL
 !####################################################################
+!     This subroutine reads general velocity data from bct.vtp
+      SUBROUTINE READBCT(lMB, lFa, fName)
+      USE COMMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+
+      TYPE(MBType), INTENT(INOUT) :: lMB
+      TYPE(faceType), INTENT(IN) :: lFa
+      CHARACTER(LEN=stdL), INTENT(IN) :: fName
+
+      CHARACTER(LEN=*), PARAMETER :: shdr = "velocity_"
+      TYPE(vtkXMLType) :: vtp
+      INTEGER :: i, j, a, Ac, n, nNo, ntime, iM, istat
+      REAL(KIND=8) :: t
+      CHARACTER(LEN=stdL) :: stmp
+
+      INTEGER, ALLOCATABLE :: ptr(:), gN(:)
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+      CHARACTER(LEN=stdL), ALLOCATABLE :: namesL(:)
+
+      iStat = 0
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtp, fName, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (init)"
+
+      CALL getVTK_numPoints(vtp, nNo, iStat)
+      IF (nNo .NE. lFa%nNo) err = "Mismatch in num points for face <"//
+     2   TRIM(lFa%name)//">"
+
+!     Get all the point data starting with "velocity_"
+      CALL getVTK_numPointData(vtp, n, istat)
+      ALLOCATE(namesL(n))
+      namesL(:) = ""
+      CALL getVTK_pointDataNames(vtp, namesL, istat)
+      IF (istat .LT. 0) err = "VTP file read error (point names)"
+
+      ntime = 0
+      DO i=1, n
+         stmp = namesL(i)
+         DO j=1, 9
+            IF (shdr(j:j) .NE. stmp(j:j)) EXIT
+         END DO
+         IF (j .LT. 9) THEN
+            namesL(i) = ""
+            CYCLE
+         END IF
+         ntime = ntime + 1
+      END DO
+
+!     Initialize lMB data structure
+      lMB%dof = nsd
+      lMB%nTP = ntime
+      iM = lFa%iM
+      ALLOCATE(lMB%t(ntime), lMB%d(nsd,nNo,ntime), ptr(msh(iM)%gnNo))
+      lMB%t = 0D0
+      lMB%d = 0D0
+      ptr   = 0
+
+!     Load time values from point data variable names
+      ntime = 0
+      DO i=1, n
+         j = LEN(TRIM(namesL(i)))
+         IF (j .EQ. 0) CYCLE
+         stmp = namesL(i)
+         stmp = stmp(10:j)
+         ntime = ntime + 1
+         READ(stmp,*) t
+         lMB%t(ntime) = t
+         IF (ntime .EQ. 1) THEN
+            IF (.NOT.ISZERO(t)) err = "First time step should be zero"//
+     2         " in <bct.vtp>"
+         ELSE
+            t = t - lMB%t(ntime-1)
+            IF (ISZERO(t) .OR. t.LT.0D0) err = "Non-increasing time "//
+     2         "trend is found in <bct.vtp>"
+         END IF
+      END DO
+      lMB%period = lMB%t(ntime)
+
+!     Prepare pointer array
+      DO a=1, lFa%nNo
+         Ac = lFa%gN(a)
+         Ac = msh(iM)%lN(Ac)
+         IF (Ac .EQ. 0) err = "Incorrect global node number detected "//
+     2      "for BC. Mesh: "//TRIM(msh(iM)%name)//", Face: "//
+     3      TRIM(lFa%name)//", Node: "//STR(a)//" gN: "//STR(lFa%gN(a))
+         ptr(Ac) = a
+      END DO
+
+!     Get GlobalNodeID from vtp file and make sure it is consistent
+!     with mesh structure
+      ALLOCATE(gN(nNo))
+      gN = 0
+      CALL getVTK_pointData(vtp, "GlobalNodeID", gN, istat)
+      DO a=1, nNo
+         Ac = gN(a)
+         IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
+            err = "Entry "//a//" is out of bound in <bct.vtp>"
+         END IF
+         Ac = ptr(Ac)
+         IF (Ac .EQ. 0) THEN
+            err = "Entry "//a//" not found in face <bct.vtp>"
+         END IF
+      END DO
+
+!     Load spatial data for each time point from vtp file
+      ALLOCATE(tmpR(nsd,nNo))
+      ntime = 0
+      DO i=1, n
+         j = LEN(TRIM(namesL(i)))
+         IF (j .EQ. 0) CYCLE
+         ntime = ntime + 1
+         tmpR  = 0D0
+         CALL getVTK_pointData(vtp, namesL(i), tmpR, istat)
+         DO a=1, nNo
+            Ac = gN(a)
+            Ac = ptr(Ac)
+            lMB%d(:,Ac,ntime) = tmpR(:,a)
+         END DO
+      END DO
+
+      CALL flushVTK(vtp)
+      DEALLOCATE(namesL, gN, tmpR)
+
+      RETURN
+      END SUBROUTINE READBCT
+!####################################################################
 !     This subroutine reads traction data from a vtp file and stores
 !     in moving BC data structure
       SUBROUTINE READTRACBCFF(lMB, lFa, fName)
@@ -2391,7 +2550,7 @@ c     2         "can be applied for Neumann boundaries only"
       IF (iStat .LT. 0) err = "VTP file read error (ien)"
       gFa%IEN = gFa%IEN + 1
 
-!     Use gFa%w as temporary array to load traction data
+!     Use gFa%N as temporary array to load traction data
       ALLOCATE(gFa%N(nsd,gFa%nNo))
       CALL getVTK_pointData(vtp, "NS_Traction", tmpX, iStat)
       gFa%N(:,:) = tmpX(1:nsd,:)

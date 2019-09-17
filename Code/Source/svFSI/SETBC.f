@@ -883,7 +883,7 @@
          IF (cplBC%useGenBC) THEN
             CALL genBC_Integ_X('T')
          ELSE
-            CALL cplBC_Integ_X('T')
+            CALL cplBC_Integ_X()
          END IF
       END IF
 
@@ -933,7 +933,7 @@
       IF (cplBC%useGenBC) THEN
          CALL genBC_Integ_X('D')
       ELSE
-         CALL cplBC_Integ_X('D')
+         CALL cplBC_Integ_X()
       END IF
 
       j    = 0
@@ -962,7 +962,7 @@
             IF (cplBC%useGenBC) THEN
                CALL genBC_Integ_X('D')
             ELSE
-               CALL cplBC_Integ_X('D')
+               CALL cplBC_Integ_X()
             END IF
 
             eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY)/diff
@@ -1041,11 +1041,10 @@
       END SUBROUTINE genBC_Integ_X
 !--------------------------------------------------------------------
 !     Interface to call 0D code (cplBC)
-      SUBROUTINE cplBC_Integ_X(genFlag)
+      SUBROUTINE cplBC_Integ_X()
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      CHARACTER, INTENT(IN) :: genFlag
 
       INTEGER fid, iFa, istat
       REAL(KIND=8), ALLOCATABLE :: y(:)
@@ -1054,7 +1053,6 @@
       IF (cm%mas()) THEN
          fid = 1
          OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
-         WRITE(fid) genFlag
          WRITE(fid) cplBC%nFa
          WRITE(fid) cplBC%nX
          WRITE(fid) cplBC%nXp

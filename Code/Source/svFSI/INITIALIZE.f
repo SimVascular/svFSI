@@ -606,7 +606,6 @@
          DO a=1, tnNo
             Yo(1:nsd,a) = Vinit(:,a)
          END DO
-         DEALLOCATE(Vinit)
       END IF
 
 !     Transfer initial pressure field
@@ -629,7 +628,6 @@
          DO a=1, tnNo
             Yo(nsd+1,a) = Pinit(a)
          END DO
-         DEALLOCATE(Pinit)
       END IF
 
 !     Transfer initial displacement field
@@ -651,7 +649,6 @@
          DO a=1, tnNo
             Do(1:nsd,a) = Dinit(:,a)
          END DO
-         DEALLOCATE(Dinit)
       END IF
 
       RETURN

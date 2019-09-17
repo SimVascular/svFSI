@@ -58,7 +58,7 @@
                IF (cplBC%useGenBC) THEN
                   CALL genBC_Integ_X('L')
                ELSE
-                  CALL cplBC_Integ_X('L')
+                  CALL cplBC_Integ_X()
                END IF
             END IF
 

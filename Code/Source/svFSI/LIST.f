@@ -135,6 +135,14 @@
 !     Empty and commented lines are ignored
          IF (l.EQ.0 .OR. sTmp(1:1).EQ."#") CYCLE
 
+!     Truncating a line for in-line comments
+         DO j=1, l
+            IF (sTmp(j:j) .EQ. "#") THEN
+               l = j-1
+               EXIT
+            END IF
+         END DO
+
          e = 0
          ctmp = ""
 !     Going one level up or down if "{" or "}" are found

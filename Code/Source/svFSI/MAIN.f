@@ -43,7 +43,6 @@
 
       LOGICAL l1, l2, l3, l4
       INTEGER i, iM, iBc, ierr, iEqOld
-c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
       REAL(KIND=8) timeP(3)
 
       INTEGER, ALLOCATABLE :: incL(:)
@@ -235,13 +234,16 @@ c      INTEGER OMP_GET_NUM_THREADS, OMP_GET_THREAD_NUM
          IF (saveVTK) THEN
             l3 = MOD(cTS,saveIncr) .EQ. 0
             l4 = cTS .GE. saveATS
-            IF (l3 .AND. l4 .AND. saveVTK) THEN
+            IF (l3 .AND. l4) THEN
                CALL OUTRESULT(timeP, 3, iEqOld)
                CALL WRITEVTUS(An, Yn, Dn)
                IF (ibFlag) CALL IB_WRITEVTUS(ib%An, ib%Yn, ib%Un)
+            ELSE
+               CALL OUTRESULT(timeP, 2, iEqOld)
             END IF
+         ELSE
+            CALL OUTRESULT(timeP, 2, iEqOld)
          END IF
-         CALL OUTRESULT(timeP, 2, iEqOld)
          IF (pstEq) CALL OUTDNORM()
 
          IF (ibFlag) CALL IB_OUTR()

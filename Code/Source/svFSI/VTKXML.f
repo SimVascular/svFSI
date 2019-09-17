@@ -253,7 +253,7 @@
       INTEGER :: iStat, a
       REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
 
-      iStat = 0;
+      iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
       CALL loadVTK(vtu, fName, iStat)
       IF (iStat .LT. 0) err = "VTU file read error (init)"
@@ -299,7 +299,7 @@
 
       REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
 
-      iStat = 0;
+      iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
       CALL loadVTK(vtp, fName, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (init)"
@@ -424,7 +424,7 @@
       CHARACTER(LEN=stdL) :: fName
       INTEGER :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo, nEl, s, l, ie,
      2   is, nSh, oGrp, outDof, nOut, cOut, itmp, ne, iFn, nFn
-      LOGICAL :: l1, l2
+      LOGICAL :: l1, l2, l3
 
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
       INTEGER, ALLOCATABLE :: outS(:), tmpI(:,:)
@@ -439,6 +439,14 @@
       itmp = SUM(ighost(:))
       itmp = cm%reduce(itmp)
       IF (itmp .GT. 0) l2 = .TRUE.
+
+      l3 = .FALSE.
+      DO iEq=1, nEq
+         IF (eq(iEq)%phys .EQ. phys_CMM .AND. ALLOCATED(Dinit)) THEN
+            l3 = .TRUE.
+            EXIT
+         END IF
+      END DO
 
       nOut   = 1
       outDof = nsd
@@ -472,6 +480,12 @@
          outDof = outDof + 1
       END IF
 
+!     Initial displacements for CMM equation
+      IF (l3) THEN
+         nOut = nOut + 1
+         outDof = outDof + nsd
+      END IF
+
       ALLOCATE(outNames(nOut), outS(nOut+1))
 
 !     Prepare all solultions in to dataType d
@@ -487,28 +501,32 @@
             d(iM)%x(1:nsd,a) = x(:,Ac)
          END DO
 
+         IF (l3) THEN
+            cOut           = cOut + 1
+            is             = outS(cOut)
+            ie             = is + nsd - 1
+            outS(cOut+1)   = ie + 1
+            outNames(cOut) = "Initial_displacement"
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               d(iM)%x(is:ie,a) = Dinit(:,Ac)
+            END DO
+         END IF
+
          DO iEq=1, nEq
             DO iOut=1, eq(iEq)%nOutput
                IF (.NOT.eq(iEq)%output(iOut)%wtn(1)) CYCLE
-               l  = eq(iEq)%output(iOut)%l
-               s  = eq(iEq)%s + eq(iEq)%output(iOut)%o
-               e  = s + l - 1
+               l = eq(iEq)%output(iOut)%l
+               s = eq(iEq)%s + eq(iEq)%output(iOut)%o
+               e = s + l - 1
 
                cOut = cOut + 1
                is   = outS(cOut)
                ie   = is + l - 1
-               outS(cOut+1)   = ie + 1
+               outS(cOut+1) = ie + 1
 
                oGrp = eq(iEq)%output(iOut)%grp
-               IF(eq(iEq)%phys.EQ.phys_CMM .AND. cmmInit) THEN
-                  IF(oGrp .EQ. outGrp_D) outNames(cOut) =
-     2               TRIM(eq(iEq)%output(iOut)%name)
-                  IF(oGrp .EQ. outGrp_stress) outNames(cOut) =
-     2               "PS_"//TRIM(eq(iEq)%output(iOut)%name)
-               ELSE
-                  outNames(cOut) = eq(iEq)%sym//"_"//
-     2               TRIM(eq(iEq)%output(iOut)%name)
-               END IF
+               outNames(cOut) = TRIM(eq(iEq)%output(iOut)%name)
 
                SELECT CASE (oGrp)
                   CASE (outGrp_NA)

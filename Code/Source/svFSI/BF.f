@@ -61,7 +61,7 @@
       REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
 
       INTEGER a, e, i, Ac, idof, nNo, eNoN
-      REAL(KIND=8) rtmp, hsgn
+      REAL(KIND=8) rtmp
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: f(:), bfl(:,:), bfg(:,:), xl(:,:),
@@ -70,9 +70,6 @@
       nNo  = lM%nNo
       idof = lBf%dof
       eNoN = lM%eNoN
-
-      hsgn = 1.0D0
-      IF (BTEST(lBf%btype,bfType_Neu)) hsgn = -1.0D0
 
       ALLOCATE(f(idof))
 
@@ -110,12 +107,6 @@
       END IF
 
       DEALLOCATE(f)
-
-!     Apply -ve sign for pressure loads
-      DO a=1, lM%nNo
-         Ac = lM%gN(a)
-         bfg(:,Ac) = hsgn*bfg(:,Ac)
-      END DO
 
 !     Assemble pressure/traction load (shells/CMM initialization) to
 !     residue. For general body force (vector), assemble later with

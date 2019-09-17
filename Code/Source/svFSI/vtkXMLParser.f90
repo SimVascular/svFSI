@@ -187,8 +187,14 @@
       public :: putVTK_pointCoords
       public :: putVTK_elemIEN
 
+      public :: getVTK_numPointData
+      public :: getVTK_pointDataNames
       public :: getVTK_pointData
+
+      public :: getVTK_numElemData
+      public :: getVTK_elemDataNames
       public :: getVTK_elemData
+
       public :: putVTK_pointData
       public :: putVTK_elemData
 
@@ -2266,6 +2272,42 @@
 
          !==========================================
 
+         subroutine getVTK_numPointData(vtk,nPtData,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(out) :: nPtData
+         integer(IK), intent(inout) :: istat
+
+         nPtData = vtk%pcAtt(1)%n
+
+         return
+         end subroutine getVTK_numPointData
+
+         !==========================================
+
+         subroutine getVTK_pointDataNames(vtk,names,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         character(len=*), intent(inout) :: names(:)
+         integer(IK), intent(inout) :: istat
+         integer(IK) i, n
+
+         n = size(names)
+         if (n .ne. vtk%pcAtt(1)%n) then
+            write(stdout,ftab4) "ERROR: not enough size of input "//&
+              "array for point data names"
+            istat = -1; return
+         end if
+
+         do i=1, vtk%pcAtt(1)%n
+            names(i) = trim(vtk%pcAtt(1)%dataArr(i)%dName)
+         end do
+
+         return
+         end subroutine getVTK_pointDataNames
+
+         !==========================================
+
          subroutine getVTK_pointDataIntS(vtk,kwrd,u,istat)
          implicit none
          type(vtkXMLType), intent(inout) :: vtk
@@ -2478,6 +2520,42 @@
          end if
 
          end subroutine getVTK_pointDataRealV
+
+         !==========================================
+
+         subroutine getVTK_numElemData(vtk,nElData,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         integer(IK), intent(out) :: nElData
+         integer(IK), intent(inout) :: istat
+
+         nElData = vtk%pcAtt(2)%n
+
+         return
+         end subroutine getVTK_numElemData
+
+         !==========================================
+
+         subroutine getVTK_elemDataNames(vtk,names,istat)
+         implicit none
+         type(vtkXMLType), intent(inout) :: vtk
+         character(len=*), intent(inout) :: names(:)
+         integer(IK), intent(inout) :: istat
+         integer(IK) i, n
+
+         n = size(names)
+         if (n .ne. vtk%pcAtt(2)%n) then
+            write(stdout,ftab4) "ERROR: not enough size of input "//&
+              "array for point data names"
+            istat = -1; return
+         end if
+
+         do i=1, vtk%pcAtt(2)%n
+            names(i) = trim(vtk%pcAtt(2)%dataArr(i)%dName)
+         end do
+
+         return
+         end subroutine getVTK_elemDataNames
 
          !==========================================
 
