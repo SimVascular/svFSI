@@ -651,7 +651,7 @@ c               END IF
          DO b=1, blk(iBk)%n
             Bc = blk(iBk)%gN(b)
             IF (iM.EQ.jM .AND. Ac.EQ.Bc) CYCLE
-            ds  = SQRT(SUM( (x(:,Bc+jSh) - x(:,Ac+iSh))**2 ))
+            ds = SQRT(SUM( (x(:,Bc+jSh) - x(:,Ac+iSh))**2 ))
             IF (ds .LT. minS) THEN
                minS = ds
                i = Bc

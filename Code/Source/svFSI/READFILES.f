@@ -1399,7 +1399,7 @@
             lBc%bType = IBSET(lBc%bType,bType_gen)
             lBc%bType = IBSET(lBc%bType,bType_flat)
 
-            lPtr => list%get(rtmp, "Traction multiplier",1)
+            lPtr => list%get(rtmp, "Traction multiplier")
             IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
             lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
 
@@ -2547,9 +2547,9 @@ c     2         "can be applied for Neumann boundaries only"
 
       TYPE(vtkXMLType) :: vtp
       TYPE(faceType) :: gFa
-      INTEGER :: iStat, a, e, Ac
+      INTEGER :: iStat, a, Ac
 
-      INTEGER, ALLOCATABLE :: ptr(:), lIEN(:,:)
+      INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=8), ALLOCATABLE :: tmpX(:,:)
 
 !     Read Traction data from VTP file
@@ -2561,25 +2561,14 @@ c     2         "can be applied for Neumann boundaries only"
       CALL getVTK_numPoints(vtp, gFa%nNo, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (num points)"
 
-      CALL getVTK_numElems(vtp, gFa%nEl, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (num cells)"
-
-      CALL getVTK_nodesPerElem(vtp, gFa%eNoN, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (nodes per cell)"
-
       ALLOCATE(gFa%x(nsd,gFa%nNo), tmpX(maxNSD,gFa%nNo))
       CALL getVTK_pointCoords(vtp, tmpX, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (coords)"
       gFa%x(:,:) = tmpX(1:nsd,:)
 
-      ALLOCATE(gFa%IEN(gFa%eNoN,gFa%nEl))
-      CALL getVTK_elemIEN(vtp, gFa%IEN, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (ien)"
-      gFa%IEN = gFa%IEN + 1
-
 !     Use gFa%N as temporary array to load traction data
       ALLOCATE(gFa%N(nsd,gFa%nNo))
-      CALL getVTK_pointData(vtp, "NS_Traction", tmpX, iStat)
+      CALL getVTK_pointData(vtp, "Traction", tmpX, iStat)
       gFa%N(:,:) = tmpX(1:nsd,:)
       IF (iStat .LT. 0) err = "VTP file read error (point data)"
 
@@ -2587,28 +2576,15 @@ c     2         "can be applied for Neumann boundaries only"
       CALL flushVTK(vtp)
 
 !     Project traction from gFa to lFa. First prepare lFa%x, lFa%IEN
-      ALLOCATE(ptr(gtnNo), lFa%x(nsd,lFa%nNo), lIEN(lFa%eNoN,lFa%nEl))
-
-      ptr = 0
+      ALLOCATE(lFa%x(nsd,lFa%nNo))
       DO a=1, lFa%nNo
          Ac = lFa%gN(a)
-         ptr(Ac) = a
          lFa%x(:,a) = x(:,Ac)
       END DO
-
-      lIEN = lFa%IEN
-      DO e=1, lFa%nEl
-         DO a=1, lFa%eNoN
-            Ac = lFa%IEN(a,e)
-            lFa%IEN(a,e) = ptr(Ac)
-         END DO
-      END DO
-      DEALLOCATE(ptr)
 
       ALLOCATE(ptr(lFa%nNo))
       ptr = 0
       CALL FACEMATCH(lFa, gFa, ptr)
-      lFa%IEN = lIEN
 
 !     Copy traction data to MB data structure
       DO a=1, lFa%nNo
@@ -2618,177 +2594,117 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       CALL DESTROY(gFa)
-      DEALLOCATE(lFa%x, lIEN, ptr)
+      DEALLOCATE(lFa%x, ptr)
 
       RETURN
       END SUBROUTINE READTRACBCFF
 !--------------------------------------------------------------------
       SUBROUTINE FACEMATCH(lFa, gFa, ptr)
       USE COMMOD
-      USE ALLFUN
-      USE UTILMOD
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(IN) :: lFa, gFa
       INTEGER, INTENT(INOUT) :: ptr(lFa%nNo)
 
-      INTEGER :: a, b, i
-      REAL(KIND=8) :: ds
-      TYPE(adjType) :: lAdj, gAdj
-      TYPE(queueType) :: lnQ, gnQ
+      TYPE blkType
+         INTEGER :: n = 0
+         INTEGER, ALLOCATABLE :: gN(:)
+      END TYPE
 
-      INTEGER, ALLOCATABLE :: seed(:)
-      LOGICAL, ALLOCATABLE :: flag(:)
+      LOGICAL :: nFlt(nsd)
+      INTEGER :: i, a, b, iBlk, nBlk, nBlkd
+      REAL(KIND=8) :: ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
 
-      CALL SETNADJ(lFa, lAdj)
+      INTEGER, ALLOCATABLE :: nodeBlk(:)
+      TYPE(blkType), ALLOCATABLE :: blk(:)
 
-      CALL SETNADJ(gFa, gAdj)
+      nBlkd = NINT((REAL(gFa%nNo,KIND=8)/1D3)**(3.33D-1))
+      IF (nBlkd .EQ. 0) nBlkd = 1
+      nBlk = nBlkd**nsd
+      ALLOCATE(nodeBlk(gFa%nNo), blk(nBlk))
 
-      ALLOCATE(flag(lFa%nNo), seed(lFa%nNo))
-      flag = .FALSE.
-      seed = 0
-      DO a=1, lFa%nNo
-         DO b=1, gFa%nNo
-            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
-            IF (ds .LT. 1D3*eps) THEN
-               ptr(a)  = b
-               flag(a) = .TRUE.
-               seed(a) = b
-               DO i=lAdj%prow(a), lAdj%prow(a+1)-1
-                  CALL ENQUEUE(lnQ, lAdj%pcol(i))
-                  seed(lAdj%pcol(i)) = b
-               END DO
-               EXIT
-            END IF
-         END DO
-         IF (flag(a)) EXIT
-      END DO
-      IF (lnQ%n .EQ. 0) err = " Failed to find a matching node"
-
-      DO WHILE (DEQUEUE(lnQ, a))
-         IF (ALL(flag(:))) EXIT
-         IF (flag(a)) CYCLE
-
-         CALL DESTROY(gnQ)
-         b = seed(a)
-         DO i=gAdj%prow(b), gAdj%prow(b+1)-1
-            CALL ENQUEUE(gnQ, gAdj%pcol(i))
-         END DO
-
-         DO WHILE (DEQUEUE(gnQ, b))
-            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
-            IF (ds .LT. 1D3*eps) THEN
-               ptr(a)  = b
-               flag(a) = .TRUE.
-               IF (seed(a) .EQ. 0) seed(a) = b
-               DO i=lAdj%prow(a), lAdj%prow(a+1)-1
-                  CALL ENQUEUE(lnQ, lAdj%pcol(i))
-                  IF (seed(lAdj%pcol(i)) .EQ. 0) THEN
-                     seed(lAdj%pcol(i)) = b
-                  END IF
-               END DO
-               EXIT
-            END IF
-         END DO
-
-         IF (.NOT.flag(a)) THEN
-            DO b=1, gFa%nNo
-               ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
-               IF (ds .LT. 1D3*eps) THEN
-                  ptr(a)  = b
-                  flag(a) = .TRUE.
-                  seed(a) = b
-                  DO i=lAdj%prow(a), lAdj%prow(a+1)-1
-                     CALL ENQUEUE(lnQ, lAdj%pcol(i))
-                     seed(lAdj%pcol(i)) = b
-                  END DO
-                  EXIT
-               END IF
-            END DO
-            IF (.NOT.flag(a)) err = " Failed to map node "//STR(a)
+      DO i=1, nsd
+         xMin(i) = MIN(MINVAL(lFa%x), MINVAL(gFa%x))
+         xMax(i) = MAX(MAXVAL(lFa%x), MAXVAL(gFa%x))
+         IF (xMin(i) .LT. 0D0) THEN
+            xMin(i) = xMin(i)*(1D0+eps)
+         ELSE
+            xMin(i) = xMin(i)*(1D0-eps)
+         END IF
+         IF (xMax(i) .LT. 0D0) THEN
+            xMax(i) = xMax(i)*(1D0-eps)
+         ELSE
+            xMax(i) = xMax(i)*(1D0+eps)
          END IF
       END DO
+      dx(:) = (xMax(:) - xMin(:))/REAL(nBlkd,KIND=8)
 
-      DEALLOCATE(flag, seed, lAdj%prow, lAdj%pcol, gAdj%prow, gAdj%pcol)
+      nFlt(:) = .TRUE.
+      DO i=1, nsd
+         IF (ISZERO(dx(i))) nFlt(i) = .FALSE.
+      END DO
+
+      blk(:)%n = 0
+      DO a=1, gFa%nNo
+         iBlk = FINDBLK(gFa%x(:,a))
+         nodeBlk(a) = iBlk
+         blk(iBlk)%n = blk(iBlk)%n + 1
+      END DO
+      DO iBlk=1, nBlk
+         ALLOCATE(blk(iBlk)%gN(blk(iBlk)%n))
+      END DO
+      blk(:)%n = 0
+      DO a=1, gFa%nNo
+         iBlk = nodeBlk(a)
+         blk(iBlk)%n = blk(iBlk)%n + 1
+         blk(iBlk)%gN(blk(iBlk)%n) = a
+      END DO
+
+      DO a=1, lFa%nNo
+         iBlk = FINDBLK(lFa%x(:,a))
+         minS = HUGE(minS)
+         DO i=1, blk(iBlk)%n
+            b  = blk(iBlk)%gN(i)
+            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
+            IF (ds .LT. minS) THEN
+               minS = ds
+               ptr(a) = b
+            END IF
+         END DO
+         IF (ptr(a) .EQ. 0) err = " Failed to map node "//STR(a)
+      END DO
+
+      DO iBlk=1, nBlk
+         DEALLOCATE(blk(iBlk)%gN)
+      END DO
+      DEALLOCATE(nodeBlk, blk)
+
       RETURN
       CONTAINS
 !--------------------------------------------------------------------
-         SUBROUTINE SETNADJ(pFa, pAdj)
-         USE COMMOD
+         INTEGER FUNCTION FINDBLK(x)
          IMPLICIT NONE
+         REAL(KIND=8), INTENT(IN) :: x(nsd)
 
-         TYPE(faceType), INTENT(IN) :: pFa
-         TYPE(adjType), INTENT(INOUT) :: pAdj
+         INTEGER i, j, k
 
-         INTEGER :: a, b, e, i, Ac, Bc, maxN
-         LOGICAL :: flag
+         i = 1
+         j = 1
+         k = 1
+         IF (nFlt(1)) i = INT((x(1) - xMin(1))/dx(1))
+         IF (nFlt(2)) j = INT((x(2) - xMin(2))/dx(2))
+         IF (i .EQ. nBlkd) i = nBlkd - 1
+         IF (j .EQ. nBlkd) j = nBlkd - 1
+         IF (nsd .EQ. 3) THEN
+            IF (nFlt(3)) k = INT((x(3) - xMin(3))/dx(3))
+            IF (k .EQ. nBlkd) k = nBlkd - 1
+            FINDBLK = k + (j + i*nBlkd)*nBlkd + 1
+         ELSE ! nsd .EQ. 2
+            FINDBLK = j + i*nBlkd + 1
+         END IF
 
-         INTEGER, ALLOCATABLE :: incNd(:), adjL(:,:)
-
-         ALLOCATE(incNd(pFa%nNo))
-         incNd = 0
-         DO e=1, pFa%nEl
-            DO a=1, pFa%eNoN
-               Ac = pFa%IEN(a,e)
-               DO b=1, pFa%eNoN
-                  IF (b .Eq. a) CYCLE
-                  Bc = pFa%IEN(b,e)
-                  incNd(Ac) = incNd(Ac) + 1
-               END DO
-            END DO
-         END DO
-         maxN = MAXVAL(incNd)
-
-         ALLOCATE(adjL(maxN, pFa%nNo))
-         adjL = 0
-         incNd = 0
-         DO e=1, pFa%nEl
-            DO a=1, pFa%eNoN
-               Ac = pFa%IEN(a,e)
-               DO b=1, pFa%eNoN
-                  IF (a .EQ. b) CYCLE
-                  Bc = pFa%IEN(b,e)
-                  flag = .TRUE.
-                  DO i=1, incNd(Ac)
-                     IF (adjL(i,Ac) .EQ. Bc) THEN
-                        flag = .FALSE.
-                        EXIT
-                     END IF
-                  END DO
-                  IF (flag) THEN
-                     incNd(Ac) = incNd(Ac) + 1
-                     adjL(incNd(Ac),Ac) = Bc
-                  END IF
-               END DO
-            END DO
-         END DO
-         maxN = MAXVAL(incNd)
-
-         pAdj%nnz = 0
-         DO a=1, pFa%nNo
-            DO i=1, maxN
-               Ac = adjL(i,a)
-               IF (Ac .EQ. 0) EXIT
-               pAdj%nnz = pAdj%nnz + 1
-            END DO
-         END DO
-
-         ALLOCATE(pAdj%prow(pFa%nNo+1), pAdj%pcol(pAdj%nnz))
-         b = 0
-         pAdj%prow(1) = 1
-         DO a=1, pFa%nNo
-            DO i=1, maxN
-               Ac = adjL(i,a)
-               IF (Ac .EQ. 0) EXIT
-               b = b + 1
-               pAdj%pcol(b) = Ac
-            END DO
-            pAdj%prow(a+1) = b + 1
-         END DO
-
-         DEALLOCATE(adjL, incNd)
          RETURN
-         END SUBROUTINE SETNADJ
+         END FUNCTION FINDBLK
 !--------------------------------------------------------------------
       END SUBROUTINE FACEMATCH
 !####################################################################
