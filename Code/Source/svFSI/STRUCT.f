@@ -108,13 +108,13 @@
       CALL GETPK2CC(stModel, F, nFn, fN, ya_g, S, CC)
 
 !     Prestress
-      S = S + S0
       pSl(1) = S(1,1)
       pSl(2) = S(2,2)
       pSl(3) = S(3,3)
       pSl(4) = S(1,2)
       pSl(5) = S(1,3)
       pSl(6) = S(2,3)
+      S = S + S0
 
 !     Active stress - electromechanics
       IF (cem%aStress) CALL ACTVSTRESS(ya_g, nFn, fN, S)
@@ -311,10 +311,10 @@
       CALL GETPK2CC(stModel, F, nFn, fN, ya_g, S, CC)
 
 !     Prestress
-      S = S + S0
       pSl(1) = S(1,1)
       pSl(2) = S(2,2)
       pSl(3) = S(1,2)
+      S = S + S0
 
 !     Active stress - electromechanics
       IF (cem%aStress) CALL ACTVSTRESS(ya_g, nFn, fN, S)
