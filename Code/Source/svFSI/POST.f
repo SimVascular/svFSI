@@ -527,7 +527,7 @@
                   sigma = MATMUL(P, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
                ELSE
-                  CALL GETPK2CC(stModel, F, nFn, fN, S, CC)
+                  CALL GETPK2CC(stModel, F, nFn, fN, 0D0, S, CC)
                   sigma = S
                END IF
 
