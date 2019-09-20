@@ -73,10 +73,7 @@
          lhs%face%incFlag = .TRUE.
          IF (PRESENT(incL)) THEN
             DO faIn=1, lhs%nFaces
-               IF (incL(faIn) .EQ. 0 .AND.
-     2             lhs%face(faIn)%bGrp .NE. BC_Type_Dir) THEN
-                  lhs%face(faIn)%incFlag = .FALSE.
-               END IF
+               IF (incL(faIn) .EQ. 0 ) lhs%face(faIn)%incFlag = .FALSE.
             END DO
          END IF
 

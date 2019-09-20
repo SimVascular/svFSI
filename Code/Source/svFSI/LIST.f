@@ -139,6 +139,9 @@
          DO j=1, l
             IF (sTmp(j:j) .EQ. "#") THEN
                l = j-1
+               sTmp = sTmp(1:l)
+               sTmp = ADJUSTC(sTmp)
+               l = LEN(TRIM(sTmp))
                EXIT
             END IF
          END DO

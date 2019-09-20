@@ -175,6 +175,8 @@
             IF (ibFlag) CALL IB_CONSTRUCT()
 
             incL = 0
+            IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
+            IF (cmmInit) incL(nFacesLS) = 1
             DO iBc=1, eq(cEq)%nBc
                i = eq(cEq)%bc(iBc)%lsPtr
                IF (i .NE. 0) THEN
@@ -182,6 +184,7 @@
                   incL(i) = 1
                END IF
             END DO
+            IF (ibLSptr .NE. 0) incL(ibLSptr) = 1
 
             dbg = "Solving equation <"//eq(cEq)%sym//">"
             CALL LSSOLVE(eq(cEq), incL, res)

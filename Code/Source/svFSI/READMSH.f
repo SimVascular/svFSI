@@ -385,7 +385,7 @@ c               END IF
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
-         lPtr => lPM%get(cTmp, "Prestress file path (vtu)")
+         lPtr => lPM%get(cTmp, "Prestress file path")
          IF (ASSOCIATED(lPtr)) THEN
             IF (rmsh%isReqd) THEN
                err = "Prestress is currently not allowed with remeshing"
@@ -393,7 +393,7 @@ c               END IF
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nstd,msh(iM)%gnNo))
             msh(iM)%x = 0D0
-            CALL READVTUPDATA(msh(iM), cTmp, "PS_Prestress", nstd, 1)
+            CALL READVTUPDATA(msh(iM), cTmp, "Stress", nstd, 1)
          END IF
       END DO
       IF (flag) THEN
@@ -1068,7 +1068,7 @@ c               END IF
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
-         lPtr => lPM%get(cTmp,"Initial pressures file path (vtu)")
+         lPtr => lPM%get(cTmp,"Initial pressures file path")
          IF(ASSOCIATED(lPtr)) THEN
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
@@ -1094,7 +1094,7 @@ c               END IF
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
-         lPtr => lPM%get(cTmp,"Initial velocities file path (vtu)")
+         lPtr => lPM%get(cTmp,"Initial velocities file path")
          IF(ASSOCIATED(lPtr)) THEN
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
@@ -1120,7 +1120,7 @@ c               END IF
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name, "Add mesh",iM)
 
-         lPtr => lPM%get(ctmp,"Initial displacements file path (vtu)")
+         lPtr => lPM%get(ctmp,"Initial displacements file path")
          IF(ASSOCIATED(lPtr)) THEN
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))

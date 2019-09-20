@@ -814,7 +814,16 @@
 
 !     Initialize cplBC for RCR-type BC
       IF (ANY(BTEST(lEq%bc(:)%bType,bType_RCR))) THEN
+         IF ((lEq%phys .NE. phys_fluid) .AND.
+     2       (lEq%phys .NE. phys_CMM) .AND.
+     3       (lEq%phys .NE. phys_FSI)) THEN
+            err = "RCR-type BC is allowed for fluid/CMM/FSI eq. only"
+         END IF
          cplBC%schm = cplBC_SI
+         IF (useTrilinosLS) THEN
+            std = " Using explicit RCR coupling with Trilinos LS"
+            cplBC%schm = cplBC_E
+         END IF
          cplBC%nX   = cplBC%nFa
          cplBC%nXp  = cplBC%nFa + 1
          IF (ALLOCATED(cplBC%xo)) err = "ERROR: cplBC structure is "//
@@ -1381,7 +1390,7 @@
       CASE ("Traction","Trac")
          lBc%bType = IBSET(lBc%bType,bType_trac)
 
-         lPtr => list%get(fTmp, "Traction values file path (vtp)")
+         lPtr => list%get(fTmp, "Traction values file path")
          IF (ASSOCIATED(lPtr)) THEN
             iM  = lBc%iM
             iFa = lBc%iFa
@@ -1524,7 +1533,7 @@
          iM  = lBc%iM
          iFa = lBc%iFa
          lBc%bType = IBSET(lBc%bType,bType_gen)
-         lPtr => list%get(ftmp,"BCT file path (vtp)")
+         lPtr => list%get(ftmp,"BCT file path")
          IF (ASSOCIATED(lPtr)) THEN
             ALLOCATE(lBc%gm)
             CALL READBCT(lBc%gm, msh(iM)%fa(iFa), ftmp%fname)
@@ -1771,9 +1780,9 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     For CMM BC, load wall displacements
       IF (BTEST(lBC%bType, bType_CMM)) THEN
-         lPtr => list%get(cTmp, "Initial displacements file path (vtp)")
+         lPtr => list%get(cTmp, "Initial displacements file path")
          IF (.NOT.ASSOCIATED(lPtr) .AND. .NOT.ALLOCATED(Dinit)) THEN
-            lPtr => list%get(cTmp, "Prestress file path (vtp)")
+            lPtr => list%get(cTmp, "Prestress file path")
             IF (.NOT.ASSOCIATED(lPtr) .AND. .NOT.ALLOCATED(pS0)) THEN
                err = "Either wall displacement field or prestress "//
      2           "is required for CMM eqn"

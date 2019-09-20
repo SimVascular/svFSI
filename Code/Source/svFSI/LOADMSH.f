@@ -49,7 +49,7 @@
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) :: ftmp
 
-      lPtr => list%get(ftmp,"Mesh file path (vtu)")
+      lPtr => list%get(ftmp,"Mesh file path")
       IF (.NOT.ASSOCIATED(lPtr)) RETURN
       CALL READVTU(lM, ftmp%fname)
 
@@ -65,9 +65,8 @@
       DO iFa=1, lM%nFa
          lPBC => list%get(lM%fa(iFa)%name,"Add face",iFa)
          IF (.NOT.lM%lFib) THEN
-            lPtr => lPBC%get(ftmp,"Face file path (vtp)")
-            IF (.NOT.ASSOCIATED(lPtr)) err =
-     2         "Face file (vtp) not provided"
+            lPtr => lPBC%get(ftmp,"Face file path")
+            IF (.NOT.ASSOCIATED(lPtr)) err = "Face file not provided"
             CALL READVTP(lM%fa(iFa), ftmp%fname)
             IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
          ELSE
