@@ -169,7 +169,7 @@ c         CALL IB_SETBCPEN()
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL :: l1, l2, l3, l4, l5
+      LOGICAL :: l1, l2, l3, l4
       INTEGER :: s, e, a, Ac
       REAL(KIND=8) :: coef(5), r1, r2, dUl(nsd)
 
@@ -270,14 +270,12 @@ c         CALL IB_SETBCPEN()
          eq(cEq)%pNorm = eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm
       END IF
       r1 = eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm
-      r2 = 2D1*LOG10(r1/eq(cEq)%pNorm)
 
       l1 = eq(cEq)%itr .GE. eq(cEq)%maxItr
       l2 = r1 .LE. eq(cEq)%tol
       l3 = r1 .LE. eq(cEq)%tol*eq(cEq)%pNorm
       l4 = eq(cEq)%itr .GE. eq(cEq)%minItr
-      l5 = r2 .LE. eq(cEq)%dBr
-      IF (l1 .OR. ((l2.OR.l3).AND.l4.AND.l5)) eq(cEq)%ok = .TRUE.
+      IF (l1 .OR. ((l2.OR.l3).AND.l4)) eq(cEq)%ok = .TRUE.
       IF (ALL(eq%ok)) RETURN
 
       IF (eq(cEq)%coupled) THEN

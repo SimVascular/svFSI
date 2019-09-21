@@ -286,11 +286,10 @@
                END IF
             ELSE
                CALL ZEROINIT(timeP)
+!              Load any explicitly provided solution variables
+               CALL INITSOLNVAR()
             END IF ! stFileFlag
          END IF
-
-!        Load any explicitly provided solution variables
-         CALL INITSOLNVAR()
 
          rsTS = cTS
       ELSE

@@ -351,7 +351,6 @@
       lPtr => list%get(lEq%coupled,"Coupled")
       lPtr => list%get(lEq%minItr,"Min iterations",ll=1)
       lPtr => list%get(lEq%maxItr,"Max iterations",ll=1)
-      lPtr => list%get(lEq%dBr,"Residual dB reduction",ul=0D0)
       lPtr => list%get(lEq%tol,"Tolerance",ll=0D0)
 
 !     Coupled BC stuff

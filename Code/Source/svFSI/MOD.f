@@ -719,8 +719,6 @@
          REAL(KIND=8) am
 !        \beta
          REAL(KIND=8) beta
-!        dB reduction in residual
-         REAL(KIND=8) :: dBr = -4D1
 !        \gamma
          REAL(KIND=8) gam
 !        Initial norm of residual

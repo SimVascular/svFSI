@@ -467,7 +467,6 @@
       CALL cm%bcast(lEq%nBc)
       CALL cm%bcast(lEq%nBf)
       CALL cm%bcast(lEq%tol)
-      CALL cm%bcast(lEq%dBr)
       IF (ibFlag) THEN
          CALL cm%bcast(lEq%nDmnIB)
          CALL cm%bcast(lEq%nBcIB)

@@ -1247,7 +1247,6 @@
       lEq%nBc     = 0
       lEq%nBcIB   = 0
       lEq%nBf     = 0
-      lEq%dBr     = -4D1
       lEq%tol     = 1D64
 
       RETURN
