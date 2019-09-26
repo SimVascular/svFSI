@@ -1806,7 +1806,6 @@ c     2         "can be applied for Neumann boundaries only"
                   pS0(:,Ac) = msh(iM)%fa(iFa)%x(:,a)
                END DO
                DEALLOCATE(msh(iM)%fa(iFa)%x)
-               NULLIFY(lPtr)
             END IF
          END IF
 

@@ -998,7 +998,8 @@
 !     Array that maps global node id to rowN in the matrix
       INTEGER, ALLOCATABLE :: idMap(:)
 
-!     Boundary nodes set for CMM initialization
+!     Boundary nodes set for CMM initialization and for zeroing-out
+!     non-wall nodal displacements
       INTEGER, ALLOCATABLE :: cmmBdry(:)
 
 !     Additional arrays for immersed boundaries

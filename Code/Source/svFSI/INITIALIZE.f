@@ -286,8 +286,6 @@
                END IF
             ELSE
                CALL ZEROINIT(timeP)
-!              Load any explicitly provided solution variables
-               CALL INITSOLNVAR()
             END IF ! stFileFlag
          END IF
 
@@ -387,6 +385,8 @@
       IMPLICIT NONE
       REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
+      INTEGER a
+
       std = " Initializing state variables to zero"
 
 !     This cTS corresponds to old variables. As soon as incrementing it
@@ -415,6 +415,25 @@
          ib%Yn  = 0D0
          ib%Uo  = 0D0
          ib%Un  = 0D0
+      END IF
+
+!     Load any explicitly provided solution variables
+      IF (ALLOCATED(Vinit)) THEN
+         DO a=1, tnNo
+            Yo(1:nsd,a) = Vinit(:,a)
+         END DO
+      END IF
+
+      IF (ALLOCATED(Pinit)) THEN
+         DO a=1, tnNo
+            Yo(nsd+1,a) = Pinit(a)
+         END DO
+      END IF
+
+      IF (ALLOCATED(Dinit)) THEN
+         DO a=1, tnNo
+            Do(1:nsd,a) = Dinit(:,a)
+         END DO
       END IF
 
       RETURN
@@ -575,83 +594,6 @@
 
       RETURN
       END SUBROUTINE INITFROMBIN
-!--------------------------------------------------------------------
-      SUBROUTINE INITSOLNVAR()
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      INTEGER a
-      LOGICAL flag
-
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
-
-!     Transfer initial velocity field
-      flag = ALLOCATED(Vinit)
-      CALL cm%bcast(flag)
-      IF (flag) THEN
-         IF (tDof .LT. nsd) err = "Not enough dof to initialize "//
-     2      "velocity field"
-         IF (cm%mas()) THEN
-            ALLOCATE(tmpR(nsd,gtnNo))
-            tmpR = Vinit
-            DEALLOCATE(Vinit)
-         ELSE
-            ALLOCATE(tmpR(0,0))
-         END IF
-         ALLOCATE(Vinit(nsd,tnNo))
-         Vinit = LOCAL(tmpR)
-         DEALLOCATE(tmpR)
-         DO a=1, tnNo
-            Yo(1:nsd,a) = Vinit(:,a)
-         END DO
-      END IF
-
-!     Transfer initial pressure field
-      flag = ALLOCATED(Pinit)
-      CALL cm%bcast(flag)
-      IF (flag) THEN
-         IF (tDof .LT. nsd+1) err = "Not enough dof to initialize "//
-     2      "pressure field"
-         IF (cm%mas()) THEN
-            ALLOCATE(tmpR(1,gtnNo))
-            tmpR(1,:) = Pinit
-            DEALLOCATE(Pinit)
-         ELSE
-            ALLOCATE(tmpR(0,0))
-         END IF
-         ALLOCATE(Pinit(tnNo))
-         tmpR = LOCAL(tmpR)
-         Pinit(:) = tmpR(1,:)
-         DEALLOCATE(tmpR)
-         DO a=1, tnNo
-            Yo(nsd+1,a) = Pinit(a)
-         END DO
-      END IF
-
-!     Transfer initial displacement field
-      flag = ALLOCATED(Dinit)
-      CALL cm%bcast(flag)
-      IF (flag) THEN
-         IF (.NOT.dFlag) err = "Incorrect phys to initialize "//
-     2      "displacement field"
-         IF (cm%mas()) THEN
-            ALLOCATE(tmpR(nsd,gtnNo))
-            tmpR = Dinit
-            DEALLOCATE(Dinit)
-         ELSE
-            ALLOCATE(tmpR(0,0))
-         END IF
-         ALLOCATE(Dinit(nsd,tnNo))
-         Dinit = LOCAL(tmpR)
-         DEALLOCATE(tmpR)
-         DO a=1, tnNo
-            Do(1:nsd,a) = Dinit(:,a)
-         END DO
-      END IF
-
-      RETURN
-      END SUBROUTINE INITSOLNVAR
 !####################################################################
       SUBROUTINE FINALIZE
       USE COMMOD

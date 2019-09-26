@@ -257,6 +257,54 @@
          DEALLOCATE(tmpX)
       END IF
 
+!     Distribute initial flow quantities to processors
+      flag = ALLOCATED(Pinit)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpX(1,gtnNo))
+            tmpX(1,:) = Pinit
+            DEALLOCATE(Pinit)
+         ELSE
+            ALLOCATE(tmpX(0,0))
+         END IF
+         IF (ALLOCATED(wgt)) DEALLOCATE(wgt)
+         ALLOCATE(wgt(1,tnNo), Pinit(tnNo))
+         wgt = LOCAL(tmpX)
+         Pinit(:) = wgt(1,:)
+         DEALLOCATE(tmpX, wgt)
+      END IF
+
+      flag = ALLOCATED(Vinit)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpX(nsd,gtnNo))
+            tmpX = Vinit
+            DEALLOCATE(Vinit)
+         ELSE
+            ALLOCATE(tmpX(0,0))
+         END IF
+         ALLOCATE(Vinit(nsd,tnNo))
+         Vinit = LOCAL(tmpX)
+         DEALLOCATE(tmpX)
+      END IF
+
+      flag = ALLOCATED(Dinit)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpX(nsd,gtnNo))
+            tmpX = Dinit
+            DEALLOCATE(Dinit)
+         ELSE
+            ALLOCATE(tmpX(0,0))
+         END IF
+         ALLOCATE(Dinit(nsd,tnNo))
+         Dinit = LOCAL(tmpX)
+         DEALLOCATE(tmpX)
+      END IF
+
 !     And distributing eq to processors
       IF (cm%slv()) ALLOCATE(eq(nEq))
       DO iEq=1, nEq
