@@ -180,8 +180,6 @@
          CALL cm%bcast(startTS)
          CALL cm%bcast(nEq)
          CALL cm%bcast(dt)
-         CALL cm%bcast(useTrilinosLS)
-         CALL cm%bcast(useTrilinosAssemAndLS)
          CALL cm%bcast(zeroAve)
          CALL cm%bcast(cmmInit)
          CALL cm%bcast(cmmVarWall)
@@ -515,6 +513,8 @@
       CALL cm%bcast(lEq%nBc)
       CALL cm%bcast(lEq%nBf)
       CALL cm%bcast(lEq%tol)
+      CALL cm%bcast(lEq%useTLS)
+      CALL cm%bcast(lEq%assmTLS)
       IF (ibFlag) THEN
          CALL cm%bcast(lEq%nDmnIB)
          CALL cm%bcast(lEq%nBcIB)

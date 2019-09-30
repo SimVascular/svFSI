@@ -685,6 +685,10 @@
          LOGICAL :: coupled = .TRUE.
 !        Satisfied/not satisfied
          LOGICAL ok
+!        Use C++ Trilinos framework for the linear solvers
+         LOGICAL useTLS
+!        Use C++ Trilinos framework for assembly and for linear solvers
+         LOGICAL assmTLS
 !        Degrees of freedom
          INTEGER :: dof = 0
 !        Pointer to end of unknown Yo(:,s:e)
@@ -917,10 +921,6 @@
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required
       LOGICAL ibFlag
-!     Use C++ Trilinos framework for the linear solvers
-      LOGICAL useTrilinosLS
-!     Use C++ Trilinos framework for assembly and for linear solvers
-      LOGICAL useTrilinosAssemAndLS
 !     Postprocess step - convert bin to vtk
       LOGICAL bin2VTK
 

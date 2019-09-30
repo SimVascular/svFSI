@@ -39,9 +39,7 @@
 !--------------------------------------------------------------------
 
       MODULE ALLFUN
-
       USE MATFUN
-
       IMPLICIT NONE
 
       INTERFACE Integ
@@ -889,7 +887,7 @@
       END FUNCTION DOMAIN
 !--------------------------------------------------------------------
 !     This function is true if "phys" is solved on "node"
-      PURE FUNCTION ISDOMAIN(iEq, node, phys)
+      FUNCTION ISDOMAIN(iEq, node, phys)
       USE COMMOD
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: iEq, node, phys
@@ -898,7 +896,13 @@
       INTEGER iDmn
 
       ISDOMAIN = .FALSE.
-      IF (ALLOCATED(dmnId)) THEN
+      IF (eq(iEq)%nDmn .EQ. 1) THEN
+!        Single domain is assumed and we only need to check that
+         IF (eq(iEq)%dmn(1)%phys .EQ. phys) ISDOMAIN = .TRUE.
+      ELSE
+!        Domain partition is expected
+         IF (.NOT.ALLOCATED(dmnId)) err = "Domain partitioning info "//
+     2      "is not provided"
          DO iDmn=1, eq(iEq)%nDmn
             IF (eq(iEq)%dmn(iDmn)%phys .EQ. phys) THEN
                IF (BTEST(dmnId(node),eq(iEq)%dmn(iDmn)%Id)) THEN
@@ -907,10 +911,6 @@
                END IF
             END IF
          END DO
-      ELSE
-!     No domain partitioning exists, so single domain is assumed and we
-!     only need to check that
-         IF (eq(iEq)%dmn(1)%phys .EQ. phys) ISDOMAIN = .TRUE.
       END IF
 
       RETURN
@@ -1248,6 +1248,8 @@
       lEq%nBcIB   = 0
       lEq%nBf     = 0
       lEq%tol     = 1D64
+      lEq%useTLS  = .FALSE.
+      lEq%assmTLS = .FALSE.
 
       RETURN
       END SUBROUTINE DESTROYEQ

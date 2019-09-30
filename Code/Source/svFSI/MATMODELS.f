@@ -282,14 +282,13 @@
          Efs  = Inv8
 
          g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
-         Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
-     2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+         g2   = 2D0 * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Hfs
 
          Efs  = Efs * Efs
          g1   = 2D0*J4d*stM%b*g1
-         g2   = 2D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
+         g2   = 4D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -299,12 +298,12 @@
              Sb  = Sb + g1*Hff
 
              Eff = Eff * Eff
-             g1  = stM%aff*(1D0 + 2D0*stM%bff*Eff)*EXP(stM%bff*Eff)*
-     2          4D0*J4d
+             g1  = 4D0*J4d*stM%aff*(1D0 + 2D0*stM%bff*Eff)*
+     2          EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
          END IF
 
-         IF (Eff .GT. 0D0) THEN
+         IF (Ess .GT. 0D0) THEN
              g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
@@ -580,14 +579,13 @@
          Efs  = Inv8
 
          g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
-         Hfs  = MAT_DYADPROD(fl(:,1), fl(:,2), nsd) +
-     2          MAT_DYADPROD(fl(:,2), fl(:,1), nsd)
+         g2   = 2D0 * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Hfs
 
          Efs  = Efs * Efs
          g1   = 2D0*J4d*stM%b*g1
-         g2   = 2D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
+         g2   = 4D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -597,12 +595,12 @@
              Sb  = Sb + g1*Hff
 
              Eff = Eff * Eff
-             g1  = stM%aff*(1D0 + 2D0*stM%bff*Eff)*EXP(stM%bff*Eff)*
-     2          4D0*J4d
+             g1  = 4D0*J4d*stM%aff*(1D0 + 2D0*stM%bff*Eff)*
+     2          EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
          END IF
 
-         IF (Eff .GT. 0D0) THEN
+         IF (Ess .GT. 0D0) THEN
              g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
@@ -784,8 +782,8 @@
       as  = fl(:,2)
       an  = CROSS(fl)
 
-      gs  = 4.0D0*gf
-      gn  = 1.0D0/((1.0D0+gf)*(1.0D0+gs)) - 1.0D0
+      gn  = 4.0D0*gf
+      gs  = 1.0D0/((1.0D0+gf)*(1.0D0+gs)) - 1.0D0
 
       IDm = MAT_ID(nsd)
       Hf  = MAT_DYADPROD(af, af, nsd)

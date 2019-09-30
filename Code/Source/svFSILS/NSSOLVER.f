@@ -355,7 +355,7 @@
 
       LOGICAL flag
       INTEGER fid, i, j
-      CHARACTER(LEN=*), PARAMETER :: fName = '.FSILS_NS.log'
+      CHARACTER(LEN=*), PARAMETER :: fName = 'FSILS_NS.log'
 
       INQUIRE(FILE=fName, EXIST=flag)
 

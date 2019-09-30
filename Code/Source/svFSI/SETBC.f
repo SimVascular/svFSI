@@ -395,7 +395,7 @@
          END DO
 
 #ifdef WITH_TRILINOS
-         IF (useTrilinosAssemAndLS) THEN
+         IF (eq(cEq)%assmTLS) THEN
             CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
          ELSE
 #endif
@@ -544,7 +544,7 @@
          END DO
 
 #ifdef WITH_TRILINOS
-         IF (useTrilinosAssemAndLS) THEN
+         IF (eq(cEq)%assmTLS) THEN
             CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
          ELSE
 #endif
@@ -558,8 +558,7 @@
 #endif
       END DO
 
-      DEALLOCATE(N, xl, yl, dl, lR, lK, ptr)
-      IF (ALLOCATED(lKd)) DEALLOCATE(lKd)
+      DEALLOCATE(N, xl, yl, dl, lR, lK, lKd, ptr)
 
       RETURN
       END SUBROUTINE SETBCRBNL
@@ -836,7 +835,7 @@
 
 !     Now doing the assembly part
 #ifdef WITH_TRILINOS
-         IF (useTrilinosAssemAndLS) THEN
+         IF (eq(cEq)%assmTLS) THEN
             CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
          ELSE
 #endif

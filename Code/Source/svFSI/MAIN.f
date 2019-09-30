@@ -74,16 +74,6 @@
 !     format
       CALL INITIALIZE(timeP)
 
-!     Only compute once
-      IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-         ALLOCATE(tls)
-         ALLOCATE(tls%ltg(tnNo))
-         tls%ltg = 0
-         DO i=1, tnNo
-           tls%ltg(lhs%map(i)) = ltg(i)
-         END DO
-      END IF
-
       dbg = 'Allocating intermediate variables'
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo),
      2   res(nFacesLS), incL(nFacesLS))
@@ -135,7 +125,7 @@
             END IF
 
             dbg = 'Allocating the RHS and LHS'
-            CALL LSALLOC()
+            CALL LSALLOC(eq(cEq))
 
 !           Compute body forces. If phys is shells or CMM (init),
 !           apply contribution from body forces (pressure) to residue
@@ -162,7 +152,7 @@
 
 !     Synchronize R across processes. Note: that it is important to
 !     synchronize residue, R before treating immersed boundaries
-            IF (.NOT.useTrilinosAssemAndLS) CALL COMMU(R)
+            IF (.NOT.eq(cEq)%assmTLS) CALL COMMU(R)
 
 !     Update residue in displacement equation for VMS_STRUCT physics.
 !     Note that this step is done only first iteration. The residue will
@@ -262,7 +252,7 @@
       IF (resetSim) THEN
          CALL REMESHRESTART(timeP)
          DEALLOCATE(Ag, Yg, Dg, incL, res)
-         IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
+         IF (ALLOCATED(tls)) THEN
             DEALLOCATE(tls%ltg, tls%W, tls%R)
             DEALLOCATE(tls)
          END IF
@@ -271,16 +261,8 @@
 
       IF (l2 .AND. saveAve) CALL CALCAVE
 
-      CALL FINALIZE
-
-#ifdef WITH_TRILINOS
-      IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-         DEALLOCATE(tls%ltg, tls%W, tls%R)
-         DEALLOCATE(tls)
-      END IF
-#endif
       DEALLOCATE(Ag, Yg, Dg, incL, res)
-
+      CALL FINALIZE()
       CALL MPI_FINALIZE(ierr)
 
       END PROGRAM MAIN

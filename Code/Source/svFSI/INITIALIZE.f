@@ -43,7 +43,7 @@
       REAL(KIND=8), INTENT(OUT) :: timeP(3)
 
       LOGICAL :: flag
-      INTEGER :: i, iEq, iDmn, iM, ierr, nnz, gnnz
+      INTEGER :: i, a, iEq, iDmn, iM, ierr, nnz, gnnz
       CHARACTER(LEN=stdL) :: fTmp, sTmp
       REAL(KIND=8) :: am
       TYPE(FSILS_commuType) :: communicator
@@ -74,6 +74,7 @@
 
       IF (ANY(eq(1)%bc%cplBCptr .NE. 0)) cplBC%coupled = .TRUE.
 
+      flag = .FALSE.
       DO iEq=1, nEq
 !     This would be the default value of am for first order equations
          eq(iEq)%am = 5D-1*(3D0 - eq(iEq)%roInf) /
@@ -142,6 +143,7 @@
          eq(iEq)%s     = tDof + 1
          eq(iEq)%e     = tDof + eq(iEq)%dof
          tDof          = eq(iEq)%e
+         IF (eq(iEq)%useTLS) flag = .TRUE.
       END DO
 
       ierr = 0
@@ -207,6 +209,16 @@
       dbg = "Calling FSILS_LHS_CREATE"
       CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz, ltg,
      2   rowPtr, colPtr, nFacesLS)
+
+!     Initialize Trilinos data structure
+      IF (flag) THEN
+         ALLOCATE(tls)
+         ALLOCATE(tls%ltg(tnNo))
+         tls%ltg = 0
+         DO a=1, tnNo
+           tls%ltg(lhs%map(a)) = ltg(a)
+         END DO
+      END IF
 
 !     Variable allocation and initialization
       ALLOCATE(Ao(tDof,tnNo), An(tDof,tnNo), Yo(tDof,tnNo),
@@ -348,13 +360,16 @@
       ALLOCATE(s(1,tnNo))
       s = 1D0
       DO iEq=1, nEq
+         IF (.NOT.shlEq .AND. .NOT.cmmInit) std = " Eq. <"//
+     2      CLR(eq(iEq)%sym, iEq)//">"
          DO iDmn=1, eq(iEq)%nDmn
-            eq(iEq)%dmn(iDmn)%v =
-     2         Integ(eq(iEq)%dmn(iDmn)%Id, s, 1, 1)
+            i = eq(iEq)%dmn(iDmn)%Id
+            eq(iEq)%dmn(iDmn)%v = Integ(i, s, 1, 1)
             IF (.NOT.shlEq .AND. .NOT.cmmInit) THEN
-               std = " Volume of domain "//STR(eq(iEq)%dmn(iDmn)%v)
-               IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "Volume of "//
-     2            "domain "//iDmn//" of equation "//iEq//" is zero"
+               std = "    Volume of domain <"//STR(i)//"> is "//
+     2            STR(eq(iEq)%dmn(iDmn)%v)
+               IF (ISZERO(eq(iEq)%dmn(iDmn)%v)) wrn = "<< Volume of "//
+     2            "domain "//iDmn//" of equation "//iEq//" is zero >>"
             END IF
          END DO
       END DO
@@ -621,12 +636,15 @@
 
 !     Deallocating sparse matrix structures
       IF(lhs%foc) CALL FSILS_LHS_FREE(lhs)
+      IF (ALLOCATED(tls)) THEN
+         IF (ALLOCATED(tls%W))   DEALLOCATE(tls%W)
+         IF (ALLOCATED(tls%R))   DEALLOCATE(tls%R)
+         IF (ALLOCATED(tls%ltg)) DEALLOCATE(tls%ltg)
+         DEALLOCATE(tls)
 #ifdef WITH_TRILINOS
-      IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
          CALL TRILINOS_LHS_FREE()
-      END IF
 #endif
-      IF (.NOT.useTrilinosAssemAndLS) THEN
+      ELSE
          IF (ALLOCATED(Val))   DEALLOCATE(Val)
       END IF
 

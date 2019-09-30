@@ -36,45 +36,32 @@
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE LSALLOC()
+      SUBROUTINE LSALLOC(lEq)
       USE COMMOD
       IMPLICIT NONE
+      TYPE(eqType), INTENT(IN) :: lEq
 
-      IF (ALLOCATED(R)) THEN
-         IF (SIZE(R,1) .NE. dof) THEN
-            DEALLOCATE(R)
-            ALLOCATE (R(dof,tnNo))
-            IF (.NOT.useTrilinosAssemAndLS) THEN
-               DEALLOCATE(Val)
-               ALLOCATE (Val(dof*dof,lhs%nnz))
-            END IF
+      IF (ALLOCATED(R)) DEALLOCATE(R)
+      ALLOCATE (R(dof,tnNo))
+      R(:,:) = 0D0
 
-#ifdef WITH_TRILINOS
-            IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-               DEALLOCATE(tls%W, tls%R)
-               ALLOCATE(tls%W(dof,tnNo), tls%R(dof,tnNo))
-               CALL TRILINOS_LHS_FREE()
-               CALL TRILINOS_LHS_CREATE(gtnNo, lhs%mynNo, tnNo,
-     2            lhs%nnz, tls%ltg, ltg, rowPtr, colPtr, dof)
-            END IF
-#endif
-         END IF
-      ELSE
-         ALLOCATE (R(dof,tnNo))
-         IF (.NOT.useTrilinosAssemAndLS) THEN
-            ALLOCATE(Val(dof*dof,lhs%nnz))
-         END IF
-#ifdef WITH_TRILINOS
-         IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-            CALL TRILINOS_LHS_CREATE(gtnNo, lhs%mynNo, tnNo, lhs%nnz,
-     2         tls%ltg, ltg, rowPtr, colPtr, dof)
-            ALLOCATE(tls%W(dof,tnNo), tls%R(dof,tnNo))
-         END IF
-#endif
+      IF (.NOT.lEq%assmTLS) THEN
+         IF (ALLOCATED(Val)) DEALLOCATE(Val)
+         ALLOCATE (Val(dof*dof,lhs%nnz))
+         Val(:,:) = 0D0
       END IF
 
-      IF (.NOT. useTrilinosAssemAndLS) Val(:,:) = 0D0
-      R(:,:) = 0D0
+#ifdef WITH_TRILINOS
+      IF (lEq%useTLS) THEN
+         IF (ALLOCATED(tls%W)) THEN
+            DEALLOCATE(tls%W, tls%R)
+            CALL TRILINOS_LHS_FREE()
+         END IF
+         ALLOCATE(tls%W(dof,tnNo), tls%R(dof,tnNo))
+         CALL TRILINOS_LHS_CREATE(gtnNo, lhs%mynNo, tnNo, lhs%nnz,
+     2      tls%ltg, ltg, rowPtr, colPtr, dof)
+      END IF
+#endif
 
       RETURN
       END SUBROUTINE LSALLOC
@@ -90,19 +77,17 @@
 #ifdef WITH_TRILINOS
       INTEGER a
 
-      IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
-         CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
-      END IF
+      IF (lEq%useTLS) CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
 
-      IF (useTrilinosAssemAndLS) THEN
+      IF (lEq%assmTLS) THEN
          lEq%FSILS%RI%suc = .FALSE.
          CALL TRILINOS_SOLVE(tls%R, tls%W, lEq%FSILS%RI%fNorm,
      2      lEq%FSILS%RI%iNorm, lEq%FSILS%RI%itr, lEq%FSILS%RI%callD,
      3      lEq%FSILS%RI%dB, lEq%FSILS%RI%suc, lEq%ls%LS_type,
      4      lEq%FSILS%RI%reltol, lEq%FSILS%RI%mItr, lEq%FSILS%RI%sD,
-     5      lEq%ls%PREC_Type, useTrilinosAssemAndLS)
+     5      lEq%ls%PREC_Type, lEq%assmTLS)
 
-      ELSE IF(useTrilinosLS) THEN
+      ELSE IF(lEq%useTLS) THEN
          CALL TRILINOS_GLOBAL_SOLVE(Val, R, tls%R, tls%W,
      2      lEq%FSILS%RI%fNorm, lEq%FSILS%RI%iNorm, lEq%FSILS%RI%itr,
      3      lEq%FSILS%RI%callD, lEq%FSILS%RI%dB, lEq%FSILS%RI%suc,
@@ -116,7 +101,7 @@
 #ifdef WITH_TRILINOS
       END IF
 
-      IF (useTrilinosLS .OR. useTrilinosAssemAndLS) THEN
+      IF (lEq%useTLS) THEN
          DO a=1, tnNo
             R(:,a) = tls%R(:,lhs%map(a))
          END DO

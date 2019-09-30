@@ -91,8 +91,6 @@
          rmsh%isReqd  = .FALSE.
          ichckIEN     = .TRUE.
          zeroAve      = .FALSE.
-         useTrilinosLS         = .FALSE.
-         useTrilinosAssemAndLS = .FALSE.
          cmmInit      = .FALSE.
          cmmVarWall   = .FALSE.
          shlEq        = .FALSE.
@@ -348,6 +346,9 @@
       TYPE(listType), POINTER :: lPtr, lPBC, lPBF
       TYPE(fileType) fTmp
 
+      lEq%useTLS  = .FALSE.
+      lEq%assmTLS = .FALSE.
+
       lPtr => list%get(lEq%coupled,"Coupled")
       lPtr => list%get(lEq%minItr,"Min iterations",ll=1)
       lPtr => list%get(lEq%maxItr,"Max iterations",ll=1)
@@ -451,7 +452,7 @@
          propL(2,1) = source_term
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/2,1,2,0/)
+         nDOP = (/2,1,1,0/)
          outPuts(1) = out_temperature
          outPuts(2) = out_heatFlux
 
@@ -466,7 +467,7 @@
          propL(3,1) = solid_density
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/2,1,2,0/)
+         nDOP = (/2,1,1,0/)
          outPuts(1) = out_temperature
          outPuts(2) = out_heatFlux
 
@@ -819,7 +820,7 @@
             err = "RCR-type BC is allowed for fluid/CMM/FSI eq. only"
          END IF
          cplBC%schm = cplBC_SI
-         IF (useTrilinosLS) THEN
+         IF (lEq%useTLS) THEN
             std = " Using explicit RCR coupling with Trilinos LS"
             cplBC%schm = cplBC_E
          END IF
@@ -1035,7 +1036,7 @@
       IF (ASSOCIATED(lPL)) THEN
          CALL TO_LOWER(ctmp)
          SELECT CASE(TRIM(ctmp))
-         CASE('ns')
+         CASE('ns', 'bpn', 'bipn')
             lSolverType = lSolver_NS
             FSILSType   = LS_TYPE_NS
          CASE('gmres')
@@ -1044,7 +1045,7 @@
          CASE('cg')
             lSolverType = lSolver_CG
             FSILSType   = LS_TYPE_CG
-         CASE('bicg')
+         CASE('bicg', 'bicgs')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
          CASE DEFAULT
@@ -1061,7 +1062,7 @@
       IF (FSILSType .EQ. LS_TYPE_NS) THEN
          lEq%ls%PREC_Type = PREC_FSILS
       ELSE
-         useTrilinosLS = .TRUE.
+         lEq%useTLS = .TRUE.
          lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
       END IF
 #endif
@@ -1073,29 +1074,29 @@
             SELECT CASE(TRIM(ctmp))
             CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
-               useTrilinosLS = .FALSE.
+               lEq%useTLS = .FALSE.
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
             CASE('trilinos-blockjacobi', 'blockjacobi')
                lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
             CASE('trilinos-ilu')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILU
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
             CASE('trilinos-ilut')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
             CASE('trilinos-ic')
                lEq%ls%PREC_Type = PREC_TRILINOS_IC
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
             CASE('trilinos-ict')
                lEq%ls%PREC_Type = PREC_TRILINOS_ICT
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
             CASE ('trilinos-ml')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
-               useTrilinosLS = .TRUE.
+               lEq%useTLS = .TRUE.
 #endif
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
@@ -1105,24 +1106,22 @@
          ELSE
             SELECT CASE (lEq%ls%PREC_Type)
             CASE (PREC_FSILS)
-               std = " Using preconditioner: FSILS"
+               std = " Using preconditioner: fsils"
             CASE (PREC_TRILINOS_DIAGONAL)
-               std = " Using preconditioner: Trilinos-Diagonal"
+               std = " Using preconditioner: trilinos-diagonal"
             CASE DEFAULT
                err = " Undefined preconditioner"
             END SELECT
          END IF
 
-         IF (.NOT.useTrilinosAssemAndLS) THEN
-            lPtr => lPL%get(flag, "Use Trilinos for assembly")
-            IF (ASSOCIATED(lPtr)) useTrilinosAssemAndLS = flag
-            IF (useTrilinosAssemAndLS .AND. ibFlag) err =
-     2         "Cannnot assemble immersed boundaries using Trilinos."//
-     3         " Use Trilinos for linear solver only."
+         IF (lEq%useTLS) THEN
+            lPtr => lPL%get(lEq%assmTLS, "Use Trilinos for assembly")
+            IF (lEq%assmTLS .AND. ibFlag) err = "Cannnot assemble "//
+     2         "immersed bodies using Trilinos"
          END IF
 
          lPtr => lPL%get(lEq%ls%mItr,"Max iterations",ll=1)
-         IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%mItr = lEq%ls%mItr
+         lEq%FSILS%RI%mItr = lEq%ls%mItr
 
          lPtr => lPL%get(lEq%ls%relTol,"Tolerance",lb=0D0,ub=1D0)
          IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%relTol = lEq%ls%relTol
@@ -1134,8 +1133,7 @@
          lPtr => lPL%get(lEq%ls%sD,"Krylov space dimension",ll=1)
          IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%sD = lEq%ls%sD
 
-         IF (.NOT.useTrilinosLS) THEN
-            lPtr => lPL%get(lEq%FSILS%RI%mItr,"Max iterations",ll=1)
+         IF (lSolverType .EQ. LS_TYPE_NS) THEN
             lPtr => lPL%get(lEq%FSILS%GM%mItr,"NS-GM max iterations",
      2         ll=1)
             lPtr => lPL%get(lEq%FSILS%CG%mItr,"NS-CG max iterations",
@@ -1155,16 +1153,6 @@
 
             lEq%FSILS%GM%sD = lEq%FSILS%RI%sD
          END IF
-      END IF
-
-!     Check LS inputs
-      IF (useTrilinosAssemAndLS .AND. .NOT.useTrilinosLS) err =
-     2   "Error in LS inputs. Use Trilinos based LS"
-
-      IF (useTrilinosLS) THEN
-         IF (lSolverType .EQ. lSolver_NS) err =
-     2   "NS solver is not supported with Trilinos"//
-     3   "Use GMRES or BICG instead."
       END IF
 
       RETURN
@@ -2311,8 +2299,8 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("HO", "Holzapfel")
       ! Holzapefel and Ogden model for myocardium !
          lDmn%stM%isoType = stIso_HO
-         lPtr => lSt%get(lDmn%stM%aff, "a")
-         lPtr => lSt%get(lDmn%stM%bff, "b")
+         lPtr => lSt%get(lDmn%stM%a, "a")
+         lPtr => lSt%get(lDmn%stM%b, "b")
          lPtr => lSt%get(lDmn%stM%aff, "a4f")
          lPtr => lSt%get(lDmn%stM%bff, "b4f")
          lPtr => lSt%get(lDmn%stM%ass, "a4s")

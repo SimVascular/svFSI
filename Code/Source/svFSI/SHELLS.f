@@ -400,7 +400,7 @@
 
 !     Global assembly
 #ifdef WITH_TRILINOS
-      IF (useTrilinosAssemAndLS) THEN
+      IF (eq(cEq)%assmTLS) THEN
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
       ELSE
 #endif

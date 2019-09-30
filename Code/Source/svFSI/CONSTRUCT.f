@@ -188,7 +188,7 @@
             END DO
 !        Perform global assembly
 #ifdef WITH_TRILINOS
-            IF (useTrilinosAssemAndLS) THEN
+            IF (eq(cEq)%assmTLS) THEN
                CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
             ELSE
 #endif
@@ -311,7 +311,7 @@
 
 !     Now doing the assembly part
 #ifdef WITH_TRILINOS
-      IF (useTrilinosAssemAndLS) THEN
+      IF (eq(cEq)%assmTLS) THEN
          IF (cPhys .EQ. phys_vms_struct) err = " VMS_STRUCT cannot be"//
      2      " assembled using Trilinos yet. Use local assembly."
          CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
@@ -441,7 +441,7 @@
 
 !           Now doing the assembly part
 #ifdef WITH_TRILINOS
-            IF (useTrilinosAssemAndLS) THEN
+            IF (eq(cEq)%assmTLS) THEN
                CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
             ELSE
 #endif
