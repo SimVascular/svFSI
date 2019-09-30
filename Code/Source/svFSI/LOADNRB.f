@@ -30,28 +30,31 @@
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
 !--------------------------------------------------------------------
-!      
+!
 !     This routine is desinged to read NURBS patches and if neccessary
-!     refine it by knot insertion
-!      
+!     refine it by knot insertion.
+!
 !--------------------------------------------------------------------
+
 !     This is for reading a single NURBS patch
       SUBROUTINE READNRB(list, lM)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-      
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
       LOGICAL flag, isZ, dirSet(3)
-      INTEGER n, i, j, rep, fid, nDir
+      INTEGER n, i, j, rep, fid, nDir, insd
       REAL(KIND=8) tmp, tmpO
       TYPE(listType), POINTER :: lPtr, lPD
       TYPE(fileType) ftmp
+
+      insd = nsd
+      IF (lM%lShl) insd = nsd - 1
+      IF (lM%lFib) err = "NURBS cannot be used for fiber mesh"
 
       lPtr => list%get(ftmp,"NURBS data file path")
       IF (.NOT.ASSOCIATED(lPtr)) RETURN
@@ -59,19 +62,19 @@
       fid = ftmp%open()
 
       lM%nNo   = 1
-      lM%nFa   = 2*nsd
+      lM%nFa   = 2*insd
       lM%eType = eType_NRB
-      ALLOCATE(lM%bs(nsd), lM%fa(lM%nFa))
-!     These are the default faces      
+      ALLOCATE(lM%bs(insd), lM%fa(lM%nFa))
+!     These are the default faces
       lM%fa(1)%name = "XN_"//TRIM(lM%name)
       lM%fa(2)%name = "XP_"//TRIM(lM%name)
       lM%fa(3)%name = "YN_"//TRIM(lM%name)
       lM%fa(4)%name = "YP_"//TRIM(lM%name)
-      IF (nsd .EQ. 3) THEN
+      IF (insd .EQ. 3) THEN
          lM%fa(5)%name = "ZN_"//TRIM(lM%name)
          lM%fa(6)%name = "ZP_"//TRIM(lM%name)
       END IF
-      DO i=1, nsd
+      DO i=1, insd
          lM%fa(2*i-1)%d = i
          lM%fa(2*i)%d   = i
 
@@ -83,7 +86,7 @@
          ALLOCATE(lM%bs(i)%xi(n))
          DO j=1, n
             READ(fid,*) tmp
-            IF (j .GT. 1) THEN 
+            IF (j .GT. 1) THEN
                isZ = ISZERO(tmpO,tmp)
                IF (tmpO .GT. tmp) err = "Knot vector must be"
      2            //" non-decreasing"
@@ -106,24 +109,24 @@
          END DO
          lM%bs(i)%nNo = lM%bs(i)%n - lM%bs(i)%p - 1
          lM%nNo       = lM%nNo*lM%bs(i)%nNo
-!     Default values for number of guass points and sample points         
+!     Default values for number of gauss points and sample points
          lM%bs(i)%nG  = MIN(lM%bs(i)%p+1,5)
          lM%bs(i)%nSl = lM%bs(i)%p + 1
       END DO
       CALL GTBLK(fid,'ctrlPts',n)
       IF (n .NE. lM%nNo) err = "Unexpected number of "//
      2   " control points"
-      
-      ALLOCATE(lM%nW(n), x(nsd,n))
+
+      ALLOCATE(lM%nW(n), lM%x(nsd,n))
       DO i=1, n
-         READ(fid,*) x(:,i), lM%nW(i)
+         READ(fid,*) lM%x(:,i), lM%nW(i)
       END DO
       CLOSE(fid)
-         
+
       dirSet = .FALSE.
       nDir   = list%srch("Set direction")
       DO j=1, nDir
-!     This would be the direction of refinement      
+!     This would be the direction of refinement
          lPD => list%get(i,"Set direction",j,ul=3,ll=1)
          IF (dirSet(i)) err = TRIM(lPD%ping("Set direction"))//
      2      " is repeated more than once"
@@ -149,36 +152,38 @@
          lPtr => lPD%get(lM%fa(2*i-1)%name,"Start face name")
          lPtr => lPD%get(lM%fa(2*i)%name,"End face name")
       END DO
-      CALL CONSTNRB(lM)
+      CALL CONSTNRB(lM, insd)
 
+      dbg = " Number of Control Points: "//lM%nNo
+      dbg = " Number of Elements: "//lM%gnEl
       dbg = " Number of DOF/element: "//lM%eNoN
       dbg = " Number of Gauss points/element: "//lM%nG
 
       RETURN
       END SUBROUTINE READNRB
-
-!####################################################################
+!--------------------------------------------------------------------
 !     Inserts a knot into a NURBS. "i" is the direction, "n" is total
-!     number of inserted knts, and "r" is the repetition of each knot
+!     number of inserted knots, and "r" is the repetition of each knot
       SUBROUTINE KNOTINS(lM, bs, dir, n, rep)
-      
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(bsType), INTENT(INOUT) :: bs
       INTEGER, INTENT(IN) :: dir, n, rep
-   
-      INTEGER l, i, j, k, ns, tn, p, ir, m
+
+      INTEGER insd, l, i, j, k, ns, tn, p, ir, m
       TYPE(bsType) tbs
       REAL(KIND=8) u, tmp, tmpO, c, alpha
       REAL(KIND=8), ALLOCATABLE :: xo(:,:), xn(:,:)
 
+      insd = nsd
+      IF (lM%lShl) insd = nsd - 1
+
 !     For convinience
       p = bs%p
-!     Number of segments in each element      
+!     Number of segments in each element
       ns = n/rep + 1
 !     The total number of inserted knots
       tn = n*bs%nEl
@@ -187,16 +192,16 @@
       tbs = bs
 
       DO i=1, lM%nNo
-         xo(1:nsd,i) = x(:,i)
+         xo(1:nsd,i) = lM%x(:,i)
          xo(nsd+1,i) = lM%nW(i)
       END DO
-      DEALLOCATE(bs%xi, x, lM%nW)
+      DEALLOCATE(bs%xi, lM%x, lM%nW)
 !     For one knot insertion
       bs%n   = tbs%n + tn
       bs%nNo = bs%nNo + tn
       bs%nEl = bs%nEl*ns
       lM%nNo = lM%nNo*bs%nNo/tbs%nNo
-      ALLOCATE(bs%xi(bs%n), x(nsd,lM%nNo), lM%nW(lM%nNo),
+      ALLOCATE(bs%xi(bs%n), lM%x(nsd,lM%nNo), lM%nW(lM%nNo),
      2   xn(nsd+1,lM%nNo))
 
       DO i=1, p+1
@@ -243,28 +248,28 @@
          tmpO = tmp
       END DO
       DO i=1, lM%nNo
-         x(:,i)   = xn(1:nsd,i)
-         lM%nW(i) = xn(nsd+1,i)
+         lM%x(:,i) = xn(1:nsd,i)
+         lM%nW(i)  = xn(nsd+1,i)
       END DO
 
       RETURN
-      CONTAINS 
-!--------------------------------------------------------------------      
+      CONTAINS
+!--------------------------------------------------------------------
 !     This routine sets %x and %nW
       SUBROUTINE INTROW(a1, alpha)
-      
+
       IMPLICIT NONE
-      
+
       INTEGER, INTENT(IN) :: a1
       REAL(KIND=8), INTENT(IN) :: alpha
 
-      INTEGER i, j, k, c, p, jmp(nsd), a2, a3
+      INTEGER i, j, k, c, p, jmp(insd), a2, a3
       REAL(KIND=8) w1, w2
 
       IF (ISZERO(alpha,1D0)) RETURN
 
       i = dir
-      IF (nsd .EQ. 2) THEN
+      IF (insd .EQ. 2) THEN
          jmp(1) = lM%bs(2)%nNo
          jmp(2) = 1
          j      = 1
@@ -273,16 +278,15 @@
          DO a2=1, lM%bs(j)%nNo
             c = jmp(i)*(a1-1) + jmp(j)*(a2-1) + 1
             p = c - jmp(i)
- 
-            w1      = xn(3,c)*alpha
-            w2      = xn(3,p)*(1D0-alpha)
-            xn(3,c) = w1 + w2
-            w1      = w1/xn(3,c)
-            w2      = w2/xn(3,c)
-            xn(1,c) = w1*xn(1,c) + w2*xn(1,p)
-            xn(2,c) = w1*xn(2,c) + w2*xn(2,p)
+
+            w1 = xn(nsd+1,c)*alpha
+            w2 = xn(nsd+1,p)*(1D0-alpha)
+            xn(nsd+1,c) = w1 + w2
+            w1 = w1/xn(nsd+1,c)
+            w2 = w2/xn(nsd+1,c)
+            xn(1:nsd,c) = w1*xn(1:nsd,c) + w2*xn(1:nsd,p)
          END DO
-      ELSE
+      ELSE IF (insd .EQ. 3) THEN
          jmp(1) = lM%bs(3)%nNo*lM%bs(2)%nNo
          jmp(2) = lM%bs(3)%nNo
          jmp(3) = 1
@@ -302,32 +306,30 @@
                c = jmp(i)*(a1-1) + jmp(j)*(a2-1) + jmp(k)*(a3-1) + 1
                p = c - jmp(i)
 
-               w1      = xn(4,c)*alpha
-               w2      = xn(4,p)*(1D0-alpha)
-               xn(4,c) = w1 + w2
-               w1      = w1/xn(4,c)
-               w2      = w2/xn(4,c)
-               xn(1,c) = w1*xn(1,c) + w2*xn(1,p)
-               xn(2,c) = w1*xn(2,c) + w2*xn(2,p)
-               xn(3,c) = w1*xn(3,c) + w2*xn(3,p)
+               w1 = xn(nsd+1,c)*alpha
+               w2 = xn(nsd+1,p)*(1D0-alpha)
+               xn(nsd+1,c) = w1 + w2
+               w1      = w1/xn(nsd+1,c)
+               w2      = w2/xn(nsd+1,c)
+               xn(1:nsd,c) = w1*xn(1:nsd,c) + w2*xn(1:nsd,p)
             END DO
          END DO
       END IF
 
       RETURN
       END SUBROUTINE INTROW
-!--------------------------------------------------------------------      
+!--------------------------------------------------------------------
 !     This routine sets x and %nW
       SUBROUTINE SETROW(a1n,a1o)
-      
+
       IMPLICIT NONE
-      
+
       INTEGER, INTENT(IN) :: a1n, a1o
 
-      INTEGER i, j, k, cn, co, jmpn(nsd), jmpo(nsd), a2, a3
+      INTEGER i, j, k, cn, co, jmpn(insd), jmpo(insd), a2, a3
 
       i = dir
-      IF (nsd .EQ. 2) THEN
+      IF (insd .EQ. 2) THEN
          a2      = lM%bs(2)%nNo
          jmpn(1) = a2
          jmpn(2) = 1
@@ -335,7 +337,7 @@
             j = 2
          ELSE
             j  = 1
-!     If this is direction 2, nNo in this direction has changed            
+!     If this is direction 2, nNo in this direction has changed
             a2 = tbs%nNo
          END IF
          jmpo(1) = a2
@@ -346,7 +348,7 @@
             co = jmpo(i)*(a1o-1) + jmpo(j)*(a2-1) + 1
             xn(:,cn) = xo(:,co)
          END DO
-      ELSE
+      ELSE IF (insd .EQ. 3) THEN
          a2      = lM%bs(2)%nNo
          a3      = lM%bs(3)%nNo
          jmpn(1) = a3*a2
@@ -381,28 +383,26 @@
       END SUBROUTINE SETROW
 
       END SUBROUTINE KNOTINS
-
-!####################################################################
+!--------------------------------------------------------------------
 !     This routine constructs a NURBS based on %bs sub-structures
-      SUBROUTINE CONSTNRB(lM)
-
+      SUBROUTINE CONSTNRB(lM, insd)
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-      
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER, INTENT(IN) :: insd
 
-      TYPE dType  
+      TYPE dType
          INTEGER, ALLOCATABLE :: INN(:)
          INTEGER, ALLOCATABLE :: IEN(:,:)
-      END TYPE dType 
-      
+      END TYPE dType
+
       INTEGER i, j, k, ex, ey, ez, e, Ec, ax, ay, az, a, Ac, iFa,
-     2   shN, shE, jn(nsd), je(nsd), e1, e2, a1, a2
+     2   shN, shE, jn(insd), je(insd), e1, e2, a1, a2
       REAL(KIND=8) tmp, tmpO
-      TYPE(dType) d(nsd)
+      TYPE(dType) d(insd)
 
       IF (lM%eType .NE. eType_NRB) err = "Wrong call to CONSTNRB"
 
@@ -412,11 +412,11 @@
       lM%gnEl  = 1
       lM%nG    = 1
       lM%nSl   = 1
-      DO i=1, nsd
+      DO i=1, insd
          lM%bs(i)%nEl = 0
          DO j=1, lM%bs(i)%n
             tmp = lM%bs(i)%xi(j)
-            IF (j .GT. 1) THEN 
+            IF (j .GT. 1) THEN
                IF (.NOT.ISZERO(tmpO,tmp)) THEN
                   lM%bs(i)%nEl = lM%bs(i)%nEl + 1
                END IF
@@ -430,8 +430,8 @@
          lM%nG   = lM%nG  *lM%bs(i)%nG
          lM%nSl  = lM%nSl *lM%bs(i)%nSl
       END DO
-      ALLOCATE(lM%gIEN(lM%eNoN,lM%gnEl), lM%INN(nsd,lM%gnEl))
- 
+      ALLOCATE(lM%gIEN(lM%eNoN,lM%gnEl), lM%INN(insd,lM%gnEl))
+
 !     Setting the faces
       CALL SELECTELE(lM)
       DO iFa=1, lM%nFa
@@ -439,7 +439,7 @@
       END DO
 
 !     First constructing local IEN and INN arrays
-      DO i=1, nsd
+      DO i=1, insd
          ALLOCATE(d(i)%INN(lM%bs(i)%nEl),
      2            d(i)%IEN(lM%bs(i)%p+1,lM%bs(i)%nEl))
          e = 0
@@ -454,9 +454,9 @@
          END DO
       END DO
 
-!     Now based on the local IEN, I will construct global IEN         
+!     Now based on the local IEN, I will construct global IEN
       e = 0
-      IF (nsd .EQ. 2) THEN
+      IF (insd .EQ. 2) THEN
          DO ex=1, lM%bs(1)%nEl
             DO ey=1, lM%bs(2)%nEl
                e = e + 1
@@ -483,8 +483,8 @@
                      DO ay=1, lM%bs(2)%p + 1
                         DO az=1, lM%bs(3)%p + 1
                            Ac = lM%bs(3)%nNo*(lM%bs(2)%nNo
-     3                        *(d(1)%IEN(ax,ex) - 1) 
-     4                        + d(2)%IEN(ay,ey) - 1) 
+     3                        *(d(1)%IEN(ax,ex) - 1)
+     4                        + d(2)%IEN(ay,ey) - 1)
      5                        + d(3)%IEN(az,ez)
                            a = a + 1
                            lM%gIEN(a,e) = Ac
@@ -503,17 +503,17 @@
          i = lM%fa(iFa)%d
          lM%fa(iFa)%nEl = lM%gnEl/lM%bs(i)%nEl
          lM%fa(iFa)%nNo = lM%gnNo/lM%bs(i)%nNo
-         ALLOCATE(lM%fa(iFa)%gE(lM%fa(iFa)%nEl), 
+         ALLOCATE(lM%fa(iFa)%gE(lM%fa(iFa)%nEl),
      4      lM%fa(iFa)%IEN(lM%fa(iFa)%eNoN,lM%fa(iFa)%nEl))
 
 !     If control point is at the beginnig of the vector, starting ele%gl
 !     element is always 1. Otherwise it is calculated based on
 !     (ex-1)*(nEl_2*nEl_3) + (ey-1)*nEl_3 + ez. "pon" denotes moving in
 !     positive or negative direction. This is to have normal allways
-!     pointing outward. 
+!     pointing outward.
          shN = 0
          shE = 0
-         IF (nsd .EQ. 2) THEN
+         IF (insd .EQ. 2) THEN
             jn(1) = lM%bs(2)%nNo
             jn(2) = 1
             je(1) = lM%bs(2)%nEl
@@ -582,7 +582,7 @@
                   DO a1=1, lM%bs(j)%p + 1
                      DO a2=1, lM%bs(k)%p + 1
                         a  = a + 1
-                        Ac = shN + jn(j)*(d(j)%IEN(a1,e1) - 1) 
+                        Ac = shN + jn(j)*(d(j)%IEN(a1,e1) - 1)
      2                           + jn(k)* d(k)%IEN(a2,e2)
                         lM%fa(iFa)%IEN(a,e) = Ac
                      END DO
@@ -595,4 +595,4 @@
 
       RETURN
       END SUBROUTINE CONSTNRB
-
+!####################################################################

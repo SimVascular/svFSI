@@ -31,24 +31,22 @@
 !
 !--------------------------------------------------------------------
 !
-!     This is for solving linear elasticity
+!     This is for solving linear elasticity.
 !
 !--------------------------------------------------------------------
 
-      PURE SUBROUTINE LELAS3D (eNoN, w, N, Nx, al, dl, lR, lK)
-
+      PURE SUBROUTINE LELAS3D (eNoN, w, N, Nx, al, dl, bfl, lR, lK)
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), dl(tDof,eNoN)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
+     2   dl(tDof,eNoN), bfl(3,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER a, b, i, j, k
       REAL(KIND=8) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd, wl,
-     2   lDm, ed(6), ud(nsd), f(nsd)
+     2   lDm, ed(6), ud(3), f(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -70,9 +68,9 @@
       ed = 0D0
       ud = -f
       DO a=1, eNoN
-         ud(1) = ud(1) + N(a)*al(i,a)
-         ud(2) = ud(2) + N(a)*al(j,a)
-         ud(3) = ud(3) + N(a)*al(k,a)
+         ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
+         ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
+         ud(3) = ud(3) + N(a)*(al(k,a)-bfl(3,a))
 
          ed(1) = ed(1) + Nx(1,a)*dl(i,a)
          ed(2) = ed(2) + Nx(2,a)*dl(j,a)
@@ -129,13 +127,10 @@
 
       RETURN
       END SUBROUTINE LELAS3D
-
-!====================================================================
+!####################################################################
 !     This is for boundary elasticity equation
       PURE SUBROUTINE BLELAS (eNoN, w, N, h, nV, lR)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
@@ -154,23 +149,19 @@
 
       RETURN
       END SUBROUTINE BLELAS
-
 !####################################################################
-
-      PURE SUBROUTINE LELAS2D (eNoN, w, N, Nx, al, dl, lR, lK)
-
+      PURE SUBROUTINE LELAS2D (eNoN, w, N, Nx, al, dl, bfl, lR, lK)
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), dl(tDof,eNoN)
+      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
+     2   dl(tDof,eNoN), bfl(2,eNoN)
       REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
 
       INTEGER a, b, i, j
       REAL(KIND=8) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd, wl,
-     2   lDm, ed(3), ud(nsd), f(nsd)
+     2   lDm, ed(3), ud(2), f(2)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -190,8 +181,8 @@
       ed = 0D0
       ud = -f
       DO a=1, eNoN
-         ud(1) = ud(1) + N(a)*al(i,a)
-         ud(2) = ud(2) + N(a)*al(j,a)
+         ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
+         ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
 
          ed(1) = ed(1) + Nx(1,a)*dl(i,a)
          ed(2) = ed(2) + Nx(2,a)*dl(j,a)
@@ -227,4 +218,4 @@
 
       RETURN
       END SUBROUTINE LELAS2D
-
+!####################################################################

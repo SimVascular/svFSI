@@ -30,16 +30,14 @@
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
 !--------------------------------------------------------------------
-!      
+!
 !     Here Fast Fourier Transfer (FFT) and IFFT are calculated as well
 !     as values based on the linear interpolation.
-!      
+!
 !--------------------------------------------------------------------
 
       SUBROUTINE FFT(fid, np, gt)
-
       USE COMMOD
-
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: fid, np
@@ -92,41 +90,47 @@
 
       RETURN
       END SUBROUTINE FFT
-!-------------------------------------------------------------------- 
+!--------------------------------------------------------------------
 !     This is to calculate flow rate and flow acceleration (IFFT)
       PURE SUBROUTINE IFFT(gt, Y, dY)
-      
       USE COMMOD
-      
       IMPLICIT NONE
 
       TYPE(fcType), INTENT(IN) :: gt
       REAL(KIND=8), INTENT(OUT) :: Y, dY
 
       INTEGER i
-      REAL(KIND=8) t, tmp, K, kd
+      REAL(KIND=8) t, tmp, K, dk
 
-      t    = DMOD(time - gt%ti, gt%T)
-      tmp  = 2D0*pi/gt%T
-      Y    = gt%qi + t*gt%qs
-      dY   = gt%qs
-      DO i=1, gt%n
-         kd = tmp*REAL(i-1,8)
-         K  = t*kd
-         Y  =  Y +  gt%r(i)*COS(K) - gt%i(i)*SIN(K)
-         dY = dY - (gt%r(i)*SIN(K) + gt%i(i)*COS(K))*kd
-      END DO
+      IF (gt%lrmp) THEN
+         t = time - gt%ti
+         IF (t .LE. 0D0) THEN
+            t = MAX(t, 0D0)
+         ELSE
+            t = MIN(t, gt%T)
+         END IF
+         Y    = gt%qi + t*gt%qs
+         dY   = gt%qs
+      ELSE
+         t    = DMOD(time - gt%ti, gt%T)
+         tmp  = 2D0*pi/gt%T
+         Y    = gt%qi + t*gt%qs
+         dY   = gt%qs
+         DO i=1, gt%n
+            dk = tmp*REAL(i-1,8)
+            K  = t*dk
+            Y  =  Y +  gt%r(i)*COS(K) - gt%i(i)*SIN(K)
+            dY = dY - (gt%r(i)*SIN(K) + gt%i(i)*COS(K))*dk
+         END DO
+      END IF
 
-      RETURN 
+      RETURN
       END SUBROUTINE IFFT
-
-!--------------------------------------------------------------------
-!     This routine is for calculating values by the inverse of general 
+!####################################################################
+!     This routine is for calculating values by the inverse of general
 !     BC
       PURE SUBROUTINE IGBC(gm, Y, dY)
-      
       USE COMMOD
-      
       IMPLICIT NONE
 
       TYPE(MBType), INTENT(IN) :: gm
@@ -153,3 +157,4 @@
 
       RETURN
       END SUBROUTINE IGBC
+!####################################################################

@@ -28,12 +28,17 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+//--------------------------------------------------------------------
+//
+// Interface to Tetgen for remeshing purposes.
+//
+//--------------------------------------------------------------------
 
     #include "tetgen.h"
     #include <iostream>
     #include <stdio.h>
     #include <stdlib.h>
-    
+
     class tetOptions {
       public:
          double maxRadRatio;
@@ -44,7 +49,7 @@
          tetOptions();
          double maxTetVol(double r) {return (pow(r,3)/(6.0*sqrt(2)));}
    };
-               
+
    tetOptions::tetOptions () {
       maxRadRatio = 1.15;
       minDihedAng = 10.0;
@@ -64,7 +69,7 @@
          char fname [250];
          char switches [250];
          tetOptions options;
-         
+
          *pOK = 0;
          in.firstnumber = 1;
          in.numberofpoints = *nPoints;
@@ -76,11 +81,11 @@
                ++pointList;
             }
          }
-         
+
          in.numberoffacets = *nFacets;
          in.facetlist = new tetgenio::facet[in.numberoffacets];
          in.facetmarkerlist = new int[in.numberoffacets];
-         
+
          for (int i=0; i < in.numberoffacets; i++)
          {
             f = &in.facetlist[i];
@@ -98,11 +103,11 @@
             }
             in.facetmarkerlist[i] = 0;
          }
-         
+
          options.maxRadRatio = *params;
          options.minDihedAng = *(++params);
          options.maxEdgeSize = *(++params);
-         
+
          std::cout << " Using parameter <maxRadRatio> " << options.maxRadRatio << "\n";
          std::cout << " Using parameter <minDihedAng> " << options.minDihedAng << "\n";
          std::cout << " Using parameter <maxEdgeSize> " << options.maxEdgeSize << "\n\n";
@@ -112,7 +117,7 @@
                options.maxRadRatio, options.minDihedAng,   \
                options.maxTetVol(options.maxEdgeSize),      \
                options.optimLevel,   options.optimScheme);
-         
+
          if ( len > 250 )
          {
             std::cout << "    ERROR: Length of switch exceeded limit (250 char)\n";
@@ -120,11 +125,11 @@
             return;
          }
          tetrahedralize(switches, &in, &out);
-         
+
          strcpy(fname, "new-vol-mesh");
          out.save_nodes(fname);
          out.save_elements(fname);
-         
+
          return;
       }
    }

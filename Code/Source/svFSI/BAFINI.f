@@ -37,28 +37,33 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE BAFINI()
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER iM, iFa, iEq, i, a, iBc, lsPtr
 
       INTEGER, ALLOCATABLE :: gNodes(:)
 
+!     Compute face normals and area
       DO iM=1, nMsh
          DO iFa=1, msh(iM)%nFa
             msh(iM)%fa(iFa)%iM = iM
+            IF (msh(iM)%lFib) CYCLE
             CALL FACEINI(msh(iM)%fa(iFa))
          END DO
+         IF (msh(iM)%lShl) CALL SHLINI(msh(iM))
       END DO
 
+!     Initialize face BC profile
       DO iEq=1, nEq
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
             CALL BCINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa))
+            IF (msh(iM)%lShl) THEN
+               CALL SHLBCINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), msh(iM))
+            END IF
          END DO
       END DO
 
@@ -71,7 +76,8 @@
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
-            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_cpl)) THEN
+            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_cpl) .OR.
+     2          BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
                i = eq(iEq)%bc(iBc)%cplBCPtr
                cplBC%fa(i)%name = TRIM(msh(iM)%fa(iFa)%name)
                cplBC%fa(i)%y    = 0D0
@@ -81,12 +87,19 @@
                   cplBC%fa(i)%bGrp = cplBC_Neu
                   IF (cplBC%schm .NE. cplBC_E) eq(iEq)%bc(iBc)%bType=
      2               IBSET(eq(iEq)%bc(iBc)%bType,bType_res)
+
+!                 Copy RCR structure from bc() to cplBC()
+                  cplBC%fa(i)%RCR%Rp = eq(iEq)%bc(iBc)%RCR%Rp
+                  cplBC%fa(i)%RCR%C  = eq(iEq)%bc(iBc)%RCR%C
+                  cplBC%fa(i)%RCR%Rd = eq(iEq)%bc(iBc)%RCR%Rd
+                  cplBC%fa(i)%RCR%Pd = eq(iEq)%bc(iBc)%RCR%Pd
                ELSE
                   err = "Not a compatible cplBC_type"
                END IF
             END IF
          END DO
-         IF (cplBC%schm .NE. cplBC_E) CALL CALCDERCPLBC
+         IF (cplBC%useGenBC) CALL genBC_Integ_X('I')
+         IF (cplBC%schm .NE. cplBC_E) CALL CALCDERCPLBC()
       END IF
 
 !     Setting up FSILS
@@ -95,37 +108,75 @@
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
+            eq(iEq)%bc(iBc)%lsPtr = 0
             CALL FSILSINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), lsPtr)
          END DO
       END DO
 
+      IF (ibLSptr .NE. 0) THEN
+         SELECT CASE (ib%mthd)
+         CASE (ibMthd_SSM)
+            i = SUM(iblank(:))
+            ALLOCATE(gNodes(i))
+            i = 0
+            DO a=1, tnNo
+               IF (iblank(a) .EQ. 1) THEN
+                  i = i + 1
+                  gNodes(i) = a
+               END IF
+            END DO
+
+         CASE DEFAULT
+            err = " Invalid IB method (BAFINI)"
+         END SELECT
+
+         lsPtr = ibLSptr
+         CALL FSILS_BC_CREATE(lhs, lsPtr, i, nsd, BC_TYPE_Dir, gNodes)
+         DEALLOCATE(gNodes)
+      END IF
+
       IF (mvMsh) THEN
          i = 0
          DO a=1, tnNo
-            IF (ISDOMAIN(1, a, phys_struct)) i = i + 1
+            IF (ISDOMAIN(1, a, phys_struct) .OR.
+     2          ISDOMAIN(1, a, phys_vms_struct)) i = i + 1
          END DO
          ALLOCATE(gNodes(i))
          i = 0
          DO a=1, tnNo
-            IF (ISDOMAIN(1, a, phys_struct)) THEN
+            IF (ISDOMAIN(1, a, phys_struct) .OR.
+     2          ISDOMAIN(1, a, phys_vms_struct)) THEN
                i = i + 1
                gNodes(i) = a
             END IF
          END DO
-         CALL FSILS_BC_CREATE(lhs, nFacesLS, i, nsd, BC_TYPE_Dir,
-     &                        gNodes)
+         lsPtr = nFacesLS
+         CALL FSILS_BC_CREATE(lhs, lsPtr, i, nsd, BC_TYPE_Dir, gNodes)
+         DEALLOCATE(gNodes)
+      END IF
+
+      IF (cmmInit) THEN
+         i = SUM(cmmBdry)
+         ALLOCATE(gNodes(i))
+         i = 0
+         DO a=1, tnNo
+            IF (cmmBdry(a) .EQ. 1) THEN
+               i = i + 1
+               gNodes(i) = a
+            END IF
+         END DO
+         lsPtr = nFacesLS
+         CALL FSILS_BC_CREATE(lhs, lsPtr, i, nsd, BC_TYPE_Dir, gNodes)
+         DEALLOCATE(gNodes)
       END IF
 
       RETURN
       END SUBROUTINE BAFINI
-
-!--------------------------------------------------------------------
+!####################################################################
 !     Initializing faces
       SUBROUTINE FACEINI(lFa)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(INOUT) :: lFa
@@ -145,6 +196,7 @@
       sV       = 0D0
       area     = Integ(lFa,s)
       lFa%area = area
+      std = " Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
 !     Making sure area is not zero, since it will cause issues later on
       IF (ISZERO(area)) THEN
          IF (cm%mas()) wrn = "<"//TRIM(lFa%name)//"> area is zero"
@@ -182,10 +234,8 @@
       END SUBROUTINE FACEINI
 !--------------------------------------------------------------------
       SUBROUTINE BCINI(lBc, lFa)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(bcType), INTENT(INOUT) :: lBc
@@ -203,6 +253,9 @@
          END IF
          RETURN
       END IF
+
+      IF (BTEST(lBc%bType,bType_Robin) .AND. .NOT.dFlag) err =
+     2    "Robin BC can be set for a displacement-based eqn only"
 
       iM  = lFa%iM
       iFa = lBc%iFa
@@ -290,8 +343,6 @@
             Ac    = lFa%gN(a)
             s(Ac) = lBc%gx(a)
          END DO
-      ELSE IF (BTEST(lBc%bType,bType_ddep)) THEN
-         s = 1D0
       END IF
 
 !     Now correcting the inlet BC for the inlet ring
@@ -323,19 +374,17 @@
 
       RETURN
       END SUBROUTINE BCINI
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE FSILSINI(lBc, lFa, lsPtr)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       INTEGER, INTENT(INOUT) :: lsPtr
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER a, e, Ac, g, iM, i
+      INTEGER a, e, Ac, g, iM, i, nNo
       REAL(KIND=8) n(nsd)
       LOGICAL :: eDrn
 
@@ -343,30 +392,35 @@
       REAL(KIND=8), ALLOCATABLE :: sV(:,:), sVl(:,:)
 
       iM  = lFa%iM
-      ALLOCATE(sVl(nsd,lFa%nNo), sV(nsd,tnNo), gNodes(lFa%nNo))
-      DO a=1, lFa%nNo
+      nNo = lFa%nNo
+      ALLOCATE(sVl(nsd,nNo), sV(nsd,tnNo), gNodes(nNo))
+      DO a=1, nNo
          gNodes(a) = lFa%gN(a)
       END DO
 
       IF (BTEST(lBc%bType,bType_Dir)) THEN
-         lsPtr     = lsPtr + 1
-         lBc%lsPtr = lsPtr
-         sVl = 0D0
-         eDrn = .FALSE.
-         DO i=1, nsd
-            IF (lBc%eDrn(i) .NE. 0) THEN
-               eDrn = .TRUE.
-               EXIT
-            END IF
-         END DO
-         IF (eDrn) THEN
-            sVl = 1D0
+         IF (lBc%weakDir) THEN
+            lBc%lsPtr = 0
+         ELSE
+            lsPtr     = lsPtr + 1
+            lBc%lsPtr = lsPtr
+            sVl = 0D0
+            eDrn = .FALSE.
             DO i=1, nsd
-               IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0D0
+               IF (lBc%eDrn(i) .NE. 0) THEN
+                  eDrn = .TRUE.
+                  EXIT
+               END IF
             END DO
+            IF (eDrn) THEN
+               sVl = 1D0
+               DO i=1, nsd
+                  IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0D0
+               END DO
+            END IF
+            CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Dir,
+     2         gNodes, sVl)
          END IF
-         CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Dir,
-     2      gNodes, sVl)
       ELSE IF (BTEST(lBc%bType,bType_Neu)) THEN
          IF (BTEST(lBc%bType,bType_res)) THEN
             sV = 0D0
@@ -391,9 +445,216 @@
          ELSE
             lBc%lsPtr = 0
          END IF
+      ELSE IF (BTEST(lBc%bType,bType_trac)) THEN
+         lBc%lsPtr = 0
+      ELSE IF (BTEST(lBc%bType,bType_CMM)) THEN
+         lsPtr     = lsPtr + 1
+         lBc%lsPtr = lsPtr
+
+         nNo = 0
+         DO a=1, lFa%nNo
+            IF (ISZERO(lBc%gx(a))) nNo = nNo + 1
+         END DO
+         DEALLOCATE(gNodes, sVl)
+         ALLOCATE(sVl(nsd,nNo), gNodes(nNo))
+         sVl  = 0D0
+
+         eDrn = .FALSE.
+         DO i=1, nsd
+            IF (lBc%eDrn(i) .NE. 0) THEN
+               eDrn = .TRUE.
+               EXIT
+            END IF
+         END DO
+         IF (eDrn) THEN
+            sVl = 1D0
+            DO i=1, nsd
+               IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0D0
+            END DO
+         END IF
+
+         nNo = 0
+         DO a=1, lFa%nNo
+            Ac = lFa%gN(a)
+            IF (ISZERO(lBc%gx(a))) THEN
+               nNo = nNo + 1
+               gNodes(nNo) = Ac
+            END IF
+         END DO
+
+         CALL FSILS_BC_CREATE(lhs, lsPtr, nNo, nsd, BC_TYPE_Dir, gNodes,
+     2      sVl)
       ELSE
          err = "Unxpected bType in FSILSINI"
       END IF
 
+      DEALLOCATE(sVl, sV, gNodes)
+
       RETURN
       END SUBROUTINE FSILSINI
+!####################################################################
+!     Compute shell extended IEN for triangular elements. Reqd. to
+!     resolve bending moments
+      SUBROUTINE SETSHLXIEN(lM)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+
+      INTEGER :: a, b, e, f, Ac, Bc, nEl, eNoN, ep(2,3)
+
+      INTEGER, ALLOCATABLE :: incN(:)
+
+      eNoN = lM%eNoN
+      nEl  = lM%nEl
+
+      ep   = RESHAPE((/2,3,3,1,1,2/), SHAPE(ep))
+      ALLOCATE(incN(eNoN), lM%eIEN(eNoN,nEl), lM%sbc(eNoN,nEl))
+
+      lM%eIEN = 0
+      lM%sbc  = 0
+      DO e=1, nEl
+         DO a=1, eNoN
+            Ac = lM%IEN(ep(1,a),e)
+            Bc = lM%IEN(ep(2,a),e)
+            DO f=1, nEl
+               IF (e .EQ. f) CYCLE
+               incN = 0
+               DO b=1, eNoN
+                  IF (lM%IEN(b,f).EQ.Ac .OR. lM%IEN(b,f).EQ.Bc)
+     2               incN(b) = incN(b) + 1
+               END DO
+               IF (SUM(incN) .EQ. 2) THEN
+                  DO b=1, eNoN
+                     IF (incN(b) .EQ. 0) THEN
+                        lM%eIEN(a,e) = lM%IEN(b,f)
+                        EXIT
+                     END IF
+                  END DO
+                  EXIT
+               END IF
+            END DO
+            IF (lM%eIEN(a,e) .EQ. 0) THEN
+               lM%sbc(a,e) = IBSET(lM%sbc(a,e), bType_free)
+            END IF
+         END DO
+      END DO
+      DEALLOCATE(incN)
+
+      RETURN
+      END SUBROUTINE SETSHLXIEN
+!--------------------------------------------------------------------
+!     Initializing shell normals and area
+      SUBROUTINE SHLINI(lM)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+
+      INTEGER :: a, e, g, Ac, nNo, nEl, eNoN
+      LOGICAL :: flag
+      REAL(KIND=8) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
+
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sV(:,:)
+
+      nNo  = lM%nNo
+      nEl  = lM%nEl
+      eNoN = lM%eNoN
+
+!     Compute shell director (normal)
+      ALLOCATE(xl(nsd,eNoN), sV(nsd,tnNo), lM%nV(nsd,nNo))
+      sV   = 0D0
+      area = 0D0
+      DO e=1, nEl
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            xl(:,a) = x(:,Ac)
+         END DO
+
+         DO g=1, lM%nG
+            CALL GNNS(eNoN, lM%Nx(:,:,g), xl, nV, tmpR, tmpR)
+            Jac = SQRT(NORM(nV))
+            DO a=1, eNoN
+               Ac = lM%IEN(a,e)
+               sV(:,Ac) = sV(:,Ac) + lM%w(g)*lM%N(a,g)*nV
+               area     = area     + lM%w(g)*lM%N(a,g)*Jac
+            END DO
+         END DO
+      END DO
+      area = cm%reduce(area)
+      CALL COMMU(sV)
+
+      std = " Area of the shell surface <"//TRIM(lM%name)//"> is "//
+     2   STR(area)
+
+      flag = .TRUE.
+      DO a=1, nNo
+         Ac  = lM%gN(a)
+         Jac = SQRT(NORM(sV(:,Ac)))
+         IF (ISZERO(Jac)) THEN
+            IF (flag) THEN
+               wrn = "Skipping normal calculation of node "//a//
+     2            " in mesh <"//TRIM(lM%name)//">"
+               flag = .FALSE.
+            END IF
+            lM%nV(:,a) = 0D0
+            lM%nV(1,a) = 1D0
+            CYCLE
+         END IF
+         lM%nV(:,a) = sV(:,Ac)/Jac
+      END DO
+
+      DEALLOCATE(xl, sV)
+
+      RETURN
+      END SUBROUTINE SHLINI
+!--------------------------------------------------------------------
+!     Initializing shell boundary condition variables
+      SUBROUTINE SHLBCINI(lBc, lFa, lM)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(faceType), INTENT(IN) :: lFa
+      TYPE(mshType), INTENT(INOUT) :: lM
+
+      INTEGER :: a, b, e, Ac, Bc, Ec
+      LOGICAL :: bFlag
+
+      IF (lFa%eType .EQ. eType_NRB) RETURN
+      DO e=1, lFa%nEl
+         Ec = lFa%gE(e)
+         DO a=1, lM%eNoN
+            Ac = lM%IEN(a,Ec)
+            bflag = .FALSE.
+            DO b=1, lFa%eNoN
+               Bc = lFa%IEN(b,e)
+               IF (Ac .EQ. Bc) THEN
+                  bFlag = .TRUE.
+                  EXIT
+               END IF
+            END DO
+            IF (.NOT.bFlag) THEN
+               IF (.NOT.BTEST(lM%sbc(a,Ec),bType_free)) err =
+     2            "BC detected on a non-boundary shell element. "//
+     3            "Correction needed"
+               lM%sbc(a,Ec) = IBCLR(lM%sbc(a,Ec), bType_free)
+               IF (BTEST(lBc%bType,bType_free)) THEN
+                  lM%sbc(a,Ec) = IBSET(lM%sbc(a,Ec),bType_free)
+               ELSE IF (BTEST(lBc%bType,bType_fix)) THEN
+                  lM%sbc(a,Ec) = IBSET(lM%sbc(a,Ec),bType_fix)
+               ELSE IF (BTEST(lBc%bType,bType_hing)) THEN
+                  lM%sbc(a,Ec) = IBSET(lM%sbc(a,Ec),bType_hing)
+               ELSE IF (BTEST(lBc%bType,bType_symm)) THEN
+                  lM%sbc(a,Ec) = IBSET(lM%sbc(a,Ec),bType_symm)
+               END IF
+               EXIT
+            END IF
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE SHLBCINI
+!####################################################################

@@ -525,7 +525,8 @@
       IF (ALLOCATED(lhs%rowPtr)) DEALLOCATE(lhs%rowPtr)
       IF (ALLOCATED(lhs%diagPtr)) DEALLOCATE(lhs%diagPtr)
       IF (ALLOCATED(lhs%cS)) DEALLOCATE(lhs%cS)
-      DEALLOCATE(lhs%map, lhs%face)
+      IF (ALLOCATED(lhs%map)) DEALLOCATE(lhs%map)
+      IF (ALLOCATED(lhs%face)) DEALLOCATE(lhs%face)
 
       RETURN
       END SUBROUTINE FSILS_LHS_FREE

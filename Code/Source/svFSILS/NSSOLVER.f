@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,26 +31,26 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 !
 !--------------------------------------------------------------------
 !     This routine is mainley intended for solving incompressible NS or
-!     FSI equations with a form of AU=R, in which A = [K D;-G L] and 
+!     FSI equations with a form of AU=R, in which A = [K D;-G L] and
 !     G = -D^t
 !--------------------------------------------------------------------
-      
+
       SUBROUTINE NSSOLVER(lhs, ls, dof, Val, Ri)
-      
+
       INCLUDE "FSILS_STD.h"
 
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
@@ -65,9 +65,9 @@
      &   FSILS_DOTV, eps, FSILS_NCDOTS, FSILS_NCDOTV
       REAL(KIND=8), ALLOCATABLE :: U(:,:,:), P(:,:), MU(:,:,:), MP(:,:),&
      &   A(:,:), tmp(:), tmpG(:), B(:), xB(:), oldxB(:), mK(:,:),       &
-     &   mG(:,:), mD(:,:), mL(:), Gt(:,:), Rm(:,:), Rc(:), Rmi(:,:), 
+     &   mG(:,:), mD(:,:), mL(:), Gt(:,:), Rm(:,:), Rc(:), Rmi(:,:),
      &   Rci(:)
- 
+
       nNo = lhs%nNo
       nnz = lhs%nnz
       mynNo = lhs%mynNo
@@ -108,21 +108,21 @@
          ls%RI%dB = ls%RI%fNorm
 
 !        U  = K^-1*Rm
-         CALL GMRES(lhs, ls%GM, nsd, mK, Rm, U(:,:,i))                 
+         CALL GMRES(lhs, ls%GM, nsd, mK, Rm, U(:,:,i))
 !        P  = D*U
          CALL FSILS_SPARMULVS(lhs, lhs%rowPtr, lhs%colPtr, nsd, mD,     &
      &      U(:,:,i), P(:,i))
 !        P  = Rc - P
-         P(:,i) = Rc - P(:,i)                                        
+         P(:,i) = Rc - P(:,i)
 !        P  = [L + G^t*G]^-1*P
          CALL CGRAD_SCHUR(lhs, ls%CG, nsd, Gt, mG, mL, P(:,i))
 !        MU1 = G*P
          CALL FSILS_SPARMULSV(lhs, lhs%rowPtr, lhs%colPtr, nsd, mG,     &
      &      P(:,i), MU(:,:,iB))
 !        MU2 = Rm - G*P
-         MU(:,:,iBB) = Rm - MU(:,:,iB)                               
+         MU(:,:,iBB) = Rm - MU(:,:,iB)
 !        U  = K^-1*[Rm - G*P]
-         CALL GMRES(lhs, ls%GM, nsd, mK, MU(:,:,iBB), U(:,:,i))        
+         CALL GMRES(lhs, ls%GM, nsd, mK, MU(:,:,iBB), U(:,:,i))
 !        MU2 = K*U
          CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, nsd, mK,     &
      &      U(:,:,i), MU(:,:,iBB))
@@ -180,7 +180,7 @@
             ls%RI%suc = .TRUE.
             EXIT
          END IF
- 
+
          Rm = Rmi - xB(1)*MU(:,:,1)
          Rc = Rci - xB(1)*MP(:,1)
          DO j=2, iBB
@@ -192,7 +192,7 @@
          ls%RI%itr = ls%RI%mItr
       ELSE
          ls%RI%itr = i
- 
+
          Rc = Rci - xB(1)*MP(:,1)
          DO j=2, iBB
             Rc = Rc - xB(j)*MP(:,j)
@@ -201,7 +201,7 @@
       ls%Resc = NINT(1D2*FSILS_NORMS(mynNo, lhs%commu, Rc)**2D0/        &
      &   ls%RI%fNorm)
       ls%Resm = 100 - ls%Resc
- 
+
       Rmi = xB(2)*U(:,:,1)
       Rci = xB(1)*P(:,1)
       DO i=2, ls%RI%itr
@@ -214,7 +214,7 @@
 
       ls%RI%callD = FSILS_CPUT() - ls%RI%callD
       ls%RI%dB    = 5D0*LOG(ls%RI%fNorm/ls%RI%dB)
-  
+
       IF (ls%Resc.LT.0 .OR. ls%Resm.LT.0) THEN
          ls%Resc = 0
          ls%Resm = 0
@@ -226,10 +226,10 @@
          END IF
       END IF
       ls%RI%fNorm = SQRT(ls%RI%fNorm)
-    
+
       Ri(1:nsd,:) = Rmi
       Ri(dof,:) = Rci
-      
+
       IF (lhs%commu%masF) CALL LOGFILE
 
       RETURN
@@ -243,7 +243,7 @@
 
       INTEGER i, j, k, l
       REAL(KIND=8), ALLOCATABLE :: tmp(:)
-      
+
       ALLOCATE(mK(nsd*nsd,nnz), mG(nsd,nnz), mD(nsd,nnz), mL(nnz),      &
      &   Gt(nsd,nnz), tmp((nsd+1)*(nsd+1)))
 
@@ -261,13 +261,13 @@
 
             mD(1,i) = tmp(7)
             mD(2,i) = tmp(8)
-            
+
             mL(i)   = tmp(9)
          END DO
       ELSE IF(nsd .EQ. 3) THEN
          DO i=1, nnz
             tmp = Val(:,i)
-   
+
             mK(1,i) = tmp(1)
             mK(2,i) = tmp(2)
             mK(3,i) = tmp(3)
@@ -277,7 +277,7 @@
             mK(7,i) = tmp(9)
             mK(8,i) = tmp(10)
             mK(9,i) = tmp(11)
-            
+
             mG(1,i) = tmp(4)
             mG(2,i) = tmp(8)
             mG(3,i) = tmp(12)
@@ -292,7 +292,7 @@
          PRINT *, "FSILS: Not defined nsd for DEPART", nsd
          STOP "FSILS: FATAL ERROR"
       END IF
- 
+
       DO i=1, nNo
          Do j=lhs%rowPtr(1,i), lhs%rowPtr(2,i)
             k = lhs%colPtr(j)
@@ -309,7 +309,7 @@
       END SUBROUTINE DEPART
 
 !--------------------------------------------------------------------
-      
+
       SUBROUTINE BCPRE
 
       IMPLICIT NONE
@@ -346,22 +346,22 @@
 
       RETURN
       END SUBROUTINE BCPRE
-      
+
 !--------------------------------------------------------------------
 
       SUBROUTINE LOGFILE
 
       IMPLICIT NONE
- 
+
       LOGICAL flag
       INTEGER fid, i, j
-      CHARACTER(LEN=*), PARAMETER :: fName = '.FSILS_NS.log'
+      CHARACTER(LEN=*), PARAMETER :: fName = 'FSILS_NS.log'
 
       INQUIRE(FILE=fName, EXIST=flag)
 
       fid = 11232
       OPEN(fid, FILE=fName, POSITION='APPEND')
-      
+
       IF (.NOT.flag) THEN
          i = 0
          DO j=1, lhs%nFaces
@@ -382,7 +382,7 @@
      &   NINT(ls%GM%callD/ls%RI%CallD*1D2),                             &
      &   NINT(ls%CG%callD/ls%RI%CallD*1D2),                             &
      &   ls%RI%iNorm, ls%RI%fNorm/ls%RI%iNorm, ls%RI%CallD,             &
-     &   ls%Resm, ls%Resc, NINT(ls%RI%dB) 
+     &   ls%Resm, ls%Resc, NINT(ls%RI%dB)
 
       CLOSE(fid)
 

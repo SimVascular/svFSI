@@ -165,15 +165,19 @@ if(APPLE)
 
 elseif(LINUX)
 
-  # To get the distriubtion and the version, we need to use lsb
+  # To get the distribution and the version, we need to use lsb
   find_program(LSB_RELEASE lsb_release)
-  execute_process(COMMAND ${LSB_RELEASE} -a
-    OUTPUT_VARIABLE LSB_RELEASE_INFO
+
+  # Get distribution name
+  execute_process(COMMAND ${LSB_RELEASE} -is
+    OUTPUT_VARIABLE LSB_DISTRIB
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-  # Get distribution name and version number from lsb_release output
-  STRING(REGEX REPLACE "Distributor ID:[\t]*([^ \n\r]+).*$" "\\1" LSB_DISTRIB "${LSB_RELEASE_INFO}")
-  STRING(REGEX REPLACE "^.*Release:[\t]*([^ \n\r]+).*$" "\\1" LSB_VERSION "${LSB_RELEASE_INFO}")
+  # Get distribution release version
+  execute_process(COMMAND ${LSB_RELEASE} -rs
+    OUTPUT_VARIABLE LSB_VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+
   string(TOLOWER "${LSB_DISTRIB}" _platform_lower)
 
   # Set the distrib and version

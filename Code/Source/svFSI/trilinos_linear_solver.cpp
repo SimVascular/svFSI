@@ -29,6 +29,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+//--------------------------------------------------------------------
+//
+// Interface to Trilinos linear solver library.
+//
+//--------------------------------------------------------------------
+
 /*!
   \file    trilinos_linear_solver.cpp
   \brief   wrap Trilinos solver functions
@@ -305,7 +311,7 @@ void trilinos_doassem_(int &numNodesPerElement, const int *eqN,
   //converts eqN in local proc values to global values
   std::vector<int> localToGlobal(numNodesPerElement);
 
-  //subtract 1 since eqN is 1 based and C is 0 based indeing
+  //subtract 1 since eqN is 1 based and C is 0 based indexing
   for (int i = 0; i < numNodesPerElement; ++i)
     localToGlobal[i] = localToGlobalUnsorted[eqN[i] - 1];
 
@@ -463,9 +469,10 @@ void trilinos_global_solve_(const double *Val, const double *RHS, double *x,
   }
 
   //call solver code which assembles K and F for shared processors
+  bool flagFassem = false;
   trilinos_solve_(x, dirW, resNorm, initNorm, numIters,
           solverTime, dB, converged, lsType,
-          relTol, maxIters, kspace, precondType);
+          relTol, maxIters, kspace, precondType, flagFassem);
 
 } // trilinos_global_solve_
 
@@ -488,12 +495,15 @@ void trilinos_global_solve_(const double *Val, const double *RHS, double *x,
  * \param maxIters    default max number of iterations for gmres per restart
  * \param kspace      specific for gmres dim of the stored Krylov space vectors
  * \param precondType defines type of preconditioner to use
+ * \param isFassem    determines if F is already assembled at ghost nodes
  */
 void trilinos_solve_(double *x, const double *dirW, double &resNorm,
         double &initNorm, int &numIters, double &solverTime, double &dB,
         bool &converged, int &lsType, double &relTol, int &maxIters,
-        int &kspace, int &precondType)
+        int &kspace, int &precondType, bool &isFassem)
 {
+  bool flagFassem = isFassem;
+
   // Already filled from graph so does not need to call fillcomplete
   // routine will sum in contributions from elements on shared nodes amongst
   // processors
@@ -507,13 +517,16 @@ void trilinos_solve_(double *x, const double *dirW, double &resNorm,
   //very important for performance-makes memory contiguous
   Trilinos::K->OptimizeStorage();
 
-  //sum in values from shared nodes amongst the processors
-  error = Trilinos::F->GlobalAssemble();
-
-  if (error != 0)
+  if (flagFassem)
   {
-    std::cout << "ERROR: Global Assembling force vector" << std::endl;
-    exit(1);
+    //sum in values from shared nodes amongst the processors
+    error = Trilinos::F->GlobalAssemble();
+
+    if (error != 0)
+    {
+      std::cout << "ERROR: Global Assembling force vector" << std::endl;
+      exit(1);
+    }
   }
 
   // Construct Jacobi scaling vector which uses dirW to take the Dirichlet BC
@@ -692,6 +705,7 @@ void setMLPrec(AztecOO &Solver)
   int *options = new int[AZ_OPTIONS_SIZE];
   double *params = new double[AZ_PARAMS_SIZE];
   ML_Epetra::SetDefaults("SA",MLList, options, params);
+  //MLList.set("XML input file", "/home/augustin/programs/MUPFES/trunk/examples/conf-files/ml_ParameterList_sGS.xml");
 
   // ML general options
   // output level, 0 being silent and 10 verbose
@@ -1014,3 +1028,5 @@ void printSolutionToFile()
     Xfile << X[i] << std::endl; //Jacobi preconditioning on the lefts;
   Xfile.close();
 }
+
+

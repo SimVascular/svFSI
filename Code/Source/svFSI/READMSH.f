@@ -32,71 +32,59 @@
 !--------------------------------------------------------------------
 !
 !     This routine is desinged to read the mesh/es that may come in
-!     several formats and setup all parameters related to meshes
+!     several formats and setup all parameters related to meshes.
 !
 !--------------------------------------------------------------------
+
 !     The higher level routine that calls other routines
       SUBROUTINE READMSH(list)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
 
       CHARACTER, PARAMETER :: dSym(3) = (/"X","Y","Z"/)
 
-      LOGICAL flag
-      INTEGER i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
-      REAL(KIND=8) maxX(nsd), minX(nsd), scaleF, fibN(nsd)
-      CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr, lPM, lPBC
-      TYPE(stackType) avNds
-      TYPE(fileType) fTmp
-      
+      LOGICAL :: flag
+      INTEGER :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
+      REAL(KIND=8) :: maxX(nsd), minX(nsd), scaleF, fibN(nsd), rtmp
+      CHARACTER(LEN=stdL) :: ctmp, fExt
+      TYPE(listType), POINTER :: lPtr, lPM
+      TYPE(stackType) :: avNds
+      TYPE(fileType) :: fTmp
+
+      LOGICAL, ALLOCATABLE :: ichk(:)
       REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), gX(:,:), tmpA(:,:),
      2   tmpY(:,:), tmpD(:,:)
 
+      minX  =  HUGE(minX)
+      maxX  = -HUGE(minX)
       IF (.NOT.resetSim) THEN
          nMsh  = list%srch("Add mesh",ll=1)
          std = " Number of meshes: "//nMsh
          ALLOCATE (msh(nMsh), gX(0,0))
 
          gtnNo = 0
-         minX  =  HUGE(minX)
-         maxX  = -HUGE(minX)
          DO iM=1, nMsh
             lPM => list%get(msh(iM)%name,"Add mesh",iM)
-            std = " Reading mesh <"//CLR(TRIM(msh(iM)%name))//">"
+            lPtr => lPM%get(msh(iM)%lShl,"Set mesh as shell")
+            lPtr => lPM%get(msh(iM)%lFib,"Set mesh as fibers")
 
-            IF (legacyFmt) THEN
+            std  = " Reading mesh <"//CLR(TRIM(msh(iM)%name))//">"
+            CALL READSV(lPM, msh(iM))
+            IF (msh(iM)%eType .EQ. eType_NA) THEN
                CALL READCCNE(lPM, msh(iM))
-               IF (msh(iM)%eType .EQ. eType_NA) THEN
-                  CALL READNRB(lPM, msh(iM))
-               END IF
-               IF (msh(iM)%eType .EQ. eType_NA) THEN
-                  CALL READGAMBIT(lPM, msh(iM))
-               END IF
-               IF (msh(iM)%eType .EQ. eType_NA) THEN
-                  err = "Failed to identify format of the mesh"
-               END IF
-            ELSE
-               lPtr => lPM%get(ftmp,"Mesh file path (vtu)")
-               IF (.NOT.ASSOCIATED(lPtr)) err =
-     2            " Mesh file (vtu) not provided"
-               CALL READVTU(msh(iM),ftmp%fname)
-               msh(iM)%nFa = lPM%srch("Add face")
-               std = " Number of available faces: "//msh(iM)%nFa
-               ALLOCATE (msh(iM)%fa(msh(iM)%nFa))
-               DO iFa=1, msh(iM)%nFa
-                  lPBC => lPM%get(msh(iM)%fa(iFa)%name,"Add face",iFa)
-                  lPtr => lPBC%get(ftmp,"Face file path (vtp)")
-                  IF (.NOT.ASSOCIATED(lPtr)) err =
-     2               " Face file (vtp) not provided"
-                  CALL READVTP(msh(iM), msh(iM)%fa(iFa), ftmp%fname)
-               END DO
+            END IF
+            IF (msh(iM)%eType .EQ. eType_NA) THEN
+               CALL READNRB(lPM, msh(iM))
+            END IF
+            IF (msh(iM)%eType .EQ. eType_NA) THEN
+               CALL READGAMBIT(lPM, msh(iM))
+            END IF
+            IF (msh(iM)%eType .EQ. eType_NA) THEN
+               err = "Failed to identify format of the mesh"
             END IF
 
             IF (nMsh .LE. 3) THEN
@@ -135,12 +123,44 @@
                DEALLOCATE(gX)
                ALLOCATE(gX(nsd,a))
             END IF
-            gX(:,gtnNo+1:a) = x*scaleF
+            gX(:,gtnNo+1:a) = msh(iM)%x * scaleF
             gtnNo           = a
-            DEALLOCATE(x)
+            DEALLOCATE(msh(iM)%x)
          END DO
          ALLOCATE(x(nsd,gtnNo))
          x = gX
+
+!        Checks for shell elements
+         DO iM=1, nMsh
+            IF (msh(iM)%lShl) THEN
+               IF (msh(iM)%eType.NE.eType_NRB .AND.
+     2             msh(iM)%eType.NE.eType_TRI) THEN
+                  err = "Shell elements can be either triangles "//
+     2               "or C1-NURBS"
+               END IF
+               IF (msh(iM)%eType .EQ. eType_NRB) THEN
+                  DO i=1, nsd-1
+                     IF (msh(iM)%bs(i)%p .LE. 1) err =
+     2                  "NURBS for shell elements should be p > 1"
+                  END DO
+               END IF
+c               IF (msh(iM)%eType .EQ. eType_TRI) THEN
+c                  IF (.NOT.cm%seq()) err = "Triangular shell elements"//
+c     2               " should be run sequentially"
+c               END IF
+            END IF
+         END DO
+
+!        Checks for fiber mesh
+         DO iM=1, nMsh
+            IF (msh(iM)%lFib) THEN
+               IF (msh(iM)%eType.NE.eType_LIN .AND.
+     2             msh(iM)%eType.NE.eType_QUD) THEN
+                  err = "Fiber elements can be either linear "//
+     2               "or quadratic"
+               END IF
+            END IF
+         END DO
       ELSE
          ALLOCATE(gX(nsd,gtnNo))
          gX = x
@@ -174,18 +194,60 @@
       IF (avNds%n .NE. 0) err = "There are still nodes in the stack"
       CALL DESTROYSTACK(avNds)
 
-!     Re-arranging fa and x and finding the size of the entire domain
+!     Temporarily allocate msh%lN array. This is necessary for BCs and
+!     will later be deallocated in DISTRIBUTE
+      DO iM=1, nMsh
+         ALLOCATE(msh(iM)%lN(gtnNo))
+         msh(iM)%lN = 0
+         DO a=1, msh(iM)%gnNo
+            Ac = msh(iM)%gN(a)
+            msh(iM)%lN(Ac) = a
+         END DO
+      END DO
+
+!     Re-arranging x and finding the size of the entire domain
+!     First rearrange 2D/3D mesh and then, 1D fiber mesh
+      ALLOCATE(ichk(gtnNo))
+      ichk = .FALSE.
       b = 0
       DO iM=1, nMsh
+         IF (msh(iM)%lFib) THEN
+            b = b + msh(iM)%gnNo
+            CYCLE
+         END IF
          DO a=1, msh(iM)%gnNo
             b  = b + 1
             Ac = msh(iM)%gN(a)
+            ichk(Ac) = .TRUE.
             DO i=1, nsd
                x(i,Ac) = gX(i,b)
                IF (maxX(i) .LT. x(i,Ac)) maxX(i) = x(i,Ac)
                IF (minX(i) .GT. x(i,Ac)) minX(i) = x(i,Ac)
             END DO
          END DO
+      END DO
+
+      b = 0
+      DO iM=1, nMsh
+         IF (.NOT.msh(iM)%lFib) THEN
+            b = b + msh(iM)%gnNo
+            CYCLE
+         END IF
+         DO a=1, msh(iM)%gnNo
+            b  = b + 1
+            Ac = msh(iM)%gN(a)
+            IF (ichk(Ac)) CYCLE
+            DO i=1, nsd
+               x(i,Ac) = gX(i,b)
+               IF (maxX(i) .LT. x(i,Ac)) maxX(i) = x(i,Ac)
+               IF (minX(i) .GT. x(i,Ac)) minX(i) = x(i,Ac)
+            END DO
+         END DO
+      END DO
+      DEALLOCATE(ichk)
+
+!     Rearrange fa
+      DO iM=1, nMsh
          DO iFa=1, msh(iM)%nFa
             DO a=1, msh(iM)%fa(iFa)%nNo
                Ac = msh(iM)%fa(iFa)%gN(a)
@@ -228,28 +290,6 @@
                   END DO
                END DO
             END DO
-            IF (saveAve) THEN
-               tmpA = rmsh%Aav
-               tmpY = rmsh%Yav
-               tmpD = rmsh%Dav
-               DEALLOCATE(rmsh%Aav,rmsh%Yav,rmsh%Dav)
-               ALLOCATE(rmsh%Aav(lDof,gtnNo))
-               ALLOCATE(rmsh%Yav(lDof,gtnNo))
-               ALLOCATE(rmsh%Dav(lDof,gtnNo))
-               b = 0
-               DO iM=1, nMsh
-                  DO a=1, msh(iM)%gnNo
-                     b = b + 1
-                     Ac = msh(iM)%gpN(a)
-                     DO i=1, lDof
-                        rmsh%Aav(i,Ac) = tmpA(i,b)
-                        rmsh%Yav(i,Ac) = tmpY(i,b)
-                        rmsh%Dav(i,Ac) = tmpD(i,b)
-                     END DO
-                  END DO
-               END DO
-               DEALLOCATE(tmpA, tmpY, tmpD)
-            END IF ! saveAve
          END IF ! lnNo < gtnNo
       END IF ! resetSim
 
@@ -259,11 +299,22 @@
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
 
-         lPtr => lPM%get(fTmp,"Domain file path")
-         IF (ASSOCIATED(lPtr)) CALL SETDMNIDFF(msh(iM), fTmp%open())
-
          lPtr => lPM%get(i,"Domain",ll=0,ul=BIT_SIZE(dmnId)-1)
          IF (ASSOCIATED(lPtr)) CALL SETDMNID(msh(iM),i)
+
+         lPtr => lPM%get(fTmp,"Domain file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            IF (rmsh%isReqd) err = "Variable domain properties is not"//
+     2         " allowed with remeshing"
+            i = LEN(TRIM(fTmp%fname))
+            fExt = fTmp%fname(i-2:i)
+            IF (TRIM(fExt).EQ."vtp" .OR. TRIM(fExt).EQ."vtu") THEN
+               CALL SETDMNIDVTK(msh(iM), fTmp%fname, "DOMAIN_ID")
+            ELSE
+               CALL SETDMNIDFF(msh(iM), fTmp%open())
+            END IF
+         END IF
+
          IF (ALLOCATED(msh(iM)%eId)) flag = .TRUE.
       END DO
       IF (flag) THEN
@@ -280,38 +331,86 @@
             END DO
          END DO
       END IF
-      
+
 !     Read fiber orientation
+      flag = .FALSE.
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
-         
-         lPtr => lPM%get(cTmp, "Fiber direction file path")
-         IF (ASSOCIATED(lPtr)) THEN
-            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            CALL SETFIBDIRFF(msh(iM), cTmp)
+         j = lPM%srch("Fiber direction file path")
+         IF (j .EQ. 0) j = lPM%srch("Fiber direction")
+         IF (j .NE. 0) THEN
+            flag = .TRUE.
+            EXIT
          END IF
-         
-         lPtr => lPM%get(fibN, "Fiber direction")
+      END DO
+
+      IF (flag) THEN
+         DO iM=1, nMsh
+            lPM => list%get(msh(iM)%name,"Add mesh",iM)
+
+            msh(iM)%nFn = lPM%srch("Fiber direction file path")
+            IF (msh(iM)%nFn .NE. 0) THEN
+               IF (rmsh%isReqd) err = "Fiber directions read from "//
+     2            "file is not allowed with remeshing"
+               ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
+               msh(iM)%fN = 0D0
+               DO i=1, msh(iM)%nFn
+                  lPtr => lPM%get(cTmp,
+     2               "Fiber direction file path", i)
+                  IF (ASSOCIATED(lPtr))
+     2               CALL READFIBNFF(msh(iM), cTmp, "FIB_DIR", i)
+               END DO
+            ELSE
+               msh(iM)%nFn = lPM%srch("Fiber direction")
+               IF (msh(iM)%nFn .NE. 0) THEN
+                  ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
+                  msh(iM)%fN = 0D0
+                  DO i=1, msh(iM)%nFn
+                     lPtr => lPM%get(fibN, "Fiber direction", i)
+                     rtmp = SQRT(NORM(fibN))
+                     IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
+                     DO e=1, msh(iM)%gnEl
+                        msh(iM)%fN((i-1)*nsd+1:i*nsd,e) = fibN(1:nsd)
+                     END DO
+                  END DO
+               END IF
+            END IF
+         END DO
+      ELSE
+         msh(:)%nFn = 0
+      END IF
+
+!     Read prestress data
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+
+         lPtr => lPM%get(cTmp, "Prestress file path")
          IF (ASSOCIATED(lPtr)) THEN
-            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            DO a=1, msh(iM)%gnNo
-               msh(iM)%x(:,a) = fibN(:)
-            END DO
+            IF (rmsh%isReqd) THEN
+               err = "Prestress is currently not allowed with remeshing"
+            END IF
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(nstd,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Stress", nstd, 1)
          END IF
-         IF (ALLOCATED(msh(iM)%x)) flag = .TRUE.
       END DO
       IF (flag) THEN
-         ALLOCATE(fN(nsd,gtnNo))
-         fN = 0D0
+         ALLOCATE(pS0(nstd,gtnNo))
+         pS0 = 0D0
          DO iM=1, nMsh
             IF (.NOT.ALLOCATED(msh(iM)%x)) CYCLE
             DO a=1, msh(iM)%gnNo
                Ac = msh(iM)%gN(a)
-               fN(:,Ac) = msh(iM)%x(:,a)
+               pS0(:,Ac) = msh(iM)%x(:,a)
             END DO
             DEALLOCATE(msh(iM)%x)
          END DO
       END IF
+
+!      Load any initial data (velocity, pressure, displacements)
+      IF (.NOT.resetSim) CALL LOADVARINI(list)
 
       IF (nMsh .GT. 1) THEN
          IF (.NOT.resetSim) THEN
@@ -320,7 +419,7 @@
          ELSE
             std = " Total number of nodes after remesh: "//gtnNo
             std = " Total number of elements after remesh: "//
-     2      SUM(msh%gnEl)
+     2         SUM(msh%gnEl)
          END IF
       END IF
 
@@ -335,23 +434,46 @@
      2      //" "//STR(maxX(i)),4)
       END DO
 
+!     Read contact model parameters
+      IF (.NOT.resetSim) THEN
+         iCntct = .FALSE.
+         lPM => list%get(ctmp, "Contact model")
+         IF (ASSOCIATED(lPM)) THEN
+            iCntct = .TRUE.
+            SELECT CASE (TRIM(ctmp))
+            CASE ("penalty")
+               cntctM%cType = cntctM_penalty
+               lPtr => lPM%get(cntctM%k,
+     2            "Penalty constant (k)", 1, ll=0D0)
+               lPtr => lPM%get(cntctM%h,
+     2            "Desired separation (h)", 1, lb=0D0)
+               lPtr => lPM%get(cntctM%c,
+     2            "Closest gap to activate penalty (c)", 1, lb=0D0)
+               IF (cntctM%c .LT. cntctM%h) err =
+     2            "Choose c > h for proper contact penalization"
+               lPtr => lPM%get(cntctM%al,
+     2            "Min norm of face normals (alpha)",1,lb=0D0,ub=1D0)
+            CASE DEFAULT
+               err = "Undefined contact model"
+            END SELECT
+         END IF
+      END IF
+
       RETURN
       END SUBROUTINE READMSH
-
 !####################################################################
 !     This routines associates two faces with each other and sets gN
       SUBROUTINE SETPROJECTOR(list, avNds)
-
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(stackType), INTENT(OUT) :: avNds
 
       INTEGER i, j, k, iM, jM, kM, iFa, jFa, ia, ja, nPrj, iPrj, nStk
+      REAL(KIND=8) tol
       CHARACTER(LEN=stdL) ctmpi, ctmpj
       TYPE(stackType) lPrj
       TYPE(listType), POINTER :: lPtr, lPP
@@ -379,7 +501,9 @@
          CALL FINDFACE(ctmpi, iM, iFa)
          lPtr => lPP%get(ctmpj,"Project from face",1)
          CALL FINDFACE(ctmpj, jM, jFa)
-         CALL MATCHFACES(msh(iM)%fa(iFa), msh(jM)%fa(jFa), lPrj)
+         tol = 0.0D0
+         lPtr => lPP%get(tol,"Projection tolerance")
+         CALL MATCHFACES(msh(iM)%fa(iFa), msh(jM)%fa(jFa), lPrj, tol)
          DO
 !     First in, last out
             IF (.NOT.PULLSTACK(lPrj,ja)) EXIT
@@ -432,19 +556,17 @@
 
       RETURN
       END SUBROUTINE SETPROJECTOR
-
 !--------------------------------------------------------------------
 !     This is match isoparameteric faces to each other. Project nodes
 !     from two adjacent meshes to each other based on a L2 norm.
-      SUBROUTINE MATCHFACES(lFa, pFa, lPrj)
-
+      SUBROUTINE MATCHFACES(lFa, pFa, lPrj, tol)
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(faceType), INTENT(INOUT) :: lFa, pFa
       TYPE(stackType), INTENT(OUT) :: lPrj
+      REAL(KIND=8), INTENT(IN) :: tol
 
       TYPE blkType
          INTEGER :: n = 0
@@ -453,14 +575,11 @@
 
       LOGICAL nFlt(nsd)
       INTEGER nBkd, i, a, b, Ac, Bc, iBk, nBk, iM, jM, iSh, jSh
-      REAL(KIND=8) ds, xMin(nsd), xMax(nsd), dx(nsd)
+      REAL(KIND=8) ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
 
       INTEGER, ALLOCATABLE :: nodeBlk(:)
       TYPE(blkType), ALLOCATABLE :: blk(:)
       INTEGER :: cnt
-
-      IF (lFa%eType .NE. pFa%eType)
-     2   err = "Incompatible faces in MATCHFACES"
 
       iM  = lFa%iM
       jM  = pFa%iM
@@ -474,7 +593,7 @@
       END DO
 
 !     We want to have approximately 1000 nodes in each block. So we
-!     calculate nBkd, which is the number of separate blockes in eahc
+!     calculate nBkd, which is the number of separate blockes in each
 !     direction, based on that.
       a    = pFa%nNo
       nBkd = NINT((REAL(a,8)/1D3)**(3.33D-1))
@@ -523,30 +642,42 @@
       END DO
 
 !     Doing the calculation for every single node on this face
-      cnt = 0
+      cnt  = 0
       DO a=1, lFa%nNo
          Ac  = lFa%gN(a)
          iBk = FINDBLK(x(:,Ac+iSh))
 !     Checking every single node on the other face
+         minS = HUGE(minS)
          DO b=1, blk(iBk)%n
             Bc = blk(iBk)%gN(b)
             IF (iM.EQ.jM .AND. Ac.EQ.Bc) CYCLE
-            ds  = SQRT(SUM( (x(:,BC+jSh) - x(:,Ac+iSh))**2 ))
-            IF (ds .LT. 1D3*EPSILON(ds)) THEN
+            ds = SQRT(SUM( (x(:,Bc+jSh) - x(:,Ac+iSh))**2 ))
+            IF (ds .LT. minS) THEN
+               minS = ds
+               i = Bc
+            END IF
+         END DO
+         Bc = i
+         IF (ISZERO(tol)) THEN
+            IF (minS .LT. 1D3*eps) THEN
                CALL PUSHSTACK(lPrj, (/Ac,Bc/))
                cnt = cnt + 1
-            END If
-         END DO
+            END IF
+         ELSE IF (tol < 0D0) THEN
+            CALL PUSHSTACK(lPrj, (/Ac,Bc/))
+            cnt = cnt + 1
+         END IF
       END DO
 
-      IF ( (lFa%nNo.EQ.pFa%nNo) .AND. (cnt.NE.lFa%nNo) ) THEN
-         err = " Failed to project faces between <"//TRIM(lFa%name)//
-     2      "> and <"//TRIM(pFa%name)//">. Try changing the tolerance"//
-     3      " of the closest-node-finding algorithm"
-      END IF
+      IF (cnt .NE. lFa%nNo) err = " Failed to project faces between <"//
+     2   TRIM(lFa%name)//"> and <"//TRIM(pFa%name)//">"
 
       IF (lPrj%n .EQ. 0) err = "Unable to find any matching node"//
      2   " between <"//TRIM(lFa%name)//"> and <"//TRIM(pFa%name)//">"
+
+      IF (lPrj%n/2 .NE. lFa%nNo) err = "Mismatch in no. of "//
+     2   "projected nodes between <"//TRIM(lFa%name)//"> and <"//
+     3   TRIM(pFa%name)//">"
 
       RETURN
       CONTAINS
@@ -579,26 +710,84 @@
       END FUNCTION FINDBLK
 
       END SUBROUTINE MATCHFACES
-
 !####################################################################
-!     Read domain from a file
-      SUBROUTINE SETDMNIDFF(lM, fid)
-
+!     Read mesh domains from a vtu/vtp file
+      SUBROUTINE SETDMNIDVTK(lM, fName, kwrd)
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
 
+      TYPE(mshType), INTENT(INOUT) :: lM
+      CHARACTER(LEN=*) :: fName, kwrd
+
+      TYPE(vtkXMLType) :: vtu
+      INTEGER :: e, iDmn, iStat, btSiz
+      CHARACTER(LEN=stdL) ctmp
+
+      INTEGER, ALLOCATABLE :: eId(:)
+
+      btSiz = BIT_SIZE(dmnId)
+      IF (btSiz .NE. BIT_SIZE(lM%eId))
+     2   err = "Use same type for dmnId and lM%eId"
+
+      ctmp = "Domain ID exceeds BIT_SIZE(dmnId). Reduce the number"//
+     2   " of domains or increase BIT_SIZE(dmnId)."
+
+!     Check to see if I need to increase the size of dmnId
+      IF (.NOT.ALLOCATED(lM%eId)) THEN
+         ALLOCATE(lM%eId(lM%gnEl))
+         lM%eId = 0
+      END IF
+
+      iStat = 0
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtu, fName, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error (init)"
+
+      CALL getVTK_numElems(vtu, e, iStat)
+      IF (e .NE. lM%gnEl) err = "Mismatch in num elems for "//
+     2   TRIM(kwrd)
+
+      ALLOCATE(eId(lM%gnEl))
+      eId = -1
+      CALL getVTK_elemData(vtu, TRIM(kwrd), eId, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+
+      CALL flushVTK(vtu)
+
+      DO e=1, lM%gnEl
+         iDmn = eId(e)
+         IF (iDmn .GE. btSiz) THEN
+            err = TRIM(ctmp)
+         ELSE IF (iDmn .LT. 0) THEN
+            CYCLE
+         END IF
+         lM%eId(e) = IBSET(lM%eId(e), iDmn)
+      END DO
+      DEALLOCATE(eId)
+
+      RETURN
+      END SUBROUTINE SETDMNIDVTK
+!--------------------------------------------------------------------
+!     Read domain from a dat file
+      SUBROUTINE SETDMNIDFF(lM, fid)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER, INTENT(IN) :: fid
 
-      INTEGER i, e, a
+      INTEGER i, e, a, btSiz
       CHARACTER(LEN=stdL) ctmp, stmp
 
       INTEGER, ALLOCATABLE :: iDmn(:)
 
-      IF (BIT_SIZE(dmnId) .NE. BIT_SIZE(lM%eId))
+      btSiz = BIT_SIZE(dmnId)
+      IF (btSiz .NE. BIT_SIZE(lM%eId))
      2   err = "Use same type for dmnId and lM%eId"
 
 !     Check to see if I need to increase the size of dmnId
@@ -607,16 +796,16 @@
          lM%eId = 0
       END IF
 
-      ALLOCATE (iDmn(BIT_SIZE(dmnId)))
+      ALLOCATE (iDmn(btSiz))
       ctmp = "Domain ID exceeds BIT_SIZE(dmnId). Reduce the number"//
      2   " of domains or increase BIT_SIZE(dmnId)."
       DO e=1, lM%gnEl
          READ (fid,"(A)") stmp
          i = CheckNoNumbers(stmp)
-         IF (i .GT. BIT_SIZE(dmnId)) err = ctmp
+         IF (i .GT. btSiz) err = ctmp
          READ (stmp,*) iDmn(1:i)
          DO a=1, i
-            IF (iDmn(a) .GE. BIT_SIZE(dmnId)) THEN
+            IF (iDmn(a) .GE. btSiz) THEN
                err = ctmp
             ELSE IF (iDmn(a) .LT. 0) THEN
                err = "Domain ID must greater or equal to 0"
@@ -628,53 +817,51 @@
 
       RETURN
       END SUBROUTINE SETDMNIDFF
-
 !####################################################################
-!     Read domain from a vtu file
-      SUBROUTINE SETFIBDIRFF(lM, fName)
-      
+!     Read fiber direction from a vtu file
+      SUBROUTINE READFIBNFF(lM, fName, kwrd, idx)
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
       USE vtkXMLMod
-      
       IMPLICIT NONE
-      
+
       TYPE(mshType), INTENT(INOUT) :: lM
-      CHARACTER(LEN=stdL) :: fName
-      
+      CHARACTER(LEN=*) :: fName, kwrd
+      INTEGER, INTENT(IN) :: idx
+
       TYPE(vtkXMLType) :: vtu
-      INTEGER :: iStat, iTmp
-      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:)
-      
-      iStat = 0
+      INTEGER :: iStat, e
+      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      iStat = 0;
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
       CALL loadVTK(vtu, fName, iStat)
       IF (iStat .LT. 0) err = "VTU file read error (init)"
-      
-      CALL getVTK_numPoints(vtu, iTmp, iStat)
-      IF (iTmp .NE. lM%gnNo) err = "Mismatch in num points for fiber "//
-     2   "direction"
-      ALLOCATE(tmpX(maxNSD,lM%gnNo))
-      
-      CALL getVTK_pointData(vtu, "FIB_DIR", tmpX, iStat)
-      IF (iStat .LT. 0) err = "VTU file read error (fiber direction)"
-      lM%x(:,:) = tmpX(1:nsd,:)
-      DEALLOCATE(tmpX)
-      
+
+      CALL getVTK_numElems(vtu, e, iStat)
+      IF (e .NE. lM%gnEl) err = "Mismatch in num elems for "//
+     2   TRIM(kwrd)
+
+      ALLOCATE(tmpR(maxNSD,lM%gnEl))
+      tmpR = 0D0
+      CALL getVTK_elemData(vtu, TRIM(kwrd), tmpR, iStat)
+      IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
+      DO e=1, lM%gnEl
+         lM%fN((idx-1)*nsd+1:idx*nsd,e) = tmpR(1:nsd,e)
+      END DO
+      DEALLOCATE(tmpR)
+
       CALL flushVTK(vtu)
-      
+
       RETURN
-      END SUBROUTINE SETFIBDIRFF
-      
+      END SUBROUTINE READFIBNFF
 !####################################################################
 !     Check the mesh. If this is flag=nonL=.true., then we only check first 4 nodes
 !     of IEN array
       SUBROUTINE CHECKIEN(lM, flag)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
@@ -719,7 +906,7 @@
 !     By default no change
          a = 1; b = 1
          IF (lM%eType.EQ.eType_BIL .OR. lM%eType.EQ.eType_BIQ) THEN
-            xl     = x(:,lM%gIEN(1:4,e))
+            xl     = lM%x(:,lM%gIEN(1:4,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
             v(:,3) = xl(:,4) - xl(:,3)
@@ -753,7 +940,7 @@
                err = "Element "//e//" is distorted"
             END IF
          ELSE IF (lM%eType .EQ. eType_WDG) THEN
-            xl     = x(:,lM%gIEN(:,e))
+            xl     = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
             v(:,3) = xl(:,4) - xl(:,1)
@@ -772,7 +959,7 @@
                err = "Element "//e//" is distorted"
             END IF
          ELSE IF (lM%eType .EQ. eType_TET) THEN
-            xl     = x(:,lM%gIEN(:,e))
+            xl     = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
             v(:,3) = xl(:,4) - xl(:,3)
@@ -788,7 +975,8 @@
                err = "Element "//e//" is distorted"
             END IF
          ELSE IF (lM%eType .EQ. eType_TRI) THEN
-            xl(:,1:3) = x(:,lM%gIEN(:,e))
+            IF (nsd .NE. 2) CYCLE
+            xl(:,1:3) = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
             sn(1)  = SGN(v(1,1)*v(2,2) - v(2,1)*v(1,2))
@@ -809,14 +997,11 @@
 
       RETURN
       END SUBROUTINE CHECKIEN
-
 !####################################################################
 !     Making sure all the faces contain in range values
       SUBROUTINE CALCNBC(lM, lFa)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
@@ -866,14 +1051,105 @@
 
       RETURN
       END SUBROUTINE CALCNBC
+!####################################################################
+      SUBROUTINE LOADVARINI(list)
+      USE COMMOD
+      USE LISTMOD
+      IMPLICIT NONE
+      TYPE(listType), INTENT(INOUT) :: list
 
+      LOGICAL flag
+      INTEGER a, Ac, iM
+      CHARACTER(LEN=stdL) cTmp
+      TYPE(listType), POINTER :: lPtr, lPM
+
+!     Initialize pressure field from file
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+
+         lPtr => lPM%get(cTmp,"Initial pressures file path")
+         IF(ASSOCIATED(lPtr)) THEN
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Pressure", 1, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(Pinit(gtnNo))
+         Pinit = 0D0
+         DO iM=1, nMsh
+            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               Pinit(Ac) = msh(iM)%x(1,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+
+!     Initialize velocity field from file
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+
+         lPtr => lPM%get(cTmp,"Initial velocities file path")
+         IF(ASSOCIATED(lPtr)) THEN
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Velocity", nsd, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(Vinit(nsd,gtnNo))
+         Vinit = 0D0
+         DO iM=1, nMsh
+            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               Vinit(:,Ac) = msh(iM)%x(:,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+
+!     Initializing displacement field from file
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name, "Add mesh",iM)
+
+         lPtr => lPM%get(ctmp,"Initial displacements file path")
+         IF(ASSOCIATED(lPtr)) THEN
+            flag = .TRUE.
+            ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
+            msh(iM)%x = 0D0
+            CALL READVTUPDATA(msh(iM), cTmp, "Displacement", nsd, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(Dinit(nsd,gtnNo))
+         Dinit = 0D0
+         DO iM=1, nMsh
+            IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               Dinit(:,Ac) = msh(iM)%x(:,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+
+      RETURN
+      END SUBROUTINE LOADVARINI
 !####################################################################
 !     Calculate mesh properties to check its quality
       SUBROUTINE CALCMESHPROPS(nMesh, mesh)
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
+
       INTEGER, INTENT(IN) :: nMesh
       TYPE(mshType), INTENT(INOUT) :: mesh(nMesh)
 
@@ -925,25 +1201,20 @@
 
       RETURN
       END SUBROUTINE CALCMESHPROPS
-
 !####################################################################
 !     Calculate element Jacobian of a given mesh
       SUBROUTINE CALCELEMJAC(lM, rflag)
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(INOUT) :: rflag
 
-      INTEGER :: e, a, Ac, cnt, ierr
-      INTEGER :: iDmn, cPhys, nTot
-      REAL(KIND=8) :: maxJ, gmaxJ
-      REAL(KIND=8) :: minJ, gminJ
-      REAL(KIND=8) :: tmp
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Jac
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xl,dol
+      INTEGER :: e, a, Ac, cnt, iDmn, cPhys
+      REAL(KIND=8) :: minJ, maxJ, tmp
+
+      REAL(KIND=8), ALLOCATABLE :: Jac(:), xl(:,:), dol(:,:)
 
       rflag = .FALSE.
       ALLOCATE(Jac(lM%nEl))
@@ -954,7 +1225,6 @@
       DO e=1, lM%nEl
          iDmn = DOMAIN(lM, cEq, e)
          cPhys = eq(cEq)%dmn(iDmn)%phys
-
          DO a=1, lM%eNoN
             Ac = lM%IEN(a,e)
             xl(:,a)  = x(:,Ac)
@@ -965,7 +1235,7 @@
 
          IF (mvMsh) xl = xl + dol
 
-         Jac(e) = JACOBIAN(nsd,lM%eNoN,xl,lM%Nx(:,:,1))
+         Jac(e) = JACOBIAN(nsd, lM%eNoN, xl, lM%Nx(:,:,1))
          IF (Jac(e) .LT. 0D0) THEN
             cnt = cnt + 1
             IF (cPhys .NE. phys_fluid) err = "Negative Jacobian in "//
@@ -974,21 +1244,17 @@
       END DO ! e
 
       maxJ = MAXVAL(ABS(Jac(:)))
-      CALL MPI_ALLREDUCE(maxJ, gmaxJ, 1, mpreal, MPI_MAX,
-     2 cm%com(),ierr)
-      Jac(:) = Jac(:)/ABS(gmaxJ)
+      maxJ = cm%reduce(maxJ, MPI_MAX)
+      Jac(:) = Jac(:)/ABS(maxJ)
 
-      minJ  = MINVAL(Jac(:))
-      CALL MPI_ALLREDUCE(minJ, gminJ, 1, mpreal, MPI_MIN,
-     2 cm%com(), ierr)
-      CALL MPI_ALLREDUCE(cnt, nTot, 1, mpint, MPI_SUM,
-     2 cm%com(), ierr)
-      tmp = 1D2 * REAL(nTot,KIND=8) / REAL(lM%gnEl)
-
-      IF (gminJ .LT. 0D0) rflag = .TRUE.
+      minJ = MINVAL(Jac(:))
+      minJ = cm%reduce(minJ, MPI_MIN)
+      cnt  = cm%reduce(cnt)
+      tmp  = 1D2 * REAL(cnt,KIND=8) / REAL(lM%gnEl,KIND=8)
+      IF (minJ .LT. 0D0) rflag = .TRUE.
 
       IF (.NOT.rflag) THEN
-         std = "    Min normalized Jacobian <"//gminJ//">"
+         std = "    Min normalized Jacobian <"//minJ//">"
       ELSE
          rmsh%cntr = rmsh%cntr + 1
          std = " "
@@ -996,37 +1262,32 @@
      2      "cccccccc"
          std = ""
          std = " Mesh is DISTORTED (Min. Jacobian < 0) at time "//cTS
-         std = "    Min normalized Jacobian <"//gminJ//">"
-         std = "    No. of Elements with Jac < 0: "//nTot//
+         std = "    Min normalized Jacobian <"//minJ//">"
+         std = "    No. of Elements with Jac < 0: "//cnt//
      2      " ("//tmp//"%)"
          IF (.NOT.rmsh%isReqd) THEN
             err = "Unexpected behavior! Mesh is DISTORTED. "//
      2         " But Remesher is not initialized. Fatal"
          END IF
       END IF
-      DEALLOCATE(xl,dol,Jac)
+      DEALLOCATE(xl, dol, Jac)
 
       RETURN
       END SUBROUTINE CALCELEMJAC
-
 !####################################################################
 !     Calculate element Skewness of a given mesh
       SUBROUTINE CALCELEMSKEW(lM, rflag)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(INOUT) :: rflag
 
-      INTEGER :: e, a, Ac, i, ierr
-      INTEGER :: iDmn, cPhys
-      INTEGER :: bins(5), gbins(5)
-      REAL(KIND=8) :: maxSk, gmaxSk, p1, p2, tmp(5)
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: Skw
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xl,dol
+      INTEGER :: e, a, Ac, i, iDmn, cPhys, bins(5)
+      REAL(KIND=8) :: maxSk, p1, p2, tmp(5)
+
+      REAL(KIND=8), ALLOCATABLE :: Skw(:), xl(:,:), dol(:,:)
 
       IF (lM%eType .NE. eType_TET .AND.
      2    lM%eType .NE. eType_TRI) THEN
@@ -1063,46 +1324,38 @@ c         wrn = " Skewness is computed for TRI and TET elements only"
          END DO ! i
       END DO ! e
 
-      maxSk  = MAXVAL(Skw(:))
-      CALL MPI_ALLREDUCE(maxSk, gmaxSk, 1, mpreal, MPI_MAX,
-     2 cm%com(), ierr)
-      CALL MPI_ALLREDUCE(bins, gbins, 5, mpint, MPI_SUM,
-     2 cm%com(), ierr)
-
-      tmp(:) = 1D2 * REAL(gbins(:),KIND=8) / REAL(lM%gnEl)
+      maxSk = MAXVAL(Skw(:))
+      maxSk = cm%reduce(maxSk, MPI_MAX)
+      bins  = cm%reduce(bins)
+      tmp(:) = 1D2 * REAL(bins(:),KIND=8) / REAL(lM%gnEl,KIND=8)
       IF (rflag) THEN
-         std = "    Max Skewness <"//gmaxSk//">"
-         std = "    Skew [    < 0.6] <"//gbins(1)//">  ("//tmp(1)//"%)"
-         std = "         [0.6 - 0.7] <"//gbins(2)//">  ("//tmp(2)//"%)"
-         std = "         [0.7 - 0.8] <"//gbins(3)//">  ("//tmp(3)//"%)"
-         std = "         [0.8 - 0.9] <"//gbins(4)//">  ("//tmp(4)//"%)"
-         std = "         [0.9 - 1.0] <"//gbins(5)//">  ("//tmp(5)//"%)"
+         std = "    Max Skewness <"//maxSk//">"
+         std = "    Skew [    < 0.6] <"//bins(1)//">  ("//tmp(1)//"%)"
+         std = "         [0.6 - 0.7] <"//bins(2)//">  ("//tmp(2)//"%)"
+         std = "         [0.7 - 0.8] <"//bins(3)//">  ("//tmp(3)//"%)"
+         std = "         [0.8 - 0.9] <"//bins(4)//">  ("//tmp(4)//"%)"
+         std = "         [0.9 - 1.0] <"//bins(5)//">  ("//tmp(5)//"%)"
       ELSE
-         std = "    Max Skewness <"//gmaxSk//">"
+         std = "    Max Skewness <"//maxSk//">"
       END IF
-      DEALLOCATE(xl,dol,Skw)
+      DEALLOCATE(xl, dol, Skw)
 
       RETURN
       END SUBROUTINE CALCELEMSKEW
-
 !####################################################################
 !     Calculate element Aspect Ratio of a given mesh
       SUBROUTINE CALCELEMAR(lM, rflag)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
 
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(INOUT) :: rflag
 
-      INTEGER :: e, a, Ac, i, ierr
-      INTEGER :: iDmn, cPhys
-      INTEGER :: bins(5), gbins(5)
-      REAL(KIND=8) :: maxAR, gmaxAR, p1, p2, tmp(5)
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:) :: AsR
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: xl,dol
+      INTEGER :: e, a, Ac, i, iDmn, cPhys, bins(5)
+      REAL(KIND=8) :: maxAR, p1, p2, tmp(5)
+
+      REAL(KIND=8), ALLOCATABLE :: AsR(:), xl(:,:), dol(:,:)
 
       IF (lM%eType .NE. eType_TET .AND.
      2    lM%eType .NE. eType_TRI) THEN
@@ -1140,33 +1393,24 @@ c         wrn = "AR is computed for TRI and TET elements only"
          IF (i .GT. 4) bins(5) = bins(5) + 1
       END DO ! e
 
-      maxAR  = MAXVAL(AsR(:))
-      CALL MPI_ALLREDUCE(maxAR, gmaxAR, 1, mpreal, MPI_MAX,
-     2 cm%com(), ierr)
-      CALL MPI_ALLREDUCE(bins, gbins, 5, mpint, MPI_SUM,
-     2 cm%com(), ierr)
+      maxAR = MAXVAL(AsR(:))
+      maxAR = cm%reduce(maxAR, MPI_MAX)
+      bins  = cm%reduce(bins)
 
-      tmp(:) = 1D2 * REAL(gbins(:),KIND=8) / REAL(lM%gnEl)
+      tmp(:) = 1D2 * REAL(bins(:),KIND=8) / REAL(lM%gnEl,KIND=8)
       IF (rflag) THEN
-         std = "    Max Asp. Ratio <"//gmaxAR//">"
-         std = "    AR [   <  5] <"//gbins(1)//">  ("//tmp(1)//"%)"
-         std = "       [ 5 - 10] <"//gbins(2)//">  ("//tmp(2)//"%)"
-         std = "       [10 - 15] <"//gbins(3)//">  ("//tmp(3)//"%)"
-         std = "       [15 - 20] <"//gbins(4)//">  ("//tmp(4)//"%)"
-         std = "       [   > 20] <"//gbins(5)//">  ("//tmp(5)//"%)"
+         std = "    Max Asp. Ratio <"//maxAR//">"
+         std = "    AR [   <  5] <"//bins(1)//">  ("//tmp(1)//"%)"
+         std = "       [ 5 - 10] <"//bins(2)//">  ("//tmp(2)//"%)"
+         std = "       [10 - 15] <"//bins(3)//">  ("//tmp(3)//"%)"
+         std = "       [15 - 20] <"//bins(4)//">  ("//tmp(4)//"%)"
+         std = "       [   > 20] <"//bins(5)//">  ("//tmp(5)//"%)"
       ELSE
-         std = "    Max Asp. Ratio <"//gmaxAR//">"
+         std = "    Max Asp. Ratio <"//maxAR//">"
       END IF
-      DEALLOCATE(xl,dol,AsR)
+      DEALLOCATE(xl, dol, AsR)
 
       RETURN
       END SUBROUTINE CALCELEMAR
-
 !####################################################################
-
-
-
-
-
-
 

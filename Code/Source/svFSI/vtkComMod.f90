@@ -29,8 +29,11 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-
-!**************************************************
+!--------------------------------------------------------------------
+!
+!     General data structures interfaced with custom VTK functions.
+!
+!--------------------------------------------------------------------
 
       module stdParams
         character(len=8), parameter :: ftab1="(4X,A)"
@@ -41,7 +44,7 @@
         character, parameter :: newl=achar(10)
 
       integer, parameter :: stdout=6
-      double precision, parameter :: eps=EPSILON(eps)
+      real(kind=8), parameter :: eps=EPSILON(eps)
 
       integer, parameter :: strL=400
       integer, parameter :: maxToks=30
@@ -180,11 +183,12 @@
 
          !==========================================
 
-         function getTokenValue(toks,ntoks,kwrd) result (res)
+         function getTokenValue(toks,ntoks,kwrd,ind) result (res)
          implicit none
          integer, intent(in) :: ntoks
          character(len=*), dimension(ntoks), intent(in) :: toks
          character(len=*), intent(in) :: kwrd
+         integer, intent(in), optional :: ind
          character(len=strL) :: res
 
          integer :: i
@@ -192,7 +196,11 @@
          res=''
          do i=1, ntoks
             if (trim(toks(i)).eq.trim(kwrd) ) then
-               res = toks(i+1)
+               if (present(ind)) then
+                  res = toks(i+ind)
+               else
+                  res = toks(i+1)
+               end if
                return
             end if
          end do
@@ -235,7 +243,7 @@
          pure function RTSTR(rVal) result(str)
          implicit none
          integer, parameter :: l=8
-         REAL(KIND=4), intent(in) :: rVal
+         real(kind=4), intent(in) :: rVal
          character(len=l) :: str
 
          str = NDTSTR(dble(rVal),l)
@@ -248,7 +256,7 @@
          pure function DTSTR(dVal) result(str)
          implicit none
          integer, parameter :: l=8
-         double precision, intent(in) :: dVal
+         real(kind=8), intent(in) :: dVal
          character(len=l) :: str
 
          str = NDTSTR(dVal,l)
@@ -261,11 +269,11 @@
          pure function NDTSTR(dVal,l) result(str)
          implicit none
          integer, intent(in) :: l
-         double precision, intent(in) :: dVal
+         real(kind=8), intent(in) :: dVal
          character(len=l) :: str
 
          integer :: i,k,ipos,cnt,ex,abex,nex
-         double precision :: absd
+         real(kind=8) :: absd
 
          ! check NaN !
          if ( dVal.ne.dVal ) then
@@ -342,14 +350,14 @@
          if ( l.gt.cnt ) then
             absd = absd*(1D1**(l-cnt-1-ex))
             do i=ipos, ipos-(l-cnt)+2, -1
-               k = idint(modulo(absd,1D1)) + 1
+               k = floor(modulo(absd,1D1)) + 1
                str(i:i) = '0123456789'(k:k)
                absd = absd/1D1
             end do
             ipos = i
             str(ipos:ipos) = '.'
             ipos = ipos-1
-            k = idint(modulo(absd,1D1)) + 1
+            k = floor(modulo(absd,1D1)) + 1
             str(ipos:ipos) = '0123456789'(k:k)
          else ! l.eq.cnt
             absd = absd*(1D1**(l-cnt-ex))

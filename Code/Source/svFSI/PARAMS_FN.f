@@ -28,28 +28,25 @@
 ! LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-!      
+!
 !--------------------------------------------------------------------
-!      
-!     This is a header file for the data structure used for 
-!     communication with svFSI
-!      
+!
+!     Parameters used for Fitzhugh-Nagumo Myocyte Activation Model.
+!
 !--------------------------------------------------------------------
 
-      INTEGER, PARAMETER :: cplBC_Dir = 66112, cplBC_Neu = 66113,
-     2   cplBCVersion = 8
-     
-      TYPE cplFaceType
-         SEQUENCE
-         INTEGER bGrp            ! (IN)  geBC_Dir/genBC_Neu
-         INTEGER xPtr            ! (USE) pointer to x
-         INTEGER :: eqv = 0      ! (USE) internal genBC use
-         INTEGER reserved        ! ( - ) reserved for alignment
-         REAL(KIND=8) Qo         ! (IN)  flow rate at t
-         REAL(KIND=8) Qn         ! (IN)  flow rate at t+dt
-         REAL(KIND=8) Po         ! (IN)  pressure at t
-         REAL(KIND=8) Pn         ! (IN)  pressure at t+dt
-         REAL(KIND=8) y          ! (OUT) imposed flow/pressure
-         CHARACTER(LEN=128) name ! (IN)  name of the face
-      END TYPE cplFaceType
-     
+!     Scaling factors
+!     Voltage scaling
+      REAL(KIND=8) :: Vscale  = 1.0D0
+!     Time scaling
+      REAL(KIND=8) :: Tscale  = 1.0D0
+!     Voltage offset parameter
+      REAL(KIND=8) :: Voffset = 0.0D0
+!-----------------------------------------------------------------------
+!     Model parameters
+      REAL(KIND=8) :: alpha = -0.5D0
+      REAL(KIND=8) :: a     = 0.0D0
+      REAL(KIND=8) :: b     = -0.6D0
+      REAL(KIND=8) :: c     = 50.0D0
+!#######################################################################
+

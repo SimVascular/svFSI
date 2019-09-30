@@ -8,7 +8,7 @@
 !     California. All Rights Reserved.
 !
 !     Permission to copy and modify this software and its documentation
-!     for educational, research and non-profit purposes, without fee, 
+!     for educational, research and non-profit purposes, without fee,
 !     and without a written agreement is hereby granted, provided that
 !     the above copyright notice, this paragraph and the following three
 !     paragraphs appear in all copies.
@@ -31,26 +31,26 @@
 !     purposes and is advised not to rely exclusively on the program for
 !     any reason.
 !
-!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY 
-!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL 
-!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS 
-!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF 
-!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
-!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY 
-!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES 
-!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE 
-!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE 
-!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE 
+!     IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO ANY
+!     PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL
+!     DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS
+!     SOFTWARE AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF
+!     CALIFORNIA HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+!     THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+!     WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+!     OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE
+!     SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND THE
+!     UNIVERSITY OF CALIFORNIA HAS NO OBLIGATIONS TO PROVIDE
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 !
 !--------------------------------------------------------------------
 !     This routine is mainley intended for solving incompressible NS or
-!     FSI equations with a form of AU=R, in which A = [K D;-G L] and 
+!     FSI equations with a form of AU=R, in which A = [K D;-G L] and
 !     G = -D^t
 !--------------------------------------------------------------------
-      
+
       SUBROUTINE FSISOLVER(lhs, ls, dof, Val, R, isS)
-      
+
       INCLUDE "FSILS_STD.h"
 
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
@@ -59,7 +59,7 @@
       REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
       REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
       LOGICAL, INTENT(IN) :: isS(lhs%nNo)
- 
+
       LOGICAL flag, GE
       INTEGER nNo, mynNo, i, j, k, n, l
       REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
@@ -76,7 +76,7 @@
      &   y(ls%sD), c(ls%sD), s(ls%sD), err(ls%sD+1), unCondU(dof,nNo),
      3   A(2*n,2*n), v(dof,nNo,n,2), b(2*n), xb(2*n), tmpU(dof,nNo,2),
      4   tmp(4*n+1), oldxb(2*n))
-       
+
       ls%callD  = FSILS_CPUT()
       ls%suc    = .FALSE.
       eps       = FSILS_NORMV(dof, mynNo, lhs%commu, R)
@@ -86,7 +86,7 @@
       ls%itr    = 0
       X         = 0D0
       h         = 0D0
-      
+
       CALL BCPRE
 
       IF (ls%iNorm .LE. ls%absTol) THEN
@@ -98,16 +98,16 @@
       err(1)   = FSILS_NORMV(dof, mynNo, lhs%commu, R)
       u(:,:,1) = R/err(1)
       i = 0
-      DO 
+      DO
          i     = i + 1
          ls%dB = ls%fNorm
          CALL SEPARATE(isS, tmpu(:,:,1), tmpu(:,:,2), u(:,:,i))
-         
+
          l = 0
          DO j=1, 2
-            CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, dof, Val, 
+            CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, dof, Val,
      2         tmpu(:,:,j), v(:,:,i,j))
-            CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, dof, tmpu(:,:,j), 
+            CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, dof, tmpu(:,:,j),
      2         v(:,:,i,j))
             IF (ANY(lhs%face%coupledFlag)) THEN
                unCondU = v(:,:,i,j)
@@ -160,7 +160,7 @@
             l = l + 1
             b(2*i-2+j) = tmp(l)
          END DO
-         
+
          xb = b
          IF (GE(2*n, 2*i, A, xB)) THEN
             oldxB = xB
@@ -176,7 +176,7 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
          IF(ls%fNorm .LT. eps*eps) THEN
             ls%suc = .TRUE.
             EXIT
-         END IF 
+         END IF
          IF (i .GE. ls%sD) EXIT
 
          DO j=1, i+1
@@ -184,7 +184,7 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
             h(j,i) = FSILS_NCDOTV(dof, mynno, u(:,:,j), u(:,:,i+1))
          END DO
             CALL FSILS_BCASTV(i+1, h(:,i), lhs%commu)
-            
+
          DO j=1, i
             CALL OMPSUMV(dof, nNo, -h(j,i), u(:,:,i+1), u(:,:,j))
 !           u(:,:,i+1) = u(:,:,i+1) - h(j,i)*u(:,:,j)
@@ -255,7 +255,7 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
                Rf(:,Ac) = 0D0
                Rs(:,Ac) = Rfi(:,Ac)
             ELSE
-               Rf(:,Ac) = Rfi(:,Ac) 
+               Rf(:,Ac) = Rfi(:,Ac)
                Rs(:,Ac) = 0D0
             END IF
          END DO
@@ -265,7 +265,7 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
       END SUBROUTINE SEPARATE
 
 !--------------------------------------------------------------------
-      
+
       SUBROUTINE BCPRE
 
       IMPLICIT NONE
