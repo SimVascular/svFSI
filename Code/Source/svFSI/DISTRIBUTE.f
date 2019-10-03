@@ -131,8 +131,9 @@
                   END DO
                   DEALLOCATE(tmpX)
                ELSE IF (ALLOCATED(eq(iEq)%bf(iBf)%bm)) THEN
-                  i = eq(iEq)%bf(iBf)%bm%dof
-                  a = eq(iEq)%bf(iBf)%bm%nTP
+                  i  = eq(iEq)%bf(iBf)%bm%dof
+                  a  = eq(iEq)%bf(iBf)%bm%nTP
+                  iM = eq(iEq)%bf(iBf)%iM
                   ALLOCATE(tmpD(i,gtnNo,a))
                   tmpD = eq(iEq)%bf(iBf)%bm%d
                   DEALLOCATE(eq(iEq)%bf(iBf)%bm%d)
