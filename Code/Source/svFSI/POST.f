@@ -439,8 +439,8 @@
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
 
       INTEGER a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd, nFn
-      REAL(KIND=8) w, Jac, detF, ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
-     2   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      REAL(KIND=8) w, Jac, detF, ya, Ja, ksix(nsd,nsd), F(nsd,nsd),
+     2   S(nsd,nsd), P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), pSl(:),
      2   Nx(:,:), N(:), sA(:), sF(:,:)
       TYPE(stModelType) :: stModel
@@ -459,6 +459,7 @@
       sA   = 0D0
       sF   = 0D0
       insd = nsd
+      ya   = 0D0
       IF (lM%lFib) insd = 1
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
@@ -522,12 +523,12 @@
             ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
                IF (cPhys .EQ. phys_vms_struct) THEN
-                  CALL GETPK2CCdev(stModel, F, nFn, fN, S, CC)
+                  CALL GETPK2CCdev(stModel, F, nFn, fN, ya, S, CC, Ja)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
                ELSE
-                  CALL GETPK2CC(stModel, F, nFn, fN, 0D0, S, CC)
+                  CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
                   sigma = S
                END IF
 
