@@ -337,7 +337,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 18
+      INTEGER, PARAMETER :: maxOutput = 19
 
       INTEGER fid, iBc, iBf, iM, iFa, phys(3), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
@@ -430,7 +430,7 @@
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/10,2,3,0/)
+         nDOP = (/11,2,3,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_energyFlux
@@ -441,6 +441,7 @@
          outPuts(8)  = out_vortex
          outPuts(9)  = out_traction
          outPuts(10) = out_viscosity
+         outPuts(11) = out_divergence
 
          CALL READLS(lSolver_NS, lEq, list)
 
@@ -535,7 +536,7 @@
          IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/11,1,0,0/)
+         nDOP = (/12,1,0,0/)
          outPuts(1)  = out_displacement
          outPuts(2)  = out_velocity
          outPuts(3)  = out_pressure
@@ -547,6 +548,7 @@
          outPuts(9)  = out_integ
          outPuts(10) = out_jacobian
          outPuts(11) = out_defGrad
+         outPuts(12) = out_divergence
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -655,17 +657,18 @@
                propL(8,1) = elasticity_modulus
             END IF
 
-            nDOP = (/10,2,4,0/)
+            nDOP = (/11,2,4,0/)
             outPuts(1)  = out_velocity
             outPuts(2)  = out_pressure
             outPuts(3)  = out_energyFlux
-            outPuts(4)  = out_absVelocity
-            outPuts(5)  = out_acceleration
-            outPuts(6)  = out_WSS
-            outPuts(7)  = out_vorticity
+            outPuts(4)  = out_acceleration
+            outPuts(5)  = out_WSS
+            outPuts(6)  = out_vorticity
+            outPuts(7)  = out_vortex
             outPuts(8)  = out_displacement
             outPuts(9)  = out_strainInv
             outPuts(10) = out_viscosity
+            outPuts(11) = out_divergence
          ELSE
             propL(1,1) = poisson_ratio
             IF (.NOT.cmmVarWall) THEN
@@ -727,7 +730,7 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/18,3,2,0/)
+         nDOP = (/19,3,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
@@ -746,6 +749,7 @@
          outPuts(16) = out_jacobian
          outPuts(17) = out_defGrad
          outPuts(18) = out_viscosity
+         outPuts(19) = out_divergence
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1025,7 +1029,6 @@
       TYPE(listType), INTENT(INOUT) :: list
 
       INTEGER lSolverType, FSILSType
-      LOGICAL flag
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPL
 
@@ -1285,6 +1288,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd*nsd
             lEq%output(iOut)%name = "Deformation_gradient"
+         CASE (out_divergence)
+            lEq%output(iOut)%grp  = outGrp_divV
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Divergence"
          CASE (out_viscosity)
             lEq%output(iOut)%grp  = outGrp_Visc
             lEq%output(iOut)%o    = 0

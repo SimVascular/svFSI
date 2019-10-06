@@ -169,7 +169,7 @@ c         CALL IB_SETBCPEN()
 
       LOGICAL :: l1, l2, l3, l4
       INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(5), r1, r2, dUl(nsd)
+      REAL(KIND=8) :: coef(5), r1, dUl(nsd)
 
       s       = eq(cEq)%s
       e       = eq(cEq)%e

@@ -640,6 +640,16 @@
                   END DO
                   DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_divV)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(1,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL DIVPOST(msh(iM), tmpV, lY, lD, iEq)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is,a) = tmpV(1,a)
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE DEFAULT
                   err = "Undefined output"
                END SELECT

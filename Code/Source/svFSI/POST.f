@@ -54,13 +54,41 @@
          ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
          IF (outGrp.EQ.outGrp_WSS .OR. outGrp.EQ.outGrp_trac) THEN
             CALL BPOST(msh(iM), tmpV, lY, lD, outGrp)
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               res(:,Ac) = tmpV(:,a)
+            END DO
+         ELSE IF (outGrp .EQ. outGrp_J) THEN
+            IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+            ALLOCATE(tmpV(1,msh(iM)%nNo))
+            tmpV = 0D0
+            CALL TPOST(msh(iM), 1, tmpV, lD, iEq, outGrp)
+            res  = 0D0
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               res(1,Ac) = tmpV(1,a)
+            END DO
+            DEALLOCATE(tmpV)
+            ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+         ELSE IF (outGrp .EQ. outGrp_divV) THEN
+            IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+            ALLOCATE(tmpV(1,msh(iM)%nNo))
+            tmpV = 0D0
+            CALL DIVPOST(msh(iM), tmpV, lY, lD, iEq)
+            res  = 0D0
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               res(1,Ac) = tmpV(1,a)
+            END DO
+            DEALLOCATE(tmpV)
+            ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
          ELSE
             CALL POST(msh(iM), tmpV, lY, lD, outGrp, iEq)
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               res(:,Ac) = tmpV(:,a)
+            END DO
          END IF
-         DO a=1, msh(iM)%nNo
-            Ac = msh(iM)%gN(a)
-            res(:,Ac) = tmpV(:,a)
-         END DO
       END DO
 
       RETURN
@@ -888,6 +916,150 @@
 
       RETURN
       END SUBROUTINE FIBSTRETCH
+!####################################################################
+!     Routine for post processing divergence of velocity
+      SUBROUTINE DIVPOST(lM, res, lY, lD, iEq)
+      USE COMMOD
+      USE ALLFUN
+      USE MATFUN
+      IMPLICIT NONE
+
+      TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER, INTENT(IN) :: iEq
+      REAL(KIND=8), INTENT(INOUT) :: res(1,lM%nNo)
+      REAL(KIND=8), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
+
+      INTEGER a, e, g, Ac, eNoN, i, j, k, cPhys
+      REAL(KIND=8) w, Jac, divV, vx(nsd,nsd), ksix(nsd,nsd), F(nsd,nsd),
+     2   Fi(nsd,nsd), VxFi(nsd)
+      REAL(KIND=8), ALLOCATABLE :: xl(:,:), yl(:,:), dl(:,:), N(:),
+     2   Nx(:,:), sA(:), sF(:)
+
+      eNoN = lM%eNoN
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
+
+      ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), yl(tDof,eNoN),
+     2   dl(tDof,eNoN), N(eNoN), Nx(nsd,eNoN))
+
+      sA   = 0D0
+      sF   = 0D0
+      DO e=1, lM%nEl
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+
+         DO a=1, eNoN
+            Ac      = lM%IEN(a,e)
+            xl(:,a) = x(:,Ac)
+            yl(:,a) = lY(:,Ac)
+            dl(:,a) = lD(:,Ac)
+         END DO
+
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+            END IF
+            w = lM%w(g)*Jac
+            N = lM%N(:,g)
+
+            IF ((cPhys.EQ.phys_fluid) .OR. (cPhys.EQ.phys_CMM)) THEN
+               vx = 0D0
+               IF (nsd .EQ. 3) THEN
+                  DO a=1, eNoN
+                     vx(1,1) = vx(1,1) + Nx(1,a)*yl(1,a)
+                     vx(2,2) = vx(2,2) + Nx(2,a)*yl(2,a)
+                     vx(3,3) = vx(3,3) + Nx(3,a)*yl(3,a)
+                  END DO
+                  divV = vx(1,1) + vx(2,2) + vx(3,3)
+               ELSE
+                  DO a=1, eNoN
+                     vx(1,1) = vx(1,1) + Nx(1,a)*yl(1,a)
+                     vx(2,2) = vx(2,2) + Nx(2,a)*yl(2,a)
+                  END DO
+                  divV = vx(1,1) + vx(2,2)
+               END IF
+
+            ELSE IF (cPhys .EQ. phys_vms_struct) THEN
+               vx = 0D0
+               F  = MAT_ID(nsd)
+               IF (nsd .EQ. 3) THEN
+                  DO a=1, eNoN
+                     vx(1,1) = vx(1,1) + Nx(1,a)*yl(i,a)
+                     vx(1,2) = vx(1,2) + Nx(2,a)*yl(i,a)
+                     vx(1,3) = vx(1,3) + Nx(3,a)*yl(i,a)
+                     vx(2,1) = vx(2,1) + Nx(1,a)*yl(j,a)
+                     vx(2,2) = vx(2,2) + Nx(2,a)*yl(j,a)
+                     vx(2,3) = vx(2,3) + Nx(3,a)*yl(j,a)
+                     vx(3,1) = vx(3,1) + Nx(1,a)*yl(k,a)
+                     vx(3,2) = vx(3,2) + Nx(2,a)*yl(k,a)
+                     vx(3,3) = vx(3,3) + Nx(3,a)*yl(k,a)
+
+                     F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                     F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                     F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                     F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                     F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                     F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                     F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                     F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                     F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+                  END DO
+                  Fi = MAT_INV(F,3)
+
+                  VxFi(1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1) +
+     2               vx(1,3)*Fi(3,1)
+                  VxFi(2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2) +
+     2               vx(2,3)*Fi(3,2)
+                  VxFi(3) = vx(3,1)*Fi(1,3) + vx(3,2)*Fi(2,3) +
+     2               vx(3,3)*Fi(3,3)
+
+                  divV = VxFi(1) + VxFi(2) + VxFi(3)
+               ELSE
+                  DO a=1, eNoN
+                     vx(1,1) = vx(1,1) + Nx(1,a)*yl(i,a)
+                     vx(1,2) = vx(1,2) + Nx(2,a)*yl(i,a)
+                     vx(2,1) = vx(2,1) + Nx(1,a)*yl(j,a)
+                     vx(2,2) = vx(2,2) + Nx(2,a)*yl(j,a)
+
+                     F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                     F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                     F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                     F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  END DO
+                  Fi = MAT_INV(F,2)
+
+                  VxFi(1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1)
+                  VxFi(2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2)
+
+                  divV = VxFi(1) + VxFi(2)
+               END IF
+            END IF
+
+            DO a=1, eNoN
+               Ac     = lM%IEN(a,e)
+               sA(Ac) = sA(Ac) + w*N(a)
+               sF(Ac) = sF(Ac) + w*N(a)*divV
+            END DO
+         END DO
+      END DO
+
+      CALL COMMU(sF)
+      CALL COMMU(sA)
+
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         IF (.NOT. iszero(sA(Ac))) THEN
+           res(1,a) = res(1,a) + sF(Ac)/sA(Ac)
+         ENDIF
+      END DO
+
+      DEALLOCATE (sA, sF, xl, yl, dl, N, Nx)
+
+      RETURN
+      END SUBROUTINE DIVPOST
 !####################################################################
 !     Postprocessing function - used to convert restart bin files
 !     into VTK format.
