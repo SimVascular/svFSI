@@ -240,9 +240,8 @@
             IF ( (eq(iEq)%dmn(iDmn)%phys .NE. phys_struct) .AND.
      2           (eq(iEq)%dmn(iDmn)%phys .NE. phys_vms_struct) .AND.
      3           (eq(iEq)%dmn(iDmn)%phys .NE. phys_lElas)  .AND.
-     4           (eq(iEq)%dmn(iDmn)%phys .NE. phys_preSt) .AND.
-     5           (eq(iEq)%dmn(iDmn)%phys .NE. phys_shell) .AND.
-     6           (eq(iEq)%dmn(iDmn)%phys .NE. phys_CMM) ) CYCLE
+     4           (eq(iEq)%dmn(iDmn)%phys .NE. phys_shell) .AND.
+     5           (eq(iEq)%dmn(iDmn)%phys .NE. phys_CMM) ) CYCLE
             dnorm = Integ(eq(iEq)%dmn(iDmn)%Id, Dn, s, e)
             vol = eq(iEq)%dmn(iDmn)%v
             IF (.NOT.ISZERO(vol)) dnorm = dnorm / vol

@@ -105,11 +105,6 @@
             dFlag = .TRUE.
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'ST'
-         CASE (phys_preSt)
-            dFlag = .TRUE.
-            eq(iEq)%dof = nsd
-            eq(iEq)%am  = am
-            eq(iEq)%sym = 'PS'
          CASE (phys_CMM)
             dFlag = .TRUE.
             eq(iEq)%dof = nsd + 1

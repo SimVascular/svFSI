@@ -559,10 +559,8 @@
                CASE (outGrp_stress)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nstd,msh(iM)%nNo))
-                  IF (eq(iEq)%phys .EQ. phys_struct .OR.
-     2                eq(iEq)%phys .EQ. phys_vms_struct) THEN
-                     tmpV = 0D0
-                  ELSE IF (pstEq) THEN
+                  tmpV = 0D0
+                  IF (pstEq) THEN
                      DO a=1, msh(iM)%nNo
                         Ac = msh(iM)%gN(a)
                         tmpV(:,a) = pS0(:,Ac)

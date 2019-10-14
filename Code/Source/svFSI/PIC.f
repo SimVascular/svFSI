@@ -220,7 +220,8 @@ c         CALL IB_SETBCPEN()
          e = eq(2)%e
          DO Ac=1, tnNo
             IF (ISDOMAIN(cEq, Ac, phys_struct) .OR.
-     2          ISDOMAIN(cEq, Ac, phys_vms_struct)) THEN
+     2          ISDOMAIN(cEq, Ac, phys_vms_struct) .OR.
+     3          ISDOMAIN(cEq, Ac, phys_lElas)) THEN
                An(s:e,Ac) = An(1:nsd,Ac)
                Yn(s:e,Ac) = Yn(1:nsd,Ac)
                Dn(s:e,Ac) = Dn(1:nsd,Ac)

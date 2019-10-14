@@ -35,18 +35,20 @@
 !
 !--------------------------------------------------------------------
 
-      PURE SUBROUTINE LELAS3D (eNoN, w, N, Nx, al, dl, bfl, lR, lK)
+      PURE SUBROUTINE LELAS3D (eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
+     2   lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(3,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+     2   dl(tDof,eNoN), bfl(3,eNoN), pS0l(6,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER a, b, i, j, k
       REAL(KIND=8) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd, wl,
-     2   lDm, ed(6), ud(3), f(3)
+     2   lDm, ed(6), ud(3), f(3), S0(6), S(6)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -67,6 +69,7 @@
 
       ed = 0D0
       ud = -f
+      S0 = 0D0
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
          ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
@@ -75,21 +78,40 @@
          ed(1) = ed(1) + Nx(1,a)*dl(i,a)
          ed(2) = ed(2) + Nx(2,a)*dl(j,a)
          ed(3) = ed(3) + Nx(3,a)*dl(k,a)
-         ed(4) = ed(4) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+         ed(4) = ed(4) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
          ed(5) = ed(5) + Nx(3,a)*dl(i,a) + Nx(1,a)*dl(k,a)
-         ed(6) = ed(6) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
+         ed(6) = ed(6) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+
+         S0(1) = S0(1) + N(a)*pS0l(1,a)
+         S0(2) = S0(2) + N(a)*pS0l(2,a)
+         S0(3) = S0(3) + N(a)*pS0l(3,a)
+         S0(4) = S0(4) + N(a)*pS0l(4,a)
+         S0(5) = S0(5) + N(a)*pS0l(5,a)
+         S0(6) = S0(6) + N(a)*pS0l(6,a)
       END DO
       divD = lambda*(ed(1) + ed(2) + ed(3))
 
+!     Stress in Voigt notation
+      S(1) = divD + 2D0*mu*ed(1)
+      S(2) = divD + 2D0*mu*ed(2)
+      S(3) = divD + 2D0*mu*ed(3)
+      S(4) = mu*ed(4)  ! 2*eps_12
+      S(5) = mu*ed(5)  ! 2*eps_13
+      S(6) = mu*ed(6)  ! 2*eps_23
+      pSl  = S
+
+!     Add prestress contribution
+      S = pSl + S0
+
       DO a=1, eNoN
-         lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + mu*Nx(2,a)*ed(6)
-     2      + mu*Nx(3,a)*ed(5) + Nx(1,a)*(2D0*mu*ed(1) + divD))
+         lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + Nx(1,a)*S(1) +
+     2      Nx(2,a)*S(4) + Nx(3,a)*S(5))
 
-         lR(2,a) = lR(2,a) + w*(rho*N(a)*ud(2) + mu*Nx(1,a)*ed(6)
-     2      + mu*Nx(3,a)*ed(4) + Nx(2,a)*(2D0*mu*ed(2) + divD))
+         lR(2,a) = lR(2,a) + w*(rho*N(a)*ud(2) + Nx(1,a)*S(4) +
+     2      Nx(2,a)*S(2) + Nx(3,a)*S(6))
 
-         lR(3,a) = lR(3,a) + w*(rho*N(a)*ud(3) + mu*Nx(1,a)*ed(5)
-     2      + mu*Nx(2,a)*ed(4) + Nx(3,a)*(2D0*mu*ed(3) + divD))
+         lR(3,a) = lR(3,a) + w*(rho*N(a)*ud(3) + Nx(1,a)*S(5) +
+     2      Nx(2,a)*S(6) + Nx(3,a)*S(3))
 
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
@@ -150,18 +172,20 @@
       RETURN
       END SUBROUTINE BLELAS
 !####################################################################
-      PURE SUBROUTINE LELAS2D (eNoN, w, N, Nx, al, dl, bfl, lR, lK)
+      PURE SUBROUTINE LELAS2D (eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
+     2   lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
       INTEGER, INTENT(IN) :: eNoN
       REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(2,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+     2   dl(tDof,eNoN), bfl(2,eNoN), pS0l(3,eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: pSl(3), lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER a, b, i, j
       REAL(KIND=8) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd, wl,
-     2   lDm, ed(3), ud(2), f(2)
+     2   lDm, ed(3), ud(2), f(2), S0(3), S(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -180,6 +204,7 @@
 
       ed = 0D0
       ud = -f
+      S0 = 0D0
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
          ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
@@ -187,15 +212,28 @@
          ed(1) = ed(1) + Nx(1,a)*dl(i,a)
          ed(2) = ed(2) + Nx(2,a)*dl(j,a)
          ed(3) = ed(3) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
+
+         S0(1) = S0(1) + N(a)*pS0l(1,a)
+         S0(2) = S0(2) + N(a)*pS0l(2,a)
+         S0(3) = S0(3) + N(a)*pS0l(3,a)
       END DO
       divD = lambda*(ed(1) + ed(2))
 
-      DO a=1, eNoN
-         lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + mu*Nx(2,a)*ed(3)
-     2                     + Nx(1,a)*(2D0*mu*ed(1) + divD))
+!     Stress in Voigt notation
+      S(1) = divD + 2D0*mu*ed(1)
+      S(2) = divD + 2D0*mu*ed(2)
+      S(3) = mu*ed(3)  ! 2*eps_12
+      pSl  = S
 
-         lR(2,a) = lR(2,a) + w*(rho*N(a)*ud(2) + mu*Nx(1,a)*ed(3)
-     2                     + Nx(2,a)*(2D0*mu*ed(2) + divD))
+!     Add prestress contribution
+      S = pSl + S0
+
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + Nx(1,a)*S(1) +
+     2      Nx(2,a)*S(3))
+
+         lR(2,a) = lR(2,a) + w*(rho*N(a)*ud(2) + Nx(1,a)*S(3) +
+     2      Nx(2,a)*S(2))
 
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)

@@ -467,10 +467,11 @@
       REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
 
       INTEGER a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd, nFn
-      REAL(KIND=8) w, Jac, detF, ya, Ja, ksix(nsd,nsd), F(nsd,nsd),
-     2   S(nsd,nsd), P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      REAL(KIND=8) w, Jac, detF, ya, Ja, elM, nu, lambda, mu,
+     2   ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
+     3   sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), pSl(:),
-     2   Nx(:,:), N(:), sA(:), sF(:,:)
+     2   ed(:), Nx(:,:), N(:), sA(:), sF(:,:)
       TYPE(stModelType) :: stModel
 
       eNoN = lM%eNoN
@@ -482,7 +483,7 @@
       IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,nFn), pSl(m), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN))
 
       sA   = 0D0
       sF   = 0D0
@@ -493,8 +494,15 @@
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_struct .AND.
-     2       cPhys .NE. phys_preSt  .AND.
-     3       cPhys .NE. phys_vms_struct) CYCLE
+     2       cPhys .NE. phys_vms_struct .AND.
+     3       cPhys .NE. phys_lElas) CYCLE
+
+         IF (cPhys .EQ. phys_lElas) THEN
+            elM = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
+            nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
+            lambda = elM*nu/(1D0 + nu)/(1D0 - 2D0*nu)
+            mu     = 0.5D0*elM/(1D0 + nu)
+         END IF
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
@@ -519,25 +527,43 @@
             w = lM%w(g)*Jac
             N = lM%N(:,g)
 
+            ed = 0D0
             F  = MAT_ID(nsd)
-            DO a=1, eNoN
-               IF (nsd .EQ. 3) THEN
-                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-                  F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
-                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
-                  F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
-                  F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
-                  F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
-                  F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
-               ELSE
-                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
-               END IF
-            END DO
+            IF (cPhys .EQ. phys_lElas) THEN
+               DO a=1, eNoN
+                  IF (nsd .EQ. 3) THEN
+                     ed(1) = ed(1) + Nx(1,a)*dl(i,a)
+                     ed(2) = ed(2) + Nx(2,a)*dl(j,a)
+                     ed(3) = ed(3) + Nx(3,a)*dl(k,a)
+                     ed(4) = ed(4) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
+                     ed(5) = ed(5) + Nx(3,a)*dl(i,a) + Nx(1,a)*dl(k,a)
+                     ed(6) = ed(6) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+                  ELSE
+                     ed(1) = ed(1) + Nx(1,a)*dl(i,a)
+                     ed(2) = ed(2) + Nx(2,a)*dl(j,a)
+                     ed(3) = ed(3) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
+                  END IF
+               END DO
+            ELSE
+               DO a=1, eNoN
+                  IF (nsd .EQ. 3) THEN
+                     F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                     F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                     F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                     F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                     F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                     F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                     F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                     F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                     F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+                  ELSE
+                     F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                     F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                     F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                     F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  END IF
+               END DO
+            END IF
             detF = MAT_DET(F, nsd)
 
             IF (outGrp .EQ. outGrp_J) THEN
@@ -550,12 +576,28 @@
 
             ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
-               IF (cPhys .EQ. phys_vms_struct) THEN
+               sigma = 0D0
+               IF (cPhys .EQ. phys_lElas) THEN
+                  IF (nsd .EQ. 3) THEN
+                     detF = lambda*(ed(1) + ed(2) + ed(3))
+                     sigma(1,1) = detF + 2D0*mu*ed(1)
+                     sigma(2,2) = detF + 2D0*mu*ed(2)
+                     sigma(3,3) = detF + 2D0*mu*ed(3)
+                     sigma(1,2) = mu*ed(4)
+                     sigma(1,3) = mu*ed(5)
+                     sigma(2,3) = mu*ed(6)
+                  ELSE
+                     detF = lambda*(ed(1) + ed(2))
+                     sigma(1,1) = detF + 2D0*mu*ed(1)
+                     sigma(2,2) = detF + 2D0*mu*ed(2)
+                     sigma(1,2) = mu*ed(3)
+                  END IF
+               ELSE IF (cPhys .EQ. phys_vms_struct) THEN
                   CALL GETPK2CCdev(stModel, F, nFn, fN, ya, S, CC, Ja)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
-               ELSE
+               ELSE IF (cPhys .EQ. phys_struct) THEN
                   CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
                   sigma = S
                END IF

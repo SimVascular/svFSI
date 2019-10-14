@@ -96,8 +96,8 @@
       INTEGER, PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_mesh = 207,
-     4   phys_preSt = 208, phys_shell = 209, phys_CMM = 210,
-     5   phys_CEP = 211, phys_vms_struct = 212
+     4   phys_shell = 208, phys_CMM = 209, phys_CEP = 210,
+     5   phys_vms_struct = 211
 
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit
