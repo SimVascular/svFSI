@@ -168,7 +168,8 @@
 !     the time step
             xl = xl + dol
          ELSE IF (cPhys .NE. phys_struct .AND.
-     2            cPhys .NE. phys_vms_struct) THEN
+     2            cPhys .NE. phys_vms_struct .AND.
+     3            cPhys .NE. phys_lElas) THEN
 !     Otherwise we use the most recent configuration
             xl = xl + dl(nsd+2:2*nsd+1,:)
          END IF
@@ -233,7 +234,7 @@
             END IF
 
          CASE (phys_CMM)
-            CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+            CALL CMM3D(eNoN, w, N, Nx, al, yl, bfl, ksix, ptr, lR, lK)
 
          CASE (phys_heatS)
             IF (nsd .EQ. 3) THEN
@@ -251,27 +252,20 @@
 
          CASE (phys_lElas)
             IF (nsd .EQ. 3) THEN
-               CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, lR, lK)
+               CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
+     2            lK)
             ELSE
-               CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, lR, lK)
+               CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
+     2            lK)
             END IF
 
-         CASE (phys_struct, phys_preSt)
+         CASE (phys_struct)
             IF (nsd .EQ. 3) THEN
                CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
      2            pS0l, pSl, ya_l, lR, lK)
             ELSE
                CALL STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
      2            pS0l, pSl, ya_l, lR, lK)
-            END IF
-
-!      Map pSl values to global nodal vector
-            IF (pstEq) THEN
-               DO a=1, eNoN
-                  Ac = ptr(a)
-                  pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
-                  pSa(Ac)   = pSa(Ac)   + w*N(a)
-               END DO
             END IF
 
          CASE (phys_vms_struct)
@@ -287,10 +281,12 @@
             w = w/Jac
             IF (nsd .EQ. 3) THEN
                dc(5:7,:) = dl(5:7,:) - dol
-               CALL LELAS3D(eNoN, w, N, Nx, al, dc, bfl, lR, lK)
+               CALL LELAS3D(eNoN, w, N, Nx, al, dc, bfl, pS0l, pSl, lR,
+     2            lK)
             ELSE
                dc(4:5,:) = dl(4:5,:) - dol
-               CALL LELAS2D(eNoN, w, N, Nx, al, dc, bfl, lR, lK)
+               CALL LELAS2D(eNoN, w, N, Nx, al, dc, bfl, pS0l, pSl, lR,
+     2            lK)
             END IF
 
          CASE (phys_CEP)
@@ -307,6 +303,15 @@
          CASE DEFAULT
             err = "Undefined phys in CONSTRUCT"
          END SELECT
+
+!      For prestress, map pSl values to global nodal vector
+         IF (pstEq) THEN
+            DO a=1, eNoN
+               Ac = ptr(a)
+               pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
+               pSa(Ac)   = pSa(Ac)   + w*N(a)
+            END DO
+         END IF
       END DO
 
 !     Now doing the assembly part
@@ -427,9 +432,6 @@
 
                CASE (phys_CEP)
                   CALL BCEP(eNoN, w, N, h, lR)
-
-               CASE (phys_preSt)
-                  CALL BLELAS(eNoN, w, N, h, nV, lR)
 
                CASE (phys_shell)
                   CALL BLELAS(eNoN, w, N, h, nV, lR)

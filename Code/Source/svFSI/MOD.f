@@ -96,8 +96,8 @@
       INTEGER, PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_mesh = 207,
-     4   phys_preSt = 208, phys_shell = 209, phys_CMM = 210,
-     5   phys_CEP = 211, phys_vms_struct = 212
+     4   phys_shell = 208, phys_CMM = 209, phys_CEP = 210,
+     5   phys_vms_struct = 211
 
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit
@@ -146,7 +146,7 @@
      4   outGrp_hFlx = 508, outGrp_absV = 509, outGrp_stInv = 510,
      5   outGrp_vortex = 511, outGrp_trac = 512, outGrp_stress = 513,
      6   outGrp_fN = 514, outGrp_fA = 515, outGrp_J = 516, outGrp_F=517,
-     7   outGrp_Visc = 518
+     7   outGrp_divV = 518, outGrp_Visc = 519
 
       INTEGER, PARAMETER :: out_velocity = 599, out_pressure = 598,
      2   out_acceleration = 597, out_temperature = 596, out_WSS = 595,
@@ -155,7 +155,7 @@
      5   out_absVelocity = 588, out_vortex = 587, out_traction = 586,
      6   out_stress = 585, out_fibDir = 584, out_fibAlign = 583,
      7   out_actionPotential = 582, out_jacobian = 581, out_defGrad=580,
-     8   out_viscosity = 579
+     8   out_divergence = 579, out_viscosity = 578
 
 !     Mesher choice for remeshing for moving wall problems
       INTEGER, PARAMETER :: RMSH_TETGEN = 1, RMSH_MESHSIM = 2

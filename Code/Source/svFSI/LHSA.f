@@ -211,6 +211,8 @@
          i = 0
          DO
             i = i + 1
+            IF (i .EQ. mnnzeic) CALL RESIZ()
+
 !           If current entry is zero, then  fill it up
             IF (uInd(i,row) .EQ. 0) THEN
                uInd(i,row) = col
@@ -234,7 +236,6 @@
             uInd(i,row) = col
             EXIT
          END DO
-         IF (i .EQ. mnnzeic) CALL RESIZ()
 
          RETURN
          END SUBROUTINE ADDCOL

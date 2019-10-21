@@ -559,10 +559,8 @@
                CASE (outGrp_stress)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nstd,msh(iM)%nNo))
-                  IF (eq(iEq)%phys .EQ. phys_struct .OR.
-     2                eq(iEq)%phys .EQ. phys_vms_struct) THEN
-                     tmpV = 0D0
-                  ELSE IF (pstEq) THEN
+                  tmpV = 0D0
+                  IF (pstEq) THEN
                      DO a=1, msh(iM)%nNo
                         Ac = msh(iM)%gN(a)
                         tmpV(:,a) = pS0(:,Ac)
@@ -637,6 +635,16 @@
                   CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
+                  END DO
+                  DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_divV)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(1,msh(iM)%nNo))
+                  tmpV = 0D0
+                  CALL DIVPOST(msh(iM), tmpV, lY, lD, iEq)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is,a) = tmpV(1,a)
                   END DO
                   DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))

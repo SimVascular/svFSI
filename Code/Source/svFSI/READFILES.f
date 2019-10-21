@@ -337,9 +337,9 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 18
+      INTEGER, PARAMETER :: maxOutput = 19
 
-      INTEGER fid, iBc, iBf, iM, iFa, phys(3), propL(maxNProp,10),
+      INTEGER fid, iBc, iBf, iM, iFa, phys(4), propL(maxNProp,10),
      2   outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
 
@@ -430,7 +430,7 @@
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/10,2,3,0/)
+         nDOP = (/11,2,3,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_energyFlux
@@ -441,6 +441,7 @@
          outPuts(8)  = out_vortex
          outPuts(9)  = out_traction
          outPuts(10) = out_viscosity
+         outPuts(11) = out_divergence
 
          CALL READLS(lSolver_NS, lEq, list)
 
@@ -485,11 +486,18 @@
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/4,1,0,0/)
-         outPuts(1) = out_displacement
-         outPuts(2) = out_velocity
-         outPuts(3) = out_acceleration
-         outPuts(4) = out_integ
+         lPtr => list%get(pstEq, "Prestress")
+         IF (pstEq) THEN
+            nDOP = (/2,2,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_stress
+         ELSE
+            nDOP = (/4,1,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_velocity
+            outPuts(3) = out_acceleration
+            outPuts(4) = out_integ
+         END IF
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -506,17 +514,24 @@
          IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/10,1,0,0/)
-         outPuts(1)  = out_displacement
-         outPuts(2)  = out_velocity
-         outPuts(3)  = out_acceleration
-         outPuts(4)  = out_stress
-         outPuts(5)  = out_fibDir
-         outPuts(6)  = out_fibAlign
-         outputs(7)  = out_strainInv
-         outPuts(8)  = out_integ
-         outPuts(9)  = out_jacobian
-         outPuts(10) = out_defGrad
+         lPtr => list%get(pstEq, "Prestress")
+         IF (pstEq) THEN
+            nDOP = (/2,2,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_stress
+         ELSE
+            nDOP = (/10,1,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_velocity
+            outPuts(3)  = out_acceleration
+            outPuts(4)  = out_stress
+            outPuts(5)  = out_fibDir
+            outPuts(6)  = out_fibAlign
+            outputs(7)  = out_strainInv
+            outPuts(8)  = out_integ
+            outPuts(9)  = out_jacobian
+            outPuts(10) = out_defGrad
+         END IF
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -535,38 +550,27 @@
          IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/11,1,0,0/)
-         outPuts(1)  = out_displacement
-         outPuts(2)  = out_velocity
-         outPuts(3)  = out_pressure
-         outPuts(4)  = out_acceleration
-         outPuts(5)  = out_stress
-         outPuts(6)  = out_fibDir
-         outPuts(7)  = out_fibAlign
-         outPuts(8)  = out_strainInv
-         outPuts(9)  = out_integ
-         outPuts(10) = out_jacobian
-         outPuts(11) = out_defGrad
-
-         CALL READLS(lSolver_CG, lEq, list)
-
-!     PRESTRESS equation solver---------------------
-      CASE ('prestress')
-         lEq%phys = phys_preSt
-         pstEq    = .TRUE.
-
-         propL(1,1) = solid_density
-         propL(2,1) = damping
-         propL(3,1) = elasticity_modulus
-         propL(4,1) = poisson_ratio
-         propL(5,1) = f_x
-         propL(6,1) = f_y
-         IF (nsd .EQ. 3) propL(7,1) = f_z
-         CALL READDOMAIN(lEq, propL, list)
-
-         nDOP = (/2,2,0,0/)
-         outPuts(1) = out_displacement
-         outPuts(2) = out_stress
+         lPtr => list%get(pstEq, "Prestress")
+         IF (pstEq) THEN
+            err = "Prestress for VMS_STRUCT is not implemented yet"
+            nDOP = (/2,2,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_stress
+         ELSE
+            nDOP = (/12,1,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_velocity
+            outPuts(3)  = out_pressure
+            outPuts(4)  = out_acceleration
+            outPuts(5)  = out_stress
+            outPuts(6)  = out_fibDir
+            outPuts(7)  = out_fibAlign
+            outPuts(8)  = out_strainInv
+            outPuts(9)  = out_integ
+            outPuts(10) = out_jacobian
+            outPuts(11) = out_defGrad
+            outPuts(12) = out_divergence
+         END IF
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -587,10 +591,18 @@
          propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/3,1,0,0/)
-         outPuts(1) = out_displacement
-         outPuts(2) = out_velocity
-         outPuts(3) = out_integ
+         lPtr => list%get(pstEq, "Prestress")
+         IF (pstEq) THEN
+            err = "Prestress for SHELLS is not implemented yet"
+            nDOP = (/2,2,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_stress
+         ELSE
+            nDOP = (/3,1,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_velocity
+            outPuts(3) = out_integ
+         END IF
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -655,17 +667,18 @@
                propL(8,1) = elasticity_modulus
             END IF
 
-            nDOP = (/10,2,4,0/)
+            nDOP = (/11,2,4,0/)
             outPuts(1)  = out_velocity
             outPuts(2)  = out_pressure
             outPuts(3)  = out_energyFlux
-            outPuts(4)  = out_absVelocity
-            outPuts(5)  = out_acceleration
-            outPuts(6)  = out_WSS
-            outPuts(7)  = out_vorticity
+            outPuts(4)  = out_acceleration
+            outPuts(5)  = out_WSS
+            outPuts(6)  = out_vorticity
+            outPuts(7)  = out_vortex
             outPuts(8)  = out_displacement
             outPuts(9)  = out_strainInv
             outPuts(10) = out_viscosity
+            outPuts(11) = out_divergence
          ELSE
             propL(1,1) = poisson_ratio
             IF (.NOT.cmmVarWall) THEN
@@ -693,10 +706,11 @@
          mvMsh = .TRUE.
          lEq%phys = phys_FSI
 
-!        3 possible equations: fluid (must), struct/vms_struct
+!        3 possible equations: fluid (must), struct/vms_struct/lElas
          phys(1) = phys_fluid
          phys(2) = phys_struct
          phys(3) = phys_vms_struct
+         phys(4) = phys_lElas
 
 !        fluid properties
          propL(1,1) = fluid_density
@@ -725,9 +739,17 @@
          propL(7,3) = f_y
          IF (nsd .EQ. 3) propL(8,3) = f_z
 
+!        lElas properties
+         propL(1,4) = solid_density
+         propL(2,4) = elasticity_modulus
+         propL(3,4) = poisson_ratio
+         propL(4,4) = f_x
+         propL(5,4) = f_y
+         IF (nsd .EQ. 3) propL(6,4) = f_z
+
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/18,3,2,0/)
+         nDOP = (/19,3,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
@@ -746,6 +768,7 @@
          outPuts(16) = out_jacobian
          outPuts(17) = out_defGrad
          outPuts(18) = out_viscosity
+         outPuts(19) = out_divergence
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -923,9 +946,11 @@
             CASE("vms_struct")
                lEq%dmn(iDmn)%phys = phys_vms_struct
                IF (.NOT.sstEq) sstEq = .TRUE.
+            CASE("lElas")
+               lEq%dmn(iDmn)%phys = phys_lElas
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/vms_struct"
+     2            "Equation must be fluid/struct/vms_struct/lElas"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys
@@ -997,8 +1022,7 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_vms_struct .OR.
-     3       lEq%dmn(iDmn)%phys.EQ.phys_preSt) THEN
+     2       lEq%dmn(iDmn)%phys.EQ.phys_vms_struct) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
 
@@ -1025,7 +1049,6 @@
       TYPE(listType), INTENT(INOUT) :: list
 
       INTEGER lSolverType, FSILSType
-      LOGICAL flag
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPL
 
@@ -1285,6 +1308,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd*nsd
             lEq%output(iOut)%name = "Deformation_gradient"
+         CASE (out_divergence)
+            lEq%output(iOut)%grp  = outGrp_divV
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Divergence"
          CASE (out_viscosity)
             lEq%output(iOut)%grp  = outGrp_Visc
             lEq%output(iOut)%o    = 0

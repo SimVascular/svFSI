@@ -169,7 +169,7 @@ c         CALL IB_SETBCPEN()
 
       LOGICAL :: l1, l2, l3, l4
       INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(5), r1, r2, dUl(nsd)
+      REAL(KIND=8) :: coef(5), r1, dUl(nsd)
 
       s       = eq(cEq)%s
       e       = eq(cEq)%e
@@ -220,7 +220,8 @@ c         CALL IB_SETBCPEN()
          e = eq(2)%e
          DO Ac=1, tnNo
             IF (ISDOMAIN(cEq, Ac, phys_struct) .OR.
-     2          ISDOMAIN(cEq, Ac, phys_vms_struct)) THEN
+     2          ISDOMAIN(cEq, Ac, phys_vms_struct) .OR.
+     3          ISDOMAIN(cEq, Ac, phys_lElas)) THEN
                An(s:e,Ac) = An(1:nsd,Ac)
                Yn(s:e,Ac) = Yn(1:nsd,Ac)
                Dn(s:e,Ac) = Dn(1:nsd,Ac)
