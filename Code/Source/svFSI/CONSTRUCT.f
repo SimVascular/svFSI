@@ -129,8 +129,8 @@
       INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
       REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), dol(nsd,eNoN), bfl(nsd,eNoN), fN(nsd,nFn),
-     3   pS0l(nstd,eNoN), vwpl(2,eNoN), ya_l(eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
+     3   vwpl(2,eNoN), ya_l(eNoN)
+      REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN), pS0l(nstd,eNoN)
 
       INTEGER a, g, Ac, cPhys, insd
       REAL(KIND=8) w, Jac, vwp(2), ksix(nsd,nsd)
@@ -279,6 +279,7 @@
 
          CASE (phys_mesh)
             w = w/Jac
+            pS0l = 0D0
             IF (nsd .EQ. 3) THEN
                dc(5:7,:) = dl(5:7,:) - dol
                CALL LELAS3D(eNoN, w, N, Nx, al, dc, bfl, pS0l, pSl, lR,
@@ -288,6 +289,7 @@
                CALL LELAS2D(eNoN, w, N, Nx, al, dc, bfl, pS0l, pSl, lR,
      2            lK)
             END IF
+            pSl = 0D0
 
          CASE (phys_CEP)
             IF (insd .EQ. 3) THEN
@@ -305,7 +307,7 @@
          END SELECT
 
 !      For prestress, map pSl values to global nodal vector
-         IF (pstEq) THEN
+         IF (pstEq .AND. cPhys.NE.phys_mesh) THEN
             DO a=1, eNoN
                Ac = ptr(a)
                pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
