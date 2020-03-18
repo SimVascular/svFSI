@@ -48,14 +48,12 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE OMPSUMS (nNo, r, U, V)
-
       INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo
+      REAL(KIND=LSRP), INTENT(IN) :: r, V(nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: U(nNo)
 
-      INTEGER, INTENT(IN) :: nNo
-      REAL(KIND=8), INTENT(IN) :: r, V(nNo)
-      REAL(KIND=8), INTENT(INOUT) :: U(nNo)
-
-      INTEGER i
+      INTEGER(KIND=LSIP) i
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
       DO i=1, nNo
@@ -65,18 +63,14 @@
 
       RETURN
       END SUBROUTINE OMPSUMS
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE OMPSUMV (dof, nNo, r, U, V)
-
       INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
+      REAL(KIND=LSRP), INTENT(IN) :: r, V(dof,nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: U(dof,nNo)
 
-      INTEGER, INTENT(IN) :: dof, nNo
-      REAL(KIND=8), INTENT(IN) :: r, V(dof,nNo)
-      REAL(KIND=8), INTENT(INOUT) :: U(dof,nNo)
-
-      INTEGER i
+      INTEGER(KIND=LSIP) i
 
       SELECT CASE(dof)
       CASE(1)
@@ -119,18 +113,14 @@
 
       RETURN
       END SUBROUTINE OMPSUMV
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE OMPMULS (nNo, r, U)
-
       INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo
+      REAL(KIND=LSRP), INTENT(IN) :: r
+      REAL(KIND=LSRP), INTENT(INOUT) :: U(nNo)
 
-      INTEGER, INTENT(IN) :: nNo
-      REAL(KIND=8), INTENT(IN) :: r
-      REAL(KIND=8), INTENT(INOUT) :: U(nNo)
-
-      INTEGER i
+      INTEGER(KIND=LSIP) i
 
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
       DO i=1, nNo
@@ -140,18 +130,14 @@
 
       RETURN
       END SUBROUTINE OMPMULS
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE OMPMULV (dof, nNo, r, U)
-
       INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
+      REAL(KIND=LSRP), INTENT(IN) :: r
+      REAL(KIND=LSRP), INTENT(INOUT) :: U(dof,nNo)
 
-      INTEGER, INTENT(IN) :: dof, nNo
-      REAL(KIND=8), INTENT(IN) :: r
-      REAL(KIND=8), INTENT(INOUT) :: U(dof,nNo)
-
-      INTEGER i
+      INTEGER(KIND=LSIP) i
 
       SELECT CASE(dof)
       CASE(1)
@@ -194,6 +180,4 @@
 
       RETURN
       END SUBROUTINE OMPMULV
-
-!====================================================================
-
+!####################################################################

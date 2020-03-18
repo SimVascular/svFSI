@@ -39,15 +39,15 @@
       SUBROUTINE SETBCDIR(lA, lY, lD)
       USE COMMOD
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(INOUT) :: lA(tDof, tnNo), lY(tDof, tnNo),
+      REAL(KIND=RKIND), INTENT(INOUT) :: lA(tDof, tnNo), lY(tDof, tnNo),
      2   lD(tDof, tnNo)
 
       LOGICAL :: eDir(maxnsd)
-      INTEGER iFa, a, Ac, iEq, iBc, s, e, iM, nNo, lDof, i, j
-      REAL(KIND=8) :: c1, c1i, c2
+      INTEGER(KIND=IKIND) iFa, a, Ac, iEq, iBc, s, e, iM, nNo, lDof, i,
+     2   j
+      REAL(KIND=RKIND) :: c1, c1i, c2
 
-      REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpA(:,:), tmpY(:,:)
 
       DO iEq=1, nEq
          DO iBc=1, eq(iEq)%nBc
@@ -60,8 +60,8 @@
                DO a=1, msh(iM)%fa(iFa)%nNo
                   IF (ISZERO(eq(iEq)%bc(iBc)%gx(a))) THEN
                      Ac = msh(iM)%fa(iFa)%gN(a)
-                     lA(s:e,Ac) = 0D0
-                     lY(s:e,Ac) = 0D0
+                     lA(s:e,Ac) = 0._RKIND
+                     lY(s:e,Ac) = 0._RKIND
                   END IF
                END DO
             END IF ! END bType_CMM
@@ -133,8 +133,8 @@
             IF ((eq(iEq)%phys .EQ. phys_FSI .AND. sstEq) .OR.
      2           eq(iEq)%phys .EQ. phys_vms_struct) THEN
                c1  = eq(iEq)%gam * dt
-               c1i = 1.0D0 / c1
-               c2  = (eq(iEq)%gam - 1.0D0)*dt
+               c1i = 1._RKIND / c1
+               c2  = (eq(iEq)%gam - 1._RKIND)*dt
                IF (ANY(eDir)) THEN
                   IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
                      DO a=1, msh(iM)%fa(iFa)%nNo
@@ -197,14 +197,14 @@
       SUBROUTINE SETBCDIRL(lBc, lFa, lA, lY, lDof)
       USE COMMOD
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: lDof
+      INTEGER(KIND=IKIND), INTENT(IN) :: lDof
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(INOUT) :: lA(lDof,lFa%nNo), lY(lDof,lFa%nNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lA(lDof,lFa%nNo),
+     2   lY(lDof,lFa%nNo)
 
-      INTEGER :: a, i
-      REAL(KIND=8) :: dirY, dirA, nV(nsd)
+      INTEGER(KIND=IKIND) :: a, i
+      REAL(KIND=RKIND) :: dirY, dirA, nV(nsd)
 
       IF (BTEST(lBc%bType,bType_gen)) THEN
          IF (lDof .NE. lBc%gm%dof) err = "Inconsistent DOF"
@@ -213,7 +213,7 @@
       ELSE IF (BTEST(lBc%bType,bType_ustd)) THEN
          CALL IFFT(lBc%gt, dirY, dirA)
       ELSE ! std / cpl
-         dirA = 0D0
+         dirA = 0._RKIND
          dirY = lBc%g
       END IF
       IF (lDof .EQ. nsd) THEN
@@ -238,10 +238,9 @@
       SUBROUTINE SETBCNEU(Yg, Dg)
       USE COMMOD
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-
-      INTEGER iFa, iBc, iM
+      INTEGER(KIND=IKIND) iFa, iBc, iM
 
       DO iBc=1, eq(cEq)%nBc
          iFa = eq(cEq)%bc(iBc)%iFa
@@ -261,15 +260,14 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, Ac, nNo
-      REAL(KIND=8) h, rtmp
+      INTEGER(KIND=IKIND) a, Ac, nNo
+      REAL(KIND=RKIND) h, rtmp
 
-      REAL(KIND=8), ALLOCATABLE :: hg(:), tmpA(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: hg(:), tmpA(:)
 
       nNo  = lFa%nNo
 
@@ -295,7 +293,7 @@
       END IF
 
       ALLOCATE(hg(tnNo))
-      hg = 0D0
+      hg = 0._RKIND
 
 !     Transforming it to a unified format
       IF (BTEST(lBc%bType,bType_gen)) THEN
@@ -325,16 +323,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER :: a, e, g, Ac, iM, nNo, eNoN, cPhys
-      REAL(KIND=8) :: w, Jac, nV(nsd), h(nsd)
+      INTEGER(KIND=IKIND) :: a, e, g, Ac, iM, nNo, eNoN, cPhys
+      REAL(KIND=RKIND) :: w, Jac, nV(nsd), h(nsd)
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:), hl(:,:), hg(:,:), tmpA(:,:),
-     2   lR(:,:), lK(:,:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), hl(:,:), hg(:,:),
+     2   tmpA(:,:), lR(:,:), lK(:,:,:)
 
       iM   = lFa%iM
       nNo  = lFa%nNo
@@ -376,15 +373,15 @@
             hl(:,a) = hg(:,Ac)
          END DO
 
-         lK = 0D0
-         lR = 0D0
+         lK = 0._RKIND
+         lR = 0._RKIND
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nV)
             Jac = SQRT(NORM(nV))
             w   = lFa%w(g)*Jac
             N   = lFa%N(:,g)
 
-            h = 0D0
+            h = 0._RKIND
             DO a=1, eNoN
                h(:) = h(:) + N(a)*hl(:,a)
             END DO
@@ -415,16 +412,16 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: ks, cs, Yg(tDof,tnNo), Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: ks, cs, Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
 
-      INTEGER :: a, b, e, g, s, Ac, iM, eNoN, cPhys
-      REAL(KIND=8) :: af, am, afm, w, wl, T1, T2, nV(nsd), u(nsd),
+      INTEGER(KIND=IKIND) :: a, b, e, g, s, Ac, iM, eNoN, cPhys
+      REAL(KIND=RKIND) :: af, am, afm, w, wl, T1, T2, nV(nsd), u(nsd),
      2   ud(nsd), h(nsd)
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:), xl(:,:), yl(:,:), dl(:,:),
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), xl(:,:), yl(:,:), dl(:,:),
      2   lR(:,:), lK(:,:,:), lKd(:,:,:)
 
       s   = eq(cEq)%s
@@ -452,16 +449,16 @@
          END DO
          IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
-         lK  = 0D0
-         lR  = 0D0
-         lKd = 0D0
+         lK  = 0._RKIND
+         lR  = 0._RKIND
+         lKd = 0._RKIND
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nV)
             w  = lFa%w(g) * SQRT(NORM(nV))
             N  = lFa%N(:,g)
 
-            u  = 0D0
-            ud = 0D0
+            u  = 0._RKIND
+            ud = 0._RKIND
             DO a=1, eNoN
                u(:)  = u(:)  + N(a)*dl(:,a)
                ud(:) = ud(:) + N(a)*yl(:,a)
@@ -574,7 +571,7 @@
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER iFa, iBc, iM
+      INTEGER(KIND=IKIND) iFa, iBc, iM
 
       DO iBc=1, eq(cEq)%nBc
          iFa = eq(cEq)%bc(iBc)%iFa
@@ -591,11 +588,10 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER a, i, masN, rowN, colN
+      INTEGER(KIND=IKIND) a, i, masN, rowN, colN
 
       masN = lBc%masN
       IF (lFa%nNo.EQ.0 .OR. masN.EQ.0) RETURN
@@ -604,17 +600,17 @@
          DO a=1, lFa%nNo
             rowN = lFa%gN(a)
             IF (rowN .EQ. masN) CYCLE
-            R (1:2,rowN) = 0D0
+            R (1:2,rowN) = 0._RKIND
 
 !           Diagonalize the stiffness matrix (A)
             DO i=rowPtr(rowN), rowPtr(rowN+1)-1
                colN = colPtr(i)
                IF (colN .EQ. rowN) THEN
-                  Val(1,i) = 1D0
-                  Val(5,i) = 1D0
+                  Val(1,i) = 1._RKIND
+                  Val(5,i) = 1._RKIND
                ELSE IF (colN .EQ. masN) THEN
-                  Val(1,i) = -1D0
-                  Val(5,i) = -1D0
+                  Val(1,i) = -1._RKIND
+                  Val(5,i) = -1._RKIND
                END IF
             END DO
          END DO
@@ -623,19 +619,19 @@
          DO a=1, lFa%nNo
             rowN = lFa%gN(a)
             IF (rowN .EQ. masN) CYCLE
-            R (1:3,rowN) = 0D0
+            R (1:3,rowN) = 0._RKIND
 
 !           Diagonalize the stiffness matrix (A)
             DO i=rowPtr(rowN), rowPtr(rowN+1)-1
                colN = colPtr(i)
                IF (colN .EQ. rowN) THEN
-                  Val(1, i) = 1D0
-                  Val(6, i) = 1D0
-                  Val(11,i) = 1D0
+                  Val(1, i) = 1._RKIND
+                  Val(6, i) = 1._RKIND
+                  Val(11,i) = 1._RKIND
                ELSE IF (colN .EQ. masN) THEN
-                  Val(1, i) = -1D0
-                  Val(6, i) = -1D0
-                  Val(11,i) = -1D0
+                  Val(1, i) = -1._RKIND
+                  Val(6, i) = -1._RKIND
+                  Val(11,i) = -1._RKIND
                END IF
             END DO
          END DO
@@ -649,10 +645,9 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
-
-      INTEGER :: iBc, iFa, iM
+      INTEGER(KIND=IKIND) :: iBc, iFa, iM
 
       DO iBc=1, eq(cEq)%nBc
          iM  = eq(cEq)%bc(iBc)%iM
@@ -669,20 +664,19 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
       LOGICAL :: eDir(maxnsd), l1, l2, l3, l4
-      INTEGER :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl, nG, eNoN,
-     2   eNoNb, cPhys
-      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
+      INTEGER(KIND=IKIND) :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl,
+     2   nG, eNoN, eNoNb, cPhys
+      REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
      2   ub(nsd), tauB(2), Ks(nsd,nsd), rt, xiL(2), Nl(2)
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
      2   xl(:,:), xbl(:,:), yl(:,:), ubl(:,:), ubg(:,:), tmpA(:,:),
      3   tmpY(:,:), lR(:,:), lK(:,:,:)
 
@@ -712,7 +706,7 @@
       IF (BTEST(lBc%bType,bType_impD)) tmpY(:,:) = tmpA(:,:)
 
       ALLOCATE(ubg(nsd,tnNo))
-      ubg = 0D0
+      ubg = 0._RKIND
       IF (ANY(eDir)) THEN
          DO a=1, nNo
             Ac = lFa%gN(a)
@@ -738,25 +732,25 @@
      2   yl(tDof,eNoN), ptr(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
 !     Initialize parameteric coordinate for Newton's iterations
-      xi0 = 0D0
+      xi0 = 0._RKIND
       DO g=1, lM%nG
          xi0 = xi0 + lM%xi(:,g)
       END DO
-      xi0 = xi0 / REAL(lM%nG,KIND=8)
+      xi0 = xi0 / REAL(lM%nG, KIND=RKIND)
 
 !     Set bounds on the parameteric coordinates
-      xiL(1) = -1.0001D0
-      xiL(2) =  1.0001D0
+      xiL(1) = -1.0001_RKIND
+      xiL(2) =  1.0001_RKIND
       IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
-         xiL(1) = -0.0001D0
+         xiL(1) = -1.E-4_RKIND
       END IF
 
 !     Set bounds on shape functions
-      Nl(1) = -0.0001D0
-      Nl(2) =  1.0001d0
+      Nl(1) = -0.0001_RKIND
+      Nl(2) =  1.0001_RKIND
       IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
-         Nl(1) = -0.1251D0
-         Nl(2) =  1.0001D0
+         Nl(1) = -0.1251_RKIND
+         Nl(2) =  1.0001_RKIND
       END IF
 
       DO e=1, nEl
@@ -782,8 +776,8 @@
             IF (mvMsh) xbl(:,a) = xbl(:,a) + Dg(nsd+2:2*nsd+1,Ac)
          END DO
 
-         lK = 0D0
-         lR = 0D0
+         lK = 0._RKIND
+         lR = 0._RKIND
          DO g=1, nG
             CALL GNNB(lFa, e, g, nV)
             Jac = SQRT(NORM(nV))
@@ -791,8 +785,8 @@
             w   = lFa%w(g) * Jac
             Nb  = lFa%N(:,g)
 
-            xp = 0D0
-            ub = 0D0
+            xp = 0._RKIND
+            ub = 0._RKIND
             DO a=1, eNoNb
                xp = xp + xbl(:,a)*Nb(a)
                ub = ub + ubl(:,a)*Nb(a)
@@ -812,13 +806,13 @@
 
 !           Check if shape functions are within bounds and sum to unity
             i  = 0
-            rt = 0D0
+            rt = 0._RKIND
             DO a=1, eNoN
                rt = rt + N(a)
                IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) i = i + 1
             END DO
             l3 = i .EQ. eNoN
-            l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
 
             l1 = ALL((/l1, l2, l3, l4/))
             IF (.NOT.l1) err = " Error in computing face shape function"
@@ -853,12 +847,11 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, PARAMETER :: iEq = 1
+      INTEGER(KIND=IKIND), PARAMETER :: iEq = 1
 
       LOGICAL RCRflag
-      INTEGER iFa, ptr, iBc, iM
-      REAL(KIND=8) tmp
+      INTEGER(KIND=IKIND) iFa, ptr, iBc, iM
+      REAL(KIND=RKIND) tmp
 
       IF (cplBC%schm .EQ. cplBC_I) THEN
          CALL CALCDERCPLBC
@@ -875,14 +868,14 @@
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                   cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
-                  cplBC%fa(ptr)%Po = 0D0
-                  cplBC%fa(ptr)%Pn = 0D0
+                  cplBC%fa(ptr)%Po = 0._RKIND
+                  cplBC%fa(ptr)%Pn = 0._RKIND
                ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
                   tmp = msh(iM)%fa(iFa)%area
                   cplBC%fa(ptr)%Po = Integ(msh(iM)%fa(iFa),Yo,nsd+1)/tmp
                   cplBC%fa(ptr)%Pn = Integ(msh(iM)%fa(iFa),Yn,nsd+1)/tmp
-                  cplBC%fa(ptr)%Qo = 0D0
-                  cplBC%fa(ptr)%Qn = 0D0
+                  cplBC%fa(ptr)%Qo = 0._RKIND
+                  cplBC%fa(ptr)%Qn = 0._RKIND
                END IF
             END IF
          END DO
@@ -907,13 +900,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, PARAMETER :: iEq = 1
-      REAL(KIND=8), PARAMETER :: absTol = 1D-8, relTol = 1D-5
+      INTEGER(KIND=IKIND), PARAMETER :: iEq = 1
+      REAL(KIND=RKIND), PARAMETER :: absTol = 1.E-8_RKIND,
+     2   relTol = 1.E-5_RKIND
 
       LOGICAL RCRflag
-      INTEGER iFa, i, j, ptr, iBc, iM
-      REAL(KIND=8) orgQ, orgY, diff, area
+      INTEGER(KIND=IKIND) iFa, i, j, ptr, iBc, iM
+      REAL(KIND=RKIND) orgQ, orgY, diff, area
 
       IF (ALL(cplBC%fa%bGrp.EQ.cplBC_Dir)) RETURN
 
@@ -929,14 +922,14 @@
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
-               cplBC%fa(ptr)%Po = 0D0
-               cplBC%fa(ptr)%Pn = 0D0
+               cplBC%fa(ptr)%Po = 0._RKIND
+               cplBC%fa(ptr)%Pn = 0._RKIND
             ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
                area = msh(iM)%fa(iFa)%area
                cplBC%fa(ptr)%Po = Integ(msh(iM)%fa(iFa),Yo,nsd+1)/area
                cplBC%fa(ptr)%Pn = Integ(msh(iM)%fa(iFa),Yn,nsd+1)/area
-               cplBC%fa(ptr)%Qo = 0D0
-               cplBC%fa(ptr)%Qn = 0D0
+               cplBC%fa(ptr)%Qo = 0._RKIND
+               cplBC%fa(ptr)%Qn = 0._RKIND
             END IF
          END IF
       END DO
@@ -948,15 +941,15 @@
       END IF
 
       j    = 0
-      diff = 0D0
+      diff = 0._RKIND
       DO iBc=1, eq(iEq)%nBc
          i = eq(iEq)%bc(iBc)%cplBCptr
          IF (i.NE.0 .AND. BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-            diff = diff + cplBC%fa(i)%Qo**2D0
+            diff = diff + (cplBC%fa(i)%Qo*cplBC%fa(i)%Qo)
             j = j + 1
          END IF
       END DO
-      diff = SQRT(diff/REAL(j,8))
+      diff = SQRT(diff/REAL(j, KIND=RKIND))
       IF (diff*relTol .LT. absTol) THEN
          diff = absTol
       ELSE
@@ -993,8 +986,9 @@
       IMPLICIT NONE
       CHARACTER, INTENT(IN) :: genFlag
 
-      INTEGER fid, iFa, nDir, nNeu
-      REAL(KIND=8), ALLOCATABLE :: y(:)
+      INTEGER(KIND=IKIND) fid, iFa, nDir, nNeu
+
+      REAL(KIND=RKIND), ALLOCATABLE :: y(:)
 
       nDir  = 0
       nNeu  = 0
@@ -1056,11 +1050,10 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       LOGICAL, INTENT(IN) :: RCRflag
 
-      INTEGER fid, iFa, istat
-      REAL(KIND=8), ALLOCATABLE :: y(:)
+      INTEGER(KIND=IKIND) fid, iFa, istat
+      REAL(KIND=RKIND), ALLOCATABLE :: y(:)
 
       IF (cm%mas()) THEN
          istat = 0
@@ -1073,7 +1066,7 @@
             WRITE(fid) cplBC%nX
             WRITE(fid) cplBC%nXp
             WRITE(fid) dt
-            WRITE(fid) MAX(time-dt, 0D0)
+            WRITE(fid) MAX(time-dt, 0._RKIND)
             WRITE(fid) cplBC%xo
             DO iFa=1, cplBC%nFa
                WRITE(fid) cplBC%fa(iFa)%bGrp
@@ -1122,19 +1115,20 @@
       END SUBROUTINE cplBC_Integ_X
 !--------------------------------------------------------------------
       SUBROUTINE RCR_Integ_X(istat)
+      USE TYPEMOD
       USE COMMOD, ONLY : dt, time, cplBC
       IMPLICIT NONE
-      INTEGER, INTENT(INOUT) :: istat
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: istat
 
-      INTEGER, PARAMETER :: nTS = 100
-      INTEGER i, n, nX
-      REAL(KIND=8) r, tt, dtt, trk
+      INTEGER(KIND=IKIND), PARAMETER :: nTS = 100
+      INTEGER(KIND=IKIND) i, n, nX
+      REAL(KIND=RKIND) r, tt, dtt, trk
 
-      REAL(KIND=8), ALLOCATABLE :: Rp(:), C(:), Rd(:), Pd(:), X(:),
+      REAL(KIND=RKIND), ALLOCATABLE :: Rp(:), C(:), Rd(:), Pd(:), X(:),
      2   Xrk(:), frk(:,:), Qrk(:,:)
 
-      tt  = MAX(time-dt, 0D0)
-      dtt = dt/REAL(nTS, KIND=8)
+      tt  = MAX(time-dt, 0._RKIND)
+      dtt = dt/REAL(nTS, KIND=RKIND)
 
       nX  = cplBC%nFa
       ALLOCATE(Rp(nX), C(nX), Rd(nX), Pd(nX), X(nX), Xrk(nX), frk(nX,4),
@@ -1150,8 +1144,8 @@
 
       DO n=1, nTS
          DO i=1, 4
-            r = REAL(i-1,KIND=8)/3.0D0
-            r = (REAL(n-1,KIND=8) + r)/REAL(nTS,KIND=8)
+            r = REAL(i-1, KIND=RKIND)/3._RKIND
+            r = (REAL(n-1, KIND=RKIND) + r)/REAL(nTS, KIND=RKIND)
             Qrk(:,i) = cplBC%fa(:)%Qo +
      2         (cplBC%fa(:)%Qn - cplBC%fa(:)%Qo)*r
          END DO
@@ -1162,13 +1156,13 @@
          frk(:,1) = (Qrk(:,1) - (Xrk-Pd(:))/Rd(:))/C(:)
 
 !        RK-4 2nd pass
-         trk = tt + dtt/3.0D0
-         Xrk = X  + dtt*frk(:,1)/3.0D0
+         trk = tt + dtt/3._RKIND
+         Xrk = X  + dtt*frk(:,1)/3._RKIND
          frk(:,2) = (Qrk(:,2) - (Xrk-Pd(:))/Rd(:))/C(:)
 
 !        RK-4 3rd pass
-         trk = tt + 2.0D0*dtt/3.0D0
-         Xrk = X  - dtt*frk(:,1)/3.0D0 + dtt*frk(:,2)
+         trk = tt + 2._RKIND*dtt/3._RKIND
+         Xrk = X  - dtt*frk(:,1)/3._RKIND + dtt*frk(:,2)
          frk(:,3) = (Qrk(:,3) - (Xrk-Pd(:))/Rd(:))/C(:)
 
 !        RK-4 4th pass
@@ -1176,8 +1170,9 @@
          Xrk = X  + dtt*frk(:,1) - dtt*frk(:,2) + dtt*frk(:,3)
          frk(:,4) = (Qrk(:,4) - (Xrk-Pd(:))/Rd(:))/C(:)
 
-         r  = dtt/8.0D0
-         X  = X + r*(frk(:,1) + 3.0D0*(frk(:,2) + frk(:,3)) + frk(:,4))
+         r  = dtt/8._RKIND
+         X  = X + r*(frk(:,1) + 3._RKIND*(frk(:,2) + frk(:,3)) +
+     2      frk(:,4))
          tt = tt + dtt
 
          DO i=1, nX
@@ -1205,10 +1200,9 @@
       SUBROUTINE SETBCCMM(Ag, Dg)
       USE COMMOD
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
-
-      INTEGER iFa, iBc, iM
+      INTEGER(KIND=IKIND) iFa, iBc, iM
 
       DO iBc=1, eq(cEq)%nBc
           IF(.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_CMM)) CYCLE
@@ -1234,15 +1228,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER a, e, Ac, iM, eNoN
-      REAL(KIND=8) :: pSl(6), vwp(2)
+      INTEGER(KIND=IKIND) a, e, Ac, iM, eNoN
+      REAL(KIND=RKIND) :: pSl(6), vwp(2)
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: al(:,:), dl(:,:), xl(:,:), bfl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: al(:,:), dl(:,:), xl(:,:),
+     2   bfl(:,:)
 
       iM   = lFa%iM
       eNoN = lFa%eNoN
@@ -1255,8 +1249,8 @@
          cDmn = DOMAIN(msh(iM), cEq, lFa%gE(e))
          IF (eq(cEq)%dmn(cDmn)%phys .NE. phys_CMM) CYCLE
 
-         pSl = 0D0
-         vwp = 0D0
+         pSl = 0._RKIND
+         vwp = 0._RKIND
          DO a=1, eNoN
             Ac = lFa%IEN(a,e)
             ptr(a)   = Ac
@@ -1271,8 +1265,8 @@
                vwp(:) = vwp(:) + varWallProps(:,Ac)
             END IF
          END DO
-         pSl(:) = pSl(:) / REAL(eNoN,KIND=8)
-         vwp(:) = vwp(:) / REAL(eNoN,KIND=8)
+         pSl(:) = pSl(:) / REAL(eNoN, KIND=RKIND)
+         vwp(:) = vwp(:) / REAL(eNoN, KIND=RKIND)
 
 !     Add CMM BCs contributions to the LHS/RHS
          CALL CMMb(lFa, e, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)

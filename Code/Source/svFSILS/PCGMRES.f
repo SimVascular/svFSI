@@ -49,18 +49,19 @@
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
 
       LOGICAL flag
-      INTEGER nNo, mynNo, i, j, k, l, nsd, sD
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
-      REAL(KIND=8) eps, tmp
-      REAL(KIND=8), ALLOCATABLE :: u(:,:,:), h(:,:), X(:,:), y(:), c(:),&
-     &   s(:), err(:), Ua(:,:)
-      REAL(KIND=8), ALLOCATABLE :: mK(:,:), mG(:,:), mD(:,:), mL(:),
-     2   Gt(:,:), Xm(:,:), Xc(:), Um(:,:), Uc(:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i, j, k, l, nsd, sD
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
+      REAL(KIND=LSRP) eps, tmp
+
+      REAL(KIND=LSRP), ALLOCATABLE :: u(:,:,:), h(:,:), X(:,:), y(:),   &
+     &   c(:), s(:), err(:), Ua(:,:)
+      REAL(KIND=LSRP), ALLOCATABLE :: mK(:,:), mG(:,:), mD(:,:), mL(:), &
+     &   Gt(:,:), Xm(:,:), Xc(:), Um(:,:), Uc(:)
 
       nsd = dof - 1
       flag = .FALSE.
@@ -79,14 +80,14 @@
       ls%RI%fNorm  = eps
       eps       = MAX(ls%RI%absTol,ls%RI%relTol*eps)
       ls%RI%itr    = 0
-      X         = 0D0
+      X         = 0._LSRP
 
       CALL DEPART
       CALL BCPRE
 
       IF (ls%RI%iNorm .LE. ls%RI%absTol) THEN
          ls%RI%callD = EPSILON(ls%RI%callD)
-         ls%RI%dB    = 0D0
+         ls%RI%dB    = 0._LSRP
          RETURN
       END IF
 
@@ -119,7 +120,7 @@
             END DO
             h(i+1,i) = SQRT(ABS(h(i+1,i)))
 
-            CALL OMPMULV(dof, nNo, 1D0/h(i+1,i), u(:,:,i+1))
+            CALL OMPMULV(dof, nNo, 1._LSRP/h(i+1,i), u(:,:,i+1))
             !u(:,:,i+1) = u(:,:,i+1)/h(i+1,i)
             DO j=1, i-1
                tmp      =  c(j)*h(j,i) + s(j)*h(j+1,i)
@@ -130,7 +131,7 @@
             c(i)     = h(i,i)/tmp
             s(i)     = h(i+1,i)/tmp
             h(i,i)   = tmp
-            h(i+1,i) = 0D0
+            h(i+1,i) = 0._LSRP
             err(i+1) = -s(i)*err(i)
             err(i)   =  c(i)*err(i)
             IF (ABS(err(i+1)) .LT. eps) THEN
@@ -157,15 +158,15 @@
       END DO
       CALL DOMUL(X,R,.true.)
       ls%RI%callD = FSILS_CPUT() - ls%RI%callD
-      ls%RI%dB    = 1D1*LOG(ls%RI%fNorm/ls%RI%dB)
+      ls%RI%dB    = 10._LSRP*LOG(ls%RI%fNorm/ls%RI%dB)
 
       RETURN
       CONTAINS
 !--------------------------------------------------------------------
       SUBROUTINE DOMUL(X, R, flag)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: X(dof,lhs%nNo)
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: X(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
       LOGICAL, INTENT(IN) :: flag
 
       if (.true.) then
@@ -216,16 +217,17 @@
       SUBROUTINE BCPRE
       IMPLICIT NONE
 
-      INTEGER faIn, i, a, Ac, nsd
-      REAL(KIND=8) FSILS_NORMV
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
+      INTEGER(KIND=LSIP) faIn, i, a, Ac, nsd
+      REAL(KIND=LSRP) FSILS_NORMV
+
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:)
 
       nsd = dof -  1
       ALLOCATE(v(nsd,nNo))
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
             IF (lhs%face(faIn)%sharedFlag) THEN
-               v = 0D0
+               v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
@@ -233,14 +235,14 @@
                   END DO
                END DO
                lhs%face(faIn)%nS = FSILS_NORMV(nsd, mynNo, lhs%commu,   &
-     &            v)**2D0
+     &            v)**2._LSRP
             ELSE
-               lhs%face(faIn)%nS = 0D0
+               lhs%face(faIn)%nS = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      lhs%face(faIn)%nS = lhs%face(faIn)%nS +            &
-     &                  lhs%face(faIn)%valM(i,a)**2D0
+     &                  lhs%face(faIn)%valM(i,a)**2._LSRP
                   END DO
                END DO
             END IF
@@ -253,8 +255,9 @@
       SUBROUTINE DEPART
       IMPLICIT NONE
 
-      INTEGER i, j, k, l, nnz
-      REAL(KIND=8), ALLOCATABLE :: tmp(:)
+      INTEGER(KIND=LSIP) i, j, k, l, nnz
+
+      REAL(KIND=LSRP), ALLOCATABLE :: tmp(:)
 
       nnz = lhs%nnz
 
@@ -321,6 +324,6 @@
 
       RETURN
       END SUBROUTINE DEPART
-
+!--------------------------------------------------------------------
       END SUBROUTINE PCGMRES
-
+!####################################################################

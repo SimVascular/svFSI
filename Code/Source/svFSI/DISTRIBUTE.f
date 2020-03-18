@@ -43,11 +43,11 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER :: a, e, i, Ac, iEq, iM, iFa, iBf
+      INTEGER(KIND=IKIND) :: a, e, i, Ac, iEq, iM, iFa, iBf
 
-      INTEGER, ALLOCATABLE :: part(:), gmtl(:)
-      REAL, ALLOCATABLE :: iWgt(:)
-      REAL(KIND=8), ALLOCATABLE :: wgt(:,:), wrk(:), tmpX(:,:),
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), gmtl(:)
+      REAL(KIND=RKIND4), ALLOCATABLE :: iWgt(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: wgt(:,:), wrk(:), tmpX(:,:),
      2   tmpD(:,:,:)
       TYPE(mshType), ALLOCATABLE :: tMs(:)
 
@@ -77,7 +77,7 @@
 
 !     Here is rough estimation of how each mesh should be splited
 !     between processors
-      wrk = REAL(msh%gnNo,8)/REAL(gtnNo,8)
+      wrk = REAL(msh%gnNo, KIND=RKIND)/REAL(gtnNo, KIND=RKIND)
       CALL cm%bcast(wrk)
       CALL SPLITJOBS(nMsh, cm%np(), wgt, wrk)
 
@@ -94,7 +94,7 @@
       END IF
       DO iM=1, nMsh
          dbg = "Partitioning mesh "//iM
-         iWgt = REAL(wgt(iM,:)/SUM(wgt(iM,:)))
+         iWgt = REAL(wgt(iM,:)/SUM(wgt(iM,:)), KIND=RKIND4)
          CALL PARTMSH(msh(iM), gmtl, cm%np(), iWgt)
       END DO
 
@@ -138,7 +138,7 @@
                   tmpD = eq(iEq)%bf(iBf)%bm%d
                   DEALLOCATE(eq(iEq)%bf(iBf)%bm%d)
                   ALLOCATE(eq(iEq)%bf(iBf)%bm%d(i,msh(iM)%nNo,a))
-                  eq(iEq)%bf(iBf)%bm%d = 0D0
+                  eq(iEq)%bf(iBf)%bm%d = 0._RKIND
                   DO i=1, eq(iEq)%bf(iBf)%bm%nTP
                      DO a=1, msh(iM)%nNo
                         Ac = msh(iM)%gN(a)
@@ -194,8 +194,8 @@
             CALL cm%bcast(rmsh%cpVar)
             IF (cm%slv()) THEN
                ALLOCATE(rmsh%maxEdgeSize(nMsh))
-               rmsh%minDihedAng = 0D0
-               rmsh%maxRadRatio = 0D0
+               rmsh%minDihedAng = 0._RKIND
+               rmsh%maxRadRatio = 0._RKIND
             END IF
             call cm%bcast(rmsh%maxEdgeSize)
          END IF
@@ -371,7 +371,7 @@
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER iM, iFa
+      INTEGER(KIND=IKIND) iM, iFa
       LOGICAL flag
 
       IF (cm%slv()) ALLOCATE(ib)
@@ -407,10 +407,9 @@
       SUBROUTINE DISTIBMSH(lM)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER i, insd
+      INTEGER(KIND=IKIND) i, insd
 
       CALL cm%bcast(lM%lShpF)
       CALL cm%bcast(lM%lShl)
@@ -467,7 +466,6 @@
       SUBROUTINE DISTIBFa(lM, lFa)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
@@ -496,12 +494,11 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: gmtl(gtnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: gmtl(gtnNo)
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(mshType), INTENT(IN) :: tMs(nMsh)
 
-      INTEGER iDmn, iOut, iBc, iBf
+      INTEGER(KIND=IKIND) iDmn, iOut, iBc, iBf
 
 !     Distribute equation parameters
       CALL cm%bcast(lEq%nOutput)
@@ -640,16 +637,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: gmtl(gtnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: gmtl(gtnNo)
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(mshType), INTENT(IN) :: tMs(nMsh)
 
       LOGICAL flag
-      INTEGER i, j, iDof, nTp, nNo, a, b, Ac, iM, iFa
+      INTEGER(KIND=IKIND) i, j, iDof, nTp, nNo, a, b, Ac, iM, iFa
 
-      INTEGER, ALLOCATABLE :: tmpI(:)
-      REAL(KIND=8), ALLOCATABLE :: tmp(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: tmpI(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmp(:)
 
       CALL cm%bcast(lBc%cplBCptr)
       CALL cm%bcast(lBc%bType)
@@ -817,13 +813,12 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(INOUT) :: lBc
 
       LOGICAL flag
-      INTEGER i, j, iDof, nTp, nNo, a
+      INTEGER(KIND=IKIND) i, j, iDof, nTp, nNo, a
 
-      REAL(KIND=8), ALLOCATABLE :: tmp(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmp(:)
 
       CALL cm%bcast(lBc%bType)
       IF (cm%slv()) ALLOCATE(lBc%eDrn(nsd))
@@ -909,13 +904,12 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bfType), INTENT(INOUT) :: lBf
 
       LOGICAL flag
-      INTEGER a, i, j, Ac, iM, idof, nTP
+      INTEGER(KIND=IKIND) a, i, j, Ac, iM, idof, nTP
 
-      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), tmpD(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:), tmpD(:,:,:)
 
       CALL cm%bcast(lBf%bType)
       CALL cm%bcast(lBf%dof)
@@ -948,7 +942,7 @@
          tmpX = lBf%bx
          DEALLOCATE(lBf%bx)
          ALLOCATE(lBf%bx(lBf%dof,msh(iM)%nNo))
-         lBf%bx = 0D0
+         lBf%bx = 0._RKIND
          DO a=1, msh(iM)%nNo
             Ac = msh(iM)%gN(a)
             lBf%bx(:,a) = tmpX(:,Ac)
@@ -1001,7 +995,7 @@
          END IF
          ALLOCATE(tmpX(lBf%bm%dof,tnNo),
      2      lBf%bm%d(lBf%bm%dof,msh(iM)%nNo,lBf%bm%nTP))
-         lBf%bm%d = 0D0
+         lBf%bm%d = 0._RKIND
          DO i=1, lBf%bm%nTP
             tmpX = LOCAL(tmpD(:,:,i))
             DO a=1, msh(iM)%nNo
@@ -1021,7 +1015,6 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(stModelType), INTENT(INOUT) :: lStM
 
       CALL cm%bcast(lStM%volType)
@@ -1048,7 +1041,6 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(viscModelType), INTENT(INOUT) :: lVis
 
       CALL cm%bcast(lVis%viscType)
@@ -1066,21 +1058,20 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: nP
-      REAL, INTENT(IN) :: wgt(nP)
-      INTEGER, INTENT(INOUT) :: gmtl(gtnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nP
+      REAL(KIND=RKIND4), INTENT(IN) :: wgt(nP)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: gmtl(gtnNo)
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER(KIND=MPI_OFFSET_KIND) :: idisp
       LOGICAL :: flag, fnFlag
-      INTEGER :: i, a, Ac, e, Ec, edgecut, nEl, nNo, eNoN, eNoNb, ierr,
-     2   fid, SPLIT, insd, nFn
+      INTEGER(KIND=MPI_OFFSET_KIND) :: idisp
+      INTEGER(KIND=IKIND) :: i, a, Ac, e, Ec, edgecut, nEl, nNo, eNoN,
+     2   eNoNb, ierr, fid, SPLIT, insd, nFn
       CHARACTER(LEN=stdL) fTmp
 
-      INTEGER, ALLOCATABLE :: part(:), gPart(:), tempIEN(:,:),
-     2   gtlPtr(:), sCount(:), disp(:)
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:), tmpFn(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), gPart(:),
+     2   tempIEN(:,:), gtlPtr(:), sCount(:), disp(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:), tmpFn(:,:)
 
       IF (cm%seq()) THEN
          lM%nEl = lM%gnEl
@@ -1141,14 +1132,14 @@
          a = lM%bs(2)%nEl
          IF (insd .EQ. 3) a = a*lM%bs(3)%nEl
          DO i=0, cm%np()
-            lM%eDist(i) = NINT(SUM(wgt(1:i))*lM%bs(1)%nEl)*a
+            lM%eDist(i) = a*NINT(SUM(wgt(1:i))*lM%bs(1)%nEl, KIND=IKIND)
             IF (lM%eDist(i) .GT. lM%gnEl) lM%eDist(i) = lM%gnEl
          END DO
       ELSE
 !     A draft of splitting the mesh between processors
 !     lM%eDist(i) represents first element which belong to cm%id()=i
          DO i=0, cm%np()
-            lM%eDist(i) = NINT(SUM(wgt(1:i))*lM%gnEl)
+            lM%eDist(i) = NINT(SUM(wgt(1:i))*lM%gnEl, KIND=IKIND)
             IF (lM%eDist(i) .GT. lM%gnEl) lM%eDist(i) = lM%gnEl
          END DO
       END IF
@@ -1258,7 +1249,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          END DO
 
          ALLOCATE(tempIEN(eNoN,lM%gnEl), lM%otnIEN(lM%gnEl))
-!     Making the lM%IEN array in order, based on the cm%id() number in the
+!     Making the lM%IEN array in order, based on the cm%id() number in
 !     master. lM%otnIEN maps old IEN order to new IEN order.
          disp = 0
          DO e=1, lM%gnEl
@@ -1290,7 +1281,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          IF (ALLOCATED(lM%fN)) THEN
             fnFlag = .TRUE.
             ALLOCATE(tmpFn(nFn*nsd,lM%gnEl))
-            tmpFn = 0D0
+            tmpFn = 0._RKIND
             DO e=1, lM%gnEl
                Ec = lM%otnIEN(e)
                tmpFn(:,Ec) = lM%fN(:,e)
@@ -1449,14 +1440,13 @@ c            wrn = " ParMETIS failed to partition the mesh"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa, gFa
-      INTEGER, INTENT(IN) :: gmtl(gtnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: gmtl(gtnNo)
 
-      INTEGER eNoNb, e, a, Ac, Ec, i, j
+      INTEGER(KIND=IKIND) eNoNb, e, a, Ac, Ec, i, j
 
-      INTEGER, ALLOCATABLE :: part(:), ePtr(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), ePtr(:)
 
 !     Broadcasting the number of nodes and elements of to slaves and
 !     populating gFa to all procs

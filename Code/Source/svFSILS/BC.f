@@ -49,17 +49,16 @@
 
       SUBROUTINE FSILS_BC_CREATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
      &   Val)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: faIn, nNo, dof
-      INTEGER, INTENT(IN) :: BC_type
-      INTEGER, INTENT(IN) :: gNodes(nNo)
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: Val(dof,nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
+      INTEGER(KIND=LSIP), INTENT(IN) :: BC_type
+      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
+      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
 
-      INTEGER a, Ac, i
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
+      INTEGER(KIND=LSIP) a, Ac, i
+
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:)
 
       IF (faIn .GT. lhs%nFaces) THEN
          PRINT *, "FSILS: faIn is exceeding lhs structure maximum",     &
@@ -94,7 +93,7 @@
             lhs%face(faIn)%val(:,a) = Val(:,a)
          END DO
       ELSE
-         lhs%face(faIn)%val = 0D0
+         lhs%face(faIn)%val = 0._LSRP
       END IF
 
       IF (lhs%commu%nTasks .GT. 1) THEN
@@ -104,7 +103,7 @@
          IF (Ac .GT. 1) THEN
             lhs%face(faIn)%sharedFlag = .TRUE.
             IF (.NOT.ALLOCATED(v)) ALLOCATE(v(dof,lhs%nNo))
-            v = 0D0
+            v = 0._LSRP
             DO a=1, nNo
                Ac = lhs%face(faIn)%glob(a)
                v(:,Ac) = lhs%face(faIn)%val(:,a)
@@ -120,22 +119,18 @@
 
       RETURN
       END SUBROUTINE FSILS_BC_CREATE
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE external_BC_CREATE (lhs, faIn, nNo, dof, BC_type,      &
      &         gNodes, Val)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: faIn, nNo, dof
-      INTEGER, INTENT(IN) :: BC_type
-      INTEGER, INTENT(IN) :: gNodes(nNo)
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: Val(dof,nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
+      INTEGER(KIND=LSIP), INTENT(IN) :: BC_type
+      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
+      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
 
-      INTEGER a, Ac, i
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
+      INTEGER(KIND=LSIP) a, Ac, i
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:)
 
       IF (faIn .GT. lhs%nFaces) THEN
          PRINT *, "FSILS: faIn is exceeding lhs structure maximum",     &
@@ -170,7 +165,7 @@
             lhs%face(faIn)%val(:,a) = Val(:,a)
          END DO
       ELSE
-         lhs%face(faIn)%val = 0D0
+         lhs%face(faIn)%val = 0._LSRP
       END IF
 
       IF (lhs%commu%nTasks .GT. 1) THEN
@@ -180,7 +175,7 @@
          IF (Ac .GT. 1) THEN
             lhs%face(faIn)%sharedFlag = .TRUE.
             IF (.NOT.ALLOCATED(v)) ALLOCATE(v(dof,lhs%nNo))
-            v = 0D0
+            v = 0._LSRP
             DO a=1, nNo
                Ac = lhs%face(faIn)%glob(a)
                v(:,Ac) = lhs%face(faIn)%val(:,a)
@@ -196,15 +191,11 @@
 
       RETURN
       END SUBROUTINE external_BC_CREATE
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE FSILS_BC_FREE (lhs, faIn)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: faIn
+      INTEGER(KIND=LSIP), INTENT(IN) :: faIn
 
       IF (.NOT.lhs%face(faIn)%foC) THEN
          PRINT *, 'FSILS: Cannot free a face that is not created yet'
@@ -213,7 +204,7 @@
       lhs%face(faIn)%foC        = .FALSE.
       lhs%face(faIn)%nNo        = 0
       lhs%face(faIn)%bGrp       = BC_TYPE_Dir
-      lhs%face(faIn)%res        = 0D0
+      lhs%face(faIn)%res        = 0._LSRP
       lhs%face(faIn)%sharedFlag = .FALSE.
 
       DEALLOCATE(lhs%face(faIn)%glob, lhs%face(faIn)%val,               &
@@ -221,4 +212,5 @@
 
       RETURN
       END SUBROUTINE FSILS_BC_FREE
+!####################################################################
 

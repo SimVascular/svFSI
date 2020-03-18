@@ -41,14 +41,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: co, iEq
-      REAL(KIND=8), INTENT(INOUT) :: timeP(3)
+      INTEGER(KIND=IKIND), INTENT(IN) :: co, iEq
+      REAL(KIND=RKIND), INTENT(INOUT) :: timeP(3)
 
       CHARACTER(LEN=stdL) :: sepLine
 
-      INTEGER fid, i
-      REAL(KIND=8) tmp, tmp1, tmp2
+      INTEGER(KIND=IKIND) fid, i
+      REAL(KIND=RKIND) tmp, tmp1, tmp2
       CHARACTER c1, c2
       CHARACTER(LEN=stdL) sOut
 
@@ -61,7 +60,7 @@
 
       IF (co .EQ. 1) THEN
          timeP(1) = tmp - timeP(1)
-         timeP(2) = 0D0
+         timeP(2) = 0._RKIND
          std = " "
          std = TRIM(sepLine)
          std = " Eq     N-i     T       dB  Ri/R1   Ri/R0    R/Ri  "//
@@ -81,15 +80,15 @@
      2   c1//" "//STR(timeP(3),6)
 
       IF (ISZERO(eq(iEq)%iNorm)) THEN
-         tmp  = 1D0
-         tmp1 = 1D0
-         tmp2 = 1D0
+         tmp  = 1._RKIND
+         tmp1 = 1._RKIND
+         tmp2 = 1._RKIND
          i    = 0
       ELSE
          tmp  = eq(iEq)%FSILS%RI%iNorm/eq(iEq)%iNorm
          tmp1 = tmp/eq(iEq)%pNorm
          tmp2 = eq(iEq)%FSILS%RI%fNorm/eq(iEq)%FSILS%RI%iNorm
-         i    = INT(2D1*LOG10(tmp1))
+         i    = INT(20._RKIND*LOG10(tmp1), KIND=IKIND)
       END IF
 
       IF (i .GT. 20) THEN
@@ -100,10 +99,11 @@
       sOut = TRIM(sOut)//"  "//c1//STR(i,4)//" "//STR(tmp1,7)//" "//
      2   STR(tmp,7)//" "//STR(tmp2,7)//c2
 
-      IF (ISZERO(timeP(3),timeP(2))) timeP(3) = (1D0+eps)*timeP(2) + eps
-      tmp = 1D2*eq(iEq)%FSILS%RI%callD/(timeP(3) - timeP(2))
+      IF (ISZERO(timeP(3),timeP(2)))
+     2   timeP(3) = (1._RKIND+eps)*timeP(2) + eps
+      tmp = 100._RKIND*eq(iEq)%FSILS%RI%callD/(timeP(3) - timeP(2))
       timeP(2) = timeP(3)
-      IF (ABS(tmp) .GT. 1D2) tmp = 1D2
+      IF (ABS(tmp) .GT. 100._RKIND) tmp = 100._RKIND
 
       IF (eq(iEq)%FSILS%RI%suc) THEN
          c1 = "["; c2 = "]"
@@ -111,7 +111,8 @@
          c1 = "!"; c2 = "!"
       END IF
       sOut = TRIM(sOut)//"  "//c1//STR(eq(iEq)%FSILS%RI%itr,4)//" "//
-     2   STR(NINT(eq(iEq)%FSILS%RI%dB),4)//" "//STR(NINT(tmp),3)//c2
+     2   STR(NINT(eq(iEq)%FSILS%RI%dB, KIND=IKIND),4)//" "//
+     3   STR(NINT(tmp, KIND=IKIND),3)//c2
 
       IF (nEq .GT. 1) THEN
          std = CLR(sOut,iEq)
@@ -127,9 +128,9 @@
       USE COMMOD
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(IN) :: timeP(3)
+      REAL(KIND=RKIND), INTENT(IN) :: timeP(3)
 
-      INTEGER fid, myID
+      INTEGER(KIND=IKIND) fid, myID
       CHARACTER(LEN=stdL) fName, tmpS
 
       fid  = 27
@@ -227,8 +228,8 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER iEq, iDmn, s, e
-      REAL(KIND=8) dnorm, vol
+      INTEGER(KIND=IKIND) iEq, iDmn, s, e
+      REAL(KIND=RKIND) dnorm, vol
       CHARACTER(LEN=stdL) sepLine
 
       sepLine = REPEAT('-',67)
@@ -257,15 +258,12 @@
 !     This is to find if any exception occures, commenting this out
 !     untill fortran2003 is standard in all compilers
       SUBROUTINE EXCEPTIONS
-
 c      USE IEEE_EXCEPTIONS
       USE COMMOD, ONLY: stdL
-
       IMPLICIT NONE
-
 !     I am assuming nExCk is 5, if a compilation error occured, you need
 !     to adjust the following arrays accordingely
-c      INTEGER, PARAMETER :: nExCk = SIZE(IEEE_ALL)
+c      INTEGER(KIND=IKIND), PARAMETER :: nExCk = SIZE(IEEE_ALL)
 c      LOGICAL, PARAMETER :: check(nExCk) =
 c     2   (/.TRUE.,.TRUE.,.TRUE.,.TRUE.,.FALSE./)
 c      CHARACTER(LEN=stdL), PARAMETER :: ieWarn(nExCk) =
@@ -275,8 +273,8 @@ c
 c      LOGICAL, SAVE :: iniSet = .TRUE., sprtFlag(nExCk)
 c
 c      LOGICAL fg
-c      INTEGER i
-c      REAL(KIND=8) r
+c      INTEGER(KIND=IKIND) i
+c      REAL(KIND=RKIND) r
 c
 c      IF (iniSet) THEN
 c         iniSet = .FALSE.

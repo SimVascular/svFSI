@@ -50,23 +50,22 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE NSSOLVER(lhs, ls, dof, Val, Ri)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: Ri(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
 
       LOGICAL GE
-      INTEGER nNo, nnz, mynNo, i, j, k, iB, iBB, nB, nsd, c
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_NORMV, FSILS_DOTS,    &
+      INTEGER(KIND=LSIP) nNo, nnz, mynNo, i, j, k, iB, iBB, nB, nsd, c
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMS, FSILS_NORMV, FSILS_DOTS, &
      &   FSILS_DOTV, eps, FSILS_NCDOTS, FSILS_NCDOTV
-      REAL(KIND=8), ALLOCATABLE :: U(:,:,:), P(:,:), MU(:,:,:), MP(:,:),&
-     &   A(:,:), tmp(:), tmpG(:), B(:), xB(:), oldxB(:), mK(:,:),       &
-     &   mG(:,:), mD(:,:), mL(:), Gt(:,:), Rm(:,:), Rc(:), Rmi(:,:),
-     &   Rci(:)
+
+      REAL(KIND=LSRP), ALLOCATABLE :: U(:,:,:), P(:,:), MU(:,:,:),      &
+     &   MP(:,:), A(:,:), tmp(:), tmpG(:), B(:), xB(:), oldxB(:),       &
+     &   mK(:,:), mG(:,:), mD(:,:), mL(:), Gt(:,:), Rm(:,:), Rc(:),     &
+     &   Rmi(:,:), Rci(:)
 
       nNo = lhs%nNo
       nnz = lhs%nnz
@@ -82,17 +81,17 @@
       Rmi = Ri(1:nsd,:)
       Rci = Ri(dof,:)
 
-      xB          = 0D0
-      B           = 0D0
-      oldxB       = 0D0
+      xB          = 0._LSRP
+      B           = 0._LSRP
+      oldxB       = 0._LSRP
       Rm          = Rmi
       Rc          = Rci
-      eps         = SQRT(FSILS_NORMV(nsd, mynNo, lhs%commu, Rm)**2D0    &
-     &            +      FSILS_NORMS(     mynNo, lhs%commu, Rc)**2D0)
+      eps         = SQRT(FSILS_NORMV(nsd,mynNo,lhs%commu,Rm)**2._LSRP   &
+     &            +      FSILS_NORMS(    mynNo,lhs%commu,Rc)**2._LSRP)
       ls%RI%iNorm = eps
       ls%RI%fNorm = eps*eps
-      ls%CG%callD = 0D0
-      ls%GM%callD = 0D0
+      ls%CG%callD = 0._LSRP
+      ls%GM%callD = 0._LSRP
       ls%CG%itr   = 0
       ls%GM%itr   = 0
       ls%RI%callD = FSILS_CPUT()
@@ -175,7 +174,7 @@
             EXIT
          END IF
 
-         ls%RI%fNorm = ls%RI%iNorm**2D0 - SUM(xB(1:iBB)*B(1:iBB))
+         ls%RI%fNorm = ls%RI%iNorm**2._LSRP - SUM(xB(1:iBB)*B(1:iBB))
          IF(ls%RI%fNorm .LT. eps*eps) THEN
             ls%RI%suc = .TRUE.
             EXIT
@@ -198,8 +197,8 @@
             Rc = Rc - xB(j)*MP(:,j)
          END DO
       END IF
-      ls%Resc = NINT(1D2*FSILS_NORMS(mynNo, lhs%commu, Rc)**2D0/        &
-     &   ls%RI%fNorm)
+      ls%Resc = NINT(100._LSRP*FSILS_NORMS(mynNo, lhs%commu,            &
+     &   Rc)**2._LSRP / ls%RI%fNorm, KIND=LSIP)
       ls%Resm = 100 - ls%Resc
 
       Rmi = xB(2)*U(:,:,1)
@@ -213,13 +212,13 @@
       END DO
 
       ls%RI%callD = FSILS_CPUT() - ls%RI%callD
-      ls%RI%dB    = 5D0*LOG(ls%RI%fNorm/ls%RI%dB)
+      ls%RI%dB    = 5._LSRP*LOG(ls%RI%fNorm/ls%RI%dB)
 
       IF (ls%Resc.LT.0 .OR. ls%Resm.LT.0) THEN
          ls%Resc = 0
          ls%Resm = 0
          ls%RI%db = 0
-         ls%RI%fNorm = 0D0
+         ls%RI%fNorm = 0._LSRP
          IF (lhs%commu%masF) THEN
             PRINT "(A)", "Warning: unexpected behavior in FSILS"//      &
      &        " (likely due to the ill-conditioned LHS matrix)"
@@ -234,15 +233,12 @@
 
       RETURN
       CONTAINS
-
 !--------------------------------------------------------------------
-
       SUBROUTINE DEPART
-
       IMPLICIT NONE
 
-      INTEGER i, j, k, l
-      REAL(KIND=8), ALLOCATABLE :: tmp(:)
+      INTEGER(KIND=LSIP) i, j, k, l
+      REAL(KIND=LSRP), ALLOCATABLE :: tmp(:)
 
       ALLOCATE(mK(nsd*nsd,nnz), mG(nsd,nnz), mD(nsd,nnz), mL(nnz),      &
      &   Gt(nsd,nnz), tmp((nsd+1)*(nsd+1)))
@@ -307,22 +303,19 @@
 
       RETURN
       END SUBROUTINE DEPART
-
 !--------------------------------------------------------------------
-
       SUBROUTINE BCPRE
-
       IMPLICIT NONE
 
-      INTEGER faIn, i, a, Ac
-      REAL(KIND=8) FSILS_NORMV
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
+      INTEGER(KIND=LSIP) faIn, i, a, Ac
+      REAL(KIND=LSRP) FSILS_NORMV
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:)
 
       ALLOCATE(v(nsd,nNo))
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
             IF (lhs%face(faIn)%sharedFlag) THEN
-               v = 0D0
+               v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
@@ -330,14 +323,14 @@
                   END DO
                END DO
                lhs%face(faIn)%nS = FSILS_NORMV(nsd, mynNo, lhs%commu,   &
-     &            v)**2D0
+     &            v)**2._LSRP
             ELSE
-               lhs%face(faIn)%nS = 0D0
+               lhs%face(faIn)%nS = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      lhs%face(faIn)%nS = lhs%face(faIn)%nS +            &
-     &                  lhs%face(faIn)%valM(i,a)**2D0
+     &                  lhs%face(faIn)%valM(i,a)**2._LSRP
                   END DO
                END DO
             END IF
@@ -346,22 +339,18 @@
 
       RETURN
       END SUBROUTINE BCPRE
-
 !--------------------------------------------------------------------
-
       SUBROUTINE LOGFILE
-
       IMPLICIT NONE
 
       LOGICAL flag
-      INTEGER fid, i, j
+      INTEGER(KIND=LSIP) fid, i, j
+      REAL(KIND=LSRP) rtmp
       CHARACTER(LEN=*), PARAMETER :: fName = 'FSILS_NS.log'
 
       INQUIRE(FILE=fName, EXIST=flag)
-
       fid = 11232
       OPEN(fid, FILE=fName, POSITION='APPEND')
-
       IF (.NOT.flag) THEN
          i = 0
          DO j=1, lhs%nFaces
@@ -375,19 +364,20 @@
       IF (ls%GM%suc) i = i + 10
       IF (ls%CG%suc) i = i + 1
 
-      IF (ls%RI%CallD .LT. TINY(ls%RI%CallD)) ls%RI%CallD = 1D-99
+      IF (ls%RI%CallD .LT. TINY(ls%RI%CallD)) ls%RI%CallD = 1.E-99_LSRP
+      rtmp = (ls%RI%CallD-ls%GM%CallD-ls%CG%CallD)/ls%RI%CallD
       WRITE(fid,"(I4.3,I3,I4,I5,3I4,3ES9.2E2,3I4)")                     &
      &   i, ls%RI%itr, ls%GM%itr, ls%CG%itr,                            &
-     &   NINT((ls%RI%CallD-ls%GM%CallD-ls%CG%CallD)/ls%RI%CallD*1D2),   &
-     &   NINT(ls%GM%callD/ls%RI%CallD*1D2),                             &
-     &   NINT(ls%CG%callD/ls%RI%CallD*1D2),                             &
+     &   NINT(100._LSRP*rtmp, KIND=LSIP),                               &
+     &   NINT(100._LSRP*ls%GM%callD/ls%RI%CallD, KIND=LSIP),            &
+     &   NINT(100._LSRP*ls%CG%callD/ls%RI%CallD, KIND=LSIP),            &
      &   ls%RI%iNorm, ls%RI%fNorm/ls%RI%iNorm, ls%RI%CallD,             &
-     &   ls%Resm, ls%Resc, NINT(ls%RI%dB)
+     &   ls%Resm, ls%Resc, NINT(ls%RI%dB, KIND=LSIP)
 
       CLOSE(fid)
 
       RETURN
       END SUBROUTINE LOGFILE
-
+!--------------------------------------------------------------------
       END SUBROUTINE NSSOLVER
-
+!####################################################################

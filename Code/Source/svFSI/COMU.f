@@ -36,30 +36,31 @@
 !--------------------------------------------------------------------
 
       MODULE CMMOD
+      USE TYPEMOD
       IMPLICIT NONE
       INCLUDE "mpif.h"
 
 !     Size of blocks for openMP communications
-      INTEGER, PARAMETER :: mpBs = 1000
+      INTEGER(KIND=IKIND), PARAMETER :: mpBs = 1000
 !     master is assumed to have zero ID
-      INTEGER, PARAMETER :: master = 0
+      INTEGER(KIND=IKIND), PARAMETER :: master = 0
 
 !     Abstracted MPI names
-      INTEGER, PARAMETER :: mplog  = MPI_LOGICAL
-      INTEGER, PARAMETER :: mpint  = MPI_INTEGER
-      INTEGER, PARAMETER :: mpreal = MPI_DOUBLE_PRECISION
-      INTEGER, PARAMETER :: mpchar = MPI_CHARACTER
+      INTEGER(KIND=IKIND), PARAMETER :: mplog  = MPI_LOGICAL
+      INTEGER(KIND=IKIND), PARAMETER :: mpint  = MPI_INTEGER
+      INTEGER(KIND=IKIND), PARAMETER :: mpreal = MPI_DOUBLE_PRECISION
+      INTEGER(KIND=IKIND), PARAMETER :: mpchar = MPI_CHARACTER
 
       TYPE cmType
          PRIVATE
 !        Communicator handle
-         INTEGER cHndl
+         INTEGER(KIND=IKIND) cHndl
 !        Processors ID
-         INTEGER taskId
+         INTEGER(KIND=IKIND) taskId
 !        Number of openMP threads in this cm
-         INTEGER nThreads
+         INTEGER(KIND=IKIND) nThreads
 !        Number of processors
-         INTEGER nProcs
+         INTEGER(KIND=IKIND) nProcs
       CONTAINS
 !        Create a new Communicator
          PROCEDURE, PUBLIC :: new => NEWCM
@@ -126,10 +127,10 @@
       SUBROUTINE NEWCM(cm, comHandle)
       IMPLICIT NONE
       CLASS(cmType) cm
-      INTEGER, INTENT(IN) :: comHandle
+      INTEGER(KIND=IKIND), INTENT(IN) :: comHandle
 
       LOGICAL ierr
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       cm%cHndl  = comHandle
       cm%taskId = 0
@@ -141,9 +142,9 @@
       IF (cm%nProcs .EQ. 1) RETURN
 
       CALL MPI_TYPE_SIZE(mpint, i, ierr)
-      IF (i .NE. 4) STOP "SIZE(MPI_INTEGER) .NE. 4"
+      IF (i .NE. IKIND) STOP "SIZE(MPI_INTEGER) .NE. default value"
       CALL MPI_TYPE_SIZE(mpreal, i, ierr)
-      IF (i .NE. 8) STOP "SIZE(MPI_REAL) .NE. 8"
+      IF (i .NE. RKIND) STOP "SIZE(MPI_REAL) .NE. default value"
       CALL MPI_TYPE_SIZE(mplog, i, ierr)
       IF (i .NE. 4) STOP "SIZE(MPI_LOG) .NE. 4"
       CALL MPI_TYPE_SIZE(mpchar, i, ierr)
@@ -155,7 +156,7 @@
       FUNCTION COM(cm)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER COM
+      INTEGER(KIND=IKIND) COM
 
       COM = cm%cHndl
 
@@ -165,7 +166,7 @@
       FUNCTION IDCM(cm)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER IDcm
+      INTEGER(KIND=IKIND) IDcm
 
       IDCM = cm%taskId
 
@@ -175,7 +176,7 @@
       FUNCTION NUMPROC(cm)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER NUMPROC
+      INTEGER(KIND=IKIND) NUMPROC
 
       NUMPROC = cm%nProcs
 
@@ -185,7 +186,7 @@
       FUNCTION NT(cm)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER NT
+      INTEGER(KIND=IKIND) NT
 
       NT = cm%nThreads
 
@@ -196,7 +197,7 @@
       IMPLICIT NONE
 
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER TF
+      INTEGER(KIND=IKIND) TF
 
       TF = cm%taskId + 1
 
@@ -258,7 +259,7 @@
       CLASS(cmType), INTENT(IN) :: cm
       LOGICAL, INTENT(INOUT) :: u
 
-      INTEGER ierr
+      INTEGER(KIND=IKIND) ierr
 
       CALL MPI_BCAST(u, 1, mplog, master, cm%com(), ierr)
 
@@ -270,21 +271,20 @@
       CLASS(cmType), INTENT(IN) :: cm
       LOGICAL, INTENT(INOUT) :: u(:)
 
-      INTEGER m, ierr
+      INTEGER(KIND=IKIND) m, ierr
 
       m = SIZE(u)
       CALL MPI_BCAST(u, m, mplog, master, cm%com(), ierr)
 
       RETURN
       END SUBROUTINE BCASTLV
-
 !--------------------------------------------------------------------
       SUBROUTINE BCASTIS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(INOUT) :: u
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: u
 
-      INTEGER ierr
+      INTEGER(KIND=IKIND) ierr
 
       CALL MPI_BCAST(u, 1, mpint, master, cm%com(), ierr)
 
@@ -294,9 +294,9 @@
       SUBROUTINE BCASTIV(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(INOUT) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: u(:)
 
-      INTEGER m, ierr
+      INTEGER(KIND=IKIND) m, ierr
 
       m = SIZE(u)
       CALL MPI_BCAST(u, m, mpint, master, cm%com(), ierr)
@@ -307,9 +307,9 @@
       SUBROUTINE BCASTIA2(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(INOUT) :: u(:,:)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: u(:,:)
 
-      INTEGER m, n, ierr
+      INTEGER(KIND=IKIND) m, n, ierr
 
       m = SIZE(u,1)
       n = SIZE(u,2)
@@ -321,9 +321,9 @@
       SUBROUTINE BCASTRS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(INOUT) :: u
+      REAL(KIND=RKIND), INTENT(INOUT) :: u
 
-      INTEGER ierr
+      INTEGER(KIND=IKIND) ierr
 
       CALL MPI_BCAST(u, 1, mpreal, master, cm%com(), ierr)
 
@@ -333,9 +333,9 @@
       SUBROUTINE BCASTRV(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(INOUT) :: u(:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: u(:)
 
-      INTEGER m, ierr
+      INTEGER(KIND=IKIND) m, ierr
 
       m = SIZE(u)
       CALL MPI_BCAST(u, m, mpreal, master, cm%com(), ierr)
@@ -346,9 +346,9 @@
       SUBROUTINE BCASTRA2(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(INOUT) :: u(:,:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: u(:,:)
 
-      INTEGER m, n, ierr
+      INTEGER(KIND=IKIND) m, n, ierr
 
       m = SIZE(u,1)
       n = SIZE(u,2)
@@ -362,7 +362,7 @@
       CLASS(cmType), INTENT(IN) :: cm
       CHARACTER(LEN=*), INTENT(INOUT) :: u
 
-      INTEGER l, ierr
+      INTEGER(KIND=IKIND) l, ierr
 
       l = LEN(u)
       CALL MPI_BCAST(u, l, mpchar, master, cm%com(), ierr)
@@ -375,7 +375,7 @@
       CLASS(cmType), INTENT(IN) :: cm
       CHARACTER(LEN=*), INTENT(INOUT) :: u(:)
 
-      INTEGER m, l, ierr
+      INTEGER(KIND=IKIND) m, l, ierr
 
       m = SIZE(u)
       l = LEN(u)
@@ -387,11 +387,11 @@
       SUBROUTINE SENDRV(cm, u, to, tag)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(IN) :: u(:)
-      INTEGER, INTENT(IN) :: to
-      INTEGER, INTENT(IN), OPTIONAL :: tag
+      REAL(KIND=RKIND), INTENT(IN) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: to
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: tag
 
-      INTEGER m, ierr, ftag
+      INTEGER(KIND=IKIND) m, ierr, ftag
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
@@ -408,11 +408,11 @@
       SUBROUTINE RECVRV(cm, u, from, tag)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(OUT) :: u(:)
-      INTEGER, INTENT(IN) :: from
-      INTEGER, INTENT(IN), OPTIONAL :: tag
+      REAL(KIND=RKIND), INTENT(OUT) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: from
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: tag
 
-      INTEGER m, ierr, ftag
+      INTEGER(KIND=IKIND) m, ierr, ftag
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
@@ -430,12 +430,12 @@
       FUNCTION ISENDRV(cm, u, to, tag) RESULT(req)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(IN) :: u(:)
-      INTEGER, INTENT(IN) :: to
-      INTEGER, INTENT(IN), OPTIONAL :: tag
-      INTEGER req
+      REAL(KIND=RKIND), INTENT(IN) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: to
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: tag
+      INTEGER(KIND=IKIND) req
 
-      INTEGER m, ierr, ftag
+      INTEGER(KIND=IKIND) m, ierr, ftag
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
@@ -453,12 +453,12 @@
       FUNCTION IRECVRV(cm, u, from, tag) RESULT(req)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(OUT) :: u(:)
-      INTEGER, INTENT(IN) :: from
-      INTEGER, INTENT(IN), OPTIONAL :: tag
-      INTEGER req
+      REAL(KIND=RKIND), INTENT(OUT) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: from
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: tag
+      INTEGER(KIND=IKIND) req
 
-      INTEGER m, ierr, ftag
+      INTEGER(KIND=IKIND) m, ierr, ftag
 
       ftag = 0
       IF (PRESENT(tag)) ftag = cm%np()*tag
@@ -476,9 +476,9 @@
       SUBROUTINE WAITS(cm, iReq)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(IN) :: iReq
+      INTEGER(KIND=IKIND), INTENT(IN) :: iReq
 
-      INTEGER ierr
+      INTEGER(KIND=IKIND) ierr
 
       CALL MPI_WAIT(iReq, MPI_STATUS_IGNORE, ierr)
 
@@ -488,9 +488,9 @@
       SUBROUTINE WAITV(cm, iReq)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(IN) :: iReq(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: iReq(:)
 
-      INTEGER i, n
+      INTEGER(KIND=IKIND) i, n
 
       n = SIZE(iReq)
       DO i=1, n
@@ -503,12 +503,11 @@
       FUNCTION REDUCERS(cm, u, iOp) RESULT(gU)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(IN) :: u
-      INTEGER, INTENT(IN), OPTIONAL :: iOp
-      REAL(KIND=8) gU
+      REAL(KIND=RKIND), INTENT(IN) :: u
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: iOp
+      REAL(KIND=RKIND) gU
 
-      INTEGER ierr
-      INTEGER op
+      INTEGER(KIND=IKIND) ierr, op
 
       op = MPI_SUM
       IF (PRESENT(iOp)) op = iOp
@@ -524,12 +523,11 @@
       FUNCTION REDUCEIS(cm, u, iOp) RESULT(gU)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(IN) :: u
-      INTEGER, INTENT(IN), OPTIONAL :: iOp
-      INTEGER gU
+      INTEGER(KIND=IKIND), INTENT(IN) :: u
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: iOp
+      INTEGER(KIND=IKIND) gU
 
-      INTEGER ierr
-      INTEGER op
+      INTEGER(KIND=IKIND) ierr, op
 
       op = MPI_SUM
       IF (PRESENT(iOp)) op = iOp
@@ -545,12 +543,11 @@
       FUNCTION REDUCEIV(cm, u, iOp) RESULT(gU)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(IN) :: u(:)
-      INTEGER, INTENT(IN), OPTIONAL :: iOp
-      INTEGER, ALLOCATABLE :: gU(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: iOp
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gU(:)
 
-      INTEGER n, ierr
-      INTEGER op
+      INTEGER(KIND=IKIND) n, ierr, op
 
       op = MPI_SUM
       IF (PRESENT(iOp)) op = iOp
@@ -568,12 +565,11 @@
       FUNCTION REDUCERV(cm, u, iOp) RESULT(gU)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      REAL(KIND=8), INTENT(IN) :: u(:)
-      INTEGER, INTENT(IN), OPTIONAL :: iOp
-      REAL(KIND=8), ALLOCATABLE :: gU(:)
+      REAL(KIND=RKIND), INTENT(IN) :: u(:)
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: iOp
+      REAL(KIND=RKIND), ALLOCATABLE :: gU(:)
 
-      INTEGER n, ierr
-      INTEGER op
+      INTEGER(KIND=IKIND) n, ierr, op
 
       op = MPI_SUM
       IF (PRESENT(iOp)) op = iOp
@@ -591,10 +587,10 @@
       FUNCTION createCH(cm, pid) RESULT(ch)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
-      INTEGER, INTENT(IN) :: pid(:)
-      INTEGER ch
+      INTEGER(KIND=IKIND), INTENT(IN) :: pid(:)
+      INTEGER(KIND=IKIND) ch
 
-      INTEGER n, cmGrp, newGrp, ierr
+      INTEGER(KIND=IKIND) n, cmGrp, newGrp, ierr
 
       n = SIZE(pid)
       CALL MPI_COMM_GROUP(cm%com(), cmGrp, ierr)
@@ -618,6 +614,6 @@
 
       RETURN
       END SUBROUTINE cmAssignCm
-
+!####################################################################
       END MODULE CMMOD
 !####################################################################

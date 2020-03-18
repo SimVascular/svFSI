@@ -42,21 +42,20 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
 
       CHARACTER, PARAMETER :: dSym(3) = (/"X","Y","Z"/)
 
       LOGICAL :: flag
-      INTEGER :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
-      REAL(KIND=8) :: maxX(nsd), minX(nsd), scaleF, fibN(nsd), rtmp
+      INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
+      REAL(KIND=RKIND) :: maxX(nsd), minX(nsd), scaleF, fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp, fExt
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(stackType) :: avNds
       TYPE(fileType) :: fTmp
 
       LOGICAL, ALLOCATABLE :: ichk(:)
-      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), gX(:,:), tmpA(:,:),
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:), gX(:,:), tmpA(:,:),
      2   tmpY(:,:), tmpD(:,:)
 
       minX  =  HUGE(minX)
@@ -109,8 +108,8 @@
             END DO
 
 !     To scale the mesh, while attaching x to gX
-            scaleF = 1D0
-            lPtr => lPM%get(scaleF,"Mesh scale factor",lb=0D0)
+            scaleF = 1._RKIND
+            lPtr => lPM%get(scaleF,"Mesh scale factor",lb=0._RKIND)
             a = gtnNo + msh(iM)%gnNo
             IF (iM .GT. 1) THEN
                ALLOCATE(tmpX(nsd,gtnNo))
@@ -353,7 +352,7 @@ c               END IF
                IF (rmsh%isReqd) err = "Fiber directions read from "//
      2            "file is not allowed with remeshing"
                ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
-               msh(iM)%fN = 0D0
+               msh(iM)%fN = 0._RKIND
                DO i=1, msh(iM)%nFn
                   lPtr => lPM%get(cTmp,
      2               "Fiber direction file path", i)
@@ -364,7 +363,7 @@ c               END IF
                msh(iM)%nFn = lPM%srch("Fiber direction")
                IF (msh(iM)%nFn .NE. 0) THEN
                   ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
-                  msh(iM)%fN = 0D0
+                  msh(iM)%fN = 0._RKIND
                   DO i=1, msh(iM)%nFn
                      lPtr => lPM%get(fibN, "Fiber direction", i)
                      rtmp = SQRT(NORM(fibN))
@@ -392,13 +391,13 @@ c               END IF
             END IF
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nstd,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
+            msh(iM)%x = 0._RKIND
             CALL READVTUPDATA(msh(iM), cTmp, "Stress", nstd, 1)
          END IF
       END DO
       IF (flag) THEN
          ALLOCATE(pS0(nstd,gtnNo))
-         pS0 = 0D0
+         pS0 = 0._RKIND
          DO iM=1, nMsh
             IF (.NOT.ALLOCATED(msh(iM)%x)) CYCLE
             DO a=1, msh(iM)%gnNo
@@ -444,15 +443,16 @@ c               END IF
             CASE ("penalty")
                cntctM%cType = cntctM_penalty
                lPtr => lPM%get(cntctM%k,
-     2            "Penalty constant (k)", 1, ll=0D0)
+     2            "Penalty constant (k)", 1, ll=0._RKIND)
                lPtr => lPM%get(cntctM%h,
-     2            "Desired separation (h)", 1, lb=0D0)
+     2            "Desired separation (h)", 1, lb=0._RKIND)
                lPtr => lPM%get(cntctM%c,
-     2            "Closest gap to activate penalty (c)", 1, lb=0D0)
+     2            "Closest gap to activate penalty (c)", 1, lb=0._RKIND)
                IF (cntctM%c .LT. cntctM%h) err =
      2            "Choose c > h for proper contact penalization"
                lPtr => lPM%get(cntctM%al,
-     2            "Min norm of face normals (alpha)",1,lb=0D0,ub=1D0)
+     2            "Min norm of face normals (alpha)",1,lb=0._RKIND,
+     3            ub=1._RKIND)
             CASE DEFAULT
                err = "Undefined contact model"
             END SELECT
@@ -468,12 +468,12 @@ c               END IF
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(stackType), INTENT(OUT) :: avNds
 
-      INTEGER i, j, k, iM, jM, kM, iFa, jFa, ia, ja, nPrj, iPrj, nStk
-      REAL(KIND=8) tol
+      INTEGER(KIND=IKIND) i, j, k, iM, jM, kM, iFa, jFa, ia, ja, nPrj,
+     2   iPrj, nStk
+      REAL(KIND=RKIND) tol
       CHARACTER(LEN=stdL) ctmpi, ctmpj
       TYPE(stackType) lPrj
       TYPE(listType), POINTER :: lPtr, lPP
@@ -501,7 +501,7 @@ c               END IF
          CALL FINDFACE(ctmpi, iM, iFa)
          lPtr => lPP%get(ctmpj,"Project from face",1)
          CALL FINDFACE(ctmpj, jM, jFa)
-         tol = 0.0D0
+         tol = 0._RKIND
          lPtr => lPP%get(tol,"Projection tolerance")
          CALL MATCHFACES(msh(iM)%fa(iFa), msh(jM)%fa(jFa), lPrj, tol)
          DO
@@ -563,23 +563,22 @@ c               END IF
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa, pFa
       TYPE(stackType), INTENT(OUT) :: lPrj
-      REAL(KIND=8), INTENT(IN) :: tol
+      REAL(KIND=RKIND), INTENT(IN) :: tol
 
       TYPE blkType
-         INTEGER :: n = 0
-         INTEGER, ALLOCATABLE :: gN(:)
+         INTEGER(KIND=IKIND) :: n = 0
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:)
       END TYPE
 
       LOGICAL nFlt(nsd)
-      INTEGER nBkd, i, a, b, Ac, Bc, iBk, nBk, iM, jM, iSh, jSh
-      REAL(KIND=8) ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
+      INTEGER(KIND=IKIND) nBkd, i, a, b, Ac, Bc, iBk, nBk, iM, jM, iSh,
+     2   jSh, cnt
+      REAL(KIND=RKIND) ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
 
-      INTEGER, ALLOCATABLE :: nodeBlk(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: nodeBlk(:)
       TYPE(blkType), ALLOCATABLE :: blk(:)
-      INTEGER :: cnt
 
       iM  = lFa%iM
       jM  = pFa%iM
@@ -596,7 +595,8 @@ c               END IF
 !     calculate nBkd, which is the number of separate blockes in each
 !     direction, based on that.
       a    = pFa%nNo
-      nBkd = NINT((REAL(a,8)/1D3)**(3.33D-1))
+      nBkd = NINT( (REAL(a, KIND=RKIND)/
+     2   1000._RKIND)**(0.333_RKIND),  KIND=IKIND)
       IF (nBkd .EQ. 0) nBkd = 1
       nBk  = nBkd**nsd
       ALLOCATE(nodeBlk(a), blk(nBk))
@@ -605,18 +605,18 @@ c               END IF
       DO i=1, nsd
          xMin(i) = MIN(MINVAL(x(i,iSh+lFa%gN)), MINVAL(x(i,jSh+pFa%gN)))
          xMax(i) = MAX(MAXVAL(x(i,iSh+lFa%gN)), MAXVAL(x(i,jSh+pFa%gN)))
-         IF (xMin(i) .LT. 0D0) THEN
-            xMin(i) = xMin(i)*(1D0+eps)
+         IF (xMin(i) .LT. 0._RKIND) THEN
+            xMin(i) = xMin(i)*(1._RKIND+eps)
          ELSE
-            xMin(i) = xMin(i)*(1D0-eps)
+            xMin(i) = xMin(i)*(1._RKIND-eps)
          END IF
-         IF (xMax(i) .LT. 0D0) THEN
-            xMax(i) = xMax(i)*(1D0-eps)
+         IF (xMax(i) .LT. 0._RKIND) THEN
+            xMax(i) = xMax(i)*(1._RKIND-eps)
          ELSE
-            xMax(i) = xMax(i)*(1D0+eps)
+            xMax(i) = xMax(i)*(1._RKIND+eps)
          END IF
       END DO
-      dx = (xMax - xMin)/REAL(nBkd,8)
+      dx = (xMax - xMin)/REAL(nBkd, KIND=RKIND)
       nFlt = .TRUE.
       DO i=1, nsd
          IF (ISZERO(dx(i))) nFlt(i) = .FALSE.
@@ -651,7 +651,7 @@ c               END IF
          DO b=1, blk(iBk)%n
             Bc = blk(iBk)%gN(b)
             IF (iM.EQ.jM .AND. Ac.EQ.Bc) CYCLE
-            ds = SQRT(SUM( (x(:,Bc+jSh) - x(:,Ac+iSh))**2 ))
+            ds = SQRT(SUM( (x(:,Bc+jSh) - x(:,Ac+iSh))**2._RKIND ))
             IF (ds .LT. minS) THEN
                minS = ds
                i = Bc
@@ -659,11 +659,11 @@ c               END IF
          END DO
          Bc = i
          IF (ISZERO(tol)) THEN
-            IF (minS .LT. 1D3*eps) THEN
+            IF (minS .LT. 1000._RKIND*eps) THEN
                CALL PUSHSTACK(lPrj, (/Ac,Bc/))
                cnt = cnt + 1
             END IF
-         ELSE IF (tol < 0D0) THEN
+         ELSE IF (tol < 0._RKIND) THEN
             CALL PUSHSTACK(lPrj, (/Ac,Bc/))
             cnt = cnt + 1
          END IF
@@ -681,25 +681,22 @@ c               END IF
 
       RETURN
       CONTAINS
-
 !--------------------------------------------------------------------
-      INTEGER FUNCTION FINDBLK(x)
-
+      INTEGER(KIND=IKIND) FUNCTION FINDBLK(x)
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: x(nsd)
 
-      REAL(KIND=8), INTENT(IN) :: x(nsd)
-
-      INTEGER i, j, k
+      INTEGER(KIND=IKIND) i, j, k
 
       i = 1
       j = 1
       k = 1
-      IF (nFlt(1)) i = INT((x(1) - xMin(1))/dx(1))
-      IF (nFlt(2)) j = INT((x(2) - xMin(2))/dx(2))
+      IF (nFlt(1)) i = INT((x(1) - xMin(1))/dx(1), KIND=IKIND)
+      IF (nFlt(2)) j = INT((x(2) - xMin(2))/dx(2), KIND=IKIND)
       IF (i .EQ. nBkd) i = nBkd - 1
       IF (j .EQ. nBkd) j = nBkd - 1
       IF (nsd .EQ. 3) THEN
-         IF (nFlt(3)) k = INT((x(3) - xMin(3))/dx(3))
+         IF (nFlt(3)) k = INT((x(3) - xMin(3))/dx(3), KIND=IKIND)
          IF (k .EQ. nBkd) k = nBkd - 1
          FINDBLK = k + (j + i*nBkd)*nBkd + 1
       ELSE ! nsd .EQ. 2
@@ -708,7 +705,7 @@ c               END IF
 
       RETURN
       END FUNCTION FINDBLK
-
+!--------------------------------------------------------------------
       END SUBROUTINE MATCHFACES
 !####################################################################
 !     Read mesh domains from a vtu/vtp file
@@ -718,15 +715,14 @@ c               END IF
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       CHARACTER(LEN=*) :: fName, kwrd
 
-      TYPE(vtkXMLType) :: vtu
-      INTEGER :: e, iDmn, iStat, btSiz
+      INTEGER(KIND=IKIND) :: e, iDmn, iStat, btSiz
       CHARACTER(LEN=stdL) ctmp
+      TYPE(vtkXMLType) :: vtu
 
-      INTEGER, ALLOCATABLE :: eId(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: eId(:)
 
       btSiz = BIT_SIZE(dmnId)
       IF (btSiz .NE. BIT_SIZE(lM%eId))
@@ -777,14 +773,13 @@ c               END IF
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: fid
+      INTEGER(KIND=IKIND), INTENT(IN) :: fid
 
-      INTEGER i, e, a, btSiz
+      INTEGER(KIND=IKIND) i, e, a, btSiz
       CHARACTER(LEN=stdL) ctmp, stmp
 
-      INTEGER, ALLOCATABLE :: iDmn(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: iDmn(:)
 
       btSiz = BIT_SIZE(dmnId)
       IF (btSiz .NE. BIT_SIZE(lM%eId))
@@ -825,14 +820,14 @@ c               END IF
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       CHARACTER(LEN=*) :: fName, kwrd
-      INTEGER, INTENT(IN) :: idx
+      INTEGER(KIND=IKIND), INTENT(IN) :: idx
 
+      INTEGER(KIND=IKIND) :: iStat, e
       TYPE(vtkXMLType) :: vtu
-      INTEGER :: iStat, e
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
 
       iStat = 0;
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
@@ -844,7 +839,7 @@ c               END IF
      2   TRIM(kwrd)
 
       ALLOCATE(tmpR(maxNSD,lM%gnEl))
-      tmpR = 0D0
+      tmpR = 0._RKIND
       CALL getVTK_elemData(vtu, TRIM(kwrd), tmpR, iStat)
       IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
       DO e=1, lM%gnEl
@@ -863,14 +858,13 @@ c               END IF
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(IN) :: flag
 
-      INTEGER Ac, b, i, sn(4), e, a, teNoN
+      INTEGER(KIND=IKIND) Ac, b, i, sn(4), e, a, teNoN
 
-      INTEGER, ALLOCATABLE :: incNodes(:)
-      REAL(KIND=8), ALLOCATABLE :: v(:,:), xl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNodes(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: v(:,:), xl(:,:)
 
       ALLOCATE(v(nsd,lM%eNoN), xl(nsd,lM%eNoN))
 
@@ -1003,13 +997,12 @@ c               END IF
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
-      INTEGER Ac, e, Ec, a
+      INTEGER(KIND=IKIND) Ac, e, Ec, a
 
-      INTEGER, ALLOCATABLE :: incNd(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:)
 
 !     Finding the nodes that belongs to this face and counting the
 !     number of the nodes
@@ -1059,7 +1052,7 @@ c               END IF
       TYPE(listType), INTENT(INOUT) :: list
 
       LOGICAL flag
-      INTEGER a, Ac, iM
+      INTEGER(KIND=IKIND) a, Ac, iM
       CHARACTER(LEN=stdL) cTmp
       TYPE(listType), POINTER :: lPtr, lPM
 
@@ -1072,13 +1065,13 @@ c               END IF
          IF(ASSOCIATED(lPtr)) THEN
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
+            msh(iM)%x = 0._RKIND
             CALL READVTUPDATA(msh(iM), cTmp, "Pressure", 1, 1)
          END IF
       END DO
       IF (flag) THEN
          ALLOCATE(Pinit(gtnNo))
-         Pinit = 0D0
+         Pinit = 0._RKIND
          DO iM=1, nMsh
             IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
             DO a=1, msh(iM)%gnNo
@@ -1098,13 +1091,13 @@ c               END IF
          IF(ASSOCIATED(lPtr)) THEN
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
+            msh(iM)%x = 0._RKIND
             CALL READVTUPDATA(msh(iM), cTmp, "Velocity", nsd, 1)
          END IF
       END DO
       IF (flag) THEN
          ALLOCATE(Vinit(nsd,gtnNo))
-         Vinit = 0D0
+         Vinit = 0._RKIND
          DO iM=1, nMsh
             IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
             DO a=1, msh(iM)%gnNo
@@ -1124,13 +1117,13 @@ c               END IF
          IF(ASSOCIATED(lPtr)) THEN
             flag = .TRUE.
             ALLOCATE(msh(iM)%x(nsd,msh(iM)%gnNo))
-            msh(iM)%x = 0D0
+            msh(iM)%x = 0._RKIND
             CALL READVTUPDATA(msh(iM), cTmp, "Displacement", nsd, 1)
          END IF
       END DO
       IF (flag) THEN
          ALLOCATE(Dinit(nsd,gtnNo))
-         Dinit = 0D0
+         Dinit = 0._RKIND
          DO iM=1, nMsh
             IF(.NOT. ALLOCATED(msh(iM)%x)) CYCLE
             DO a=1, msh(iM)%gnNo
@@ -1149,11 +1142,10 @@ c               END IF
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: nMesh
+      INTEGER(KIND=IKIND), INTENT(IN) :: nMesh
       TYPE(mshType), INTENT(INOUT) :: mesh(nMesh)
 
-      INTEGER :: iM, cPhys, e, ierr
+      INTEGER(KIND=IKIND) :: iM, cPhys, e, ierr
 
       LOGICAL, ALLOCATABLE :: gFlag(:,:)
 
@@ -1161,9 +1153,7 @@ c               END IF
       DO iM=1, nMesh
          std = " Mesh properties: <"//CLR(TRIM(mesh(iM)%name))//">"
          CALL CALCELEMJAC(mesh(iM), rmsh%flag(iM))
-
          CALL CALCELEMSKEW(mesh(iM), rmsh%flag(iM))
-
          CALL CALCELEMAR(mesh(iM), rmsh%flag(iM))
       END DO
 
@@ -1207,14 +1197,13 @@ c               END IF
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(INOUT) :: rflag
 
-      INTEGER :: e, a, Ac, cnt, iDmn, cPhys
-      REAL(KIND=8) :: minJ, maxJ, tmp
+      INTEGER(KIND=IKIND) :: e, a, Ac, cnt, iDmn, cPhys
+      REAL(KIND=RKIND) :: minJ, maxJ, tmp
 
-      REAL(KIND=8), ALLOCATABLE :: Jac(:), xl(:,:), dol(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Jac(:), xl(:,:), dol(:,:)
 
       rflag = .FALSE.
       ALLOCATE(Jac(lM%nEl))
@@ -1236,7 +1225,7 @@ c               END IF
          IF (mvMsh) xl = xl + dol
 
          Jac(e) = JACOBIAN(nsd, lM%eNoN, xl, lM%Nx(:,:,1))
-         IF (Jac(e) .LT. 0D0) THEN
+         IF (Jac(e) .LT. 0._RKIND) THEN
             cnt = cnt + 1
             IF (cPhys .NE. phys_fluid) err = "Negative Jacobian in "//
      2         "non-fluid domain"
@@ -1250,8 +1239,8 @@ c               END IF
       minJ = MINVAL(Jac(:))
       minJ = cm%reduce(minJ, MPI_MIN)
       cnt  = cm%reduce(cnt)
-      tmp  = 1D2 * REAL(cnt,KIND=8) / REAL(lM%gnEl,KIND=8)
-      IF (minJ .LT. 0D0) rflag = .TRUE.
+      tmp  = 100._RKIND*REAL(cnt, KIND=RKIND)/REAL(lM%gnEl, KIND=RKIND)
+      IF (minJ .LT. 0._RKIND) rflag = .TRUE.
 
       IF (.NOT.rflag) THEN
          std = "    Min normalized Jacobian <"//minJ//">"
@@ -1280,14 +1269,13 @@ c               END IF
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(INOUT) :: rflag
 
-      INTEGER :: e, a, Ac, i, iDmn, cPhys, bins(5)
-      REAL(KIND=8) :: maxSk, p1, p2, tmp(5)
+      INTEGER(KIND=IKIND) :: e, a, Ac, i, iDmn, cPhys, bins(5)
+      REAL(KIND=RKIND) :: maxSk, p1, p2, tmp(5)
 
-      REAL(KIND=8), ALLOCATABLE :: Skw(:), xl(:,:), dol(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Skw(:), xl(:,:), dol(:,:)
 
       IF (lM%eType .NE. eType_TET .AND.
      2    lM%eType .NE. eType_TRI) THEN
@@ -1312,22 +1300,23 @@ c         wrn = " Skewness is computed for TRI and TET elements only"
          END DO
          IF (mvMsh) xl = xl + dol
          Skw(e) = SKEWNESS(nsd, lM%eNoN, xl)
-         p1 = 0D0
-         p2 = 6D-1
+         p1 = 0._RKIND
+         p2 = 0.6_RKIND
          DO i=1, 5
             IF (Skw(e).GT.p1 .AND. Skw(e).LE.p2) THEN
                bins(i) = bins(i) + 1
                EXIT
             END IF
             p1 = p2
-            p2 = p1 + 1D-1
+            p2 = p1 + 0.1_RKIND
          END DO ! i
       END DO ! e
 
       maxSk = MAXVAL(Skw(:))
       maxSk = cm%reduce(maxSk, MPI_MAX)
       bins  = cm%reduce(bins)
-      tmp(:) = 1D2 * REAL(bins(:),KIND=8) / REAL(lM%gnEl,KIND=8)
+      tmp(:) = 100._RKIND*REAL(bins(:), KIND=RKIND)/
+     2   REAL(lM%gnEl, KIND=RKIND)
       IF (rflag) THEN
          std = "    Max Skewness <"//maxSk//">"
          std = "    Skew [    < 0.6] <"//bins(1)//">  ("//tmp(1)//"%)"
@@ -1348,14 +1337,13 @@ c         wrn = " Skewness is computed for TRI and TET elements only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(INOUT) :: rflag
 
-      INTEGER :: e, a, Ac, i, iDmn, cPhys, bins(5)
-      REAL(KIND=8) :: maxAR, p1, p2, tmp(5)
+      INTEGER(KIND=IKIND) :: e, a, Ac, i, iDmn, cPhys, bins(5)
+      REAL(KIND=RKIND) :: maxAR, p1, p2, tmp(5)
 
-      REAL(KIND=8), ALLOCATABLE :: AsR(:), xl(:,:), dol(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: AsR(:), xl(:,:), dol(:,:)
 
       IF (lM%eType .NE. eType_TET .AND.
      2    lM%eType .NE. eType_TRI) THEN
@@ -1380,15 +1368,15 @@ c         wrn = "AR is computed for TRI and TET elements only"
          END DO
          IF (mvMsh) xl = xl + dol
          AsR(e) = ASPECTRATIO(nsd, lM%eNoN, xl)
-         p1 = 0D0
-         p2 = 5D0
+         p1 = 0._RKIND
+         p2 = 5._RKIND
          DO i=1, 4
             IF (AsR(e).GT.p1 .AND. AsR(e).LE.p2) THEN
                bins(i) = bins(i) + 1
                EXIT
             END IF
             p1 = p2
-            p2 = p1 + 5D0
+            p2 = p1 + 5._RKIND
          END DO ! i
          IF (i .GT. 4) bins(5) = bins(5) + 1
       END DO ! e
@@ -1397,7 +1385,8 @@ c         wrn = "AR is computed for TRI and TET elements only"
       maxAR = cm%reduce(maxAR, MPI_MAX)
       bins  = cm%reduce(bins)
 
-      tmp(:) = 1D2 * REAL(bins(:),KIND=8) / REAL(lM%gnEl,KIND=8)
+      tmp(:) = 100._RKIND*REAL(bins(:), KIND=RKIND)/
+     2   REAL(lM%gnEl, KIND=RKIND)
       IF (rflag) THEN
          std = "    Max Asp. Ratio <"//maxAR//">"
          std = "    AR [   <  5] <"//bins(1)//">  ("//tmp(1)//"%)"

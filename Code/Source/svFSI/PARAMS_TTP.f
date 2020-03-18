@@ -37,251 +37,254 @@
 
 !     Default model parameters
 !     R: Gas constant
-      REAL(KIND=8) :: Rc = 8314.472D0       ! units: J/mol/K
+      REAL(KIND=RKIND) :: Rc = 8314.472_RKIND      ! units: J/mol/K
 !     T: Temperature
-      REAL(KIND=8) :: Tc = 310.0D0          ! units: K
+      REAL(KIND=RKIND) :: Tc = 310._RKIND          ! units: K
 !     F: Faraday constant
-      REAL(KIND=8) :: Fc = 96485.3415D0     ! units: C/mmol
+      REAL(KIND=RKIND) :: Fc = 96485.3415_RKIND    ! units: C/mmol
 !     Cm: Cell capacitance per unit surface area
-      REAL(KIND=8) :: Cm = 0.185D0         ! units: uF/cm^{2}
+      REAL(KIND=RKIND) :: Cm = 0.185_RKIND         ! units: uF/cm^{2}
 !     sV: Surface to volume ratio
-      REAL(KIND=8) :: sV = 0.2D0            ! units: um^{-1}
+      REAL(KIND=RKIND) :: sV = 0.2_RKIND           ! units: um^{-1}
 !     rho: Cellular resistivity
-      REAL(KIND=8) :: rho = 162.0D0        ! units: \Omega-cm
+      REAL(KIND=RKIND) :: rho = 162._RKIND         ! units: \Omega-cm
 !     V_c: Cytoplasmic volume
-      REAL(KIND=8) :: V_c = 16.404D-3      ! units: um^{3}
+      REAL(KIND=RKIND) :: V_c = 16.404E-3_RKIND    ! units: um^{3}
 !     V_sr: Sacroplasmic reticulum volume
-      REAL(KIND=8) :: V_sr = 1.094D-3      ! units: um^{3}
+      REAL(KIND=RKIND) :: V_sr = 1.094E-3_RKIND    ! units: um^{3}
 !     V_ss: Subspace volume
-      REAL(KIND=8) :: V_ss = 5.468D-5      ! units: um^{3}
+      REAL(KIND=RKIND) :: V_ss = 5.468E-5_RKIND    ! units: um^{3}
 !     K_o: Extracellular K concentration
-      REAL(KIND=8) :: K_o = 5.4D0          ! units: mM
+      REAL(KIND=RKIND) :: K_o = 5.4_RKIND          ! units: mM
 !     Na_o: Extracellular Na concentration
-      REAL(KIND=8) :: Na_o = 140.0D0       ! units: mM
+      REAL(KIND=RKIND) :: Na_o = 140._RKIND        ! units: mM
 !     Ca_o: Extracellular Ca concentration
-      REAL(KIND=8) :: Ca_o = 2.0D0         ! units: mM
+      REAL(KIND=RKIND) :: Ca_o = 2._RKIND          ! units: mM
 !     G_Na: Maximal I_Na conductance
-      REAL(KIND=8) :: G_Na = 14.838D0      ! units: nS/pF
+      REAL(KIND=RKIND) :: G_Na = 14.838_RKIND      ! units: nS/pF
 !     G_K1: Maximal I_K1 conductance
-      REAL(KIND=8) :: G_K1 = 5.405D0       ! units: nS/pF
+      REAL(KIND=RKIND) :: G_K1 = 5.405_RKIND       ! units: nS/pF
 !     G_to: Maximal epicardial I_to conductance, units: nS/pF
-      REAL(KIND=8) :: G_to(3) = (/0.294D0, 0.073D0, 0.294D0/)
+      REAL(KIND=RKIND) :: G_to(3) =
+     2   (/0.294_RKIND, 0.073_RKIND, 0.294_RKIND/)
 !     G_Kr: Maximal I_Kr conductance
-      REAL(KIND=8) :: G_Kr = 0.153D0       ! units: nS/pF
+      REAL(KIND=RKIND) :: G_Kr = 0.153_RKIND       ! units: nS/pF
 c!     G_Kr for spiral wave breakup
-c      REAL(KIND=8) :: G_Kr = 0.172D0       ! units: nS/pF
+c      REAL(KIND=RKIND) :: G_Kr = 0.172_RKIND      ! units: nS/pF
 !     G_Ks: Maximal epicardial I_Ks conductance, units: nS/pF
-      REAL(KIND=8) :: G_Ks(3) = (/0.392D0, 0.392D0, 0.098D0/)
+      REAL(KIND=RKIND) :: G_Ks(3) =
+     2   (/0.392_RKIND, 0.392_RKIND, 0.098_RKIND/)
 c!     G_Ks for spiral wave breakup (epi)
-c      REAL(KIND=8) :: G_Ks(3) = (/0.441D0, 0.392D0, 0.098D0/)
+c      REAL(KIND=RKIND) :: G_Ks(3) =
+c     2   (/0.441_RKIND, 0.392_RKIND, 0.098_RKIND/)
 !     p_KNa: Relative I_Ks permeability to Na
-      REAL(KIND=8) :: p_KNa = 0.03D0       ! dimensionless
+      REAL(KIND=RKIND) :: p_KNa = 3.E-2_RKIND      ! dimensionless
 !     G_CaL: Maximal I_CaL conductance
-      REAL(KIND=8) :: G_CaL = 3.98D-5      ! units: cm^{3}/uF/ms
+      REAL(KIND=RKIND) :: G_CaL = 3.98E-5_RKIND    ! units: cm^{3}/uF/ms
 !     K_NaCa: Maximal I_NaCa
-      REAL(KIND=8) :: K_NaCa = 1000.0D0    ! units: pA/pF
+      REAL(KIND=RKIND) :: K_NaCa = 1000._RKIND     ! units: pA/pF
 !     gamma: Voltage dependent parameter of I_NaCa
-      REAL(KIND=8) :: gamma = 0.35D0       ! dimensionless
+      REAL(KIND=RKIND) :: gamma = 0.35_RKIND       ! dimensionless
 !     K_mCa: Ca_i half-saturation constant for I_NaCa
-      REAL(KIND=8) :: K_mCa = 1.38D0       ! units: mM
+      REAL(KIND=RKIND) :: K_mCa = 1.38_RKIND       ! units: mM
 !     K_mNai: Na_i half-saturation constant for I_NaCa
-      REAL(KIND=8) :: K_mNai = 87.5D0      ! units: mM
+      REAL(KIND=RKIND) :: K_mNai = 87.5_RKIND      ! units: mM
 !     K_sat: Saturation factor for I_NaCa
-      REAL(KIND=8) :: K_sat = 0.1D0        ! dimensionless
+      REAL(KIND=RKIND) :: K_sat = 0.1_RKIND        ! dimensionless
 !     alpha: Factor enhancing outward nature of I_NaCa
-      REAL(KIND=8) :: alpha = 2.5D0        ! dimensionless
+      REAL(KIND=RKIND) :: alpha = 2.5_RKIND        ! dimensionless
 !     p_NaK: Maximal I_NaK
-      REAL(KIND=8) :: p_NaK = 2.724D0      ! units: pA/pF
+      REAL(KIND=RKIND) :: p_NaK = 2.724_RKIND      ! units: pA/pF
 !     K_mK: K_o half-saturation constant of I_NaK
-      REAL(KIND=8) :: K_mK = 1.0D0         ! units: mM
+      REAL(KIND=RKIND) :: K_mK = 1._RKIND          ! units: mM
 !     K_mNa: Na_i half-saturation constant of I_NaK
-      REAL(KIND=8) :: K_mNa = 40.0D0       ! units: mM
+      REAL(KIND=RKIND) :: K_mNa = 40._RKIND        ! units: mM
 !     G_pK: Maximal I_pK conductance
-      REAL(KIND=8) :: G_pK = 1.46D-2       ! units: nS/pF
+      REAL(KIND=RKIND) :: G_pK = 1.46E-2_RKIND     ! units: nS/pF
 c!     G_pK for spiral wave breakup
-c      REAL(KIND=8) :: G_pK = 2.19D-3       ! units: nS/pF
+c      REAL(KIND=RKIND) :: G_pK = 2.19E-3_RKIND     ! units: nS/pF
 !     G_pCa: Maximal I_pCa conductance
-      REAL(KIND=8) :: G_pCa = 0.1238D0     ! units: pA/pF
+      REAL(KIND=RKIND) :: G_pCa = 0.1238_RKIND     ! units: pA/pF
 c!     G_pCa for spiral wave breakup
-c      REAL(KIND=8) :: G_pCa = 0.8666D0     ! units: pA/pF
+c      REAL(KIND=RKIND) :: G_pCa = 0.8666_RKIND     ! units: pA/pF
 !     K_pCa: Half-saturation constant of I_pCa
-      REAL(KIND=8) :: K_pCa = 5.0D-4       ! units: mM
+      REAL(KIND=RKIND) :: K_pCa = 5.E-4_RKIND      ! units: mM
 !     G_bNa: Maximal I_bNa conductance
-      REAL(KIND=8) :: G_bNa = 2.9D-4       ! units: nS/pF
+      REAL(KIND=RKIND) :: G_bNa = 2.9E-4_RKIND     ! units: nS/pF
 !     G_bCa: Maximal I_bCa conductance
-      REAL(KIND=8) :: G_bCa = 5.92D-4      ! units: nS/pF
+      REAL(KIND=RKIND) :: G_bCa = 5.92E-4_RKIND    ! units: nS/pF
 !     Vmax_up: Maximal I_up conductance
-      REAL(KIND=8) :: Vmax_up = 6.375D-3   ! units: mM/ms
+      REAL(KIND=RKIND) :: Vmax_up = 6.375E-3_RKIND ! units: mM/ms
 !     K_up: Half-saturation constant of I_up
-      REAL(KIND=8) :: K_up = 2.5D-4        ! units: mM
+      REAL(KIND=RKIND) :: K_up = 2.5E-4_RKIND      ! units: mM
 !     V_rel: Maximal I_rel conductance
-      REAL(KIND=8) :: V_rel = 0.102D0      ! units: mM/ms
+      REAL(KIND=RKIND) :: V_rel = 0.102_RKIND      ! units: mM/ms
 !     k1p: R to O and RI to I, I_rel transition rate
-      REAL(KIND=8) :: k1p = 0.15D0         ! units: mM^{-2}/ms
+      REAL(KIND=RKIND) :: k1p = 0.15_RKIND         ! units: mM^{-2}/ms
 !     k2p: O to I and R to RI, I_rel transition rate
-      REAL(KIND=8) :: k2p = 0.045D0        ! units: mM^{-1}/ms
+      REAL(KIND=RKIND) :: k2p = 4.5E-2_RKIND       ! units: mM^{-1}/ms
 !     k3: O to R and I to RI, I_rel transition rate
-      REAL(KIND=8) :: k3 = 0.06D0         ! units: ms^{-1}
+      REAL(KIND=RKIND) :: k3 = 6.E-2_RKIND         ! units: ms^{-1}
 !     k4: I to O and Ri to I, I_rel transition rate
-      REAL(KIND=8) :: k4 = 5.0D-3         ! units: ms^{-1}
+      REAL(KIND=RKIND) :: k4 = 5.E-3_RKIND         ! units: ms^{-1}
 !     EC: Ca_sr half-saturation constant of k_casr
-      REAL(KIND=8) :: EC = 1.5D0          ! units: mM
+      REAL(KIND=RKIND) :: EC = 1.5_RKIND           ! units: mM
 !     max_sr: Maximum value of k_casr
-      REAL(KIND=8) :: max_sr = 2.5D0       ! dimensionless
+      REAL(KIND=RKIND) :: max_sr = 2.5_RKIND       ! dimensionless
 !     min_sr: Minimum value of k_casr
-      REAL(KIND=8) :: min_sr = 1.0D0       ! dimensionless
+      REAL(KIND=RKIND) :: min_sr = 1._RKIND        ! dimensionless
 !     V_leak: Maximal I_leak conductance
-      REAL(KIND=8) :: V_leak = 3.6D-4      ! units: mM/ms
+      REAL(KIND=RKIND) :: V_leak = 3.6E-4_RKIND    ! units: mM/ms
 !     V_xfer: Maximal I_xfer conductance
-      REAL(KIND=8) :: V_xfer = 3.8D-3      ! units: mM/ms
+      REAL(KIND=RKIND) :: V_xfer = 3.8E-3_RKIND    ! units: mM/ms
 !     Buf_c: Total cytoplasmic buffer concentration
-      REAL(KIND=8) :: Buf_c = 0.2D0        ! units: mM
+      REAL(KIND=RKIND) :: Buf_c = 0.2_RKIND        ! units: mM
 !     K_bufc: Ca_i half-saturation constant for cytplasmic buffer
-      REAL(KIND=8) :: K_bufc = 1.0D-3      ! units: mM
+      REAL(KIND=RKIND) :: K_bufc = 1.E-3_RKIND     ! units: mM
 !     Buf_sr: Total sacroplasmic buffer concentration
-      REAL(KIND=8) :: Buf_sr = 10.0D0      ! units: mM
+      REAL(KIND=RKIND) :: Buf_sr = 10._RKIND       ! units: mM
 !     K_bufsr: Ca_sr half-saturation constant for subspace buffer
-      REAL(KIND=8) :: K_bufsr = 0.3D0      ! units: mM
+      REAL(KIND=RKIND) :: K_bufsr = 0.3_RKIND      ! units: mM
 !     Buf_ss: Total subspace buffer concentration
-      REAL(KIND=8) :: Buf_ss = 0.4D0       ! units: mM
+      REAL(KIND=RKIND) :: Buf_ss = 0.4_RKIND       ! units: mM
 !     K_bufss: Ca_ss half-saturation constant for subspace buffer
-      REAL(KIND=8) :: K_bufss = 2.5D-4     ! units: mM
+      REAL(KIND=RKIND) :: K_bufss = 2.5E-4_RKIND   ! units: mM
 !     Resting potential
-      REAL(KIND=8) :: Vrest = -85.23D0    ! units: mV
+      REAL(KIND=RKIND) :: Vrest = -85.23_RKIND     ! units: mV
 !-----------------------------------------------------------------------
 !     Electromechanics coupling parameters: active stress model
 !     Ca_rest: Resting Ca concentration
-      REAL(KIND=8) :: Ca_rest = 5.0D-5     ! units: mM
+      REAL(KIND=RKIND) :: Ca_rest = 5.E-5_RKIND    ! units: mM
 !     Ca_crit: Critical Ca concentration
-      REAL(KIND=8) :: Ca_crit = 8.0D-4     ! units: mM
+      REAL(KIND=RKIND) :: Ca_crit = 8.E-4_RKIND    ! units: mM
 !     eta_T: Saturation of concentration
-      REAL(KIND=8) :: eta_T = 12.5D0       ! units: MPa/mM
+      REAL(KIND=RKIND) :: eta_T = 12.5_RKIND       ! units: MPa/mM
 !     eps_0: Minimum activation
-      REAL(KIND=8) :: eps_0 = 0.1D0        ! units: ms^{-1}
+      REAL(KIND=RKIND) :: eps_0 = 0.1_RKIND        ! units: ms^{-1}
 !     eps_i: Maximum activation
-      REAL(KIND=8) :: eps_i = 1.0D0        ! units: ms^{-1}
+      REAL(KIND=RKIND) :: eps_i = 1._RKIND         ! units: ms^{-1}
 !     Transition rate
-      REAL(KIND=8) :: xi_T = 4.0D3         ! units: mM^{-1}
+      REAL(KIND=RKIND) :: xi_T = 4.E3_RKIND        ! units: mM^{-1}
 !-----------------------------------------------------------------------
 !     Electromechanics coupling parameters: active strain model
 !     Active force of sacromere (-mM^{-2})
-      REAL(KIND=8) :: alFa = -4.0D6
+      REAL(KIND=RKIND) :: alFa = -4.E6_RKIND
 !     Resting Ca concentration (mM)
-      REAL(KIND=8) :: c_Ca0 = 2.155D-4
+      REAL(KIND=RKIND) :: c_Ca0 = 2.155E-4_RKIND
 !     Viscous-type constant (ms-mM^{-2})
-      REAL(KIND=8) :: mu_Ca = 5.0D6
+      REAL(KIND=RKIND) :: mu_Ca = 5.E6_RKIND
 
 !     Force-length relationship parameters
 !     Initial length of sacromeres (um)
-      REAL(KIND=8) :: SL0 = 1.95D0
+      REAL(KIND=RKIND) :: SL0 = 1.95_RKIND
 !     Min. length of sacromeres (um)
-      REAL(KIND=8) :: SLmin = 1.7D0
+      REAL(KIND=RKIND) :: SLmin = 1.7_RKIND
 !     Max. length of sacromeres (um)
-      REAL(KIND=8) :: SLmax = 2.6D0
+      REAL(KIND=RKIND) :: SLmax = 2.6_RKIND
 !     Fourier coefficients
-      REAL(KIND=8) :: f0  = -4333.618335582119D0
-      REAL(KIND=8) :: fc1 =  2570.395355352195D0
-      REAL(KIND=8) :: fs1 = -2051.827278991976D0
-      REAL(KIND=8) :: fc2 =  1329.53611689133D0
-      REAL(KIND=8) :: fs2 =  302.216784558222D0
-      REAL(KIND=8) :: fc3 =  104.943770305116D0
-      REAL(KIND=8) :: fs3 =  218.375174229422D0
+      REAL(KIND=RKIND) :: f0  = -4333.618335582119_RKIND
+      REAL(KIND=RKIND) :: fc1 =  2570.395355352195_RKIND
+      REAL(KIND=RKIND) :: fs1 = -2051.827278991976_RKIND
+      REAL(KIND=RKIND) :: fc2 =  1329.53611689133_RKIND
+      REAL(KIND=RKIND) :: fs2 =  302.216784558222_RKIND
+      REAL(KIND=RKIND) :: fc3 =  104.943770305116_RKIND
+      REAL(KIND=RKIND) :: fs3 =  218.375174229422_RKIND
 
 !-----------------------------------------------------------------------
 !     Scaling factors
 !     Voltage scaling
-      REAL(KIND=8) :: Vscale  = 1.0D0
+      REAL(KIND=RKIND) :: Vscale  = 1._RKIND
 !     Time scaling
-      REAL(KIND=8) :: Tscale  = 1.0D0
+      REAL(KIND=RKIND) :: Tscale  = 1._RKIND
 !     Voltage offset parameter
-      REAL(KIND=8) :: Voffset = 0.0D0
+      REAL(KIND=RKIND) :: Voffset = 0._RKIND
 !-----------------------------------------------------------------------
 !     Variables
 !     Reverse potentials for Na, K, Ca
-      REAL(KIND=8) :: E_Na
-      REAL(KIND=8) :: E_K
-      REAL(KIND=8) :: E_Ca
-      REAL(KIND=8) :: E_Ks
+      REAL(KIND=RKIND) :: E_Na
+      REAL(KIND=RKIND) :: E_K
+      REAL(KIND=RKIND) :: E_Ca
+      REAL(KIND=RKIND) :: E_Ks
 !     Cellular transmembrane currents
 !     I_Na: Fast sodium current
-      REAL(KIND=8) :: I_Na
+      REAL(KIND=RKIND) :: I_Na
 !     I_K1: inward rectifier outward current
-      REAL(KIND=8) :: I_K1
+      REAL(KIND=RKIND) :: I_K1
 !     I_to: transient outward current
-      REAL(KIND=8) :: I_to
+      REAL(KIND=RKIND) :: I_to
 !     I_Kr: rapid delayed rectifier current
-      REAL(KIND=8) :: I_Kr
+      REAL(KIND=RKIND) :: I_Kr
 !     I_Ks: slow delayed rectifier current
-      REAL(KIND=8) :: I_Ks
+      REAL(KIND=RKIND) :: I_Ks
 !     I_CaL: L-type Ca current
-      REAL(KIND=8) :: I_CaL
+      REAL(KIND=RKIND) :: I_CaL
 !     I_NaCa: Na-Ca exchanger current
-      REAL(KIND=8) :: I_NaCa
+      REAL(KIND=RKIND) :: I_NaCa
 !     I_NaK: Na-K pump current
-      REAL(KIND=8) :: I_NaK
+      REAL(KIND=RKIND) :: I_NaK
 !     I_pCa: plateau Ca current
-      REAL(KIND=8) :: I_pCa
+      REAL(KIND=RKIND) :: I_pCa
 !     I_pK: plateau K current
-      REAL(KIND=8) :: I_pK
+      REAL(KIND=RKIND) :: I_pK
 !     I_bCa: background Ca current
-      REAL(KIND=8) :: I_bCa
+      REAL(KIND=RKIND) :: I_bCa
 !     I_lean: background Na current
-      REAL(KIND=8) :: I_bNa
+      REAL(KIND=RKIND) :: I_bNa
 !     I_leak: sacroplasmic reticulum Ca leak current
-      REAL(KIND=8) :: I_leak
+      REAL(KIND=RKIND) :: I_leak
 !     I_up: sacroplasmic reticulum Ca pump current
-      REAL(KIND=8) :: I_up
+      REAL(KIND=RKIND) :: I_up
 !     I_rel: Ca induced Ca release current
-      REAL(KIND=8) :: I_rel
+      REAL(KIND=RKIND) :: I_rel
 !     I_xfer: diffusive Ca current
-      REAL(KIND=8) :: I_xfer
+      REAL(KIND=RKIND) :: I_xfer
 !-----------------------------------------------------------------------
 !     State variables
-      REAL(KIND=8) :: V
-      REAL(KIND=8) :: K_i
-      REAL(KIND=8) :: Na_i
-      REAL(KIND=8) :: Ca_i
-      REAL(KIND=8) :: Ca_ss
-      REAL(KIND=8) :: Ca_sr
-      REAL(KIND=8) :: R_bar
+      REAL(KIND=RKIND) :: V
+      REAL(KIND=RKIND) :: K_i
+      REAL(KIND=RKIND) :: Na_i
+      REAL(KIND=RKIND) :: Ca_i
+      REAL(KIND=RKIND) :: Ca_ss
+      REAL(KIND=RKIND) :: Ca_sr
+      REAL(KIND=RKIND) :: R_bar
 
 !     Gating variables (runtime, steady state)
-      REAL(KIND=8) :: xr1, xr1i
-      REAL(KIND=8) :: xr2, xr2i
-      REAL(KIND=8) :: xs, xsi
-      REAL(KIND=8) :: m, mi
-      REAL(KIND=8) :: h, hi
-      REAL(KIND=8) :: j, ji
-      REAL(KIND=8) :: d, di
-      REAL(KIND=8) :: f, fi
-      REAL(KIND=8) :: f2, f2i
-      REAL(KIND=8) :: fcass, fcassi
-      REAL(KIND=8) :: s, si
-      REAL(KIND=8) :: r, ri
+      REAL(KIND=RKIND) :: xr1, xr1i
+      REAL(KIND=RKIND) :: xr2, xr2i
+      REAL(KIND=RKIND) :: xs, xsi
+      REAL(KIND=RKIND) :: m, mi
+      REAL(KIND=RKIND) :: h, hi
+      REAL(KIND=RKIND) :: j, ji
+      REAL(KIND=RKIND) :: d, di
+      REAL(KIND=RKIND) :: f, fi
+      REAL(KIND=RKIND) :: f2, f2i
+      REAL(KIND=RKIND) :: fcass, fcassi
+      REAL(KIND=RKIND) :: s, si
+      REAL(KIND=RKIND) :: r, ri
 
 !     Other variables
-      REAL(KIND=8) :: k1
-      REAL(KIND=8) :: k2
-      REAL(KIND=8) :: k_casr
-      REAL(KIND=8) :: O
+      REAL(KIND=RKIND) :: k1
+      REAL(KIND=RKIND) :: k2
+      REAL(KIND=RKIND) :: k_casr
+      REAL(KIND=RKIND) :: O
 
 !     Jacobian variables
-      REAL(KIND=8) :: E_Na_Nai, E_K_Ki, E_Ca_Cai, E_Ks_Ki, E_Ks_Nai
-      REAL(KINd=8) :: I_Na_V, I_Na_Nai
-      REAL(KIND=8) :: I_to_V, I_to_Ki
-      REAL(KIND=8) :: I_K1_V, I_K1_Ki
-      REAL(KIND=8) :: I_Kr_V, I_Kr_Ki
-      REAL(KIND=8) :: I_Ks_V, I_Ks_Ki, I_Ks_Nai
-      REAL(KIND=8) :: I_CaL_V, I_CaL_Cass
-      REAL(KIND=8) :: I_NaCa_V, I_NaCa_Nai, I_NaCa_Cai
-      REAL(KIND=8) :: I_NaK_V, I_NaK_Nai
-      REAL(KIND=8) :: I_pCa_Cai
-      REAL(KIND=8) :: I_pK_V, I_pK_Ki
-      REAL(KIND=8) :: I_bCa_V, I_bCa_Cai
-      REAL(KIND=8) :: I_bNa_V, I_bNa_Nai
-      REAL(KIND=8) :: I_leak_Cai, I_leak_Casr
-      REAL(KIND=8) :: I_up_Cai
-      REAL(KIND=8) :: I_rel_Cass, I_rel_Casr, I_rel_Rbar
-      REAL(KIND=8) :: I_xfer_Cai, I_xfer_Cass
-      REAL(KIND=8) :: k_casr_sr, k1_casr, O_Casr, O_Cass, O_Rbar
+      REAL(KIND=RKIND) :: E_Na_Nai, E_K_Ki, E_Ca_Cai, E_Ks_Ki, E_Ks_Nai
+      REAL(KIND=RKIND) :: I_Na_V, I_Na_Nai
+      REAL(KIND=RKIND) :: I_to_V, I_to_Ki
+      REAL(KIND=RKIND) :: I_K1_V, I_K1_Ki
+      REAL(KIND=RKIND) :: I_Kr_V, I_Kr_Ki
+      REAL(KIND=RKIND) :: I_Ks_V, I_Ks_Ki, I_Ks_Nai
+      REAL(KIND=RKIND) :: I_CaL_V, I_CaL_Cass
+      REAL(KIND=RKIND) :: I_NaCa_V, I_NaCa_Nai, I_NaCa_Cai
+      REAL(KIND=RKIND) :: I_NaK_V, I_NaK_Nai
+      REAL(KIND=RKIND) :: I_pCa_Cai
+      REAL(KIND=RKIND) :: I_pK_V, I_pK_Ki
+      REAL(KIND=RKIND) :: I_bCa_V, I_bCa_Cai
+      REAL(KIND=RKIND) :: I_bNa_V, I_bNa_Nai
+      REAL(KIND=RKIND) :: I_leak_Cai, I_leak_Casr
+      REAL(KIND=RKIND) :: I_up_Cai
+      REAL(KIND=RKIND) :: I_rel_Cass, I_rel_Casr, I_rel_Rbar
+      REAL(KIND=RKIND) :: I_xfer_Cai, I_xfer_Cass
+      REAL(KIND=RKIND) :: k_casr_sr, k1_casr, O_Casr, O_Cass, O_Rbar
 !#######################################################################

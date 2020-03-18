@@ -41,9 +41,9 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER iM, iFa, iEq, i, a, iBc, lsPtr
+      INTEGER(KIND=IKIND) iM, iFa, iEq, i, a, iBc, lsPtr
 
-      INTEGER, ALLOCATABLE :: gNodes(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:)
 
 !     Compute face normals and area
       DO iM=1, nMsh
@@ -80,7 +80,7 @@
      2          BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
                i = eq(iEq)%bc(iBc)%cplBCPtr
                cplBC%fa(i)%name = TRIM(msh(iM)%fa(iFa)%name)
-               cplBC%fa(i)%y    = 0D0
+               cplBC%fa(i)%y    = 0._RKIND
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
                   cplBC%fa(i)%bGrp = cplBC_Dir
                ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
@@ -180,22 +180,21 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
 
       LOGICAL flag
-      INTEGER e, a, Ac, iM, g
-      REAL(KIND=8) tmp, area, n(nsd)
+      INTEGER(KIND=IKIND) e, a, Ac, iM, g
+      REAL(KIND=RKIND) tmp, area, n(nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: s(:), sV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: s(:), sV(:,:)
 
 !     Calculating the center of the face, diameter and its area
       iM = lFa%iM
       ALLOCATE(s(tnNo), sV(nsd,tnNo))
       IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
       ALLOCATE(lFa%nV(nsd,lFa%nNo))
-      s        = 1D0
-      sV       = 0D0
+      s        = 1._RKIND
+      sV       = 0._RKIND
       area     = Integ(lFa,s)
       lFa%area = area
       std = " Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
@@ -225,8 +224,8 @@
      2            " in face <"//TRIM(lFa%name)//">"
                flag = .FALSE.
             END IF
-            lFa%nV(:,a) = 0D0
-            lFa%nV(1,a) = 1D0
+            lFa%nV(:,a) = 0._RKIND
+            lFa%nV(1,a) = 1._RKIND
             CYCLE
          END IF
          lFa%nV(:,a) = sV(:,Ac)/tmp
@@ -239,15 +238,14 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER iM, iFa, jFa, i, a, b, Ac, j, ierr
-      REAL(KIND=8) tmp, nV(nsd), center(nsd), maxN
+      INTEGER(KIND=IKIND) iM, iFa, jFa, i, a, b, Ac, j, ierr
+      REAL(KIND=RKIND) tmp, nV(nsd), center(nsd), maxN
 
-      INTEGER, ALLOCATABLE :: gNodes(:), sCount(:), disp(:)
-      REAL(KIND=8), ALLOCATABLE :: s(:), sV(:,:), sVl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:), sCount(:), disp(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: s(:), sV(:,:), sVl(:,:)
 
       IF (BTEST(lBc%bType,bType_gen)) THEN
          IF (BTEST(lBc%bType,bType_Neu) .AND. lBc%gm%dof.NE.1) THEN
@@ -264,12 +262,12 @@
       IF (.NOT.ALLOCATED(lBc%gx)) ALLOCATE(lBc%gx(lFa%nNo))
 
       ALLOCATE(s(tnNo), sCount(cm%np()), disp(cm%np()))
-      s = 0D0
+      s = 0._RKIND
       IF (BTEST(lBc%bType,bType_flat)) THEN
 !     Just a constant value for Flat profile
          DO a=1, lFa%nNo
             Ac    = lFa%gN(a)
-            s(Ac) = 1D0
+            s(Ac) = 1._RKIND
          END DO
       ELSE IF (BTEST(lBc%bType,bType_para)) THEN
 !     Here is the method that is used for imposing parabolic profile:
@@ -293,7 +291,7 @@
 !     "j" is a counter for the number of nodes that are located on the
 !     boundary of lFa and sVl contains the list of their coordinates
          j   = 0
-         sVl = 0D0
+         sVl = 0._RKIND
          DO a=1, lFa%nNo
             Ac = lFa%gN(a)
             IF (gNodes(Ac) .EQ. 1) THEN
@@ -338,7 +336,7 @@
                   i = b
                END IF
             END DO
-            s(Ac) = 1D0 - NORM(nV)/NORM(sV(:,i))
+            s(Ac) = 1._RKIND - NORM(nV)/NORM(sV(:,i))
          END DO
       ELSE IF (BTEST(lBc%bType,bType_ud)) THEN
          DO a=1, lFa%nNo
@@ -353,17 +351,17 @@
             IF (jFa .EQ. iFa) CYCLE
             DO a=1, msh(iM)%fa(jFa)%nNo
                Ac    = msh(iM)%fa(jFa)%gN(a)
-               s(Ac) = 0D0
+               s(Ac) = 0._RKIND
             END DO
          END DO
       END IF
 
 !     Normalizing the profile for flux
-      tmp = 1D0
+      tmp = 1._RKIND
       IF (BTEST(lBc%bType,bType_flx)) THEN
          tmp = Integ(lFa, s)
          IF (ISZERO(tmp)) THEN
-            tmp = 1D0
+            tmp = 1._RKIND
             wrn = "Using face <"//TRIM(lFa%name)//
      2         "> to impose BC led to no non-zero node."
          END IF
@@ -381,17 +379,16 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(INOUT) :: lsPtr
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: lsPtr
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER a, e, Ac, g, iM, i, nNo
-      REAL(KIND=8) n(nsd)
+      INTEGER(KIND=IKIND) a, e, Ac, g, iM, i, nNo
+      REAL(KIND=RKIND) n(nsd)
       LOGICAL :: eDrn
 
-      INTEGER, ALLOCATABLE :: gNodes(:)
-      REAL(KIND=8), ALLOCATABLE :: sV(:,:), sVl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:), sVl(:,:)
 
       iM  = lFa%iM
       nNo = lFa%nNo
@@ -406,7 +403,7 @@
          ELSE
             lsPtr     = lsPtr + 1
             lBc%lsPtr = lsPtr
-            sVl = 0D0
+            sVl = 0._RKIND
             eDrn = .FALSE.
             DO i=1, nsd
                IF (lBc%eDrn(i) .NE. 0) THEN
@@ -415,9 +412,9 @@
                END IF
             END DO
             IF (eDrn) THEN
-               sVl = 1D0
+               sVl = 1._RKIND
                DO i=1, nsd
-                  IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0D0
+                  IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0._RKIND
                END DO
             END IF
             CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Dir,
@@ -425,7 +422,7 @@
          END IF
       ELSE IF (BTEST(lBc%bType,bType_Neu)) THEN
          IF (BTEST(lBc%bType,bType_res)) THEN
-            sV = 0D0
+            sV = 0._RKIND
             DO e=1, lFa%nEl
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e)
                DO g=1, lFa%nG
@@ -459,7 +456,7 @@
          END DO
          DEALLOCATE(gNodes, sVl)
          ALLOCATE(sVl(nsd,nNo), gNodes(nNo))
-         sVl  = 0D0
+         sVl  = 0._RKIND
 
          eDrn = .FALSE.
          DO i=1, nsd
@@ -469,9 +466,9 @@
             END IF
          END DO
          IF (eDrn) THEN
-            sVl = 1D0
+            sVl = 1._RKIND
             DO i=1, nsd
-               IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0D0
+               IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0._RKIND
             END DO
          END IF
 
@@ -502,9 +499,9 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER :: a, b, e, f, Ac, Bc, nEl, eNoN, ep(2,3)
+      INTEGER(KIND=IKIND) :: a, b, e, f, Ac, Bc, nEl, eNoN, ep(2,3)
 
-      INTEGER, ALLOCATABLE :: incN(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incN(:)
 
       eNoN = lM%eNoN
       nEl  = lM%nEl
@@ -550,14 +547,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER :: a, e, g, Ac, nNo, nEl, eNoN
+      INTEGER(KIND=IKIND) :: a, e, g, Ac, nNo, nEl, eNoN
       LOGICAL :: flag
-      REAL(KIND=8) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
+      REAL(KIND=RKIND) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
 
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sV(:,:)
 
       nNo  = lM%nNo
       nEl  = lM%nEl
@@ -565,8 +561,8 @@
 
 !     Compute shell director (normal)
       ALLOCATE(xl(nsd,eNoN), sV(nsd,tnNo), lM%nV(nsd,nNo))
-      sV   = 0D0
-      area = 0D0
+      sV   = 0._RKIND
+      area = 0._RKIND
       DO e=1, nEl
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
          DO a=1, eNoN
@@ -600,8 +596,8 @@
      2            " in mesh <"//TRIM(lM%name)//">"
                flag = .FALSE.
             END IF
-            lM%nV(:,a) = 0D0
-            lM%nV(1,a) = 1D0
+            lM%nV(:,a) = 0._RKIND
+            lM%nV(1,a) = 1._RKIND
             CYCLE
          END IF
          lM%nV(:,a) = sV(:,Ac)/Jac
@@ -617,12 +613,11 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER :: a, b, e, Ac, Bc, Ec
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, Ec
       LOGICAL :: bFlag
 
       IF (lFa%eType .EQ. eType_NRB) RETURN

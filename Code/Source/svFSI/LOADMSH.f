@@ -41,11 +41,10 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER :: iFa
+      INTEGER(KIND=IKIND) :: iFa
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) :: ftmp
 
@@ -80,16 +79,15 @@
 
       RETURN
       END SUBROUTINE READSV
-!####################################################################
+!--------------------------------------------------------------------
 !     Read list of end nodes from a file into face data structure
       SUBROUTINE READENDNLFF(lFa, fid)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
-      INTEGER, INTENT(IN) :: fid
+      INTEGER(KIND=IKIND), INTENT(IN) :: fid
 
-      INTEGER a, Ac
+      INTEGER(KIND=IKIND) a, Ac
 
       lFa%nNo = 0
       DO
@@ -119,11 +117,10 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER i, fid, Ac, e, iFa
+      INTEGER(KIND=IKIND) i, fid, Ac, e, iFa
       CHARACTER(LEN=stdL) stmp
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) ftmp
@@ -237,35 +234,34 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
       TYPE blkType
-         INTEGER nEl
-         INTEGER id
-         INTEGER facePtr
+         INTEGER(KIND=IKIND) nEl
+         INTEGER(KIND=IKIND) id
+         INTEGER(KIND=IKIND) facePtr
       END TYPE blkType
 
       TYPE ldmnType
-         INTEGER iDmn
-         INTEGER :: blk = 0
+         INTEGER(KIND=IKIND) iDmn
+         INTEGER(KIND=IKIND) :: blk = 0
          CHARACTER(LEN=stdL) name
       END TYPE ldmnType
 
-      INTEGER, PARAMETER :: maxNblk = 1024
+      INTEGER(KIND=IKIND), PARAMETER :: maxNblk = 1024
 
       LOGICAL flag, nonL
-      INTEGER A, Ac, Ec, b, i, j, k, l, nBlk, cntr, nCon, iFa, e, fid,
-     2   eNoNb, nlDmn
-      INTEGER(KIND=8) tmp
+      INTEGER(KIND=IKIND) A, Ac, Ec, b, i, j, k, l, nBlk, cntr, nCon,
+     2   iFa, e, fid, eNoNb, nlDmn
+      INTEGER(KIND=IKIND8) tmp
       CHARACTER(LEN=stdL) fName, stmp, ctmp
       TYPE(blkType) blk(maxNblk)
       TYPE(listType),POINTER :: lPtr, lPD
       TYPE(fileType) ftmp
 
-      INTEGER, ALLOCATABLE :: adj(:,:), ef(:)
-      REAL(KIND=8), ALLOCAtABLE :: Xtmp(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: adj(:,:), ef(:)
+      REAL(KIND=RKIND), ALLOCAtABLE :: Xtmp(:,:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: names(:)
       TYPE(ldmnType), ALLOCATABLE :: ldmn(:)
 
@@ -322,7 +318,7 @@
       DO i=1, 4
          CALL GET(stmp, tmp)
       END DO
-      lM%gnNo = INT(tmp)
+      lM%gnNo = INT(tmp, KIND=IKIND)
 !     allocating the required space for solver
       ALLOCATE (lM%x(nsd,lM%gnNo))
       DO A=1, lM%gnNo
@@ -347,11 +343,11 @@
          IF (nBlk .GT. maxnBlk) err = "Increase maxnBlk"
          CALL GET(stmp, tmp)
          CALL GET(stmp, tmp)
-         blk(nBlk)%id = INT(tmp)
+         blk(nBlk)%id = INT(tmp, KIND=IKIND)
          CALL GET(stmp, tmp)
-         i = INT(tmp)
+         i = INT(tmp, KIND=IKIND)
          CALL GET(stmp, tmp)
-         i = INT(tmp) - i + 1
+         i = INT(tmp, KIND=IKIND) - i + 1
          blk(nBlk)%nEl = i
          READ(fid,"(A)") stmp
          l = CheckNoNumbers(stmp) - 1
@@ -440,7 +436,7 @@
             CALL GET(stmp,j) ! This is garbage
             DO a=1, l
                CALL GET(stmp, tmp)
-               ef(a) = INT(tmp)
+               ef(a) = INT(tmp, KIND=IKIND)
             END DO
 !        Producing adjacency data in case of nonlinear elements
             IF (nonL .AND. ef(l-1)*ef(l).NE.0) THEN
@@ -512,9 +508,9 @@
 !     Saving the range of elements in each domain so we can set the dmn
 !     after constructing gIEN
             CALL GET(stmp, tmp)
-            j = INT(tmp)
+            j = INT(tmp, KIND=IKIND)
             CALL GET(stmp, tmp)
-            k = INT(tmp)
+            k = INT(tmp, KIND=IKIND)
             CALL SETDMNID(lM, ldmn(i)%iDmn, j, k)
          END IF
       END DO
@@ -578,7 +574,7 @@
                lM%gIEN(9,e) = lM%gnNo
                i = lM%gIEN(1,e)
                j = lM%gIEN(3,e)
-               Xtmp(:,lM%gnNo) = (Xtmp(:,i) + Xtmp(:,j))/2D0
+               Xtmp(:,lM%gnNo) = (Xtmp(:,i) + Xtmp(:,j))*0.5_RKIND
             END DO
             ALLOCATE (lM%x(nsd,lM%gnNo))
             DO a=1, lM%gnNo
@@ -607,14 +603,12 @@
       SUBROUTINE ADDBETWEEN(lM, a1, a2, e, flag, Xtmp)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-
       LOGICAL, INTENT(IN) :: flag
-      INTEGER, INTENT(IN) :: a1, a2, e
-      REAL(KIND=8), INTENT(INOUT) :: Xtmp(nsd,lM%eNoN*lM%gnEl)
+      INTEGER(KIND=IKIND), INTENT(IN) :: a1, a2, e
+      REAL(KIND=RKIND), INTENT(INOUT) :: Xtmp(nsd,lM%eNoN*lM%gnEl)
 
-      INTEGER b1, b2, i
+      INTEGER(KIND=IKIND) b1, b2, i
 
       b1 = 0
       b2 = 0
@@ -647,7 +641,7 @@
          END IF
          IF (flag .AND. lM%gIEN(i,e).EQ.0) THEN
             lM%gnNo = lM%gnNo + 1
-            Xtmp(:,lM%gnNo) = (Xtmp(:,a1) + Xtmp(:,a2))/2D0
+            Xtmp(:,lM%gnNo) = (Xtmp(:,a1) + Xtmp(:,a2))*0.5_RKIND
          END IF
          IF (lM%gIEN(i,e) .EQ. 0) lM%gIEN(i,e) = lM%gnNo
       ELSE
@@ -662,15 +656,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
-      INTEGER, INTENT(IN) :: fid
+      INTEGER(KIND=IKIND), INTENT(IN) :: fid
 
-      INTEGER e, a, b, Ac, ie, maxnEtN
+      INTEGER(KIND=IKIND) e, a, b, Ac, ie, maxnEtN
       CHARACTER(LEN=stdL) rLine
 
-      INTEGER, ALLOCATABLE :: nbc(:), ndEs(:,:), bcNdEs(:,:), gnID(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: nbc(:), ndEs(:,:),
+     2   bcNdEs(:,:), gnID(:)
 
       DO
          READ (fid,'(a)',END=001) rLine

@@ -50,21 +50,20 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSISOLVER(lhs, ls, dof, Val, R, isS)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
       LOGICAL, INTENT(IN) :: isS(lhs%nNo)
 
       LOGICAL flag, GE
-      INTEGER nNo, mynNo, i, j, k, n, l
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
-      REAL(KIND=8) eps, temp
-      REAL(KIND=8), ALLOCATABLE :: u(:,:,:), h(:,:), X(:,:), y(:),
+      INTEGER(KIND=LSIP) nNo, mynNo, i, j, k, n, l
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
+      REAL(KIND=LSRP) eps, temp
+
+      REAL(KIND=LSRP), ALLOCATABLE :: u(:,:,:), h(:,:), X(:,:), y(:),
      2   c(:), s(:), err(:), unCondU(:,:), v(:,:,:,:), A(:,:), b(:),
      3   xb(:), oldxb(:), tmpU(:,:,:), tmp(:)
 
@@ -72,10 +71,10 @@
       nNo   = lhs%nNo
       mynNo = lhs%mynNo
       n     = ls%sD
-      ALLOCATE(h(ls%sD+1,ls%sD), u(dof,nNo,ls%sD+1), X(dof,nNo),
-     &   y(ls%sD), c(ls%sD), s(ls%sD), err(ls%sD+1), unCondU(dof,nNo),
-     3   A(2*n,2*n), v(dof,nNo,n,2), b(2*n), xb(2*n), tmpU(dof,nNo,2),
-     4   tmp(4*n+1), oldxb(2*n))
+      ALLOCATE(h(ls%sD+1,ls%sD), u(dof,nNo,ls%sD+1), X(dof,nNo),        &
+     &   y(ls%sD), c(ls%sD), s(ls%sD), err(ls%sD+1), unCondU(dof,nNo),  &
+     &   A(2*n,2*n), v(dof,nNo,n,2), b(2*n), xb(2*n), tmpU(dof,nNo,2),  &
+     &   tmp(4*n+1), oldxb(2*n))
 
       ls%callD  = FSILS_CPUT()
       ls%suc    = .FALSE.
@@ -84,14 +83,14 @@
       ls%fNorm  = eps
       eps       = MAX(ls%absTol,ls%relTol*eps)
       ls%itr    = 0
-      X         = 0D0
-      h         = 0D0
+      X         = 0._LSRP
+      h         = 0._LSRP
 
       CALL BCPRE
 
       IF (ls%iNorm .LE. ls%absTol) THEN
          ls%callD = EPSILON(ls%callD)
-         ls%dB    = 0D0
+         ls%dB    = 0._LSRP
          RETURN
       END IF
 
@@ -105,10 +104,10 @@
 
          l = 0
          DO j=1, 2
-            CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, dof, Val,
-     2         tmpu(:,:,j), v(:,:,i,j))
-            CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, dof, tmpu(:,:,j),
-     2         v(:,:,i,j))
+            CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, dof, Val, &
+     &         tmpu(:,:,j), v(:,:,i,j))
+            CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, dof, tmpu(:,:,j),         &
+     &         v(:,:,i,j))
             IF (ANY(lhs%face%coupledFlag)) THEN
                unCondU = v(:,:,i,j)
                CALL ADDBCMUL(lhs,BCOP_TYPE_PRE, dof,unCondU, v(:,:,i,j))
@@ -170,7 +169,7 @@
             xB = oldxB
             EXIT
          END IF
-         ls%fNorm = ABS(ls%iNorm**2D0 - SUM(xB(1:2*i)*B(1:2*i)))
+         ls%fNorm = ABS(ls%iNorm**2._LSRP - SUM(xB(1:2*i)*B(1:2*i)))
 c         print *, sqrt(ls%fnorm)/ls%inorm
 
          IF(ls%fNorm .LT. eps*eps) THEN
@@ -192,7 +191,7 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
          END DO
          h(i+1,i) = SQRT(ABS(h(i+1,i)))
 
-         CALL OMPMULV(dof, nNo, 1D0/h(i+1,i), u(:,:,i+1))
+         CALL OMPMULV(dof, nNo, 1._LSRP/h(i+1,i), u(:,:,i+1))
          !u(:,:,i+1) = u(:,:,i+1)/h(i+1,i)
          DO j=1, i-1
             temp     =  c(j)*h(j,i) + s(j)*h(j+1,i)
@@ -203,7 +202,7 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
          c(i)     = h(i,i)/temp
          s(i)     = h(i+1,i)/temp
          h(i,i)   = temp
-         h(i+1,i) = 0D0
+         h(i+1,i) = 0._LSRP
          err(i+1) = -s(i)*err(i)
          err(i)   =  c(i)*err(i)
          IF (ABS(err(i+1)) .LT. eps) THEN
@@ -214,72 +213,65 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
          END IF
       END DO
 
-      R = 0d0
+      R = 0._LSRP
       DO j=1, i
          CALL SEPARATE(isS, tmpu(:,:,1), tmpu(:,:,2), u(:,:,j))
          R = R + xB(2*j-1)*tmpu(:,:,1) + xB(2*j)*tmpu(:,:,2)
       END DO
       ls%itr   = i
       ls%callD = FSILS_CPUT() - ls%callD
-      ls%dB    = 5D0*LOG(ls%fNorm/ls%dB)
+      ls%dB    = 5._LSRP*LOG(ls%fNorm/ls%dB)
       ls%fNorm = SQRT(ls%fNorm)
 
       RETURN
       CONTAINS
 !--------------------------------------------------------------------
-
       SUBROUTINE SEPARATE(isS, Rf, Rs, Rfi, Rsi)
-
       IMPLICIT NONE
-
       LOGICAL, INTENT(IN) :: isS(nNo)
-      REAL(KIND=8), INTENT(OUT) :: Rf(dof,nNo), Rs(dof,nNo)
-      REAL(KIND=8), INTENT(IN) :: Rfi(dof,nNo)
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: Rsi(dof,nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: Rf(dof,nNo), Rs(dof,nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: Rfi(dof,nNo)
+      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Rsi(dof,nNo)
 
-      INTEGER Ac
+      INTEGER(KIND=LSIP) Ac
 
       IF (PRESENT(Rsi)) THEN
          DO Ac=1, nNo
             IF (isS(Ac)) THEN
-               Rf(:,Ac) = 0D0
+               Rf(:,Ac) = 0._LSRP
                Rs(:,Ac) = Rfi(:,Ac) + Rsi(:,Ac)
             ELSE
                Rf(:,Ac) = Rfi(:,Ac) + Rsi(:,Ac)
-               Rs(:,Ac) = 0D0
+               Rs(:,Ac) = 0._LSRP
             END IF
          END DO
       ELSE
          DO Ac=1, nNo
             IF (isS(Ac)) THEN
-               Rf(:,Ac) = 0D0
+               Rf(:,Ac) = 0._LSRP
                Rs(:,Ac) = Rfi(:,Ac)
             ELSE
                Rf(:,Ac) = Rfi(:,Ac)
-               Rs(:,Ac) = 0D0
+               Rs(:,Ac) = 0._LSRP
             END IF
          END DO
       END IF
 
       RETURN
       END SUBROUTINE SEPARATE
-
 !--------------------------------------------------------------------
-
       SUBROUTINE BCPRE
-
       IMPLICIT NONE
-
-      INTEGER faIn, i, a, Ac, nsd
-      REAL(KIND=8) FSILS_NORMV
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
+      INTEGER(KIND=LSIP) faIn, i, a, Ac, nsd
+      REAL(KIND=LSRP) FSILS_NORMV
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:)
 
       nsd = dof - 1
       ALLOCATE(v(nsd,nNo))
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
             IF (lhs%face(faIn)%sharedFlag) THEN
-               v = 0D0
+               v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
@@ -287,14 +279,14 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
                   END DO
                END DO
                lhs%face(faIn)%nS = FSILS_NORMV(nsd, mynNo, lhs%commu,   &
-     &            v)**2D0
+     &            v)**2._LSRP
             ELSE
-               lhs%face(faIn)%nS = 0D0
+               lhs%face(faIn)%nS = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      lhs%face(faIn)%nS = lhs%face(faIn)%nS +            &
-     &                  lhs%face(faIn)%valM(i,a)**2D0
+     &                  lhs%face(faIn)%valM(i,a)**2._LSRP
                   END DO
                END DO
             END IF
@@ -303,6 +295,6 @@ c         print *, sqrt(ls%fnorm)/ls%inorm
 
       RETURN
       END SUBROUTINE BCPRE
-
+!--------------------------------------------------------------------
       END SUBROUTINE FSISOLVER
-
+!####################################################################

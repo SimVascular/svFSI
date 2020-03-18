@@ -42,24 +42,24 @@
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(stModelType), INTENT(IN) :: stM
-      INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
-      REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
-      REAL(KIND=8) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2, Inv4,
-     2   Inv6, Inv8
-      REAL(KIND=8) :: IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
-     2   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
-     3   Eff, Ess, Efs, kap, Hff(nsd,nsd), Hss(nsd,nsd), Sfs(nsd,nsd,6),
-     4   Hfs(nsd,nsd)
-      REAL(KIND=8) :: r1, r2, g1, g2, g3
+      REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
+     2   Inv4, Inv6, Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
+     3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
+     3   PP(nsd,nsd,nsd,nsd)
+      REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
+!     Guccione, HGO/HO model
+      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, Hff(nsd,nsd),
+     4   Hss(nsd,nsd), Sfs(nsd,nsd,6), Hfs(nsd,nsd)
 !     Active strain for electromechanics
-      REAL(KIND=8) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
+      REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
 !     Some preliminaries
-      nd   = REAL(nsd, KIND=8)
+      nd   = REAL(nsd, KIND=RKIND)
       Kp   = stM%Kpen
 
 !     Electromechanics coupling based on active strain
@@ -73,21 +73,21 @@
       END IF
 
       J    = MAT_DET(Fe, nsd)
-      J2d  = J**(-2D0/nd)
+      J2d  = J**(-2._RKIND/nd)
       J4d  = J2d*J2d
 
       IDm  = MAT_ID(nsd)
       C    = MATMUL(TRANSPOSE(Fe), Fe)
-      E    = 5D-1 * (C - IDm)
+      E    = 0.5_RKIND * (C - IDm)
       Ci   = MAT_INV(C, nsd)
 
       trE  = MAT_TRACE(E, nsd)
       Inv1 = J2d*MAT_TRACE(C,nsd)
-      Inv2 = 5D-1*( Inv1*Inv1 - J4d*MAT_TRACE(MATMUL(C,C), nsd) )
+      Inv2 = 0.5_RKIND*( Inv1*Inv1 - J4d*MAT_TRACE(MATMUL(C,C), nsd) )
 
 !     Contribution of dilational penalty terms to S and CC
-      p  = 0D0
-      pl = 0D0
+      p  = 0._RKIND
+      pl = 0._RKIND
       IF (.NOT.ISZERO(Kp)) CALL GETSVOLP(stM, J, p, pl)
 
 !     Now, compute isochoric and total stress, elasticity tensors
@@ -100,7 +100,7 @@
 !     St.Venant-Kirchhoff
       CASE (stIso_stVK)
          g1 = stM%C10            ! lambda
-         g2 = stM%C01 * 2D0      ! 2*mu
+         g2 = stM%C01 * 2._RKIND      ! 2*mu
 
          S  = g1*trE*IDm + g2*E
          CC = g1*TEN_DYADPROD(IDm, IDm, nsd) + g2*TEN_IDs(nsd)
@@ -112,47 +112,47 @@
          g2 = stM%C01 ! mu
 
          S  = g1*LOG(J)*Ci + g2*(C-IDm)
-         CC = g1 * ( -2D0*LOG(J)*TEN_SYMMPROD(Ci, Ci, nsd) +
-     2      TEN_DYADPROD(Ci, Ci, nsd) ) + 2D0*g2*TEN_IDs(nsd)
+         CC = g1 * ( -2._RKIND*LOG(J)*TEN_SYMMPROD(Ci, Ci, nsd) +
+     2      TEN_DYADPROD(Ci, Ci, nsd) ) + 2._RKIND*g2*TEN_IDs(nsd)
          RETURN
 
 !     NeoHookean model
       CASE (stIso_nHook)
-         g1 = 2D0 * stM%C10
+         g1 = 2._RKIND * stM%C10
          Sb = g1*IDm
 
          r1 = g1*Inv1/nd
          S  = J2d*Sb - r1*Ci
-         CC = (-2D0/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC = (-2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
      2                      TEN_DYADPROD(S, Ci, nsd))
 
          S  = S + p*J*Ci
-         CC = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
-     2         (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         CC = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2         (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
          RETURN
 
 !     Mooney-Rivlin model
       CASE (stIso_MR)
-         g1  = 2D0 * (stM%C10 + Inv1*stM%C01)
-         g2  = -2D0 * stM%C01
+         g1  = 2._RKIND * (stM%C10 + Inv1*stM%C01)
+         g2  = -2._RKIND * stM%C01
          Sb  = g1*IDm + g2*J2d*C
 
-         g1  = 4D0*J4d* stM%C01
+         g1  = 4._RKIND*J4d* stM%C01
          CCb = g1 * (TEN_DYADPROD(IDm, IDm, nsd) - TEN_IDs(nsd))
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC - (2D0/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC - (2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
      2                           TEN_DYADPROD(S, Ci, nsd) )
 
          S   = S + p*J*Ci
-         CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
-     2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
          RETURN
 
 !     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
@@ -164,23 +164,25 @@
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
 
-         Eff  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv4 - 1.0D0
-         Ess  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv6 - 1.0D0
+         Eff  = kap*Inv1 + (1._RKIND-3._RKIND*kap)*Inv4 - 1._RKIND
+         Ess  = kap*Inv1 + (1._RKIND-3._RKIND*kap)*Inv6 - 1._RKIND
 
          Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
-         Hff  = kap*IDm + (1.0D0-3.0D0*kap)*Hff
+         Hff  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hff
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
-         Hss  = kap*IDm + (1.0D0-3.0D0*kap)*Hss
+         Hss  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hss
 
          g1   = stM%C10
          g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
-         Sb   = 2D0*(g1*IDm + g2*Hff + g3*Hss)
+         Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
 
-         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
-         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
-         g1   = 4D0*J4d*g1
-         g2   = 4D0*J4d*g2
+         g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
+     2      EXP(stM%bff*Eff*Eff)
+         g2   = stM%ass*(1._RKIND + 2._RKIND*stM%bss*Ess*Ess)*
+     2      EXP(stM%bss*Ess*Ess)
+         g1   = 4._RKIND*J4d*g1
+         g2   = 4._RKIND*J4d*g2
 
          CCb  = g1 * TEN_DYADPROD(Hff, Hff, nsd) +
      2          g2 * TEN_DYADPROD(Hss, Hss, nsd)
@@ -188,16 +190,16 @@
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC - (2D0/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC - (2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
      2                           TEN_DYADPROD(S, Ci, nsd) )
 
          S   = S + p*J*Ci
-         CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
-     2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
          RETURN
 
 !     Guccione (1995) transversely isotropic model
@@ -205,7 +207,7 @@
          IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
      2      "Guccione material model (2)"
 !        Compute isochoric component of E
-         E = 5D-1 * (J2d*C - Idm)
+         E = 0.5_RKIND * (J2d*C - Idm)
 
 !        Transform into local orthogonal coordinate system
          Hff(1,:) = fl(:,1)
@@ -222,7 +224,7 @@
 
 !        Fiber stiffness contribution to Siso := (dE*_MN / dE_IJ)
 !        - Voigt notation
-         Sfs(:,:,:) = 0D0
+         Sfs(:,:,:) = 0._RKIND
          Sfs(:,:,1) = MAT_DYADPROD(Hff(1,:), Hff(1,:), nsd)
          Sfs(:,:,2) = MAT_DYADPROD(Hff(2,:), Hff(2,:), nsd)
          Sfs(:,:,3) = MAT_DYADPROD(Hff(3,:), Hff(3,:), nsd)
@@ -249,24 +251,24 @@
          S   = J2d*Sb - r1*Ci
 
          r2  = r2*J4d
-         CCb = r2 * ( 2D0*TEN_DYADPROD(Hss, Hss, nsd) +
+         CCb = r2 * ( 2._RKIND*TEN_DYADPROD(Hss, Hss, nsd) +
      2      g1* TEN_DYADPROD(Sfs(:,:,1), Sfs(:,:,1), nsd)  +
      3      g2*(TEN_DYADPROD(Sfs(:,:,2), Sfs(:,:,2), nsd)  +
      4          TEN_DYADPROD(Sfs(:,:,3), Sfs(:,:,3), nsd)  +
-     5      2D0*TEN_DYADPROD(Sfs(:,:,6), Sfs(:,:,6), nsd)) + 2D0*
+     5      2._RKIND*TEN_DYADPROD(Sfs(:,:,6), Sfs(:,:,6), nsd)) +
      6      g3*(TEN_DYADPROD(Sfs(:,:,4), Sfs(:,:,4), nsd)  +
-     7          TEN_DYADPROD(Sfs(:,:,5), Sfs(:,:,5), nsd)) )
+     7          TEN_DYADPROD(Sfs(:,:,5), Sfs(:,:,5), nsd))*2._RKIND )
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC - (2D0/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC - (2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
      2                           TEN_DYADPROD(S, Ci, nsd) )
 
          S   = S + p*J*Ci
-         CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
-     2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
          RETURN
 
 !     HO (Holzapfel-Ogden) model for myocardium (2009)
@@ -277,63 +279,64 @@
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
          Inv8 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,2)))
 
-         Eff  = Inv4 - 1.0D0
-         Ess  = Inv6 - 1.0D0
+         Eff  = Inv4 - 1._RKIND
+         Ess  = Inv6 - 1._RKIND
          Efs  = Inv8
 
-         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = 2D0 * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         g1   = stM%a * EXP(stM%b*(Inv1-3._RKIND))
+         g2   = 2._RKIND * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Hfs
 
          Efs  = Efs * Efs
-         g1   = 2D0*J4d*stM%b*g1
-         g2   = 4D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
+         g1   = 2._RKIND*J4d*stM%b*g1
+         g2   = 4._RKIND*J4d*stM%afs*(1._RKIND + 2._RKIND*stM%bfs*Efs)*
+     2      EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
-         IF (Eff .GT. 0D0) THEN
-             g1  = 2D0 * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+         IF (Eff .GT. 0._RKIND) THEN
+             g1  = 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
              Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
              Sb  = Sb + g1*Hff
 
              Eff = Eff * Eff
-             g1  = 4D0*J4d*stM%aff*(1D0 + 2D0*stM%bff*Eff)*
-     2          EXP(stM%bff*Eff)
+             g1  = 4._RKIND*J4d*stM%aff*(1._RKIND +
+     2          2._RKIND*stM%bff*Eff)*EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
          END IF
 
-         IF (Ess .GT. 0D0) THEN
-             g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+         IF (Ess .GT. 0._RKIND) THEN
+             g2  = 2._RKIND * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
 
              Ess = Ess * Ess
-             g2  = 4D0*J4d*stM%ass*(1D0 + 2D0*stM%bss*Ess)*
-     2          EXP(stM%bss*Ess)
+             g2  = 4._RKIND*J4d*stM%ass*(1._RKIND +
+     2          2._RKIND*stM%bss*Ess)*EXP(stM%bss*Ess)
              CCb = CCb + g2*TEN_DYADPROD(Hss, Hss, nsd)
          END IF
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC + 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
 
          S   = S + p*J*Ci
-         CC  = CC + 2D0*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
-     2          (pl*J - 2D0*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
+         CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
+     2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
 
          IF (cem%aStrain) THEN
             S = MATMUL(Fai, S)
             S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0D0
+            CCb = 0._RKIND
             CCb = TEN_DYADPROD(Fai, Fai, nsd)
             CC  = TEN_DDOT_3424(CC, CCb, nsd)
             CC  = TEN_DDOT_2412(CCb, CC, nsd)
@@ -347,29 +350,28 @@
 
       RETURN
       END SUBROUTINE GETPK2CC
-!====================================================================
+!--------------------------------------------------------------------
       SUBROUTINE GETSVOLP(stM, J, p, pl)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(stModelType), INTENT(IN) :: stM
-      REAL(KIND=8), INTENT(IN) :: J
-      REAL(KIND=8), INTENT(INOUT) :: p, pl
+      REAL(KIND=RKIND), INTENT(IN) :: J
+      REAL(KIND=RKIND), INTENT(INOUT) :: p, pl
 
-      REAL(KIND=8) Kp
+      REAL(KIND=RKIND) Kp
 
       Kp = stM%Kpen
       SELECT CASE (stM%volType)
       CASE (stVol_Quad)
-         p  = Kp*(J-1D0)
-         pl = Kp*(2D0*J-1D0)
+         p  = Kp*(J-1._RKIND)
+         pl = Kp*(2._RKIND*J-1._RKIND)
 
       CASE (stVol_ST91)
-         p  = 5D-1*Kp*(J-1D0/J)
+         p  = 0.5_RKIND*Kp*(J-1._RKIND/J)
          pl = Kp*J
 
       CASE (stVol_M94)
-         p  = Kp*(1D0-1D0/J)
+         p  = Kp*(1._RKIND-1._RKIND/J)
          pl = Kp
 
       END SELECT
@@ -382,26 +384,26 @@
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(stModelType), INTENT(IN) :: stM
-      INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
-      REAL(KIND=8), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd), Ja
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd),
+     2   Ja
 
-      REAL(KIND=8) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,Inv8,
-     2   IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd),
-     3   CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
-      REAL(KIND=8) :: r1, r2, g1, g2, g3
+      REAL(KIND=RKIND) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,
+     2   Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
+     3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
+      REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
       ! Guccione !
-      REAL(KIND=8) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
+      REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
       ! HGO, HO !
-      REAL(KIND=8) :: kap, Eff, Ess, Efs, Hff(nsd,nsd), Hss(nsd,nsd),
-     2   Hfs(nsd,nsd)
+      REAL(KIND=RKIND) :: kap, Eff, Ess, Efs, Hff(nsd,nsd),
+     2   Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
-      REAL(KIND=8) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
+      REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
 !     Some preliminaries
-      nd   = REAL(nsd, KIND=8)
+      nd   = REAL(nsd, KIND=RKIND)
 
 !     Electromechanics coupling based on active strain
       Fe   = F
@@ -415,52 +417,52 @@
 
       Ja   = MAT_DET(Fa, nsd)
       J    = MAT_DET(Fe, nsd)
-      J2d  = J**(-2D0/nd)
+      J2d  = J**(-2._RKIND/nd)
       J4d  = J2d*J2d
 
       IDm  = MAT_ID(nsd)
       C    = MATMUL(TRANSPOSE(Fe), Fe)
-      E    = 5D-1 * (C - IDm)
+      E    = 0.5_RKIND * (C - IDm)
       Ci   = MAT_INV(C, nsd)
 
       trE  = MAT_TRACE(E, nsd)
       Inv1 = J2d*MAT_TRACE(C,nsd)
-      Inv2 = 5D-1*( Inv1*Inv1 - J4d*MAT_TRACE(MATMUL(C,C), nsd) )
+      Inv2 = 0.5_RKIND*( Inv1*Inv1 - J4d*MAT_TRACE(MATMUL(C,C), nsd) )
 
 !     Isochoric part of 2nd Piola-Kirchhoff and elasticity tensors
       SELECT CASE (stM%isoType)
 !     NeoHookean model
       CASE (stIso_nHook)
-         g1 = 2D0 * stM%C10
+         g1 = 2._RKIND * stM%C10
          Sb = g1*IDm
 
          r1 = g1*Inv1/nd
          S  = J2d*Sb - r1*Ci
-         CC = 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2        1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3      - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC = 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2        1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3      - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                   TEN_DYADPROD(S, Ci, nsd) )
          RETURN
 
 !     Mooney-Rivlin model
       CASE (stIso_MR)
-         g1  = 2D0 * (stM%C10 + Inv1*stM%C01)
-         g2  = -2D0 * stM%C01
+         g1  = 2._RKIND * (stM%C10 + Inv1*stM%C01)
+         g2  = -2._RKIND * stM%C01
          Sb  = g1*IDm + g2*J2d*C
 
-         g1  = 4D0*J4d* stM%C01
+         g1  = 4._RKIND*J4d* stM%C01
          CCb = g1 * (TEN_DYADPROD(IDm, IDm, nsd) - TEN_IDs(nsd))
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC + 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
          RETURN
 
@@ -473,23 +475,25 @@
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
 
-         Eff  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv4 - 1.0D0
-         Ess  = kap*Inv1 + (1.0D0-3.0D0*kap)*Inv6 - 1.0D0
+         Eff  = kap*Inv1 + (1._RKIND-3._RKIND*kap)*Inv4 - 1._RKIND
+         Ess  = kap*Inv1 + (1._RKIND-3._RKIND*kap)*Inv6 - 1._RKIND
 
          Hff  = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
-         Hff  = kap*IDm + (1.0D0-3.0D0*kap)*Hff
+         Hff  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hff
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
-         Hss  = kap*IDm + (1.0D0-3.0D0*kap)*Hss
+         Hss  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hss
 
          g1   = stM%C10
          g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
-         Sb   = 2D0*(g1*IDm + g2*Hff + g3*Hss)
+         Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
 
-         g1   = stM%aff*(1D0 + 2D0*stM%bff*Eff*Eff)*EXP(stM%bff*Eff*Eff)
-         g2   = stM%ass*(1D0 + 2D0*stM%bss*Ess*Ess)*EXP(stM%bss*Ess*Ess)
-         g1   = 4D0*J4d * g1
-         g2   = 4D0*J4d * g2
+         g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
+     2      EXP(stM%bff*Eff*Eff)
+         g2   = stM%ass*(1._RKIND + 2._RKIND*stM%bss*Ess*Ess)*
+     2      EXP(stM%bss*Ess*Ess)
+         g1   = 4._RKIND*J4d * g1
+         g2   = 4._RKIND*J4d * g2
 
          CCb  = g1 * TEN_DYADPROD(Hff, Hff, nsd) +
      2          g2 * TEN_DYADPROD(Hss, Hss, nsd)
@@ -497,13 +501,13 @@
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC + 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
          RETURN
 
@@ -512,7 +516,7 @@
          IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
      2      "Guccione material model (2)"
 !        Compute isochoric component of E
-         E = 5D-1 * (J2d*C - Idm)
+         E = 0.5_RKIND * (J2d*C - Idm)
 
 !        Transform into local orthogonal coordinate system
          Rm(1,:) = fl(:,1)
@@ -550,34 +554,34 @@
          S   = J2d*Sb - r1*Ci
 
          r2  = r2*J4d
-         CCb = 0D0
+         CCb = 0._RKIND
          CCb(1,1,1,1) = g1 * r2
 
          CCb(2,2,2,2) = g2 * r2
          CCb(3,3,3,3) = CCb(2,2,2,2)
 
-         CCb(2,3,2,3) = 0.5D0 * g2 * r2
+         CCb(2,3,2,3) = 0.5_RKIND * g2 * r2
          CCb(3,2,2,3) = CCb(2,3,2,3)
          CCb(2,3,3,2) = CCb(2,3,2,3)
          CCb(3,2,3,2) = CCb(2,3,2,3)
 
-         CCb(1,2,1,2) = 0.5D0 * g3 * r2
+         CCb(1,2,1,2) = 0.5_RKIND * g3 * r2
          CCb(2,1,1,2) = CCb(1,2,1,2)
          CCb(1,2,2,1) = CCb(1,2,1,2)
          CCb(2,1,2,1) = CCb(1,2,1,2)
 
-         CCb(1,3,1,3) = 0.5D0 * g3 * r2
+         CCb(1,3,1,3) = 0.5_RKIND * g3 * r2
          CCb(3,1,1,3) = CCb(1,3,1,3)
          CCb(1,3,3,1) = CCb(1,3,1,3)
          CCb(3,1,3,1) = CCb(1,3,1,3)
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC + 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
 
 !     HO (Holzapfel-Ogden) model for myocardium (2009)
@@ -588,59 +592,60 @@
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
          Inv8 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,2)))
 
-         Eff  = Inv4 - 1.0D0
-         Ess  = Inv6 - 1.0D0
+         Eff  = Inv4 - 1._RKIND
+         Ess  = Inv6 - 1._RKIND
          Efs  = Inv8
 
-         g1   = stM%a * EXP(stM%b*(Inv1-3D0))
-         g2   = 2D0 * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
+         g1   = stM%a * EXP(stM%b*(Inv1-3._RKIND))
+         g2   = 2._RKIND * stM%afs * Efs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Hfs
 
          Efs  = Efs * Efs
-         g1   = 2D0*J4d*stM%b*g1
-         g2   = 4D0*J4d*stM%afs*(1D0 + 2D0*stM%bfs*Efs)*EXP(stM%bfs*Efs)
+         g1   = 2._RKIND*J4d*stM%b*g1
+         g2   = 4._RKIND*J4d*stM%afs*(1._RKIND + 2._RKIND*stM%bfs*Efs)*
+     2      EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
-         IF (Eff .GT. 0D0) THEN
-             g1  = 2D0 * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+         IF (Eff .GT. 0._RKIND) THEN
+             g1  = 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
              Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
              Sb  = Sb + g1*Hff
 
              Eff = Eff * Eff
-             g1  = 4D0*J4d*stM%aff*(1D0 + 2D0*stM%bff*Eff)*
-     2          EXP(stM%bff*Eff)
+             g1  = 4._RKIND*J4d*stM%aff*(1._RKIND +
+     2          2._RKIND*stM%bff*Eff)*EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
          END IF
 
-         IF (Ess .GT. 0D0) THEN
-             g2  = 2D0 * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+         IF (Ess .GT. 0._RKIND) THEN
+             g2  = 2._RKIND * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
 
              Ess = Ess * Ess
-             g2  = 4D0*J4d*stM%ass*(1D0 + 2D0*stM%bss*Ess)*
-     2          EXP(stM%bss*Ess)
+             g2  = 4._RKIND*J4d*stM%ass*(1._RKIND +
+     2          2._RKIND*stM%bss*Ess)*EXP(stM%bss*Ess)
              CCb = CCb + g2*TEN_DYADPROD(Hss, Hss, nsd)
          END IF
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
-         PP  = TEN_IDs(nsd) - (1D0/nd) * TEN_DYADPROD(Ci, C, nsd)
+         PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC + 2D0*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2              1D0/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3            - 2D0/nd * ( TEN_DYADPROD(Ci, S, nsd) +
+         CC  = CC + 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
+     2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
+     3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
 
          IF (cem%aStrain) THEN
             S = MATMUL(Fai, S)
             S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0D0
+            CCb = 0._RKIND
             CCb = TEN_DYADPROD(Fai, Fai, nsd)
             CC  = TEN_DDOT_3424(CC, CCb, nsd)
             CC  = TEN_DDOT_2412(CCb, CC, nsd)
@@ -654,31 +659,30 @@
 
       RETURN
       END SUBROUTINE GETPK2CCdev
-!====================================================================
+!--------------------------------------------------------------------
 !     Compute rho and beta depending on the Gibb's free-energy based
 !     volumetric penalty model
       SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(stModelType), INTENT(IN) :: stM
-      REAL(KIND=8), INTENT(IN) :: p, Ja
-      REAL(KIND=8), INTENT(OUT) :: ro, bt, dro, dbt
+      REAL(KIND=RKIND), INTENT(IN) :: p, Ja
+      REAL(KIND=RKIND), INTENT(OUT) :: ro, bt, dro, dbt
 
-      REAL(KIND=8) :: Kp, nu, r1, r2
+      REAL(KIND=RKIND) :: Kp, nu, r1, r2
 
       ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)/Ja
       nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
-      bt  = 0D0
-      dbt = 0D0
-      dro = 0D0
-      IF (ISZERO(nu-0.5D0)) RETURN
+      bt  = 0._RKIND
+      dbt = 0._RKIND
+      dro = 0._RKIND
+      IF (ISZERO(nu-0.5_RKIND)) RETURN
 
       Kp = stM%Kpen
       SELECT CASE (stM%volType)
       CASE (stVol_Quad)
-         r1  = 1.0D0/(Kp - p)
+         r1  = 1._RKIND/(Kp - p)
 
          ro  = ro*Kp*r1
          bt  = r1
@@ -690,7 +694,7 @@
          r2  = SQRT(p*p + Kp*Kp)
 
          ro  = r1*(p + r2)
-         bt  = 1D0/r2
+         bt  = 1._RKIND/r2
          dro = ro*bt
          dbt = -bt*p/(p*p + Kp*Kp)
 
@@ -699,7 +703,7 @@
          r2  = Kp + p
 
          ro  = r1*r2
-         bt  = 1D0/r2
+         bt  = 1._RKIND/r2
          dro = r1
          dbt = -bt*bt
 
@@ -709,32 +713,31 @@
 
       RETURN
       END SUBROUTINE GVOLPEN
-!====================================================================
+!--------------------------------------------------------------------
 !     Compute stabilization parameters tauM and tauC
       SUBROUTINE GETTAU(lDmn, Je, tauM, tauC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(dmnType), INTENT(IN) :: lDmn
-      REAL(KIND=8), INTENT(IN)  :: Je
-      REAL(KIND=8), INTENT(OUT) :: tauM, tauC
+      REAL(KIND=RKIND), INTENT(IN)  :: Je
+      REAL(KIND=RKIND), INTENT(OUT) :: tauM, tauC
 
-      REAL(KIND=8) :: ctM, ctC, he, rho, Em, nu, mu, lam, c
+      REAL(KIND=RKIND) :: ctM, ctC, he, rho, Em, nu, mu, lam, c
 
-      he  = 5D-1 * Je**(1D0/REAL(nsd,KIND=8))
+      he  = 0.5_RKIND * Je**(1._RKIND/REAL(nsd, KIND=RKIND))
       rho = lDmn%prop(solid_density)
       Em  = lDmn%prop(elasticity_modulus)
       nu  = lDmn%prop(poisson_ratio)
       ctM = lDmn%prop(ctau_M)
       ctC = lDmn%prop(ctau_C)
 
-      mu  = 5D-1*Em / (1.0D0 + nu)
-      IF (ISZERO(nu-0.5D0)) THEN
+      mu  = 0.5_RKIND*Em / (1._RKIND + nu)
+      IF (ISZERO(nu-0.5_RKIND)) THEN
          c = SQRT(mu / rho)
       ELSE
-         lam = 2.0D0*mu*nu / (1.0D0-2.0D0*nu)
-         c = SQRT((lam + 2.0D0*mu)/rho)
+         lam = 2._RKIND*mu*nu / (1._RKIND-2._RKIND*nu)
+         c = SQRT((lam + 2._RKIND*mu)/rho)
       END IF
 
       tauM = ctM * he / c / rho
@@ -748,32 +751,30 @@
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: Tact, fl(nsd,nfd)
-      REAL(KIND=8), INTENT(INOUT) :: S(nsd,nsd)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: Tact, fl(nsd,nfd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: S(nsd,nsd)
 
       S = S + Tact*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
       RETURN
       END SUBROUTINE ACTVSTRESS
-!====================================================================
+!--------------------------------------------------------------------
 !     Compute deviatoric component of active stress for electromechanics
       SUBROUTINE ACTVSTRSdev(Tact, F, nfd, fl, S)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: Tact, F(nsd,nsd), fl(nsd,nfd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: S(nsd,nsd)
 
-      INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: Tact, F(nsd,nsd), fl(nsd,nfd)
-      REAL(KIND=8), INTENT(INOUT) :: S(nsd,nsd)
+      REAL(KIND=RKIND) :: nd, J, J2d, IDm(nsd,nsd), C(nsd,nsd),
+     2   Ci(nsd,nsd), Sb(nsd,nsd), r1
 
-      REAL(KIND=8) :: nd, J, J2d, IDm(nsd,nsd), C(nsd,nsd), Ci(nsd,nsd),
-     2   Sb(nsd,nsd), r1
-
-      nd  = REAL(nsd, KIND=8)
+      nd  = REAL(nsd, KIND=RKIND)
       J   = MAT_DET(F, nsd)
-      J2d = J**(-2D0/nd)
+      J2d = J**(-2._RKIND/nd)
 
       IDm = MAT_ID(nsd)
       C   = MATMUL(TRANSPOSE(F), F)
@@ -794,20 +795,19 @@
       USE UTILMOD
       USE COMMOD, ONLY : nsd
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: gf, fl(nsd,nfd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: Fa(nsd,nsd)
 
-      INTEGER, INTENT(IN) :: nfd
-      REAL(KIND=8), INTENT(IN) :: gf, fl(nsd,nfd)
-      REAL(KIND=8), INTENT(INOUT) :: Fa(nsd,nsd)
-
-      REAL(KIND=8) :: gs, gn, af(nsd), as(nsd), an(nsd), IDm(nsd,nsd),
-     2   Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
+      REAL(KIND=RKIND) :: gs, gn, af(nsd), as(nsd), an(nsd),
+     2   IDm(nsd,nsd), Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
 
       af  = fl(:,1)
       as  = fl(:,2)
       an  = CROSS(fl)
 
-      gn  = 4.0D0*gf
-      gs  = 1.0D0/((1.0D0+gf)*(1.0D0+gn)) - 1.0D0
+      gn  = 4._RKIND*gf
+      gs  = 1._RKIND/((1._RKIND+gf)*(1._RKIND+gn)) - 1._RKIND
 
       IDm = MAT_ID(nsd)
       Hf  = MAT_DYADPROD(af, af, nsd)

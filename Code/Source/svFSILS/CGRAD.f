@@ -49,21 +49,20 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE CGRAD_SCHUR(lhs, ls, dof, D, G, L, R)
-      
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: D(dof,lhs%nnz), G(dof,lhs%nnz),       &
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: D(dof,lhs%nnz), G(dof,lhs%nnz),    &
      &   L(lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(lhs%nNo)
 
-      INTEGER nNo, mynNo, i
-      REAL(KIND=8) errO, err, alpha, eps, time
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
-      REAL(KIND=8), ALLOCATABLE :: X(:), P(:), SP(:), DGP(:), GP(:,:),  &
-     &   unCondU(:,:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i
+      REAL(KIND=LSRP) errO, err, alpha, eps, time
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
+
+      REAL(KIND=LSRP), ALLOCATABLE :: X(:), P(:), SP(:), DGP(:),        &
+     &   GP(:,:), unCondU(:,:)
 
       nNo = lhs%nNo
       mynNo = lhs%mynNo
@@ -74,10 +73,10 @@
       time     = FSILS_CPUT()
       ls%suc   = .FALSE.
       ls%iNorm = FSILS_NORMS(mynNo, lhs%commu, R)
-      eps      = MAX(ls%absTol,ls%relTol*ls%iNorm)**2D0
+      eps      = MAX(ls%absTol,ls%relTol*ls%iNorm)**2._LSRP
       errO     = ls%iNorm*ls%iNorm
       err      = errO
-      X        = 0D0
+      X        = 0._LSRP
       P        = R
 
       DO i=1, ls%mItr
@@ -95,7 +94,7 @@
 
          CALL FSILS_SPARMULSS(lhs, lhs%rowPtr, lhs%colPtr, L, P, SP)
 
-         CALL OMPSUMS(nNo, -1D0, SP, DGP)
+         CALL OMPSUMS(nNo, -1._LSRP, SP, DGP)
          !SP    = SP - DGP
          alpha = errO/FSILS_DOTS(mynNo, lhs%commu, P, SP)
          CALL OMPSUMS(nNo, alpha, X, P)
@@ -113,31 +112,28 @@
       ls%callD = FSILS_CPUT() - time + ls%callD
       ls%itr   = ls%itr + i - 1
       IF (errO .LT. EPSILON(errO)) THEN
-         ls%dB = 0D0
+         ls%dB = 0._LSRP
       ELSE
-         ls%dB = 5D0*LOG(err/errO)
+         ls%dB = 5._LSRP*LOG(err/errO)
       END IF
 
       DEALLOCATE(X, P, SP, DGP, GP)
 
       RETURN
       END SUBROUTINE CGRAD_SCHUR
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE CGRADS(lhs, ls, K, R)
-      
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      REAL(KIND=8), INTENT(IN) :: K(lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: K(lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(lhs%nNo)
 
-      INTEGER nNo, mynNo, i
-      REAL(KIND=8) errO, err, alpha, eps
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
-      REAL(KIND=8), ALLOCATABLE :: P(:), KP(:), X(:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i
+      REAL(KIND=LSRP) errO, err, alpha, eps
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
+
+      REAL(KIND=LSRP), ALLOCATABLE :: P(:), KP(:), X(:)
 
       nNo = lhs%nNo
       mynNo = lhs%mynNo
@@ -147,10 +143,10 @@
       ls%callD = FSILS_CPUT()
       ls%suc   = .FALSE.
       ls%iNorm = FSILS_NORMS(mynNo, lhs%commu, R)
-      eps      = MAX(ls%absTol,ls%relTol*ls%iNorm)**2D0
+      eps      = MAX(ls%absTol,ls%relTol*ls%iNorm)**2._LSRP
       errO     = ls%iNorm*ls%iNorm
       err      = errO
-      X        = 0D0
+      X        = 0._LSRP
       P        = R
 
       DO i=1, ls%mItr
@@ -177,30 +173,27 @@
       ls%fNorm = SQRT(err)
       ls%callD = FSILS_CPUT() - ls%callD
       IF (errO .LT. EPSILON(errO)) THEN
-         ls%dB = 0D0
+         ls%dB = 0._LSRP
       ELSE
-         ls%dB = 5D0*LOG(err/errO)
+         ls%dB = 5._LSRP*LOG(err/errO)
       END IF
 
       RETURN
       END SUBROUTINE CGRADS
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE CGRADV(lhs, ls, dof, K, R)
-      
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: K(dof*dof,lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
 
-      INTEGER nNo, mynNo, i
-      REAL(KIND=8) errO, err, alpha, eps
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV
-      REAL(KIND=8), ALLOCATABLE :: P(:,:), KP(:,:), X(:,:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i
+      REAL(KIND=LSRP) errO, err, alpha, eps
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV
+
+      REAL(KIND=LSRP), ALLOCATABLE :: P(:,:), KP(:,:), X(:,:)
 
       nNo = lhs%nNo
       mynNo = lhs%mynNo
@@ -210,10 +203,10 @@
       ls%callD = FSILS_CPUT()
       ls%suc   = .FALSE.
       ls%iNorm = FSILS_NORMV(dof, mynNo, lhs%commu, R)
-      eps      = MAX(ls%absTol,ls%relTol*ls%iNorm)**2D0
+      eps      = MAX(ls%absTol,ls%relTol*ls%iNorm)**2._LSRP
       errO     = ls%iNorm*ls%iNorm
       err      = errO
-      X        = 0D0
+      X        = 0._LSRP
       P        = R
 
       DO i=1, ls%mItr
@@ -240,12 +233,11 @@
       ls%fNorm = SQRT(err)
       ls%callD = FSILS_CPUT() - ls%callD
       IF (errO .LT. EPSILON(errO)) THEN
-         ls%dB = 0D0
+         ls%dB = 0._LSRP
       ELSE
-         ls%dB = 5D0*LOG(err/errO)
+         ls%dB = 5._LSRP*LOG(err/errO)
       END IF
 
       RETURN
       END SUBROUTINE CGRADV
-
-
+!####################################################################

@@ -41,15 +41,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), fN(3,nFn)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), dl(tDof,eNoN), fN(3,nFn)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
-
-      INTEGER a, b, i
-      REAL(KIND=8) :: T1, amd, wl, Diso, Dani(nFn), Vd, Vx(3), F(3,3),
-     2   C(3,3), Jac, fl(3,nFn), Ls(nFn), D(3,3), DVx(3), DNx(3,eNoN)
+      INTEGER(KIND=IKIND) a, b, i
+      REAL(KIND=RKIND) :: T1, amd, wl, Diso, Dani(nFn), Vd, Vx(3),
+     2   F(3,3), C(3,3), Jac, fl(3,nFn), Ls(nFn), D(3,3), DVx(3),
+     3   DNx(3,eNoN)
 
       IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
      2   "No. of anisotropic conductivies exceed mesh fibers"
@@ -70,7 +70,7 @@
 !     Compute the isotropic part of diffusion tensor based on spatial
 !     isotropy for electromechanics. This models stretch induced changes
 !     in conduction velocities
-      Ls(:) = 1D0
+      Ls(:) = 1._RKIND
       IF (cem%cpld) THEN
 !        Get the displacement degrees of freedom
          DO a=1, nEq
@@ -82,10 +82,10 @@
          END DO
 
 !        Compute deformation gradient tensor
-         F(:,:) = 0D0
-         F(1,1) = 1D0
-         F(2,2) = 1D0
-         F(3,3) = 1D0
+         F(:,:) = 0._RKIND
+         F(1,1) = 1._RKIND
+         F(2,2) = 1._RKIND
+         F(3,3) = 1._RKIND
          DO a=1, eNoN
             F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
             F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
@@ -101,22 +101,22 @@
          Jac = MAT_DET(F, 3)
 
 !        Compute Cauchy-Green tensor and its inverse
-         C  = MATMUL(TRANSPOSE(F), F)
-         C  = MAT_INV(C, 3)
+         C = MATMUL(TRANSPOSE(F), F)
+         C = MAT_INV(C, 3)
 
 !        Compute fiber stretch
          DO i=1, nFn
             Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
             fl(:,i) = fN(:,i) / Ls(i)
          END DO
-         IF (Ls(1) .LE. 1D0) Ls(1) = 1D0
+         IF (Ls(1) .LE. 1._RKIND) Ls(1) = 1._RKIND
 
 !        Diffusion tensor - spatial isotropy
          Diso    = Diso * Jac
          Dani(:) = Dani(:) * Jac
          D(:,:)  = Diso * C(:,:)
       ELSE
-         D(:,:)  = 0D0
+         D(:,:)  = 0._RKIND
          D(1,1)  = Diso
          D(2,2)  = Diso
          D(3,3)  = Diso
@@ -139,8 +139,8 @@
       END DO
 
       i  = eq(cEq)%s
-      Vd = 0D0
-      Vx = 0D0
+      Vd = 0._RKIND
+      Vx = 0._RKIND
       DO a=1, eNoN
          Vd = Vd + N(a)*al(i,a)
 
@@ -175,15 +175,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), fN(2,nFn)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), dl(tDof,eNoN), fN(2,nFn)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
-
-      INTEGER a, b, i
-      REAL(KIND=8) :: T1, amd, wl, Diso, Dani(nFn), Vd, Vx(2), F(2,2),
-     2   C(2,2), Jac, fl(2,nFn), Ls(nFn), D(2,2), DVx(2), DNx(2,eNoN)
+      INTEGER(KIND=IKIND) a, b, i
+      REAL(KIND=RKIND) :: T1, amd, wl, Diso, Dani(nFn), Vd, Vx(2),
+     2   F(2,2), C(2,2), Jac, fl(2,nFn), Ls(nFn), D(2,2), DVx(2),
+     3   DNx(2,eNoN)
 
       IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
      2   "No. of anisotropic conductivies exceed mesh fibers"
@@ -204,7 +204,7 @@
 !     Compute the isotropic part of diffusion tensor based on spatial
 !     isotropy for electromechanics. This models stretch induced changes
 !     in conduction velocities
-      Ls(:) = 1D0
+      Ls(:) = 1._RKIND
       IF (cem%cpld) THEN
          DO a=1, nEq
             IF (eq(a)%phys .EQ. phys_struct .OR.
@@ -215,9 +215,9 @@
          END DO
 
 !        Compute deformation gradient tensor
-         F(:,:) = 0D0
-         F(1,1) = 1D0
-         F(2,2) = 1D0
+         F(:,:) = 0._RKIND
+         F(1,1) = 1._RKIND
+         F(2,2) = 1._RKIND
          DO a=1, eNoN
             F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
             F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
@@ -228,22 +228,22 @@
          Jac = MAT_DET(F, 2)
 
 !        Compute Cauchy-Green tensor and its inverse
-         C  = MATMUL(TRANSPOSE(F), F)
-         C  = MAT_INV(C, 2)
+         C = MATMUL(TRANSPOSE(F), F)
+         C = MAT_INV(C, 2)
 
 !        Compute fiber stretch
          DO i=1, nFn
             Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
             fl(:,i) = fN(:,i) / Ls(i)
          END DO
-         IF (Ls(1) .LE. 1D0) Ls(1) = 1D0
+         IF (Ls(1) .LE. 1._RKIND) Ls(1) = 1._RKIND
 
 !        Diffusion tensor - spatial isotropy
          Diso    = Diso * Jac
          Dani(:) = Dani(:) * Jac
          D(:,:)  = Diso * C(:,:)
       ELSE
-         D(:,:)  = 0D0
+         D(:,:)  = 0._RKIND
          D(1,1)  = Diso
          D(2,2)  = Diso
          fl(:,:) = fN(:,:)
@@ -258,8 +258,8 @@
       END DO
 
       i  = eq(cEq)%s
-      Vd = 0D0
-      Vx = 0D0
+      Vd = 0._RKIND
+      Vx = 0._RKIND
       DO a=1, eNoN
          Vd = Vd + N(a)*al(i,a)
 
@@ -291,14 +291,13 @@
       PURE SUBROUTINE CEP1D (eNoN, insd, w, N, Nx, al, yl, lR, lK)
       USE COMMOD
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN, insd
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(insd,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, insd
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(insd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      INTEGER a, b, i
-      REAL(KIND=8) :: T1, amd, wl, Td, Tx, Diso, DNx(eNoN)
+      INTEGER(KIND=IKIND) a, b, i
+      REAL(KIND=RKIND) :: T1, amd, wl, Td, Tx, Diso, DNx(eNoN)
 
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
@@ -306,8 +305,8 @@
       i    = eq(cEq)%s
       wl   = w*T1
 
-      Td = 0D0
-      Tx = 0D0
+      Td = 0._RKIND
+      Tx = 0._RKIND
       DO a=1, eNoN
          Td = Td + N(a)*al(i,a)
          Tx = Tx + Nx(1,a)*yl(i,a)
@@ -328,13 +327,12 @@
       PURE SUBROUTINE BCEP (eNoN, w, N, h, lR)
       USE COMMOD
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), h
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), h
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN)
-
-      INTEGER :: a
-      REAL(KIND=8) f
+      INTEGER(KIND=IKIND) :: a
+      REAL(KIND=RKIND) f
 
       f = w*h
 

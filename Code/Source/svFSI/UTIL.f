@@ -37,37 +37,38 @@
 !--------------------------------------------------------------------
 
       MODULE UTILMOD
+      USE TYPEMOD
       IMPLICIT NONE
 
 !     This is the standard length for all the strings used in this code
-      INTEGER, PARAMETER :: stdL = 400
+      INTEGER(KIND=IKIND), PARAMETER :: stdL = 400
 !     This is the standard double number precision
-      INTEGER, PARAMETER :: dblPr = 14
-!     This is the standard integer number precision
-      INTEGER, PARAMETER :: intPr = 10
+      INTEGER(KIND=IKIND), PARAMETER :: dblPr = 14
+!     This is the standard INTEGER(KIND=IKIND) number precision
+      INTEGER(KIND=IKIND), PARAMETER :: intPr = 10
 
 !     This is for writing binary files
       CHARACTER, PARAMETER :: eol = CHAR(10)
 
 !     \pi value
-      REAL(KIND=8), PARAMETER :: pi = 3.1415926535897932384626D0
+      REAL(KIND=RKIND), PARAMETER :: pi = 3.1415926535897932384626_RKIND
 !     minimum value for a double number that is not considered zero
-      REAL(KIND=8), PARAMETER :: eps = EPSILON(eps)
+      REAL(KIND=RKIND), PARAMETER :: eps = EPSILON(eps)
 
 !     This is a general variable that will be used as a stack
       TYPE stackType
 !        Maximum length of the stack
-         INTEGER :: maxN = 0
+         INTEGER(KIND=IKIND) :: maxN = 0
 !        Current size of stack
-         INTEGER :: n = 0
+         INTEGER(KIND=IKIND) :: n = 0
 !        Values inside stack
-         INTEGER, ALLOCATABLE :: v(:)
+         INTEGER(KIND=IKIND), ALLOCATABLE :: v(:)
       END TYPE stackType
 
       TYPE queueType
-         INTEGER :: n = 0
-         INTEGER :: maxN = 0
-         INTEGER, ALLOCATABLE :: v(:)
+         INTEGER(KIND=IKIND) :: n = 0
+         INTEGER(KIND=IKIND) :: maxN = 0
+         INTEGER(KIND=IKIND), ALLOCATABLE :: v(:)
       END TYPE queueType
 
       TYPE fileType
@@ -101,10 +102,6 @@
          MODULE PROCEDURE :: CNCSL, CNCSI, CNCIS, CNCSR
       END INTERFACE OPERATOR(//)
 
-      INTERFACE CONV
-         MODULE PROCEDURE :: CONVI, CONVR
-      END INTERFACE CONV
-
       INTERFACE SWAP
          MODULE PROCEDURE :: SWAPI, SWAPR
       END INTERFACE SWAP
@@ -115,7 +112,7 @@
       FUNCTION OPENFILE(f) RESULT(fid)
       IMPLICIT NONE
       CLASS(fileType), INTENT(INOUT) :: f
-      INTEGER fid
+      INTEGER(KIND=IKIND) fid
 
       LOGICAL flag
 
@@ -141,14 +138,14 @@
 !     This function will compute second NORM of a vector
       PURE FUNCTION NORMS(U, V)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: U(:)
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: V(:)
-      REAL(KIND=8) NORMS
+      REAL(KIND=RKIND), INTENT(IN) :: U(:)
+      REAL(KIND=RKIND), INTENT(IN), OPTIONAL :: V(:)
+      REAL(KIND=RKIND) NORMS
 
-      INTEGER i, n
+      INTEGER(KIND=IKIND) i, n
 
       n = SIZE(U)
-      NORMS = 0D0
+      NORMS = 0._RKIND
       IF (PRESENT(V)) THEN
          DO i=1, n
             NORMS = NORMS + U(i)*V(i)
@@ -164,15 +161,15 @@
 !--------------------------------------------------------------------
       PURE FUNCTION NORMV(U, V)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: U(:,:)
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: V(:,:)
-      REAL(KIND=8) NORMV
+      REAL(KIND=RKIND), INTENT(IN) :: U(:,:)
+      REAL(KIND=RKIND), INTENT(IN), OPTIONAL :: V(:,:)
+      REAL(KIND=RKIND) NORMV
 
-      INTEGER m, n, i, j
+      INTEGER(KIND=IKIND) m, n, i, j
 
       m = SIZE(U,1)
       n = SIZE(U,2)
-      NORMV = 0D0
+      NORMV = 0._RKIND
       IF (PRESENT(V)) THEN
          SELECT CASE(m)
          CASE(1)
@@ -233,11 +230,9 @@
 !     This routine does the cross product for a two given vector of
 !     V1 and V2.
       PURE FUNCTION CROSS(V) RESULT(U)
-
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: V(:,:)
-      REAL(KIND=8) U(SIZE(V,1))
+      REAL(KIND=RKIND), INTENT(IN) :: V(:,:)
+      REAL(KIND=RKIND) U(SIZE(V,1))
 
       IF (SIZE(V,1) .EQ. 2) THEN
          U(1) =  V(2,1)
@@ -257,7 +252,7 @@
       CHARACTER(LEN=*), INTENT(IN) :: str
       CHARACTER(LEN=LEN(str)) ADJUSTC
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       DO i=1, LEN(str)
          IF (str(i:i) .NE. " " .AND. str(i:i) .NE. "  ") EXIT
@@ -272,7 +267,7 @@
       END FUNCTION ADJUSTC
 !####################################################################
 !     This routine reads a word from "strg" and puts in the "rVal" and
-!     removes the readed part from "strg". Valid charecters to read are
+!     removes the read part from "strg". Valid charecters to read are
 !     defined in "valS"
       SUBROUTINE GETSTR(strg, rVal, valS)
       IMPLICIT NONE
@@ -281,7 +276,7 @@
       CHARACTER(LEN=*), INTENT(IN) :: valS
 
       LOGICAL flag
-      INTEGER i, j, s
+      INTEGER(KIND=IKIND) i, j, s
 
       s    = 1
       flag = .FALSE.
@@ -316,7 +311,7 @@
       SUBROUTINE GETHEX(str, r)
       IMPLICIT NONE
       CHARACTER(LEN=stdL), INTENT(INOUT) :: str
-      INTEGER(KIND=8), INTENT(OUT) :: r
+      INTEGER(KIND=IKIND8), INTENT(OUT) :: r
 
       CHARACTER(LEN=*), PARAMETER :: valS="+-1234567890ABCDEFabcdefZz"
       CHARACTER(LEN=stdL) tmp
@@ -327,12 +322,12 @@
       RETURN
       END SUBROUTINE GETHEX
 !--------------------------------------------------------------------
-!     This reads an integer from the begining of "str" and returns
+!     This reads an INTEGER from the begining of "str" and returns
 !     the results in "r" and removes the readed part from "str"
       SUBROUTINE GETINT(str, r)
       IMPLICIT NONE
       CHARACTER(LEN=stdL), INTENT(INOUT) :: str
-      INTEGER, INTENT(OUT) :: r
+      INTEGER(KIND=IKIND), INTENT(OUT) :: r
 
       CHARACTER(LEN=*), PARAMETER :: valS="+-1234567890"
       CHARACTER(LEN=stdL) tmp
@@ -346,12 +341,12 @@
 !     This function will return the current time in sec
       PURE FUNCTION SGN(u)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: u
-      INTEGER SGN
+      REAL(KIND=RKIND), INTENT(IN) :: u
+      INTEGER(KIND=IKIND) SGN
 
       IF (ISZERO(u)) THEN
          SGN = 0
-      ELSE IF (u .GT. 0D0) THEN
+      ELSE IF (u .GT. 0._RKIND) THEN
          SGN = 1
       ELSE
          SGN = -1
@@ -366,7 +361,7 @@
       CHARACTER(LEN=stdL), INTENT(IN) :: sTmp
 
       LOGICAL isBnk
-      INTEGER CheckNoNumbers, i
+      INTEGER(KIND=IKIND) CheckNoNumbers, i
 
       isBnk = .TRUE.
       CheckNoNumbers = 0
@@ -390,9 +385,9 @@
       PURE SUBROUTINE PUSHSTACKS(stk, iVal)
       IMPLICIT NONE
       TYPE(stackType), INTENT(INOUT) :: stk
-      INTEGER, INTENT(IN) :: iVal
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal
 
-      INTEGER, ALLOCATABLE :: tmp(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: tmp(:)
 
       IF (stk%maxN .EQ. 0) THEN
 !     This is a new stack
@@ -420,9 +415,9 @@
       PURE SUBROUTINE PUSHSTACKV(stk, iVal)
       IMPLICIT NONE
       TYPE(stackType), INTENT(INOUT) :: stk
-      INTEGER, INTENT(IN) :: iVal(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal(:)
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       DO i=1, SIZE(iVal)
          CALL PUSHSTACKS(stk, iVal(i))
@@ -434,7 +429,7 @@
       FUNCTION PULLSTACK(stk, iVal) RESULT(flag)
       IMPLICIT NONE
       TYPE(stackType), INTENT(INOUT) :: stk
-      INTEGER, INTENT(OUT) :: iVal
+      INTEGER(KIND=IKIND), INTENT(OUT) :: iVal
       LOGICAL flag
 
       IF (stk%n .EQ. 0) THEN
@@ -453,12 +448,12 @@
       PURE SUBROUTINE ENQUEUES(que, iVal)
       IMPLICIT NONE
       TYPE(queueType), INTENT(INOUT) :: que
-      INTEGER, INTENT(IN) :: iVal
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal
 
       LOGICAL flag
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
-      INTEGER, ALLOCATABLE :: tmp(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: tmp(:)
 
       IF (que%maxN .EQ. 0) THEN
          que%n = 1
@@ -492,13 +487,11 @@
       END SUBROUTINE ENQUEUES
 !--------------------------------------------------------------------
       PURE SUBROUTINE ENQUEUEV(que, iVal)
-
       IMPLICIT NONE
-
       TYPE(queueType), INTENT(INOUT) :: que
-      INTEGER, INTENT(IN) :: iVal(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal(:)
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       DO i=1, SIZE(iVal)
          CALL ENQUEUES(que, iVal(i))
@@ -510,9 +503,9 @@
       FUNCTION DEQUEUE(que, iVal) RESULT(flag)
       IMPLICIT NONE
       TYPE(queueType), INTENT(INOUT) :: que
-      INTEGER, INTENT(OUT) :: iVal
+      INTEGER(KIND=IKIND), INTENT(OUT) :: iVal
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
       LOGICAL flag
 
       IF (que%n .EQ. 0) THEN
@@ -534,12 +527,10 @@
 !     doubles
       PURE FUNCTION DTSTR(dVal) RESULT(string)
       IMPLICIT NONE
-      INTEGER, PARAMETER :: l = 8
+      REAL(KIND=RKIND8), INTENT(IN) :: dVal
+      CHARACTER(LEN=RKIND8) string
 
-      REAL(KIND=8), INTENT(IN) :: dVal
-      CHARACTER(LEN=l) string
-
-      string = NDTSTR(dVal,l)
+      string = NDTSTR(dVal, RKIND8)
 
       RETURN
       END FUNCTION DTSTR
@@ -547,12 +538,12 @@
 !     Similar to last one, but with a specified length
       PURE FUNCTION NDTSTR(dVal,l) RESULT(string)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: l
-      REAL(KIND=8), INTENT(IN) :: dVal
+      INTEGER(KIND=IKIND), INTENT(IN) :: l
+      REAL(KIND=RKIND8), INTENT(IN) :: dVal
       CHARACTER(LEN=l) string
 
-      INTEGER ex, pos, i, j, abex, k, exex
-      REAL(KIND=8) absn
+      INTEGER(KIND=IKIND) ex, pos, i, j, abex, k, exex
+      REAL(KIND=RKIND8) absn
 
       IF (l .EQ. 0) RETURN
 
@@ -590,15 +581,15 @@
       END IF
 
 !     This is the exponent of the number
-      IF (absn .NE. 0D0) THEN
-         ex = FLOOR(LOG10(absn))
+      IF (absn .NE. 0._RKIND8) THEN
+         ex = FLOOR(LOG10(absn), KIND=IKIND)
       ELSE
          ex = 0
       END IF
       abex = ABS(ex)
 !     How many digits exponent has
       IF (ex .NE. 0) THEN
-         exex = FLOOR(LOG10(REAL(abex,8))) + 1
+         exex = FLOOR(LOG10(REAL(abex, KIND=RKIND8)), KIND=IKIND) + 1
       ELSE
          exex = 0
       END IF
@@ -606,7 +597,7 @@
 !     Number of digits of exponents and at least one for number
       i = exex + 1
 !     Negative sign of the number
-      IF (dVal .LT. 0D0) i = i + 1
+      IF (dVal .LT. 0._RKIND8) i = i + 1
 !     For negative sign on exponent
       IF (ex .LT. 0) i = i + 1
 !     That is for 'E'
@@ -642,24 +633,24 @@
 
 !     l-i is the useful length remaining, beside the first number
       IF (l-i .GE. 1) THEN
-         absn = absn*(1D1**(-ex/2))
-         absn = absn*(1D1**(l-i-1-ex+ex/2))
+         absn = absn*(10._RKIND8**(REAL(-ex/2, KIND=RKIND8)))
+         absn = absn*(10._RKIND8**(REAL(l-i-1-ex+ex/2, KIND=RKIND8)))
          j = pos
          DO pos=j,j-l+i+2,-1
-            k = FLOOR(MODULO(absn,1D1)) + 1
+            k = FLOOR(MODULO(absn,10._RKIND8), KIND=IKIND) + 1
             string(pos:pos) = "0123456789"(k:k)
-            absn = absn/1D1
+            absn = absn/10._RKIND8
          END DO
          string(pos:pos) = "."
          pos = pos - 1
-         k = FLOOR(MODULO(absn,1D1)) + 1
+         k = FLOOR(MODULO(absn,10._RKIND8)) + 1
          string(pos:pos) = "0123456789"(k:k)
       ELSE ! l-i .EQ. 0
-         absn = absn*(1D1**(l-i-ex))
-         k = FLOOR(MODULO(absn,1D1)) + 1
+         absn = absn*(10._RKIND8**(REAL(l-i-ex, KIND=RKIND)))
+         k = FLOOR(MODULO(absn,10._RKIND8), KIND=IKIND) + 1
          string(pos:pos) = "0123456789"(k:k)
       END IF
-      IF (dVal .LT. 0D0) string(1:1) = "-"
+      IF (dVal .LT. 0._RKIND8) string(1:1) = "-"
 
       RETURN
       END FUNCTION NDTSTR
@@ -667,15 +658,15 @@
 !     Similar to last one, but with a specified length
       PURE FUNCTION VDTSTR(dVal) RESULT(string)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: dVal(:)
+      REAL(KIND=RKIND8), INTENT(IN) :: dVal(:)
       CHARACTER(LEN=9*SIZE(dVal)) string
 
-      INTEGER i, n
+      INTEGER(KIND=IKIND) i, n
 
       n = SIZE(dVal)
       string = ""
       DO i=1, n
-         string = TRIM(string)//" "//NDTSTR(dVal(i),8)
+         string = TRIM(string)//" "//NDTSTR(dVal(i), RKIND8)
       END DO
 
       RETURN
@@ -684,12 +675,11 @@
 !     This is for real numbers
       PURE FUNCTION RTSTR(rVal) RESULT(string)
       IMPLICIT NONE
-      INTEGER, PARAMETER :: l = 7
-
-      REAL, INTENT(IN) :: rVal
+      INTEGER(KIND=IKIND), PARAMETER :: l = 7
+      REAL(KIND=RKIND4), INTENT(IN) :: rVal
       CHARACTER(LEN=l) string
 
-      string = NDTSTR(REAL(rVal,8),l)
+      string = NDTSTR(REAL(rVal, KIND=RKIND8),l)
 
       RETURN
       END FUNCTION RTSTR
@@ -697,11 +687,11 @@
 !     This is for real numbers with specified length
       PURE FUNCTION NRTSTR(rVal,l) RESULT(string)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: l
-      REAL, INTENT(IN) :: rVal
+      INTEGER(KIND=IKIND), INTENT(IN) :: l
+      REAL(KIND=RKIND4), INTENT(IN) :: rVal
       CHARACTER(LEN=l) string
 
-      string = NDTSTR(REAL(rVal,8), l)
+      string = NDTSTR(REAL(rVal, KIND=RKIND8), l)
 
       RETURN
       END FUNCTION NRTSTR
@@ -709,12 +699,12 @@
 !     This is for integers
       PURE FUNCTION ITSTR(iVal) RESULT(string)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iVal
-      INTEGER n
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal
+      INTEGER(KIND=IKIND) n
       CHARACTER(LEN=2 - MAX(0,SIGN(1,ival)) +
      2   MAXVAL((/(MIN(ABS(iVal)/10**n,1)*n,n=1,9)/))) string
 
-      INTEGER absn, j, k, is
+      INTEGER(KIND=IKIND) absn, j, k, is
 
       absn = ABS(iVal)
       IF (absn .EQ. iVal) THEN
@@ -735,8 +725,8 @@
 !     Similar to last one, but with minimum length of l
       PURE FUNCTION NITSTR(iVal, l) RESULT(string)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iVal, l
-      INTEGER n
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal, l
+      INTEGER(KIND=IKIND) n
       CHARACTER(LEN=MAX(2 - MAX(0,SIGN(1,ival)) +
      2   MAXVAL((/(MIN(ABS(iVal)/10**n,1)*n,n=1,9)/)),l)) string
 
@@ -750,7 +740,7 @@
       PURE FUNCTION CLR(iStr,clId) RESULT(oStr)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN) :: iStr
-      INTEGER, INTENT(IN), OPTIONAL :: clId
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: clId
       CHARACTER(LEN=LEN(TRIM(iStr))+9) oStr
 
 !     Colors are: 1: White, 2: Red, 3: Green, 4: Yellow, 5: Blue,
@@ -781,7 +771,7 @@
       CHARACTER(LEN=*), INTENT(IN) :: iStr
       CHARACTER(LEN=LEN(iStr)) oStr
 
-      INTEGER i, j, l
+      INTEGER(KIND=IKIND) i, j, l
 
 !     Searching and removing all the color codes
       l    = LEN(TRIM(iStr))
@@ -831,9 +821,9 @@
       FUNCTION CNCSI(sVal,iVal)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN) :: sVal
-      INTEGER, INTENT(IN) :: iVal
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal
 
-      INTEGER n
+      INTEGER(KIND=IKIND) n
       CHARACTER(LEN=LEN(sVal) + 11 - MAX(0,SIGN(1,ival)) +
      2   MAXVAL((/(MIN(ABS(iVal)/10**n,1)*n,n=1,9)/))) CNCSI
 
@@ -844,10 +834,10 @@
 !--------------------------------------------------------------------
       FUNCTION CNCIS(iVal,sVal)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iVal
+      INTEGER(KIND=IKIND), INTENT(IN) :: iVal
       CHARACTER(LEN=*), INTENT(IN) :: sVal
 
-      INTEGER n
+      INTEGER(KIND=IKIND) n
       CHARACTER(LEN=LEN(sVal) + 2 - MAX(0,SIGN(1,ival)) +
      2   MAXVAL((/(MIN(ABS(iVal)/10**n,1)*n,n=1,9)/))) CNCIS
 
@@ -859,7 +849,7 @@
       FUNCTION CNCSR(sVal,rVal)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN) :: sVal
-      REAL(KIND=8), INTENT(IN) :: rVal
+      REAL(KIND=RKIND), INTENT(IN) :: rVal
 
       CHARACTER(LEN=LEN(sVal) + 17) CNCSR
 
@@ -870,18 +860,18 @@
 !####################################################################
 !     This routine compares two doubles and returns .TRUE. if their
 !     difference is less than "eps". If one argument is mising, it
-!     will compare against 0D0
+!     will compare against 0.0
       PURE FUNCTION ISZERO(ia, ib)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: ia
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: ib
+      REAL(KIND=RKIND), INTENT(IN) :: ia
+      REAL(KIND=RKIND), INTENT(IN), OPTIONAL :: ib
       LOGICAL ISZERO
 
-      REAL(KIND=8) a, b, tmp, nrm
+      REAL(KIND=RKIND) a, b, tmp, nrm
 
 !     Absolute values are calculated and I make sure "a" is bigger
       a = ABS(ia)
-      b = 0D0
+      b = 0._RKIND
       IF (PRESENT(ib)) b = ABS(ib)
 
       IF (ABS(b) .GT. ABS(a)) THEN
@@ -892,100 +882,49 @@
       nrm = MAX(a,eps)
 
       ISZERO = .FALSE.
-      IF ((a-b)/nrm .LT. 1D1*eps) ISZERO = .TRUE.
+      IF ((a-b)/nrm .LT. 10._RKIND*eps) ISZERO = .TRUE.
 
       RETURN
       END FUNCTION ISZERO
 !####################################################################
       FUNCTION CPUT()
       IMPLICIT NONE
+      REAL(KIND=RKIND) CPUT
 
-      INTEGER timeArray(8), i
-      INTEGER, PARAMETER::nD(12)=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-
-      REAL(KIND=8) CPUT
+!     year, month, day, rel. UTC, hr, min, sec, msec
+      INTEGER(KIND=IKIND) timeArray(8)
 
       CALL DATE_AND_TIME (VALUES=timeArray)
-!     Year and Month
-      timeArray(3) = timeArray(3) + (timeArray(1) - 2010)*365
-      DO i=1, timeArray(2) - 1
-         timeArray(3) = timeArray(3) + nD(i)
-      END DO
-!     In order: day, hr, min, sec, msec
-      CPUT = timeArray(3)*8.64D4 + timeArray(5)*3.6D3 +
-     2   timeArray(6)*6D1 + timeArray(7)*1D0 + timeArray(8)*1D-3
+      CPUT = timeArray(5)*3.6E+3_RKIND + timeArray(6)*60._RKIND +
+     2   timeArray(7)*1._RKIND + timeArray(8)*1.E-3_RKIND
 
       RETURN
       END FUNCTION CPUT
 !####################################################################
-      PURE FUNCTION CONVI(s) RESULT(r)
-      IMPLICIT NONE
-      INTEGER, INTENT(IN) :: s(:)
-      INTEGER r(SIZE(s))
-
-      INTEGER i, n
-
-      n = SIZE(r)
-      DO i=1, n
-         CALL MVBITS(s(i),24,8,r(i),0)
-         CALL MVBITS(s(i),16,8,r(i),8)
-         CALL MVBITS(s(i), 8,8,r(i),16)
-         CALL MVBITS(s(i), 0,8,r(i),24)
-      END DO
-
-      RETURN
-      END FUNCTION CONVI
-!--------------------------------------------------------------------
-      PURE FUNCTION CONVR(s) RESULT(r)
-      IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: s(:)
-      REAL(KIND=8) r(SIZE(s))
-
-      INTEGER i, n
-      INTEGER(KIND=8) iS, iR
-
-      iR = 0
-      n  = SIZE(r)
-      DO i=1, n
-         iS   = TRANSFER(s(i),iS)
-         CALL MVBITS(iS,56,8,iR, 0)
-         CALL MVBITS(iS,48,8,iR, 8)
-         CALL MVBITS(iS,40,8,iR,16)
-         CALL MVBITS(iS,32,8,iR,24)
-         CALL MVBITS(iS,24,8,iR,32)
-         CALL MVBITS(iS,16,8,iR,40)
-         CALL MVBITS(iS, 8,8,iR,48)
-         CALL MVBITS(iS, 0,8,iR,56)
-         r(i) = TRANSFER(iR,0D0)
-      END DO
-
-      RETURN
-      END FUNCTION CONVR
-!####################################################################
       SUBROUTINE RSEED(s)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: s
+      INTEGER(KIND=IKIND), INTENT(IN) :: s
 
-      INTEGER n
-      INTEGER, ALLOCATABLE :: seed(:)
+      INTEGER(KIND=IKIND) n
+      INTEGER(KIND=IKIND), ALLOCATABLE :: seed(:)
       REAL, ALLOCATABLE :: seedR(:)
 
       CALL RANDOM_SEED(SIZE=n)
       ALLOCATE(seed(n), seedR(n))
       CALL RANDOM_NUMBER(seedR)
-      seed = s + INT(n*seedR)
+      seed = s + n*INT(seedR, KIND=IKIND)
       CALL RANDOM_SEED(PUT=seed)
 
       RETURN
       END SUBROUTINE RSEED
 !####################################################################
-      FUNCTION SEARCHARG(arg, exist) RESULT(r)
+      FUNCTION SEARCHARG(arg, exst) RESULT(r)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: arg
-      LOGICAL, INTENT(OUT), OPTIONAL :: exist
+      LOGICAL, INTENT(OUT), OPTIONAL :: exst
       CHARACTER(LEN=stdL) r
 
-      INTEGER nArg, i
+      INTEGER(KIND=IKIND) nArg, i
       CHARACTER(LEN=stdL) tmp
 
       nArg = COMMAND_ARGUMENT_COUNT()
@@ -996,10 +935,10 @@
             IF (tmp.EQ.arg .OR. tmp.EQ."-"//arg) EXIT
          END DO
          IF (i .GT. nArg) THEN
-            IF (PRESENT(exist)) exist = .FALSE.
+            IF (PRESENT(exst)) exst = .FALSE.
             r = ""
          ELSE
-            IF (PRESENT(exist)) exist = .TRUE.
+            IF (PRESENT(exst)) exst = .TRUE.
             IF (i .LT. nArg) THEN
                CALL GETARG(i+1, r)
             ELSE
@@ -1016,9 +955,9 @@
 !####################################################################
       SUBROUTINE parseString(strng, toks, ntoks)
       IMPLICIT NONE
-      CHARACTER(len=*), INTENT(IN) :: strng
-      CHARACTER(len=*), DIMENSION(1024), INTENT(OUT) :: toks
-      INTEGER, INTENT(out) :: ntoks
+      CHARACTER(LEN=*), INTENT(IN) :: strng
+      CHARACTER(LEN=*), DIMENSION(1024), INTENT(OUT) :: toks
+      INTEGER(KIND=IKIND), INTENT(OUT) :: ntoks
 
       CHARACTER(LEN=stdL) :: dlmtr, token
 
@@ -1044,11 +983,11 @@
 !--------------------------------------------------------------------
       CHARACTER(LEN=stdL) FUNCTION STRTOK(strng, dlms)
       IMPLICIT NONE
-      CHARACTER(len=*), INTENT(in) :: strng
-      CHARACTER(len=*), INTENT(in) :: dlms
+      CHARACTER(LEN=*), INTENT(IN) :: strng
+      CHARACTER(LEN=*), INTENT(IN) :: dlms
 
-      INTEGER :: ist, iend
-      INTEGER, SAVE :: ist0, slen
+      INTEGER(KIND=IKIND) :: ist, iend
+      INTEGER(KIND=IKIND), SAVE :: ist0, slen
       CHARACTER(LEN=stdL), SAVE :: str0
 
       IF (strng(1:1) .NE. eol) then
@@ -1088,9 +1027,9 @@
 !####################################################################
       SUBROUTINE TO_UPPER(strng)
       IMPLICIT NONE
-      CHARACTER(len=*), INTENT(INOUT) :: strng
+      CHARACTER(LEN=*), INTENT(INOUT) :: strng
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       DO i=1, LEN(strng)
          SELECT CASE(strng(i:i))
@@ -1104,9 +1043,9 @@
 !--------------------------------------------------------------------
       SUBROUTINE TO_LOWER(strng)
       IMPLICIT NONE
-      CHARACTER(len=*), INTENT(INOUT) :: strng
+      CHARACTER(LEN=*), INTENT(INOUT) :: strng
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       DO i=1, LEN(strng)
          SELECT CASE(strng(i:i))
@@ -1120,9 +1059,9 @@
 !####################################################################
       SUBROUTINE SWAPI(a, b)
       IMPLICIT NONE
-      INTEGER, INTENT(INOUT) :: a, b
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: a, b
 
-      INTEGER c
+      INTEGER(KIND=IKIND) c
 
       c = a
       a = b
@@ -1133,9 +1072,9 @@
 !--------------------------------------------------------------------
       SUBROUTINE SWAPR(a, b)
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(INOUT) :: a, b
+      REAL(KIND=RKIND), INTENT(INOUT) :: a, b
 
-      REAL(KIND=8) c
+      REAL(KIND=RKIND) c
 
       c = a
       a = b
@@ -1145,3 +1084,4 @@
       END SUBROUTINE SWAPR
 !####################################################################
       END MODULE UTILMOD
+!####################################################################

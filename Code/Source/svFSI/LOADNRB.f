@@ -42,13 +42,12 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
       LOGICAL flag, isZ, dirSet(3)
-      INTEGER n, i, j, rep, fid, nDir, insd
-      REAL(KIND=8) tmp, tmpO
+      INTEGER(KIND=IKIND) n, i, j, rep, fid, nDir, insd
+      REAL(KIND=RKIND) tmp, tmpO
       TYPE(listType), POINTER :: lPtr, lPD
       TYPE(fileType) ftmp
 
@@ -168,15 +167,14 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(bsType), INTENT(INOUT) :: bs
-      INTEGER, INTENT(IN) :: dir, n, rep
+      INTEGER(KIND=IKIND), INTENT(IN) :: dir, n, rep
 
-      INTEGER insd, l, i, j, k, ns, tn, p, ir, m
+      INTEGER(KIND=IKIND) insd, l, i, j, k, ns, tn, p, ir, m
       TYPE(bsType) tbs
-      REAL(KIND=8) u, tmp, tmpO, c, alpha
-      REAL(KIND=8), ALLOCATABLE :: xo(:,:), xn(:,:)
+      REAL(KIND=RKIND) u, tmp, tmpO, c, alpha
+      REAL(KIND=RKIND), ALLOCATABLE :: xo(:,:), xn(:,:)
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -229,12 +227,12 @@
             CYCLE
          END IF
 !     Found an element. Now I will break it down to ns pieces
-         c = (tmp - tmpO)/REAL(ns,8)
+         c = (tmp - tmpO)/REAL(ns, KIND=RKIND)
          DO k=1, ns
             DO ir=1, rep
                IF (k.EQ.ns .AND. ir.GT.1) EXIT
                j = j + 1
-               u = tmpO + c*REAL(k,8)
+               u = tmpO + c*REAL(k, KIND=RKIND)
                CALL SETROW(j-1,i-1)
                bs%xi(j) = u
                IF (k .EQ. ns) EXIT
@@ -257,16 +255,14 @@
 !--------------------------------------------------------------------
 !     This routine sets %x and %nW
       SUBROUTINE INTROW(a1, alpha)
-
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: a1
+      REAL(KIND=RKIND), INTENT(IN) :: alpha
 
-      INTEGER, INTENT(IN) :: a1
-      REAL(KIND=8), INTENT(IN) :: alpha
+      INTEGER(KIND=IKIND) i, j, k, c, p, jmp(insd), a2, a3
+      REAL(KIND=RKIND) w1, w2
 
-      INTEGER i, j, k, c, p, jmp(insd), a2, a3
-      REAL(KIND=8) w1, w2
-
-      IF (ISZERO(alpha,1D0)) RETURN
+      IF (ISZERO(alpha,1._RKIND)) RETURN
 
       i = dir
       IF (insd .EQ. 2) THEN
@@ -280,7 +276,7 @@
             p = c - jmp(i)
 
             w1 = xn(nsd+1,c)*alpha
-            w2 = xn(nsd+1,p)*(1D0-alpha)
+            w2 = xn(nsd+1,p)*(1._RKIND-alpha)
             xn(nsd+1,c) = w1 + w2
             w1 = w1/xn(nsd+1,c)
             w2 = w2/xn(nsd+1,c)
@@ -307,7 +303,7 @@
                p = c - jmp(i)
 
                w1 = xn(nsd+1,c)*alpha
-               w2 = xn(nsd+1,p)*(1D0-alpha)
+               w2 = xn(nsd+1,p)*(1._RKIND-alpha)
                xn(nsd+1,c) = w1 + w2
                w1      = w1/xn(nsd+1,c)
                w2      = w2/xn(nsd+1,c)
@@ -321,12 +317,11 @@
 !--------------------------------------------------------------------
 !     This routine sets x and %nW
       SUBROUTINE SETROW(a1n,a1o)
-
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: a1n, a1o
 
-      INTEGER, INTENT(IN) :: a1n, a1o
-
-      INTEGER i, j, k, cn, co, jmpn(insd), jmpo(insd), a2, a3
+      INTEGER(KIND=IKIND) i, j, k, cn, co, jmpn(insd), jmpo(insd), a2,
+     2   a3
 
       i = dir
       IF (insd .EQ. 2) THEN
@@ -381,7 +376,7 @@
 
       RETURN
       END SUBROUTINE SETROW
-
+!--------------------------------------------------------------------
       END SUBROUTINE KNOTINS
 !--------------------------------------------------------------------
 !     This routine constructs a NURBS based on %bs sub-structures
@@ -390,18 +385,17 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: insd
+      INTEGER(KIND=IKIND), INTENT(IN) :: insd
 
       TYPE dType
-         INTEGER, ALLOCATABLE :: INN(:)
-         INTEGER, ALLOCATABLE :: IEN(:,:)
+         INTEGER(KIND=IKIND), ALLOCATABLE :: INN(:)
+         INTEGER(KIND=IKIND), ALLOCATABLE :: IEN(:,:)
       END TYPE dType
 
-      INTEGER i, j, k, ex, ey, ez, e, Ec, ax, ay, az, a, Ac, iFa,
-     2   shN, shE, jn(insd), je(insd), e1, e2, a1, a2
-      REAL(KIND=8) tmp, tmpO
+      INTEGER(KIND=IKIND) i, j, k, ex, ey, ez, e, Ec, ax, ay, az, a, Ac,
+     2   iFa, shN, shE, jn(insd), je(insd), e1, e2, a1, a2
+      REAL(KIND=RKIND) tmp, tmpO
       TYPE(dType) d(insd)
 
       IF (lM%eType .NE. eType_NRB) err = "Wrong call to CONSTNRB"

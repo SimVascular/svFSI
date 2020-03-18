@@ -48,18 +48,18 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE BICGSS(lhs, ls, K, R)
-      
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      REAL(KIND=8), INTENT(IN) :: K(lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: K(lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(lhs%nNo)
 
-      INTEGER nNo, mynNo, i
-      REAL(KIND=8) errO, err, alpha, beta, rho, rhoO, omega, eps
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
-      REAL(KIND=8), ALLOCATABLE :: P(:), Rh(:), X(:), V(:), S(:), T(:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i
+      REAL(KIND=LSRP) errO, err, alpha, beta, rho, rhoO, omega, eps
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS
+
+      REAL(KIND=LSRP), ALLOCATABLE :: P(:), Rh(:), X(:), V(:), S(:),    &
+     &   T(:)
 
       nNo = lhs%nNo
       mynNo = lhs%mynNo
@@ -74,7 +74,7 @@
       eps      = MAX(ls%absTol,ls%relTol*err)
       rho      = err*err
       beta     = rho
-      X        = 0D0
+      X        = 0._LSRP
       P        = R
       Rh       = R
 
@@ -104,29 +104,27 @@
       ls%fNorm = err
       ls%callD = FSILS_CPUT() - ls%callD
       IF (errO .LT. EPSILON(errO)) THEN
-         ls%dB = 0D0
+         ls%dB = 0._LSRP
       ELSE
-         ls%dB = 10D0*LOG(err/errO)
+         ls%dB = 10._LSRP*LOG(err/errO)
       END IF
 
       RETURN
       END SUBROUTINE BICGSS
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE BICGSV(lhs, ls, dof, K, R)
-      
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: K(dof*dof,lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
 
-      INTEGER nNo, mynNo, i
-      REAL(KIND=8) errO, err, alpha, beta, rho, rhoO, omega, eps
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV
-      REAL(KIND=8), ALLOCATABLE :: P(:,:), Rh(:,:), X(:,:), V(:,:),     &
+      INTEGER(KIND=LSIP) nNo, mynNo, i
+      REAL(KIND=LSRP) errO, err, alpha, beta, rho, rhoO, omega, eps
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV
+
+      REAL(KIND=LSRP), ALLOCATABLE :: P(:,:), Rh(:,:), X(:,:), V(:,:),  &
      &   S(:,:), T(:,:)
 
       nNo = lhs%nNo
@@ -143,7 +141,7 @@
       eps      = MAX(ls%absTol,ls%relTol*err)
       rho      = err*err
       beta     = rho
-      X        = 0D0
+      X        = 0._LSRP
       P        = R
       Rh       = R
 
@@ -173,10 +171,11 @@
       ls%fNorm = err
       ls%callD = FSILS_CPUT() - ls%callD
       IF (errO .LT. EPSILON(errO)) THEN
-         ls%dB = 0D0
+         ls%dB = 0._LSRP
       ELSE
-         ls%dB = 10D0*LOG(err/errO)
+         ls%dB = 10._LSRP*LOG(err/errO)
       END IF
 
       RETURN
       END SUBROUTINE BICGSV
+!####################################################################

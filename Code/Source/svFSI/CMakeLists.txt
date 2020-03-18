@@ -101,7 +101,8 @@ find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
 
-set(FSRCS UTIL.f
+set(FSRCS TYPEMOD.f
+         UTIL.f
          COMU.f
          CHNL.f
          LIST.f
@@ -115,8 +116,8 @@ set(FSRCS UTIL.f
          ALLFUN.f
          BAFINI.f
          BF.f
-         CEPION.f
          CEP.f
+         CEPION.f
          CMM.f
          CONSTRUCT.f
          CONTACT.f
@@ -129,9 +130,9 @@ set(FSRCS UTIL.f
          INITIALIZE.f
          LELAS.f
          LHSA.f
-         LS.f
          LOADMSH.f
          LOADNRB.f
+         LS.f
          MAIN.f
          MATMODELS.f
          NN.f

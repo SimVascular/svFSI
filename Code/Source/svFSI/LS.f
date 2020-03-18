@@ -43,12 +43,12 @@
 
       IF (ALLOCATED(R)) DEALLOCATE(R)
       ALLOCATE (R(dof,tnNo))
-      R(:,:) = 0D0
+      R(:,:) = 0._RKIND
 
       IF (.NOT.lEq%assmTLS) THEN
          IF (ALLOCATED(Val)) DEALLOCATE(Val)
          ALLOCATE (Val(dof*dof,lhs%nnz))
-         Val(:,:) = 0D0
+         Val(:,:) = 0._RKIND
       END IF
 
 #ifdef WITH_TRILINOS
@@ -69,13 +69,12 @@
       SUBROUTINE LSSOLVE(lEq, incL, res)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(INOUT) :: lEq
-      INTEGER, INTENT(IN) :: incL(nFacesLS)
-      REAL(KIND=8), INTENT(IN) :: res(nFacesLS)
+      INTEGER(KIND=IKIND), INTENT(IN) :: incL(nFacesLS)
+      REAL(KIND=RKIND), INTENT(IN) :: res(nFacesLS)
 
 #ifdef WITH_TRILINOS
-      INTEGER a
+      INTEGER(KIND=IKIND) a
 
       IF (lEq%useTLS) CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
 
@@ -115,13 +114,12 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: incL(lhs%nFaces)
+      REAL(KIND=RKIND), INTENT(IN) :: res(lhs%nFaces)
 
-      INTEGER, INTENT(IN) :: incL(lhs%nFaces)
-      REAL(KIND=8), INTENT(IN) :: res(lhs%nFaces)
+      REAL(KIND=RKIND), ALLOCATABLE :: v(:,:)
 
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
-
-      INTEGER a, i, Ac, faIn, faDof
+      INTEGER(KIND=IKIND) a, i, Ac, faIn, faDof
       LOGICAL flag, isCoupledBC
 
       IF (lhs%nFaces .NE. 0) THEN
@@ -133,14 +131,14 @@
             lhs%face(faIn)%coupledFlag = .FALSE.
             IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
             flag = lhs%face(faIn)%bGrp .EQ. BC_TYPE_Neu
-            IF (flag .AND. res(faIn).NE.0D0) THEN
+            IF (flag .AND. res(faIn).NE.0._RKIND) THEN
                lhs%face(faIn)%res = res(faIn)
                lhs%face(faIn)%coupledFlag = .TRUE.
             END IF
          END DO
       END IF
 
-      tls%W = 1D0
+      tls%W = 1._RKIND
       DO faIn=1, lhs%nFaces
          IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
          faDof = MIN(lhs%face(faIn)%dof,dof)
@@ -155,7 +153,7 @@
       END DO
 
       ALLOCATE(v(dof,tnNo))
-      v = 0D0
+      v = 0._RKIND
       isCoupledBC = .FALSE.
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN

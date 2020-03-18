@@ -41,19 +41,19 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
-      INTEGER a, b
-      REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
-     2  amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3), ua(3),
-     3  ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3), rM(3,3),
-     4  NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN)
+      REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
+
+      INTEGER(KIND=IKIND) a, b
+      REAL(KIND=RKIND) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3,
+     2  divU, amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3),
+     3  ua(3), ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3),
+     4  rM(3,3), NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -68,11 +68,11 @@
 
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first
-      p  = 0D0
-      u  = 0D0
+      p  = 0._RKIND
+      u  = 0._RKIND
       ud = -f
-      px = 0D0
-      ux = 0D0
+      px = 0._RKIND
+      ux = 0._RKIND
       DO a=1, eNoN
          p  = p + N(a)*yl(4,a)
 
@@ -129,14 +129,14 @@
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
      2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
      3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
       nu   = nu/rho
       nu_s = nu_s/rho
       IF (ISZERO(gam)) THEN
-         nu_x = 0D0
+         nu_x = 0._RKIND
       ELSE
          nu_x = nu_x/rho/gam
       END IF
@@ -154,8 +154,8 @@
      4   + ksix(1,3)*ksix(1,3) + ksix(2,3)*ksix(2,3)
      5   + ksix(3,3)*ksix(3,3)
 
-      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU +
-     2   ct(2)*nu_s*nu_s*kS + s*s)
+      tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
+     2   ct(2)*nu_s*nu_s*kS + s*s )
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
      2      + u(3)*ux(3,1) + s*u(1))
@@ -165,7 +165,7 @@
      2      + u(3)*ux(3,3) + s*u(3))
 
       tauC = ksix(1,1) + ksix(2,2) + ksix(3,3)
-      tauC = 1D0/tauM/tauC
+      tauC = 1._RKIND/tauM/tauC
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2)
@@ -174,7 +174,7 @@
      5     + up(3)*up(3)*ksix(3,3)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1D0/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB)
 
       divU = ux(1,1) + ux(2,2) + ux(3,3)
 
@@ -284,19 +284,19 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), bfl(2,eNoN), ksix(2,2)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(2,eNoN), ksix(2,2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
-      INTEGER a, b
-      REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
-     2  amd, wl, wr, wrl, s, p, u(2), ud(2), px(2), f(2), up(2), ua(2),
-     3  ux(2,2), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(2), rM(2,2),
-     4  NxdNx, nu_s, es(2,2), gam, nu_x, es_x(2,eNoN)
+      REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
+
+      INTEGER(KIND=IKIND) a, b
+      REAL(KIND=RKIND) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3,
+     2  divU, amd, wl, wr, wrl, s, p, u(2), ud(2), px(2), f(2), up(2),
+     3  ua(2), ux(2,2), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(2),
+     4  rM(2,2), NxdNx, nu_s, es(2,2), gam, nu_x, es_x(2,eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -310,11 +310,11 @@
 
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first
-      p  = 0D0
-      u  = 0D0
+      p  = 0._RKIND
+      u  = 0._RKIND
       ud = -f
-      px = 0D0
-      ux = 0D0
+      px = 0._RKIND
+      ux = 0._RKIND
       DO a=1, eNoN
          p = p + N(a)*yl(3,a)
 
@@ -354,14 +354,14 @@
 !     Shear-rate := (2*e_ij*e_ij)^.5
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
      2    + es(2,2)*es(2,2)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
       nu   = nu/rho
       nu_s = nu_s/rho
       IF (ISZERO(gam)) THEN
-         nu_x = 0D0
+         nu_x = 0._RKIND
       ELSE
          nu_x = nu_x/rho/gam
       END IF
@@ -373,8 +373,8 @@
       kS = ksix(1,1)*ksix(1,1) + ksix(2,1)*ksix(2,1)
      2   + ksix(1,2)*ksix(1,2) + ksix(2,2)*ksix(2,2)
 
-      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU +
-     2   ct(2)*nu_s*nu_s*kS + s*s)
+      tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
+     2   ct(2)*nu_s*nu_s*kS + s*s )
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
      2      + s*u(1))
@@ -382,13 +382,13 @@
      2      + s*u(2))
 
       tauC = ksix(1,1) + ksix(2,2)
-      tauC = 1D0/tauM/tauC
+      tauC = 1._RKIND/tauM/tauC
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(1)*up(2)*ksix(1,2) + up(2)*up(2)*ksix(2,2)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1D0/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB)
 
       divU = ux(1,1) + ux(2,2)
 
@@ -469,16 +469,16 @@
       PURE SUBROUTINE BFLUID (eNoN, w, N, y, h, nV, lR, lK)
       USE COMMOD
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), y(tDof), h, nV(nsd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), y(tDof), h, nV(nsd)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER a, b, i, j
-      REAL(KIND=8) T1, wl, hc(nsd), udn, u(nsd)
+      INTEGER(KIND=IKIND) a, b, i, j
+      REAL(KIND=RKIND) T1, wl, hc(nsd), udn, u(nsd)
 
       wl  = w*eq(cEq)%af*eq(cEq)%gam*dt
-      udn = 0D0
+      udn = 0._RKIND
       IF (mvMsh) THEN
          DO i=1, nsd
             j    = i + nsd + 1
@@ -492,7 +492,7 @@
          END DO
       END IF
 
-      udn = eq(cEq)%dmn(cDmn)%prop(backflow_stab)/2D0*
+      udn = 0.5_RKIND*eq(cEq)%dmn(cDmn)%prop(backflow_stab)*
      2   eq(cEq)%dmn(cDmn)%prop(fluid_density)*(udn - ABS(udn))
       hc  = h*nV + udn*u
 
@@ -527,16 +527,16 @@
       SUBROUTINE BWFLUID3D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
       USE COMMOD
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
+     2   yl(tDof,eNoN), ub(3), nV(3), tauB(2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), yl(tDof,eNoN),
-     2   ub(3), nV(3), tauB(2)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER :: a, b
-      REAL(KIND=8) :: rho, nu, T1, wr, wl, wrl, tauT, tauN, p, uhn, ubn,
-     2   u(3), uh(3), ux(3,3), sigman(3), Nxn(eNoN), rV(3), rM(3,3),
-     3   nu_s, es(3,3), gam, nu_x
+      INTEGER(KIND=IKIND) :: a, b
+      REAL(KIND=RKIND) :: rho, nu, T1, wr, wl, wrl, tauT, tauN, p, uhn,
+     2   ubn, u(3), uh(3), ux(3,3), sigman(3), Nxn(eNoN), rV(3),
+     3   rM(3,3), nu_s, es(3,3), gam, nu_x
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       T1   = eq(cEq)%af * eq(cEq)%gam * dt
@@ -546,9 +546,9 @@
       tauT = tauB(1) / rho
       tauN = tauB(2) / rho
 
-      p    = 0D0
-      u    = 0D0
-      ux   = 0D0
+      p    = 0._RKIND
+      u    = 0._RKIND
+      ux   = 0._RKIND
       DO a=1, eNoN
          p = p + N(a)*yl(4,a)
 
@@ -569,7 +569,7 @@
          Nxn(a)  = Nx(1,a)*nV(1) + Nx(2,a)*nV(2) + Nx(3,a)*nV(3)
       END DO
 
-      uh = 0D0
+      uh = 0._RKIND
       IF (mvMsh) THEN
          DO a=1, eNoN
             uh(1) = uh(1) + N(a)*yl(5,a)
@@ -579,7 +579,7 @@
       END IF
       ubn = (u(1)-ub(1))*nV(1) + (u(2)-ub(2))*nV(2) + (u(3)-ub(3))*nV(3)
       uhn = (u(1)-uh(1))*nV(1) + (u(2)-uh(2))*nV(2) + (u(3)-uh(3))*nV(3)
-      uhn = (ABS(uhn) - uhn) / 2D0
+      uhn = (ABS(uhn) - uhn) * 0.5_RKIND
 
 !     Strain rate tensor 2*e_ij := (u_ij + u_ji)
       es(1,1) = ux(1,1) + ux(1,1)
@@ -598,7 +598,7 @@
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
      2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
      3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
@@ -702,16 +702,16 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
       SUBROUTINE BWFLUID2D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
       USE COMMOD
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   yl(tDof,eNoN), ub(2), nV(2), tauB(2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), yl(tDof,eNoN),
-     2   ub(2), nV(2), tauB(2)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER :: a, b
-      REAL(KIND=8) :: rho, nu, T1, wr, wl, wrl, tauT, tauN, p, uhn, ubn,
-     2   u(2), uh(2), ux(2,2), sigman(2), Nxn(eNoN), rV(2), rM(2,2),
-     3   nu_s, es(2,2), gam, nu_x
+      INTEGER(KIND=IKIND) :: a, b
+      REAL(KIND=RKIND) :: rho, nu, T1, wr, wl, wrl, tauT, tauN, p, uhn,
+     2   ubn, u(2), uh(2), ux(2,2), sigman(2), Nxn(eNoN), rV(2),
+     3   rM(2,2), nu_s, es(2,2), gam, nu_x
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       T1   = eq(cEq)%af * eq(cEq)%gam * dt
@@ -721,9 +721,9 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
       tauT = tauB(1) / rho
       tauN = tauB(2) / rho
 
-      p    = 0D0
-      u    = 0D0
-      ux   = 0D0
+      p    = 0._RKIND
+      u    = 0._RKIND
+      ux   = 0._RKIND
       DO a=1, eNoN
          p = p + N(a)*yl(3,a)
 
@@ -738,7 +738,7 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
          Nxn(a)  = Nx(1,a)*nV(1) + Nx(2,a)*nV(2)
       END DO
 
-      uh = 0D0
+      uh = 0._RKIND
       IF (mvMsh) THEN
          DO a=1, eNoN
             uh(1) = uh(1) + N(a)*yl(4,a)
@@ -747,7 +747,7 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
       END IF
       uhn = (u(1)-uh(1))*nV(1) + (u(2)-uh(2))*nV(2)
       ubn = (u(1)-ub(1))*nV(1) + (u(2)-ub(2))*nV(2)
-      uhn = (ABS(uhn) - uhn) / 2D0
+      uhn = (ABS(uhn) - uhn) * 0.5_RKIND
 
 !     Strain rate tensor 2*e_ij := (u_ij + u_ji)
       es(1,1) = ux(1,1) + ux(1,1)
@@ -759,7 +759,7 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
 !     Shear-rate := (2*e_ij*e_ij)^.5
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
      2    + es(2,2)*es(2,2)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
@@ -826,18 +826,17 @@ c     2         nu*(N(a)*Nx(2,b)*nV(1) + Nx(2,a)*N(b)*nV(1))
       SUBROUTINE GETVISCOSITY(lDmn, gamma, mu, mu_s, mu_x)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(dmnType), INTENT(IN) :: lDmn
-      REAL(KIND=8), INTENT(INOUT)  :: gamma
-      REAL(KIND=8), INTENT(OUT) :: mu, mu_s, mu_x
+      REAL(KIND=RKIND), INTENT(INOUT)  :: gamma
+      REAL(KIND=RKIND), INTENT(OUT) :: mu, mu_s, mu_x
 
-      REAL(KIND=8) :: mu_i, mu_o, lam, a, n, T1, T2
+      REAL(KIND=RKIND) :: mu_i, mu_o, lam, a, n, T1, T2
 
       SELECT CASE (lDmn%visc%viscType)
       CASE (viscType_Const)
          mu   = lDmn%visc%mu_i
          mu_s = mu
-         mu_x = 0D0
+         mu_x = 0._RKIND
 
       CASE (viscType_CY)
          mu_i = lDmn%visc%mu_i
@@ -846,14 +845,14 @@ c     2         nu*(N(a)*Nx(2,b)*nV(1) + Nx(2,a)*N(b)*nV(1))
          a    = lDmn%visc%a
          n    = lDmn%visc%n
 
-         T1   = 1.0D0 + (lam*gamma)**a
-         T2   = T1**((n-1.0D0)/a)
+         T1   = 1._RKIND + (lam*gamma)**a
+         T2   = T1**((n-1._RKIND)/a)
          mu   = mu_i + (mu_o-mu_i)*T2
          mu_s = mu_i
 
          T1   = T2/T1
-         T2   = lam**a * gamma**(a-1.0D0) * T1
-         mu_x = (mu_o-mu_i)*(n-1.0D0)*T2
+         T2   = lam**a * gamma**(a-1._RKIND) * T1
+         mu_x = (mu_o-mu_i)*(n-1._RKIND)*T2
 
       CASE (viscType_Cass)
          mu_i = lDmn%visc%mu_i
@@ -868,7 +867,7 @@ c     2         nu*(N(a)*Nx(2,b)*nV(1) + Nx(2,a)*N(b)*nV(1))
          END IF
          mu   = (mu_i + mu_o) * (mu_i + mu_o)
          mu_s = mu_i*mu_i
-         mu_x = 2.0D0*mu_o*(mu_o + mu_i)/gamma
+         mu_x = 2._RKIND*mu_o*(mu_o + mu_i)/gamma
 
       END SELECT
 

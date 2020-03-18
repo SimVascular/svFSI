@@ -49,20 +49,20 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE GMRES(lhs, ls, dof, Val, R, X)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz), R(dof,lhs%nNo)
-      REAL(KIND=8), INTENT(OUT) :: X(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz),              &
+     &   R(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: X(dof,lhs%nNo)
 
-      INTEGER nNo, mynNo, i, j, k, l
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
-      REAL(KIND=8) eps, tmp, time
-      REAL(KIND=8), ALLOCATABLE :: u(:,:,:), h(:,:), unCondU(:,:), y(:),&
-     &   c(:), s(:), err(:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i, j, k, l
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
+      REAL(KIND=LSRP) eps, tmp, time
+
+      REAL(KIND=LSRP), ALLOCATABLE :: u(:,:,:), h(:,:), unCondU(:,:),   &
+     &   y(:), c(:), s(:), err(:)
 
       nNo = lhs%nNo
       mynNo = lhs%mynNo
@@ -73,8 +73,8 @@
       time   = FSILS_CPUT()
       ls%suc = .FALSE.
 
-      eps = 0D0
-      X   = 0D0
+      eps = 0._LSRP
+      X   = 0._LSRP
       DO l=1, ls%mItr
          IF (l .EQ. 1) THEN
             u(:,:,1) = R
@@ -95,7 +95,7 @@
             eps       = err(1)
             IF (eps .LE. ls%absTol) THEN
                ls%callD = EPSILON(ls%callD)
-               ls%dB    = 0D0
+               ls%dB    = 0._LSRP
                RETURN
             END IF
             ls%iNorm  = eps
@@ -125,7 +125,7 @@
             END DO
             h(i+1,i) = SQRT(ABS(h(i+1,i)))
 
-            CALL OMPMULV(dof, nNo, 1D0/h(i+1,i), u(:,:,i+1))
+            CALL OMPMULV(dof, nNo, 1._LSRP/h(i+1,i), u(:,:,i+1))
             !u(:,:,i+1) = u(:,:,i+1)/h(i+1,i)
             DO j=1, i-1
                tmp      =  c(j)*h(j,i) + s(j)*h(j+1,i)
@@ -136,7 +136,7 @@
             c(i)     = h(i,i)/tmp
             s(i)     = h(i+1,i)/tmp
             h(i,i)   = tmp
-            h(i+1,i) = 0D0
+            h(i+1,i) = 0._LSRP
             err(i+1) = -s(i)*err(i)
             err(i)   =  c(i)*err(i)
             IF (ABS(err(i+1)) .LT. eps) THEN
@@ -163,26 +163,23 @@
       END DO
 
       ls%callD = FSILS_CPUT() - time + ls%callD
-      ls%dB    = 1D1*LOG(ls%fNorm/ls%dB)
+      ls%dB    = 10._LSRP*LOG(ls%fNorm/ls%dB)
 
       RETURN
       END SUBROUTINE GMRES
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE GMRESS(lhs, ls, Val, R)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      REAL(KIND=8), INTENT(IN) :: Val(lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: Val(lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(lhs%nNo)
 
-      INTEGER nNo, mynNo, i, j, k, l
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS, FSILS_NCDOTS
-      REAL(KIND=8) eps, tmp
-      REAL(KIND=8), ALLOCATABLE :: u(:,:), h(:,:), X(:), y(:), c(:),    &
+      INTEGER(KIND=LSIP) nNo, mynNo, i, j, k, l
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMS, FSILS_DOTS, FSILS_NCDOTS
+      REAL(KIND=LSRP) eps, tmp
+
+      REAL(KIND=LSRP), ALLOCATABLE :: u(:,:), h(:,:), X(:), y(:), c(:), &
      &   s(:), err(:)
 
       nNo = lhs%nNo
@@ -198,11 +195,11 @@
       ls%fNorm  = eps
       eps       = MAX(ls%absTol,ls%relTol*eps)
       ls%itr    = 0
-      X         = 0D0
+      X         = 0._LSRP
 
       IF (ls%iNorm .LE. ls%absTol) THEN
          ls%callD = EPSILON(ls%callD)
-         ls%dB    = 0D0
+         ls%dB    = 0._LSRP
          RETURN
       END IF
       DO l=1, ls%mItr
@@ -230,7 +227,7 @@
             END DO
             h(i+1,i) = SQRT(ABS(h(i+1,i)))
 
-            CALL OMPMULS(nNo, 1D0/h(i+1,i), u(:,i+1))
+            CALL OMPMULS(nNo, 1._LSRP/h(i+1,i), u(:,i+1))
             !u(:,i+1) = u(:,i+1)/h(i+1,i)
             DO j=1, i-1
                tmp      =  c(j)*h(j,i) + s(j)*h(j+1,i)
@@ -241,7 +238,7 @@
             c(i)     = h(i,i)/tmp
             s(i)     = h(i+1,i)/tmp
             h(i,i)   = tmp
-            h(i+1,i) = 0D0
+            h(i+1,i) = 0._LSRP
             err(i+1) = -s(i)*err(i)
             err(i)   =  c(i)*err(i)
             IF (ABS(err(i+1)) .LT. eps) THEN
@@ -268,28 +265,26 @@
       END DO
       R = X
       ls%callD = FSILS_CPUT() - ls%callD
-      ls%dB    = 1D1*LOG(ls%fNorm/ls%dB)
+      ls%dB    = 10._LSRP*LOG(ls%fNorm/ls%dB)
 
       RETURN
       END SUBROUTINE GMRESS
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE GMRESV(lhs, ls, dof, Val, R)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_subLsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
 
       LOGICAL flag
-      INTEGER nNo, mynNo, i, j, k, l
-      REAL(KIND=8) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
-      REAL(KIND=8) eps, tmp
-      REAL(KIND=8), ALLOCATABLE :: u(:,:,:), h(:,:), X(:,:), y(:), c(:),&
-     &   s(:), err(:), unCondU(:,:)
+      INTEGER(KIND=LSIP) nNo, mynNo, i, j, k, l
+      REAL(KIND=LSRP) FSILS_CPUT, FSILS_NORMV, FSILS_DOTV, FSILS_NCDOTV
+      REAL(KIND=LSRP) eps, tmp
+
+      REAL(KIND=LSRP), ALLOCATABLE :: u(:,:,:), h(:,:), X(:,:), y(:),   &
+     &   c(:), s(:), err(:), unCondU(:,:)
 
       flag = .FALSE.
       nNo = lhs%nNo
@@ -305,13 +300,13 @@
       ls%fNorm  = eps
       eps       = MAX(ls%absTol,ls%relTol*eps)
       ls%itr    = 0
-      X         = 0D0
+      X         = 0._LSRP
 
       CALL BCPRE
 
       IF (ls%iNorm .LE. ls%absTol) THEN
          ls%callD = EPSILON(ls%callD)
-         ls%dB    = 0D0
+         ls%dB    = 0._LSRP
          RETURN
       END IF
 
@@ -351,7 +346,7 @@
             END DO
             h(i+1,i) = SQRT(ABS(h(i+1,i)))
 
-            CALL OMPMULV(dof, nNo, 1D0/h(i+1,i), u(:,:,i+1))
+            CALL OMPMULV(dof, nNo, 1._LSRP/h(i+1,i), u(:,:,i+1))
             !u(:,:,i+1) = u(:,:,i+1)/h(i+1,i)
             DO j=1, i-1
                tmp      =  c(j)*h(j,i) + s(j)*h(j+1,i)
@@ -362,7 +357,7 @@
             c(i)     = h(i,i)/tmp
             s(i)     = h(i+1,i)/tmp
             h(i,i)   = tmp
-            h(i+1,i) = 0D0
+            h(i+1,i) = 0._LSRP
             err(i+1) = -s(i)*err(i)
             err(i)   =  c(i)*err(i)
             IF (ABS(err(i+1)) .LT. eps) THEN
@@ -389,26 +384,26 @@
       END DO
       R = X
       ls%callD = FSILS_CPUT() - ls%callD
-      ls%dB    = 1D1*LOG(ls%fNorm/ls%dB)
+      ls%dB    = 10._LSRP*LOG(ls%fNorm/ls%dB)
 
       RETURN
 
       CONTAINS
 !--------------------------------------------------------------------
       SUBROUTINE BCPRE
-
       IMPLICIT NONE
 
-      INTEGER faIn, i, a, Ac, nsd
-      REAL(KIND=8) FSILS_NORMV
-      REAL(KIND=8), ALLOCATABLE :: v(:,:)
+      INTEGER(KIND=LSIP) faIn, i, a, Ac, nsd
+      REAL(KIND=LSRP) FSILS_NORMV
 
-      nsd = dof -  1
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:)
+
+      nsd = dof - 1
       ALLOCATE(v(nsd,nNo))
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
             IF (lhs%face(faIn)%sharedFlag) THEN
-               v = 0D0
+               v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
@@ -416,14 +411,14 @@
                   END DO
                END DO
                lhs%face(faIn)%nS = FSILS_NORMV(nsd, mynNo, lhs%commu,   &
-     &            v)**2D0
+     &            v)**2._LSRP
             ELSE
-               lhs%face(faIn)%nS = 0D0
+               lhs%face(faIn)%nS = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      lhs%face(faIn)%nS = lhs%face(faIn)%nS +            &
-     &                  lhs%face(faIn)%valM(i,a)**2D0
+     &                  lhs%face(faIn)%valM(i,a)**2._LSRP
                   END DO
                END DO
             END IF
@@ -432,6 +427,6 @@
 
       RETURN
       END SUBROUTINE BCPRE
-
+!--------------------------------------------------------------------
       END SUBROUTINE GMRESV
-
+!####################################################################

@@ -31,22 +31,29 @@
 !
 !--------------------------------------------------------------------
 !
-!     Parameters used for Fitzhugh-Nagumo Myocyte Activation Model.
+!     Data types are defined here
 !
 !--------------------------------------------------------------------
 
-!     Scaling factors
-!     Voltage scaling
-      REAL(KIND=RKIND) :: Vscale  = 1._RKIND
-!     Time scaling
-      REAL(KIND=RKIND) :: Tscale  = 1._RKIND
-!     Voltage offset parameter
-      REAL(KIND=RKIND) :: Voffset = 0._RKIND
-!-----------------------------------------------------------------------
-!     Model parameters
-      REAL(KIND=RKIND) :: alpha = -0.5_RKIND
-      REAL(KIND=RKIND) :: a = 0._RKIND
-      REAL(KIND=RKIND) :: b = -0.6_RKIND
-      REAL(KIND=RKIND) :: c = 50._RKIND
-!#######################################################################
+!     Integer, 8 bits
+      INTEGER, PARAMETER :: LSIP1  = SELECTED_INT_KIND(2)
+!     Integer, 16 bits
+      INTEGER, PARAMETER :: LSIP2  = SELECTED_INT_KIND(4)
+!     Integer, 32 bits
+      INTEGER, PARAMETER :: LSIP4  = SELECTED_INT_KIND(9)
+!     Integer, 64 bits
+      INTEGER, PARAMETER :: LSIP8  = SELECTED_INT_KIND(18)
 
+!     Real 32 bits (single)
+      INTEGER, PARAMETER :: LSRP4  = SELECTED_REAL_KIND(6, 37)
+!     Real 64 bits (double)
+      INTEGER, PARAMETER :: LSRP8  = SELECTED_REAL_KIND(15, 307)
+!     Real 128 bits (long double)
+      INTEGER, PARAMETER :: LSRP16 = SELECTED_REAL_KIND(33, 4931)
+
+!     Default integer precision
+      INTEGER, PARAMETER :: LSIP = LSIP4
+!     Default real precision
+      INTEGER, PARAMETER :: LSRP = LSRP8
+
+!####################################################################

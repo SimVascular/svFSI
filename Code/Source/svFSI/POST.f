@@ -41,13 +41,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(OUT) :: res(maxnsd,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: outGrp, iEq
 
-      REAL(KIND=8), INTENT(OUT) :: res(maxnsd,tnNo)
-      REAL(KIND=8), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: outGrp, iEq
+      INTEGER(KIND=IKIND) a, Ac, iM
 
-      INTEGER a, Ac, iM
-      REAL(KIND=8), ALLOCATABLE :: tmpV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
 
       DO iM=1, nMsh
          IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -61,9 +61,9 @@
          ELSE IF (outGrp .EQ. outGrp_J) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo))
-            tmpV = 0D0
+            tmpV = 0._RKIND
             CALL TPOST(msh(iM), 1, tmpV, lD, iEq, outGrp)
-            res  = 0D0
+            res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
                res(1,Ac) = tmpV(1,a)
@@ -73,9 +73,9 @@
          ELSE IF (outGrp .EQ. outGrp_divV) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo))
-            tmpV = 0D0
+            tmpV = 0._RKIND
             CALL DIVPOST(msh(iM), tmpV, lY, lD, iEq)
-            res  = 0D0
+            res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
                res(1,Ac) = tmpV(1,a)
@@ -93,26 +93,25 @@
 
       RETURN
       END SUBROUTINE ALLPOST
-!####################################################################
+!--------------------------------------------------------------------
 !     General purpose routine for post processing outputs.
       SUBROUTINE POST(lM, res, lY, lD, outGrp, iEq)
       USE COMMOD
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(OUT) :: res(maxnsd,lM%nNo)
-      REAL(KIND=8), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: outGrp, iEq
+      REAL(KIND=RKIND), INTENT(OUT) :: res(maxnsd,lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: outGrp, iEq
 
       LOGICAL FSIeq
-      INTEGER a, Ac, e, i, j, eNoN, g, insd
-      REAL(KIND=8) rho, kappa, w, Jac, ksix(nsd,nsd), lRes(maxnsd),
+      INTEGER(KIND=IKIND) a, Ac, e, i, j, eNoN, g, insd
+      REAL(KIND=RKIND) rho, kappa, w, Jac, ksix(nsd,nsd), lRes(maxnsd),
      2   q(nsd), u(nsd), p, T, ux(nsd,nsd), gam, mu, mu_s
-      COMPLEX*16 :: eig(nsd)
+      COMPLEX(KIND=CXKIND) :: eig(nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: sA(:), sF(:,:), xl(:,:), yl(:,:),
+      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), xl(:,:), yl(:,:),
      2   Nx(:,:), N(:)
 
       FSIeq = .FALSE.
@@ -127,7 +126,7 @@
             Ac = lM%gN(a)
             p  = lY(nsd+1,Ac)
             u  = lY(1:nsd,Ac)
-            res(1:nsd,Ac) = (p + 5D-1*rho*NORM(u))*u
+            res(1:nsd,Ac) = (p + 0.5_RKIND*rho*NORM(u))*u
          END DO
          RETURN
       END IF
@@ -136,10 +135,10 @@
       eNoN  = lM%eNoN
       ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), xl(nsd,eNoN), yl(tDof,eNoN),
      2   Nx(nsd,eNoN), N(eNoN))
-      sA   = 0D0
-      sF   = 0D0
-      lRes = 0D0
-      eig  = (0D0, 0D0)
+      sA   = 0._RKIND
+      sF   = 0._RKIND
+      lRes = 0._RKIND
+      eig  = (0._RKIND, 0._RKIND)
       insd = nsd
       IF (lM%lFib) insd = 1
       DO e=1, lM%nEl
@@ -166,7 +165,7 @@
             w = lM%w(g)*Jac
             N = lM%N(:,g)
 
-            lRes(:) = 0D0
+            lRes(:) = 0._RKIND
 
 !     Vorticity calculation   ---------------------------------------
             IF (outGrp .EQ. outGrp_vort) THEN
@@ -181,7 +180,7 @@
                END DO
 !     Vortex Identification Criterion (lamda_ci)
             ELSE IF (outGrp .EQ. outGrp_vortex) THEN
-               ux   = 0D0
+               ux   = 0._RKIND
                DO a=1, eNoN
                   DO i=1, nsd
                      DO j=1, nsd
@@ -192,17 +191,17 @@
                eig = MAT_EIG(ux, nsd)
                lRes(1:nsd) = AIMAG(eig)
                lRes(1) = MAXVAL(lRes(1:nsd))
-               lRes(2:maxnsd) = 0D0
+               lRes(2:maxnsd) = 0._RKIND
 !     Energy flux calculation   -------------------------------------
             ELSE IF (outGrp .EQ. outGrp_eFlx) THEN
                rho = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-               p   = 0D0
-               u   = 0D0
+               p   = 0._RKIND
+               u   = 0._RKIND
                DO a=1, eNoN
                   p = p + N(a)*yl(nsd+1,a)
                   u = u + N(a)*yl(1:nsd,a)
                END DO
-               lRes(1:nsd) = (p + 5D-1*rho*NORM(u))*u
+               lRes(1:nsd) = (p + 0.5_RKIND*rho*NORM(u))*u
 !     Heat flux calculation   ---------------------------------------
             ELSE IF (outGrp .EQ. outGrp_hFlx) THEN
                kappa = eq(iEq)%dmn(cDmn)%prop(conductivity)
@@ -210,9 +209,9 @@
                DO a=1, eNoN
                END DO
                IF (eq(iEq)%phys .EQ. phys_heatF) THEN
-                  u = 0D0
-                  T = 0D0
-                  q = 0D0
+                  u = 0._RKIND
+                  T = 0._RKIND
+                  q = 0._RKIND
                   DO a=1, eNoN
                      q = q + Nx(:,a)*yl(i,a)
                      u = u + N(a)*yl(1:nsd,a)
@@ -220,7 +219,7 @@
                   END DO
                   lRes(1:nsd) = u*T - kappa*q
                ELSE
-                  q = 0D0
+                  q = 0._RKIND
                   DO a=1, eNoN
                      q = q + Nx(:,a)*yl(i,a)
                   END DO
@@ -228,17 +227,17 @@
                END IF
 !     Strain tensor invariants calculation   ------------------------
             ELSE IF (outGrp .EQ. outGrp_stInv) THEN
-               ksix = 0D0
+               ksix = 0._RKIND
                DO a=1, eNoN
                   ksix(1,1) = ksix(1,1) + Nx(1,a)*yl(1,a)
                   ksix(2,1) = ksix(2,1) +(Nx(1,a)*yl(2,a)
-     2                                  + Nx(2,a)*yl(1,a))/2D0
+     2                                  + Nx(2,a)*yl(1,a))*0.5_RKIND
                   ksix(2,2) = ksix(2,2) + Nx(2,a)*yl(2,a)
                   IF (nsd .EQ. 3) THEN
                      ksix(3,1) = ksix(3,1) +(Nx(1,a)*yl(3,a)
-     2                                     + Nx(3,a)*yl(1,a))/2D0
+     2                                     + Nx(3,a)*yl(1,a))*0.5_RKIND
                      ksix(3,2) = ksix(3,2) +(Nx(2,a)*yl(3,a)
-     2                                     + Nx(3,a)*yl(2,a))/2D0
+     2                                     + Nx(3,a)*yl(2,a))*0.5_RKIND
                      ksix(3,3) = ksix(3,3) + Nx(3,a)*yl(3,a)
                   END IF
                END DO
@@ -251,7 +250,7 @@
      2                    + ksix(3,3)*ksix(1,1) - ksix(2,1)*ksix(2,1)
      3                    - ksix(3,1)*ksix(3,1) - ksix(3,2)*ksix(3,2)
                   lRes(3) = ksix(1,1)*ksix(2,2)*ksix(3,3)
-     2                    + ksix(2,1)*ksix(3,2)*ksix(3,1)*2D0
+     2                    + ksix(2,1)*ksix(3,2)*ksix(3,1)*2._RKIND
      3                    - ksix(1,1)*ksix(3,2)*ksix(3,2)
      4                    - ksix(3,1)*ksix(2,2)*ksix(3,1)
      5                    - ksix(2,1)*ksix(2,1)*ksix(3,3)
@@ -259,7 +258,7 @@
                lRes = ABS(lRes)
 !     Viscosity
             ELSE IF (outGrp .EQ. outGrp_Visc) THEN
-               ux = 0D0
+               ux = 0._RKIND
                DO a=1, eNoN
                   DO i=1, nsd
                      DO j=1, nsd
@@ -269,13 +268,13 @@
                END DO
 
 !              Shear rate, gam := (2*e_ij*e_ij)^0.5
-               gam = 0D0
+               gam = 0._RKIND
                DO i=1, nsd
                   DO j=1, nsd
                      gam = gam + (ux(i,j)+ux(j,i))*(ux(i,j)+ux(j,i))
                   END DO
                END DO
-               gam = SQRT(0.5D0*gam)
+               gam = SQRT(0.5_RKIND*gam)
 !              Compute viscosity
                CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu, mu_s, mu_s)
                lRes(1) = mu
@@ -302,7 +301,7 @@
 
       RETURN
       END SUBROUTINE POST
-!####################################################################
+!--------------------------------------------------------------------
 !     General purpose routine for post processing outputs at the
 !     faces. Currently this calculates WSS, which is t.n - (n.t.n)n
 !     Here t is stress tensor: t = \mu (grad(u) + grad(u)^T)
@@ -310,18 +309,18 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(OUT) :: res(maxnsd,lM%nNo)
-      REAL(KIND=8), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
-      INTEGER, INTENT(IN) :: outGrp
+      REAL(KIND=RKIND), INTENT(OUT) :: res(maxnsd,lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: outGrp
 
       LOGICAL FSIeq
-      INTEGER a, Ac, e, Ec, i, j, iEq, iFa, eNoN, g
-      REAL(KIND=8) Tdn(nsd), ndTdn, taue(nsd), ux(nsd,nsd), mu, w,
+      INTEGER(KIND=IKIND) a, Ac, e, Ec, i, j, iEq, iFa, eNoN, g
+      REAL(KIND=RKIND) Tdn(nsd), ndTdn, taue(nsd), ux(nsd,nsd), mu, w,
      2   nV(nsd), Jac, ks(nsd,nsd), lRes(maxnsd), p, gam, mu_s
-      REAL(KIND=8), ALLOCATABLE :: sA(:), sF(:,:), gnV(:,:), lnV(:,:),
-     2   xl(:,:), ul(:,:), Nx(:,:), N(:), pl(:)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), gnV(:,:),
+     2   lnV(:,:), xl(:,:), ul(:,:), Nx(:,:), N(:), pl(:)
 
       iEq   = 1
       eNoN  = lM%eNoN
@@ -331,10 +330,10 @@
       ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), gnV(nsd,tnNo),
      2   lnV(nsd,eNoN), xl(nsd,eNoN), ul(nsd,eNoN), Nx(nsd,eNoN),
      3   N(eNoN), pl(eNoN))
-      sA   = 0D0
-      sF   = 0D0
-      gnV  = 0D0
-      lRes = 0D0
+      sA   = 0._RKIND
+      sF   = 0._RKIND
+      gnV  = 0._RKIND
+      lRes = 0._RKIND
 !     First creating the norm field
       DO iFa=1, lM%nFa
          DO a=1, lM%fa(iFa)%nNo
@@ -355,7 +354,7 @@
 !     Finding the norm for all the nodes of this element, including
 !     those that don't belong to this face, which will be inerpolated
 !     from the nodes of the face
-            nV = 0D0
+            nV = 0._RKIND
             DO a=1, eNoN
                Ac       = lM%IEN(a,Ec)
                lnV(:,a) = gnV(:,Ac)
@@ -381,9 +380,9 @@
                N = lM%N(:,g)
 
 !     Calculating ux = grad(u) and nV at a Gauss point
-               ux = 0D0
-               nV = 0D0
-               p  = 0D0
+               ux = 0._RKIND
+               nV = 0._RKIND
+               p  = 0._RKIND
                DO a=1, eNoN
                   nV = nV + N(a)*lnV(:,a)
                   p  = p  + N(a)*pl(a)
@@ -395,19 +394,19 @@
                END DO
 
 !              Shear rate, gam := (2*e_ij*e_ij)^0.5
-               gam = 0D0
+               gam = 0._RKIND
                DO i=1, nsd
                   DO j=1, nsd
                      gam = gam + (ux(i,j)+ux(j,i))*(ux(i,j)+ux(j,i))
                   END DO
                END DO
-               gam = SQRT(0.5D0*gam)
+               gam = SQRT(0.5_RKIND*gam)
 !              Compute viscosity
                CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu, mu_s, mu_s)
 
 !     Now finding grad(u).n and n.grad(u).n
-               Tdn   = 0D0
-               ndTdn = 0D0
+               Tdn   = 0._RKIND
+               ndTdn = 0._RKIND
                DO i=1,nsd
                   DO j=1, nsd
                      Tdn(i) = Tdn(i) + mu*(ux(i,j) + ux(j,i))*nV(j)
@@ -440,12 +439,12 @@
             Ac = lM%fa(iFa)%gN(a)
             IF (.NOT.ISZERO(sA(Ac))) THEN
                sF(:,Ac) = sF(:,Ac)/sA(Ac)
-               sA(Ac)   = 1D0
+               sA(Ac)   = 1._RKIND
             END IF
          END DO
       END DO
 
-      res = 0D0
+      res = 0._RKIND
       DO a=1, lM%nNo
          Ac       = lM%gN(a)
          res(:,a) = sF(:,Ac)
@@ -460,19 +459,20 @@
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: m, iEq, outGrp
-      REAL(KIND=8), INTENT(INOUT) :: res(m,lM%nNo)
-      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: m, iEq, outGrp
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
 
-      INTEGER a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd, nFn
-      REAL(KIND=8) w, Jac, detF, ya, Ja, elM, nu, lambda, mu,
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd,
+     2   nFn
+      REAL(KIND=RKIND) w, Jac, detF, ya, Ja, elM, nu, lambda, mu,
      2   ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
      3   sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), pSl(:),
-     2   ed(:), Nx(:,:), N(:), sA(:), sF(:,:)
       TYPE(stModelType) :: stModel
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
+     2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -485,10 +485,10 @@
       ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
      2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN))
 
-      sA   = 0D0
-      sF   = 0D0
+      sA   = 0._RKIND
+      sF   = 0._RKIND
       insd = nsd
-      ya   = 0D0
+      ya   = 0._RKIND
       IF (lM%lFib) insd = 1
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
@@ -500,13 +500,13 @@
          IF (cPhys .EQ. phys_lElas) THEN
             elM = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
             nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
-            lambda = elM*nu/(1D0 + nu)/(1D0 - 2D0*nu)
-            mu     = 0.5D0*elM/(1D0 + nu)
+            lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
+            mu     = 0.5_RKIND*elM/(1._RKIND + nu)
          END IF
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
-         fN = 0D0
+         fN = 0._RKIND
          IF (ALLOCATED(lM%fN)) THEN
             DO l=1, nFn
                fN(:,l) = lM%fN((l-1)*nsd+1:l*nsd,e)
@@ -527,7 +527,7 @@
             w = lM%w(g)*Jac
             N = lM%N(:,g)
 
-            ed = 0D0
+            ed = 0._RKIND
             F  = MAT_ID(nsd)
             IF (cPhys .EQ. phys_lElas) THEN
                DO a=1, eNoN
@@ -576,20 +576,20 @@
 
             ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
-               sigma = 0D0
+               sigma = 0._RKIND
                IF (cPhys .EQ. phys_lElas) THEN
                   IF (nsd .EQ. 3) THEN
                      detF = lambda*(ed(1) + ed(2) + ed(3))
-                     sigma(1,1) = detF + 2D0*mu*ed(1)
-                     sigma(2,2) = detF + 2D0*mu*ed(2)
-                     sigma(3,3) = detF + 2D0*mu*ed(3)
+                     sigma(1,1) = detF + 2._RKIND*mu*ed(1)
+                     sigma(2,2) = detF + 2._RKIND*mu*ed(2)
+                     sigma(3,3) = detF + 2._RKIND*mu*ed(3)
                      sigma(1,2) = mu*ed(4)
                      sigma(1,3) = mu*ed(5)
                      sigma(2,3) = mu*ed(6)
                   ELSE
                      detF = lambda*(ed(1) + ed(2))
-                     sigma(1,1) = detF + 2D0*mu*ed(1)
-                     sigma(2,2) = detF + 2D0*mu*ed(2)
+                     sigma(1,1) = detF + 2._RKIND*mu*ed(1)
+                     sigma(2,2) = detF + 2._RKIND*mu*ed(2)
                      sigma(1,2) = mu*ed(3)
                   END IF
                ELSE IF (cPhys .EQ. phys_vms_struct) THEN
@@ -671,16 +671,16 @@
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: iEq, nFn
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, nFn
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(INOUT) :: res(nFn*nsd,lM%nNo)
-      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(nFn*nsd,lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
 
-      INTEGER a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
-      REAL(KIND=8) w, Jac, F(nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), fl(:,:),
-     2   Nx(:,:), N(:), sA(:), sF(:,:)
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, eNoN, i, j, k, l, iFn, cPhys
+      REAL(KIND=RKIND) w, Jac, F(nsd,nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
+     2   fl(:,:), Nx(:,:), N(:), sA(:), sF(:,:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -691,8 +691,8 @@
       ALLOCATE (sA(tnNo), sF(nFn*nsd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
      2   fN(nsd,lM%nFn), fl(nsd,lM%nFn), Nx(nsd,eNoN), N(eNoN))
 
-      sA = 0D0
-      sF = 0D0
+      sA = 0._RKIND
+      sF = 0._RKIND
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
@@ -774,16 +774,16 @@
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: iEq
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(INOUT) :: res(1,lM%nNo)
-      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(1,lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
 
-      INTEGER a, e, g, Ac, eNoN, i, j, k, iFn, cPhys
-      REAL(KIND=8) w, Jac, sHat, F(nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:), fl(:,:),
-     2   Nx(:,:), N(:), sA(:), sF(:)
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, iFn, cPhys
+      REAL(KIND=RKIND) w, Jac, sHat, F(nsd,nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
+     2   fl(:,:), Nx(:,:), N(:), sA(:), sF(:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -794,8 +794,8 @@
       ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
      2   fN(nsd,2), fl(nsd,2), Nx(nsd,eNoN), N(eNoN))
 
-      sA = 0D0
-      sF = 0D0
+      sA = 0._RKIND
+      sF = 0._RKIND
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
@@ -873,15 +873,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: iEq
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: lD(tDof,tnNo)
-      REAL(KIND=8), INTENT(INOUT) :: res(lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(lM%nNo)
 
-      INTEGER a, e, g, Ac, eNoN, i, j, k, cPhys
-      REAL(KIND=8) w, Jac, I4f, fl(nsd), F(nsd,nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), dl(:,:), Nx(:,:), N(:),
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, cPhys
+      REAL(KIND=RKIND) w, Jac, I4f, fl(nsd), F(nsd,nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), Nx(:,:), N(:),
      2   sA(:), sF(:)
 
       eNoN = lM%eNoN
@@ -893,8 +893,8 @@
       ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
      2   Nx(nsd,eNoN), N(eNoN))
 
-      sA = 0D0
-      sF = 0D0
+      sA = 0._RKIND
+      sF = 0._RKIND
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
@@ -946,7 +946,7 @@
       CALL COMMU(sF)
       CALL COMMU(sA)
 
-      res = 0D0
+      res = 0._RKIND
       DO a=1, lM%nNo
          Ac = lM%gN(a)
          IF (.NOT.ISZERO(sA(Ac))) THEN
@@ -965,16 +965,16 @@
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: iEq
-      REAL(KIND=8), INTENT(INOUT) :: res(1,lM%nNo)
-      REAL(KIND=8), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(1,lM%nNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lY(tDof,tnNo), lD(tDof,tnNo)
 
-      INTEGER a, e, g, Ac, eNoN, i, j, k, cPhys
-      REAL(KIND=8) w, Jac, divV, vx(nsd,nsd), ksix(nsd,nsd), F(nsd,nsd),
-     2   Fi(nsd,nsd), VxFi(nsd)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), yl(:,:), dl(:,:), N(:),
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, cPhys
+      REAL(KIND=RKIND) w, Jac, divV, vx(nsd,nsd), ksix(nsd,nsd),
+     2   F(nsd,nsd), Fi(nsd,nsd), VxFi(nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), yl(:,:), dl(:,:), N(:),
      2   Nx(:,:), sA(:), sF(:)
 
       eNoN = lM%eNoN
@@ -986,8 +986,8 @@
       ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), N(eNoN), Nx(nsd,eNoN))
 
-      sA   = 0D0
-      sF   = 0D0
+      sA   = 0._RKIND
+      sF   = 0._RKIND
       DO e=1, lM%nEl
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
          cDmn  = DOMAIN(lM, iEq, e)
@@ -1008,7 +1008,7 @@
             N = lM%N(:,g)
 
             IF ((cPhys.EQ.phys_fluid) .OR. (cPhys.EQ.phys_CMM)) THEN
-               vx = 0D0
+               vx = 0._RKIND
                IF (nsd .EQ. 3) THEN
                   DO a=1, eNoN
                      vx(1,1) = vx(1,1) + Nx(1,a)*yl(1,a)
@@ -1025,7 +1025,7 @@
                END IF
 
             ELSE IF (cPhys .EQ. phys_vms_struct) THEN
-               vx = 0D0
+               vx = 0._RKIND
                F  = MAT_ID(nsd)
                IF (nsd .EQ. 3) THEN
                   DO a=1, eNoN
@@ -1110,8 +1110,8 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER :: iTS, ierr
-      REAL(KIND=8) :: rtmp(3)
+      INTEGER(KIND=IKIND) :: iTS, ierr
+      REAL(KIND=RKIND) :: rtmp(3)
       CHARACTER(LEN=stdL) :: stmp, fName, sepLine
 
       sepLine = REPEAT("-", 50)

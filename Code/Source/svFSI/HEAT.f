@@ -40,15 +40,16 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), ksix(nsd,nsd)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(4) = (/4D0,1D0,3D0,1D0/)
-      INTEGER i, a, b
-      REAL(KIND=8) nu, tauM, kU, kS, nTx, Tp, udTx, udNx(eNoN), T1,
+      REAL(KIND=RKIND), PARAMETER :: ct(4) = (/4._RKIND, 1._RKIND,
+     2   3._RKIND, 1._RKIND/)
+
+      INTEGER(KIND=IKIND) i, a, b
+      REAL(KIND=RKIND) nu, tauM, kU, kS, nTx, Tp, udTx, udNx(eNoN), T1,
      2   amd, wl, Td, Tx(nsd), u(nsd), s
 
       T1  = eq(cEq)%af*eq(cEq)%gam*dt
@@ -56,12 +57,11 @@
       nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
       s   = eq(cEq)%dmn(cDmn)%prop(source_term)
       i   = eq(cEq)%s
-
       wl  = w*T1
 
-      u  = 0D0
+      u  = 0._RKIND
       Td = -s
-      Tx = 0D0
+      Tx = 0._RKIND
       DO a=1, eNoN
          u(1) = u(1) + N(a)*yl(1,a)
          u(2) = u(2) + N(a)*yl(2,a)
@@ -104,15 +104,11 @@
       IF (ISZERO(nTx)) nTx = eps
 
       udTx = u(1)*Tx(1) + u(2)*Tx(2) + u(3)*Tx(3)
-
-      Tp = ABS(Td + udTx)
-
-!     nu = nu + kDC
-      nu = nu + Tp/SQRT(nTx)/2D0
-
-      tauM = ct(4)/SQRT(ct(1)/dt/dt + ct(2)*kU + ct(3)*nu*nu*kS)
-
-      Tp = -tauM*(Td + udTx)
+      Tp   = ABS(Td + udTx)
+!      nu   = nu + kDC
+      nu   = nu + 0.5_RKIND*Tp/SQRT(nTx)
+      tauM = ct(4)/SQRT((ct(1)/(dt*dt)) + ct(2)*kU + ct(3)*nu*nu*kS)
+      Tp   = -tauM*(Td + udTx)
 
       DO a=1,eNoN
          udNx(a) = u(1)*Nx(1,a) + u(2)*Nx(2,a) + u(3)*Nx(3,a)
@@ -131,122 +127,22 @@
 
       RETURN
       END SUBROUTINE HEATF3D
-!====================================================================
-      PURE SUBROUTINE BHEATF (eNoN, w, N, y, h, nV, lR, lK)
-      USE COMMOD
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), y(tDof), h, nV(nsd)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER a, b, i
-      REAL(KIND=8) T1, wl, T, udn
-
-      wl = w*eq(cEq)%af*eq(cEq)%gam*dt
-      T  = y(eq(cEq)%s)
-
-      udn = 0D0
-      DO i=1, nsd
-         udn = udn + y(i)*nV(i)
-      END DO
-      udn = 5D-1*(udn - ABS(udn))
-      T1  = h - udn*T
-
-!     Here the loop is started for constructing left and right hand side
-      DO a=1, eNoN
-         lR(1,a) = lR(1,a) + w*N(a)*T1
-         DO b=1, eNoN
-            lK(1,a,b) = lK(1,a,b) - wl*N(a)*N(b)*udn
-         END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE BHEATF
-!####################################################################
-!     This is for solving the heat equation in a solid
-      PURE SUBROUTINE HEATS3D (eNoN, w, N, Nx, al, yl, lR, lK)
-      USE COMMOD
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
-
-      INTEGER i, a, b
-      REAL(KIND=8) nu, T1, amd, wl, Td, Tx(nsd), s, rho
-
-      nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
-      s   = eq(cEq)%dmn(cDmn)%prop(source_term)
-      rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
-
-      T1  = eq(cEq)%af*eq(cEq)%gam*dt
-      amd = eq(cEq)%am * rho/T1
-      i   = eq(cEq)%s
-
-      wl = w*T1
-
-      Td = -s
-      Tx = 0D0
-      DO a=1, eNoN
-         Td = Td + N(a)*al(i,a)
-
-         Tx(1) = Tx(1) + Nx(1,a)*yl(i,a)
-         Tx(2) = Tx(2) + Nx(2,a)*yl(i,a)
-         Tx(3) = Tx(3) + Nx(3,a)*yl(i,a)
-      END DO
-      Td = Td * rho
-
-      DO a=1,eNoN
-         lR(1,a) = lR(1,a) + w*(N(a)*Td
-     2      + (Nx(1,a)*Tx(1) + Nx(2,a)*Tx(2) + Nx(3,a)*Tx(3))*nu)
-
-         DO b=1,eNoN
-            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd
-     2         + nu*(Nx(1,a)*Nx(1,b) +Nx(2,a)*Nx(2,b) +Nx(3,a)*Nx(3,b)))
-         END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE HEATS3D
-!====================================================================
-      PURE SUBROUTINE BHEATS (eNoN, w, N, h, lR)
-      USE COMMOD
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), h
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN)
-
-      INTEGER a
-
-!     Here the loop is started for constructing left and right hand side
-      DO a=1, eNoN
-         lR(1,a) = lR(1,a) + w*N(a)*h
-      END DO
-
-      RETURN
-      END SUBROUTINE BHEATS
-!####################################################################
-
-!     2D versions
-
-!####################################################################
+!--------------------------------------------------------------------
 !     This is for solving heat equation in a fluid
       PURE SUBROUTINE HEATF2D (eNoN, w, N, Nx, al, yl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), ksix(nsd,nsd)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(4) = (/4D0,1D0,3D0,1D0/)
-      INTEGER i, a, b
-      REAL(KIND=8) nu, tauM, kU, kS, nTx, Tp, udTx, udNx(eNoN), T1,
+      REAL(KIND=RKIND), PARAMETER :: ct(4) = (/4._RKIND, 1._RKIND,
+     2   3._RKIND, 1._RKIND/)
+
+      INTEGER(KIND=IKIND) i, a, b
+      REAL(KIND=RKIND) nu, tauM, kU, kS, nTx, Tp, udTx, udNx(eNoN), T1,
      2   amd, wl, Td, Tx(nsd), u(nsd), s
 
       T1  = eq(cEq)%af*eq(cEq)%gam*dt
@@ -254,12 +150,11 @@
       nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
       s   = eq(cEq)%dmn(cDmn)%prop(source_term)
       i   = eq(cEq)%s
-
       wl  = w*T1
 
-      u  = 0D0
+      u  = 0._RKIND
       Td = -s
-      Tx = 0D0
+      Tx = 0._RKIND
       DO a=1, eNoN
          u(1) = u(1) + N(a)*yl(1,a)
          u(2) = u(2) + N(a)*yl(2,a)
@@ -290,15 +185,11 @@
       IF (ISZERO(nTx)) nTx = eps
 
       udTx = u(1)*Tx(1) + u(2)*Tx(2)
-
-      Tp = ABS(Td + udTx)
-
-!     nu = nu + kDC
-      nu = nu + Tp/SQRT(nTx)/2D0
-
-      tauM = ct(4)/SQRT(ct(1)/dt/dt + ct(2)*kU + ct(3)*nu*nu*kS)
-
-      Tp = -tauM*(Td + udTx)
+      Tp   = ABS(Td + udTx)
+!      nu   = nu + kDC
+      nu   = nu + 0.5_RKIND*Tp/SQRT(nTx)
+      tauM = ct(4)/SQRT((ct(1)/(dt*dt)) + ct(2)*kU + ct(3)*nu*nu*kS)
+      Tp   = -tauM*(Td + udTx)
 
       DO a=1, eNoN
          udNx(a) = u(1)*Nx(1,a) + u(2)*Nx(2,a)
@@ -317,19 +208,50 @@
 
       RETURN
       END SUBROUTINE HEATF2D
-!####################################################################
-!     This is for solving the heat equation in a solid
-      PURE SUBROUTINE HEATS2D (eNoN, w, N, Nx, al, yl, lR, lK)
+!--------------------------------------------------------------------
+      PURE SUBROUTINE BHEATF (eNoN, w, N, y, h, nV, lR, lK)
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), y(tDof), h, nV(nsd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER i, a, b
-      REAL(KIND=8) nu, T1, amd, wl, Td, Tx(nsd), s, rho
+      INTEGER(KIND=IKIND) a, b, i
+      REAL(KIND=RKIND) T1, wl, T, udn
+
+      wl = w*eq(cEq)%af*eq(cEq)%gam*dt
+      T  = y(eq(cEq)%s)
+
+      udn = 0._RKIND
+      DO i=1, nsd
+         udn = udn + y(i)*nV(i)
+      END DO
+      udn = 0.5_RKIND*(udn - ABS(udn))
+      T1  = h - udn*T
+
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) + w*N(a)*T1
+         DO b=1, eNoN
+            lK(1,a,b) = lK(1,a,b) - wl*N(a)*N(b)*udn
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE BHEATF
+!####################################################################
+!     This is for solving the heat equation in a solid
+      PURE SUBROUTINE HEATS3D (eNoN, w, N, Nx, al, yl, lR, lK)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) i, a, b
+      REAL(KIND=RKIND) nu, T1, amd, wl, Td, Tx(nsd), s, rho
 
       nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
       s   = eq(cEq)%dmn(cDmn)%prop(source_term)
@@ -342,7 +264,53 @@
       wl = w*T1
 
       Td = -s
-      Tx = 0D0
+      Tx = 0._RKIND
+      DO a=1, eNoN
+         Td = Td + N(a)*al(i,a)
+
+         Tx(1) = Tx(1) + Nx(1,a)*yl(i,a)
+         Tx(2) = Tx(2) + Nx(2,a)*yl(i,a)
+         Tx(3) = Tx(3) + Nx(3,a)*yl(i,a)
+      END DO
+      Td = Td * rho
+
+      DO a=1,eNoN
+         lR(1,a) = lR(1,a) + w*(N(a)*Td
+     2      + (Nx(1,a)*Tx(1) + Nx(2,a)*Tx(2) + Nx(3,a)*Tx(3))*nu)
+
+         DO b=1,eNoN
+            lK(1,a,b) = lK(1,a,b) + wl*(N(a)*N(b)*amd
+     2         + nu*(Nx(1,a)*Nx(1,b) +Nx(2,a)*Nx(2,b) +Nx(3,a)*Nx(3,b)))
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE HEATS3D
+!--------------------------------------------------------------------
+!     This is for solving the heat equation in a solid
+      PURE SUBROUTINE HEATS2D (eNoN, w, N, Nx, al, yl, lR, lK)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(nsd,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(1,eNoN), lK(1,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) i, a, b
+      REAL(KIND=RKIND) nu, T1, amd, wl, Td, Tx(nsd), s, rho
+
+      nu  = eq(cEq)%dmn(cDmn)%prop(conductivity)
+      s   = eq(cEq)%dmn(cDmn)%prop(source_term)
+      rho = eq(cEq)%dmn(cDmn)%prop(solid_density)
+
+      T1  = eq(cEq)%af*eq(cEq)%gam*dt
+      amd = eq(cEq)%am * rho/T1
+      i   = eq(cEq)%s
+
+      wl = w*T1
+
+      Td = -s
+      Tx = 0._RKIND
       DO a=1, eNoN
          Td = Td + N(a)*al(i,a)
 
@@ -363,4 +331,20 @@
 
       RETURN
       END SUBROUTINE HEATS2D
+!--------------------------------------------------------------------
+      PURE SUBROUTINE BHEATS (eNoN, w, N, h, lR)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), h
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN)
+
+      INTEGER(KIND=IKIND) a
+
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) + w*N(a)*h
+      END DO
+
+      RETURN
+      END SUBROUTINE BHEATS
 !####################################################################

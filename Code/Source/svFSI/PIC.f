@@ -41,15 +41,15 @@
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER iEq, s, e
-      REAL(KIND=8) coef, ctime
+      INTEGER(KIND=IKIND) iEq, s, e
+      REAL(KIND=RKIND) coef, ctime
 
 !     Prestress initialization
       IF (pstEq) THEN
          pS0 = pS0 + pSn
-         Ao = 0D0
-         Yo = 0D0
-         Do = 0D0
+         Ao = 0._RKIND
+         Yo = 0._RKIND
+         Do = 0._RKIND
       END IF
 
 !     Immersed body treatment (explicit)
@@ -57,7 +57,7 @@
          ib%callD(1) = CPUT()
 
 !        Set IB forces to zero, except for feedback force
-         ib%R = 0D0
+         ib%R = 0._RKIND
 
 !        Compute FSI forcing (ib%R) for immersed bodies (IFEM)
          CALL IB_CALCFFSI(Do)
@@ -79,7 +79,7 @@ c         CALL IB_SETBCPEN()
       DO iEq=1, nEq
          s = eq(iEq)%s
          e = eq(iEq)%e
-         coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
+         coef = (eq(iEq)%gam - 1._RKIND)/eq(iEq)%gam
          An(s:e,:) = Ao(s:e,:)*coef
 
 !        electrophysiology
@@ -92,20 +92,20 @@ c         CALL IB_SETBCPEN()
          IF (dFlag) THEN
             IF (.NOT.sstEq) THEN
 !              struct, lElas, FSI (struct, mesh)
-               coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
-     2            /(eq(iEq)%gam - 1D0)
+               coef = dt*dt*(0.5_RKIND*eq(iEq)%gam - eq(iEq)%beta)
+     2            /(eq(iEq)%gam - 1._RKIND)
                Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
             ELSE
 !              vms_struct, FSI
                IF (eq(iEq)%phys .EQ. phys_vms_struct .OR.
      2             eq(iEq)%phys .EQ. phys_FSI) THEN
-                  coef = (eq(iEq)%gam - 1D0)/eq(iEq)%gam
+                  coef = (eq(iEq)%gam - 1._RKIND)/eq(iEq)%gam
                   Ad(:,:)   = Ad(:,:)*coef
                   Dn(s:e,:) = Do(s:e,:)
                ELSE IF (eq(iEq)%phys .EQ. phys_mesh) THEN
 !              mesh
-                  coef = dt*dt*(5D-1*eq(iEq)%gam - eq(iEq)%beta)
-     2               /(eq(iEq)%gam - 1D0)
+                  coef = dt*dt*(0.5_RKIND*eq(iEq)%gam - eq(iEq)%beta)
+     2               /(eq(iEq)%gam - 1._RKIND)
                   Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
                END IF
             END IF
@@ -121,12 +121,11 @@ c         CALL IB_SETBCPEN()
       SUBROUTINE PICI(Ag, Yg, Dg)
       USE COMMOD
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(INOUT) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+      REAL(KIND=RKIND), INTENT(INOUT) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      INTEGER s, e, i, a
-      REAL(KIND=8) coef(4)
+      INTEGER(KIND=IKIND) s, e, i, a
+      REAL(KIND=RKIND) coef(4)
 
       dof         = eq(cEq)%dof
       eq(cEq)%itr = eq(cEq)%itr + 1
@@ -134,9 +133,9 @@ c         CALL IB_SETBCPEN()
       DO i=1, nEq
          s       = eq(i)%s
          e       = eq(i)%e
-         coef(1) = 1D0 - eq(i)%am
+         coef(1) = 1._RKIND - eq(i)%am
          coef(2) = eq(i)%am
-         coef(3) = 1D0 - eq(i)%af
+         coef(3) = 1._RKIND - eq(i)%af
          coef(4) = eq(i)%af
 
          DO a=1, tnNo
@@ -156,7 +155,7 @@ c         CALL IB_SETBCPEN()
          END IF
       END DO
 
-      IF (pstEq) pSn(:,:) = 0D0
+      IF (pstEq) pSn(:,:) = 0._RKIND
 
       RETURN
       END SUBROUTINE PICI
@@ -168,15 +167,15 @@ c         CALL IB_SETBCPEN()
       IMPLICIT NONE
 
       LOGICAL :: l1, l2, l3, l4
-      INTEGER :: s, e, a, Ac
-      REAL(KIND=8) :: coef(5), r1, dUl(nsd)
+      INTEGER(KIND=IKIND) :: s, e, a, Ac
+      REAL(KIND=RKIND) :: coef(5), r1, dUl(nsd)
 
       s       = eq(cEq)%s
       e       = eq(cEq)%e
       coef(1) = eq(cEq)%gam*dt
       coef(2) = eq(cEq)%af*coef(1)
       coef(3) = eq(cEq)%beta*dt*dt
-      coef(4) = 1D0 / eq(cEq)%am
+      coef(4) = 1._RKIND / eq(cEq)%am
       coef(5) = coef(2)*coef(4)
 
       IF ( (eq(cEq)%phys .EQ. phys_fluid .OR.
@@ -246,13 +245,13 @@ c         CALL IB_SETBCPEN()
                pSn(:,a) = pSn(:,a) / pSa(a)
             END IF
          END DO
-         pSa = 0D0
+         pSa = 0._RKIND
       END IF
 
 !     Filter out the non-wall displacements for CMM equation
       IF (eq(cEq)%phys.EQ.phys_CMM .AND. .NOT.cmmInit) THEN
          DO a=1, tnNo
-            r1 = REAL(cmmBdry(a), KIND=8)
+            r1 = REAL(cmmBdry(a), KIND=RKIND)
             Dn(s:e-1,a) = Dn(s:e-1,a)*r1
          END DO
       END IF

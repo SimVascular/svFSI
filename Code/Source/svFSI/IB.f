@@ -41,17 +41,16 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
 
       LOGICAL :: flag
-      INTEGER :: i, j, iM, iFa, a, b, Ac, e
-      REAL(KIND=8) :: scaleF, fibN(nsd), rtmp
+      INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e
+      REAL(KIND=RKIND) :: scaleF, fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(fileType) :: fTmp
 
-      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:), gX(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:), gX(:,:)
 
       ib%nMsh  = list%srch("Add IB",ll=1)
       std = " Number of immersed boundaries: "//ib%nMsh
@@ -95,8 +94,8 @@
          END DO
 
 !     To scale the mesh, while attaching x to gX
-         scaleF = 1D0
-         lPtr => lPM%get(scaleF, "Mesh scale factor", lb=0D0)
+         scaleF = 1._RKIND
+         lPtr => lPM%get(scaleF, "Mesh scale factor", lb=0._RKIND)
          a = ib%tnNo + ib%msh(iM)%gnNo
          IF (iM .GT. 1) THEN
             ALLOCATE(tmpX(nsd,ib%tnNo))
@@ -113,7 +112,7 @@
          ib%tnNo           = a
          DEALLOCATE(ib%msh(iM)%x)
 
-         ib%msh(iM)%dx = 0.1D0
+         ib%msh(iM)%dx = 0.1_RKIND
          lPtr => lPM%get(rtmp,"Mesh edge size")
          IF (ASSOCIATED(lPtr)) ib%msh(iM)%dx = rtmp
       END DO
@@ -224,7 +223,7 @@
             j = lPM%srch("Fiber direction file path")
             IF (j .NE. 0) THEN
                ALLOCATE(ib%msh(iM)%x(ib%nFn*nsd,ib%msh(iM)%gnNo))
-               ib%msh(iM)%x = 0D0
+               ib%msh(iM)%x = 0._RKIND
                DO i=1, j
                   lPtr => lPM%get(cTmp, "Fiber direction file path", i)
                   CALL READVTUPDATA(ib%msh(iM), cTmp, "FIB_DIR", nsd, i)
@@ -233,7 +232,7 @@
                j = lPM%srch("Fiber direction")
                IF (j .NE. 0) THEN
                   ALLOCATE(ib%msh(iM)%x(ib%nFn*nsd,msh(iM)%gnNo))
-                  ib%msh(iM)%x = 0D0
+                  ib%msh(iM)%x = 0._RKIND
                   DO i=1, j
                      lPtr => lPM%get(fibN, "Fiber direction", i)
                      DO a=1, ib%msh(iM)%gnNo
@@ -245,7 +244,7 @@
          END DO
 
          ALLOCATE(ib%fN(ib%nFn*nsd,ib%tnNo))
-         ib%fN = 0D0
+         ib%fN = 0._RKIND
          DO iM=1, ib%nMsh
             IF (.NOT.ALLOCATED(ib%msh(iM)%x)) CYCLE
             DO a=1, ib%msh(iM)%gnNo
@@ -278,7 +277,6 @@
       USE COMMOD
       USE LISTMOD
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
 
       CHARACTER(LEN=stdL) :: ctmp
@@ -311,17 +309,16 @@
       USE ALLFUN
       USE LISTMOD
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 5
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 5
 
       LOGICAL flag
-      INTEGER i, iBc, propL(maxNProp), iDmn, iProp, prop, nDOP(4),
-     2   outputs(maxOutput)
-      REAL(KIND=8) rtmp
+      INTEGER(KIND=IKIND) i, iBc, propL(maxNProp), iDmn, iProp, prop,
+     2   nDOP(4), outputs(maxOutput)
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPD, lPBC
 
@@ -403,19 +400,20 @@
 
 !        Domain properties
          DO iProp=1, maxNProp
-            rtmp = 0D0
+            rtmp = 0._RKIND
             prop = propL(iProp)
             SELECT CASE (prop)
             CASE (prop_NA)
                EXIT
             CASE (solid_density)
-               lPtr => lPD%get(rtmp,"Density",1,ll=0D0)
+               lPtr => lPD%get(rtmp,"Density",1,ll=0._RKIND)
             CASE (elasticity_modulus)
-               lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
+               lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0._RKIND)
             CASE (poisson_ratio)
-               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ul=5D-1)
+               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0._RKIND,
+     2            ul=0.5_RKIND)
             CASE (solid_viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",ll=0D0)
+               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (f_x)
                lPtr => lPD%get(rtmp,"Force_X")
             CASE (f_y)
@@ -427,15 +425,15 @@
             CASE (damping)
                lPtr => lPD%get(rtmp,"Mass damping")
             CASE (shell_thickness)
-               lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0D0)
+               lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0._RKIND)
             CASE (ctau_M)
                lPtr => lPD%get(rtmp,
      2            "Momentum stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.001D0
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1.E-3_RKIND
             CASE (ctau_C)
                lPtr => lPD%get(rtmp,
      2            "Continuity stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.0D0
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0._RKIND
             CASE DEFAULT
                err = "Undefined properties (IB)"
             END SELECT
@@ -483,12 +481,11 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(INOUT) :: lEq
-      INTEGER, INTENT(IN) :: nDOP(4), outputs(nDOP(1))
+      INTEGER(KIND=IKIND), INTENT(IN) :: nDOP(4), outputs(nDOP(1))
       TYPE(listType), INTENT(INOUT) :: list
 
-      INTEGER nOut, iOut, i, j
+      INTEGER(KIND=IKIND) nOut, iOut, i, j
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPO
 
@@ -570,9 +567,8 @@
       SUBROUTINE IB_FINDFACE(faName, iM, iFa)
       USE COMMOD
       IMPLICIT NONE
-
+      INTEGER(KIND=IKIND), INTENT(OUT) :: iM, iFa
       CHARACTER(LEN=stdL) :: faName
-      INTEGER, INTENT(OUT) :: iM, iFa
 
       iFa = 0
       MY_LOOP : DO iM=1, ib%nMsh
@@ -600,18 +596,17 @@
       USE ALLFUN
       USE LISTMOD
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(listType), INTENT(INOUT) :: list
 
       LOGICAL ltmp
-      INTEGER a, b, i, j, Ac, iM, iFa, fid, nNo
-      REAL(KIND=8) rtmp
+      INTEGER(KIND=IKIND) a, b, i, j, Ac, iM, iFa, fid, nNo
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr
       TYPE(fileType) fTmp
 
-      INTEGER, ALLOCATABLE :: ptr(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
 
       iM  = lBc%iM
       iFa = lBc%iFa
@@ -747,7 +742,7 @@ c     2         "can be applied for Neumann boundaries only"
          ALLOCATE(lBc%gm)
          ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(ib%msh(iM)%nNo))
 !     I am seting all the nodes to zero just in case a node is not set
-         lBc%gm%d   = 0D0
+         lBc%gm%d   = 0._RKIND
          lBc%gm%dof = i
          lBc%gm%nTP = j
          ptr        = 0
@@ -777,7 +772,7 @@ c     2         "can be applied for Neumann boundaries only"
      2            " should be zero in <"//TRIM(ftmp%fname)//">"
             ELSE
                rtmp = rtmp - lBc%gm%t(i-1)
-               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-in"//
+               IF (ISZERO(rtmp) .OR. rtmp.LT.0._RKIND) err = "Non-in"//
      2            "creasing time trend is found in <"//
      3            TRIM(ftmp%fname)//">"
             END IF
@@ -837,7 +832,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Preparing the pointer array
          IF (iFa .NE. 0) THEN
             DO a=1, nNo
-               lBc%gx(a) = 0D0
+               lBc%gx(a) = 0._RKIND
                Ac = ib%msh(iM)%fa(iFa)%gN(a)
                Ac = ib%msh(iM)%lN(Ac)
                IF (Ac .EQ. 0) err = "Incorrect global node number "//
@@ -849,7 +844,7 @@ c     2         "can be applied for Neumann boundaries only"
             END DO
          ELSE
             DO a=1, nNo
-               lBc%gx(a) = 0D0
+               lBc%gx(a) = 0._RKIND
                ptr(a) = a
             END DO
          END IF
@@ -896,14 +891,13 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
-
-      INTEGER a, iM, iFa, iEq, iDmn, iBc, nnz
-      REAL(KIND=8) lD(nsd,tnNo), s(1,ib%tnNo)
+      INTEGER(KIND=IKIND) a, iM, iFa, iEq, iDmn, iBc, nnz
+      REAL(KIND=RKIND) lD(nsd,tnNo), s(1,ib%tnNo)
       CHARACTER(LEN=stdL) sOut
 
-      ib%callD = 0D0
+      ib%callD = 0._RKIND
       ib%callD(1) = CPUT()
 
       std = " ================================="
@@ -917,7 +911,7 @@ c     2         "can be applied for Neumann boundaries only"
          END IF
       END DO
 
-      lD = 0D0
+      lD = 0._RKIND
       IF (mvMsh) THEN
          DO a=1, tnNo
             lD(:,a) = Dg(nsd+2:2*nsd+1,a)
@@ -925,7 +919,7 @@ c     2         "can be applied for Neumann boundaries only"
       END IF
 
 !     Calculating the volume of each domain
-      s = 1D0
+      s = 1._RKIND
       DO iEq=1, nEq
          DO iDmn=1, eq(iEq)%nDmnIB
             eq(iEq)%dmnIB(iDmn)%v =
@@ -1025,13 +1019,12 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
 
-      INTEGER e, a, Ac, g, iM
-      REAL(KIND=8) tmp, area, n(nsd), Jac
+      INTEGER(KIND=IKIND) e, a, Ac, g, iM
+      REAL(KIND=RKIND) tmp, area, n(nsd), Jac
 
-      REAL(KIND=8), ALLOCATABLE :: sV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:)
 
 !     Calculating the center of the face, diameter and its area
       iM = lFa%iM
@@ -1039,8 +1032,8 @@ c     2         "can be applied for Neumann boundaries only"
       ALLOCATE(lFa%nV(nsd,lFa%nNo))
 
       ALLOCATE(sV(nsd,ib%tnNo))
-      sV   = 0D0
-      area = 0D0
+      sV   = 0._RKIND
+      area = 0._RKIND
       DO e=1, lFa%nEl
          IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(ib%msh(iM), lFa, e)
          DO g=1, lFa%nG
@@ -1065,8 +1058,8 @@ c     2         "can be applied for Neumann boundaries only"
          IF (ISZERO(tmp)) THEN
             wrn = " Skipping normal calculation of node "//a//
      2         " in face <"//TRIM(lFa%name)//">"
-            lFa%nV(:,a) = 0D0
-            lFa%nV(1,a) = 1D0
+            lFa%nV(:,a) = 0._RKIND
+            lFa%nV(1,a) = 1._RKIND
             CYCLE
          END IF
          lFa%nV(:,a) = sV(:,Ac)/tmp
@@ -1080,15 +1073,14 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER iM, iFa, jFa, i, a, b, Ac, j
-      REAL(KIND=8) tmp, nV(nsd), center(nsd), maxN
+      INTEGER(KIND=IKIND) iM, iFa, jFa, i, a, b, Ac, j
+      REAL(KIND=RKIND) tmp, nV(nsd), center(nsd), maxN
 
-      INTEGER, ALLOCATABLE :: gNodes(:)
-      REAL(KIND=8), ALLOCATABLE :: s(:), sV(:,:), sVl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: s(:), sV(:,:), sVl(:,:)
 
       IF (BTEST(lBc%bType,bType_gen)) THEN
          IF (BTEST(lBc%bType,bType_Neu) .AND. lBc%gm%dof.NE.1) THEN
@@ -1102,12 +1094,12 @@ c     2         "can be applied for Neumann boundaries only"
       IF (.NOT.ALLOCATED(lBc%gx)) ALLOCATE(lBc%gx(lFa%nNo))
 
       ALLOCATE(s(ib%tnNo))
-      s = 0D0
+      s = 0._RKIND
       IF (BTEST(lBc%bType,bType_flat)) THEN
 !     Just a constant value for Flat profile
          DO a=1, lFa%nNo
             Ac    = lFa%gN(a)
-            s(Ac) = 1D0
+            s(Ac) = 1._RKIND
          END DO
       ELSE IF (BTEST(lBc%bType,bType_para)) THEN
 !     Here is the method that is used for imposing parabolic profile:
@@ -1115,12 +1107,12 @@ c     2         "can be applied for Neumann boundaries only"
 !     vector from center to each of points on the boundary: ew
 !     3- maximize ew(i).e where e is the unit vector from current
 !     point to the center 4- Use the point i as the diam here
-         center = 0D0
+         center = 0._RKIND
          DO a=1, lFa%nNo
             Ac = lFa%gN(a)
             center(:) = center(:) + ib%x(:,Ac)
          END DO
-         center(:) = center(:)/REAL(lFa%nNo,KIND=8)
+         center(:) = center(:)/REAL(lFa%nNo, KIND=RKIND)
          ALLOCATE(gNodes(ib%tnNo), sV(nsd,ib%tnNo))
 !     gNodes is one if a node located on the boundary (beside iFa)
          gNodes = 0
@@ -1134,7 +1126,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     "j" is a counter for the number of nodes that are located on the
 !     boundary of lFa and sVl contains the list of their coordinates
          j  = 0
-         sV = 0D0
+         sV = 0._RKIND
          DO a=1, lFa%nNo
             Ac = lFa%gN(a)
             IF (gNodes(Ac) .EQ. 1) THEN
@@ -1163,7 +1155,7 @@ c     2         "can be applied for Neumann boundaries only"
                   i = b
                END IF
             END DO
-            s(Ac) = 1D0 - NORM(nV)/NORM(sV(:,i))
+            s(Ac) = 1._RKIND - NORM(nV)/NORM(sV(:,i))
          END DO
       ELSE IF (BTEST(lBc%bType,bType_ud)) THEN
          DO a=1, lFa%nNo
@@ -1178,7 +1170,7 @@ c     2         "can be applied for Neumann boundaries only"
             IF (jFa .EQ. iFa) CYCLE
             DO a=1, ib%msh(iM)%fa(jFa)%nNo
                Ac    = ib%msh(iM)%fa(jFa)%gN(a)
-               s(Ac) = 0D0
+               s(Ac) = 0._RKIND
             END DO
          END DO
       END IF
@@ -1196,13 +1188,12 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(mshType), INTENT(IN) :: lM
 
-      INTEGER a, Ac, iFa
+      INTEGER(KIND=IKIND) a, Ac, iFa
 
-      REAL(KIND=8), ALLOCATABLE :: s(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: s(:)
 
       IF (BTEST(lBc%bType,bType_gen)) THEN
          IF (BTEST(lBc%bType,bType_Neu) .AND. lBc%gm%dof.NE.1) THEN
@@ -1214,12 +1205,12 @@ c     2         "can be applied for Neumann boundaries only"
       IF (.NOT.ALLOCATED(lBc%gx)) ALLOCATE(lBc%gx(lM%nNo))
 
       ALLOCATE(s(ib%tnNo))
-      s = 0D0
+      s = 0._RKIND
       IF (BTEST(lBc%bType,bType_flat)) THEN
 !     Just a constant value for Flat profile
          DO a=1, lM%nNo
             Ac    = lM%gN(a)
-            s(Ac) = 1D0
+            s(Ac) = 1._RKIND
          END DO
       ELSE IF (BTEST(lBc%bType,bType_para)) THEN
          err = "Parabolic BC not set up yet for immersed shells"
@@ -1236,7 +1227,7 @@ c     2         "can be applied for Neumann boundaries only"
          DO iFa=1, lM%nFa
             DO a=1, lM%fa(iFa)%nNo
                Ac    = lM%fa(iFa)%gN(a)
-               s(Ac) = 0D0
+               s(Ac) = 0._RKIND
             END DO
          END DO
       END IF
@@ -1254,15 +1245,15 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER :: a, b, e, f, g, Ac, Bc, nNo, nEl, eNoN, ep(2,3)
+      INTEGER(KIND=IKIND) :: a, b, e, f, g, Ac, Bc, nNo, nEl, eNoN,
+     2   ep(2,3)
       LOGICAL :: flag
-      REAL(KIND=8) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
+      REAL(KIND=RKIND) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
 
-      INTEGER, ALLOCATABLE :: incN(:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sV(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incN(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sV(:,:)
 
       IF (lM%eType .EQ. eType_NRB) THEN
          ALLOCATE(lM%eIEN(0,0), lM%sbc(lM%eNoN,lM%nEl))
@@ -1309,8 +1300,8 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Compute shell director (normal)
       ALLOCATE(xl(nsd,eNoN), sV(nsd,ib%tnNo), lM%nV(nsd,nNo))
-      sV   = 0D0
-      area = 0D0
+      sV   = 0._RKIND
+      area = 0._RKIND
       DO e=1, nEl
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
          DO a=1, eNoN
@@ -1342,8 +1333,8 @@ c     2         "can be applied for Neumann boundaries only"
      2            " in mesh <"//TRIM(lM%name)//">"
                flag = .FALSE.
             END IF
-            lM%nV(:,a) = 0D0
-            lM%nV(1,a) = 1D0
+            lM%nV(:,a) = 0._RKIND
+            lM%nV(1,a) = 1._RKIND
             CYCLE
          END IF
          lM%nV(:,a) = sV(:,Ac)/Jac
@@ -1359,12 +1350,11 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(OUT) :: nnz
 
-      INTEGER, INTENT(OUT) :: nnz
+      INTEGER(KIND=IKIND) i, j, a, b, e, mnnzeic, rowN, colN, iM
 
-      INTEGER i, j, a, b, e, mnnzeic, rowN, colN, iM
-
-      INTEGER, ALLOCATABLE :: uInd(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: uInd(:,:)
 
       mnnzeic = 10*MAXVAL(ib%msh(:)%eNoN)
  003  mnnzeic = mnnzeic + MAX(5,mnnzeic/5)
@@ -1480,12 +1470,11 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
-
-      INTEGER :: a, Ac, i, iM, itmp
       LOGICAL :: flag, incL
-      REAL(KIND=8) :: minb(nsd), maxb(nsd), xp(nsd), dx
+      INTEGER(KIND=IKIND) :: a, Ac, i, iM, itmp
+      REAL(KIND=RKIND) :: minb(nsd), maxb(nsd), xp(nsd), dx
 
       LOGICAL, ALLOCATABLE :: chck(:)
 
@@ -1553,14 +1542,13 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
       LOGICAL flag
-      INTEGER a, b, i, Ac, Bc, iswp, iM, nNo
-      REAL(KIND=8) xp(nsd)
+      INTEGER(KIND=IKIND) a, b, i, Ac, Bc, iswp, iM, nNo
+      REAL(KIND=RKIND) xp(nsd)
 
-      INTEGER, ALLOCATABLE :: incNd(:), ptr(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), ptr(:)
 
 !     Just in case a fresh iblank appears in the current process
       IF (SUM(iblank) .EQ. 0) CALL IB_SETIBLANK(lD)
@@ -1622,25 +1610,24 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: xp(nsd)
+      REAL(KIND=RKIND), INTENT(IN) :: xp(nsd)
       LOGICAL, INTENT(INOUT) :: flag
 
-      INTEGER :: a, e, Ac, Ec, iM, iFa, jM, jFa
-      REAL(KIND=8) :: dS, minS, Jac, nV(nsd), xb(nsd), dotP
+      INTEGER(KIND=IKIND) :: a, e, Ac, Ec, iM, iFa, jM, jFa
+      REAL(KIND=RKIND) :: dS, minS, Jac, nV(nsd), xb(nsd), dotP
 
 !     Find the closest immersed face centroid from the probe
       minS = HUGE(minS)
       DO iM=1, ib%nMsh
          DO iFa=1, ib%msh(iM)%nFa
             DO e=1, ib%msh(iM)%fa(iFa)%nEl
-               xb = 0D0
+               xb = 0._RKIND
                DO a=1, ib%msh(iM)%fa(iFa)%eNoN
                   Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
                   xb = xb + ib%x(:,Ac) + ib%Uo(:,Ac)
                END DO
-               xb = xb / REAL(ib%msh(iM)%fa(iFa)%eNoN, KIND=8)
-               dS = SQRT( SUM( (xp(:)-xb(:))**2 ) )
+               xb = xb / REAL(ib%msh(iM)%fa(iFa)%eNoN, KIND=RKIND)
+               dS = SQRT( SUM( (xp(:)-xb(:))**2._RKIND ) )
                IF (dS .LT. minS) THEN
                   minS = dS
                   Ec   = e
@@ -1657,18 +1644,18 @@ c     2         "can be applied for Neumann boundaries only"
       nV  = nV(:)/Jac
 
 !     Check the sign of op.n
-      xb = 0D0
+      xb = 0._RKIND
       DO a=1, ib%msh(jM)%fa(jFa)%eNoN
          Ac = ib%msh(jM)%fa(jFa)%IEN(a,Ec)
          xb = xb + ib%x(:,Ac) + ib%Uo(:,Ac)
       END DO
-      xb   = xb / REAL(ib%msh(jM)%fa(jFa)%eNoN, KIND=8)
+      xb   = xb / REAL(ib%msh(jM)%fa(jFa)%eNoN, KIND=RKIND)
       dotP = NORM(xp-xb, nV)
 
-      IF (dotP .LT. -1D-9) THEN
+      IF (dotP .LT. -1.E-9_RKIND) THEN
 !        probe lies inside IB
          flag = .TRUE.
-      ELSE IF (dotP .GT. 1D-9) THEN
+      ELSE IF (dotP .GT. 1.E-9_RKIND) THEN
 !        probe lies outside IB
          flag = .FALSE.
       ELSE
@@ -1677,7 +1664,7 @@ c     2         "can be applied for Neumann boundaries only"
          Ac   = ib%msh(jM)%fa(jFa)%IEN(1,Ec)
          xb   = ib%x(:,Ac) + ib%Uo(:,Ac)
          dotP = NORM(xp-xb,nV)
-         IF (ABS(dotP) .LT. 1D-9) THEN
+         IF (ABS(dotP) .LT. 1.E-9_RKIND) THEN
             flag = .TRUE.
          ELSE
             flag = .FALSE.
@@ -1693,13 +1680,12 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
-      INTEGER iFa
+      INTEGER(KIND=IKIND) iFa
 
-      INTEGER, ALLOCATABLE :: incEl(:), ePtr(:,:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incEl(:), ePtr(:,:,:)
 
 !     For shells and IFEM method, all the mesh elements are included for
 !     trace search. For solids, only boundary/face nodes are included
@@ -1728,14 +1714,13 @@ c     2         "can be applied for Neumann boundaries only"
       SUBROUTINE IB_UPDATE(Dg)
       USE COMMOD
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
-
-      INTEGER :: a, iM, iFa
-      REAL(KIND=8), ALLOCATABLE :: lD(:,:)
+      INTEGER(KIND=IKIND) :: a, iM, iFa
+      REAL(KIND=RKIND), ALLOCATABLE :: lD(:,:)
 
       ALLOCATE(lD(nsd,tnNo))
-      lD = 0D0
+      lD = 0._RKIND
       IF (mvMsh) THEN
          DO a=1, tnNo
             lD(:,a) = Dg(nsd+2:2*nsd+1,a)
@@ -1776,18 +1761,17 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       USE UTILMOD
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
       LOGICAL :: ipass
-      INTEGER :: a, e, g, i, j, Ac, Ec, iM, iswp, ne
-      REAL(KIND=8) :: xp(nsd), xi(nsd)
+      INTEGER(KIND=IKIND) :: a, e, g, i, j, Ac, Ec, iM, iswp, ne
+      REAL(KIND=RKIND) :: xp(nsd), xi(nsd)
 
       LOGICAL, ALLOCATABLE :: ichk(:)
-      INTEGER, ALLOCATABLE :: incEl(:), eList(:), ePtr(:,:,:),
-     2   gPtr(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incEl(:), eList(:),
+     2   ePtr(:,:,:), gPtr(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:)
 
 !     It is not necessary to find traces for all nodes. Instead, use
 !     previously determined traces and update them in their neighborhood
@@ -1836,7 +1820,7 @@ c     2         "can be applied for Neumann boundaries only"
                   eList(j) = msh(iM)%eAdj%pcol(i)
                END DO
 
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lM%eNoN
                   xp = xp + xl(:,a)*lM%N(a,g)
                END DO
@@ -1889,18 +1873,17 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       USE UTILMOD
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
       LOGICAL :: ipass
-      INTEGER :: a, e, g, i, j, Ac, Ec, iM, iswp, ne
-      REAL(KIND=8) :: xp(nsd), xi(nsd)
+      INTEGER(KIND=IKIND) :: a, e, g, i, j, Ac, Ec, iM, iswp, ne
+      REAL(KIND=RKIND) :: xp(nsd), xi(nsd)
 
       LOGICAL, ALLOCATABLE :: ichk(:)
-      INTEGER, ALLOCATABLE :: incEl(:), eList(:), ePtr(:,:,:),
-     2   gPtr(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incEl(:), eList(:),
+     2   ePtr(:,:,:), gPtr(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:)
 
 !     It is not necessary to find traces for all nodes. Instead, use
 !     previously determined traces and update them in their neighborhood
@@ -1949,7 +1932,7 @@ c     2         "can be applied for Neumann boundaries only"
                   eList(j) = msh(iM)%eAdj%pcol(i)
                END DO
 
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lFa%eNoN
                   xp = xp + xl(:,a)*lFa%N(a,g)
                END DO
@@ -2001,24 +1984,23 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: srchEl(lM%nEl)
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
-      INTEGER, INTENT(INOUT) :: ePtr(2,lM%nG,lM%nEl)
+      INTEGER(KIND=IKIND), INTENT(IN) :: srchEl(lM%nEl)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: ePtr(2,lM%nG,lM%nEl)
 
-      INTEGER :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
-      REAL(KIND=8) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
-
+      INTEGER(KIND=IKIND) :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
+      REAL(KIND=RKIND) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
       TYPE(queueType) :: probeElQ
+
       LOGICAL, ALLOCATABLE :: ichk(:)
-      INTEGER, ALLOCATABLE :: incEl(:), rootEl(:), eList(:), sCount(:),
-     2   disps(:), masEList(:), ptr(:), gptr(:), tmpI(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), xpL(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incEl(:), rootEl(:), eList(:),
+     2   sCount(:), disps(:), masEList(:), ptr(:), gptr(:), tmpI(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), xpL(:,:)
 
 !     Create a list of all the mesh nodes
       ALLOCATE(xpL(nsd,lM%nNo))
-      xpL = 0D0
+      xpL = 0._RKIND
       DO a=1, lM%nNo
          Ac = lM%gN(a)
          xpL(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
@@ -2139,7 +2121,7 @@ c     2         "can be applied for Neumann boundaries only"
                xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             END DO
             DO g=1, lM%nG
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lM%eNoN
                   xp = xp + xl(:,a)*lM%N(a,g)
                END DO
@@ -2179,7 +2161,7 @@ c     2         "can be applied for Neumann boundaries only"
                   xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
                END DO
 
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lM%eNoN
                   xp = xp + xl(:,a)*lM%N(a,g)
                END DO
@@ -2237,7 +2219,7 @@ c     2         "can be applied for Neumann boundaries only"
                      xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
                   END DO
 
-                  xp = 0D0
+                  xp = 0._RKIND
                   DO a=1, lM%eNoN
                      xp = xp + xl(:,a)*lM%N(a,g)
                   END DO
@@ -2397,7 +2379,7 @@ c     2         "can be applied for Neumann boundaries only"
                xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             END DO
             DO g=1, lM%nG
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lM%eNoN
                   xp = xp + xl(:,a)*lM%N(a,g)
                END DO
@@ -2452,25 +2434,24 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
-      INTEGER, INTENT(IN) :: srchEl(lFa%nEl)
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
-      INTEGER, INTENT(INOUT) :: ePtr(2,lFa%nG,lFa%nEl)
+      INTEGER(KIND=IKIND), INTENT(IN) :: srchEl(lFa%nEl)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: ePtr(2,lFa%nG,lFa%nEl)
 
       LOGICAL lShl
-      INTEGER :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
-      REAL(KIND=8) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
+      INTEGER(KIND=IKIND) :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
+      REAL(KIND=RKIND) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
 
       TYPE(queueType) :: probeElQ
       LOGICAL, ALLOCATABLE :: ichk(:)
-      INTEGER, ALLOCATABLE :: incEl(:), rootEl(:), eList(:), sCount(:),
-     2   disps(:), masEList(:), ptr(:), gptr(:), tmpI(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), xpL(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incEl(:), rootEl(:), eList(:),
+     2   sCount(:), disps(:), masEList(:), ptr(:), gptr(:), tmpI(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), xpL(:,:)
 
 !     Create a list of all the face nodes
       ALLOCATE(xpL(nsd,lFa%nNo))
-      xpL = 0D0
+      xpL = 0._RKIND
       DO a=1, lFa%nNo
          Ac = lFa%gN(a)
          xpL(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
@@ -2603,7 +2584,7 @@ c     2         "can be applied for Neumann boundaries only"
                xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             END DO
             DO g=1, lFa%nG
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lFa%eNoN
                   xp = xp + xl(:,a)*lFa%N(a,g)
                END DO
@@ -2643,7 +2624,7 @@ c     2         "can be applied for Neumann boundaries only"
                   xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
                END DO
 
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lFa%eNoN
                   xp = xp + xl(:,a)*lFa%N(a,g)
                END DO
@@ -2701,7 +2682,7 @@ c     2         "can be applied for Neumann boundaries only"
                      xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
                   END DO
 
-                  xp = 0D0
+                  xp = 0._RKIND
                   DO a=1, lFa%eNoN
                      xp = xp + xl(:,a)*lFa%N(a,g)
                   END DO
@@ -2861,7 +2842,7 @@ c     2         "can be applied for Neumann boundaries only"
                xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
             END DO
             DO g=1, lFa%nG
-               xp = 0D0
+               xp = 0._RKIND
                DO a=1, lFa%eNoN
                   xp = xp + xl(:,a)*lFa%N(a,g)
                END DO
@@ -2914,16 +2895,15 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM, gM
-      INTEGER, INTENT(IN) :: eList(gM%nEl)
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
-      INTEGER, INTENT(INOUT) :: incEl(lM%nEl)
+      INTEGER(KIND=IKIND), INTENT(IN) :: eList(gM%nEl)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: incEl(lM%nEl)
 
-      INTEGER :: itr, a, b, e, Ac, Bc, ierr
-      REAL(KIND=8) :: f, tol, dS, minS, xp(nsd), xb(nsd)
+      INTEGER(KIND=IKIND) :: itr, a, b, e, Ac, Bc, ierr
+      REAL(KIND=RKIND) :: f, tol, dS, minS, xp(nsd), xb(nsd)
 
-      INTEGER, ALLOCATABLE :: part(:), tmpI(:), gN(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), tmpI(:), gN(:)
 
       ALLOCATE(gN(tnNo))
       gN = 0
@@ -2936,13 +2916,13 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       itr = 0
-      f   = 0.05D0
+      f   = 0.05_RKIND
       ALLOCATE(part(lM%nNo), tmpI(lM%nNo))
  001  part = 0
       tmpI = 0
       itr  = itr + 1
-      f    = 2.0D0*f
-      tol  = (1.0D0 + f)*lM%dx
+      f    = 2._RKIND*f
+      tol  = (1._RKIND + f)*lM%dx
       DO a=1, lM%nNo
          IF (part(a) .NE. 0) CYCLE
          Ac   = lM%gN(a)
@@ -2997,17 +2977,16 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
       TYPE(mshType), INTENT(IN) :: gM
-      INTEGER, INTENT(IN) :: eList(gM%nEl)
-      REAL(KIND=8), INTENT(IN) :: lD(nsd,tnNo)
-      INTEGER, INTENT(INOUT) :: incEl(lFa%nEl)
+      INTEGER(KIND=IKIND), INTENT(IN) :: eList(gM%nEl)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: incEl(lFa%nEl)
 
-      INTEGER :: itr, a, b, e, Ac, Bc, ierr
-      REAL(KIND=8) :: f, tol, dS, minS, xp(nsd), xb(nsd)
+      INTEGER(KIND=IKIND) :: itr, a, b, e, Ac, Bc, ierr
+      REAL(KIND=RKIND) :: f, tol, dS, minS, xp(nsd), xb(nsd)
 
-      INTEGER, ALLOCATABLE :: part(:), tmpI(:), gN(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), tmpI(:), gN(:)
 
       ALLOCATE(gN(tnNo))
       gN = 0
@@ -3020,13 +2999,13 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       itr = 0
-      f   = 0.05D0
+      f   = 0.05_RKIND
       ALLOCATE(part(lFa%nNo), tmpI(lFa%nNo))
  001  part = 0
       tmpI = 0
       itr  = itr + 1
-      f    = 2.0D0*f
-      tol  = (1.0D0 + f)*ib%msh(lFa%iM)%dx
+      f    = 2._RKIND*f
+      tol  = (1._RKIND + f)*ib%msh(lFa%iM)%dx
       DO a=1, lFa%nNo
          IF (part(a) .NE. 0) CYCLE
          Ac   = lFa%gN(a)
@@ -3081,18 +3060,17 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: xp(nsd), lD(nsd,tnNo)
-      INTEGER, INTENT(IN)  :: ne, eSrch(ne), itMax
-      INTEGER, INTENT(OUT) :: Ec
-      REAL(KIND=8), INTENT(OUT) :: xi(nsd)
+      REAL(KIND=RKIND), INTENT(IN) :: xp(nsd), lD(nsd,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN)  :: ne, eSrch(ne), itMax
+      INTEGER(KIND=IKIND), INTENT(OUT) :: Ec
+      REAL(KIND=RKIND), INTENT(OUT) :: xi(nsd)
       TYPE(mshType), INTENT(IN) :: lM
 
       LOGICAL flag
-      INTEGER :: a, e, i, El, En, nEl, nEn, iter, is, ie
+      INTEGER(KIND=IKIND) :: a, e, i, El, En, nEl, nEn, iter, is, ie
 
       LOGICAL, ALLOCATABLE :: eChk(:)
-      INTEGER, ALLOCATABLE :: eList(:), tmpI(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: eList(:), tmpI(:)
 
       nEn = ne
       ALLOCATE(eList(nEn), eChk(lM%nEl))
@@ -3157,9 +3135,10 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER i, a, e, n, Ac, iM, iFa, ierr, tag
+      INTEGER(KIND=IKIND) i, a, e, n, Ac, iM, iFa, ierr, tag
 
-      INTEGER, ALLOCATABLE :: incNd(:), ptr(:), rA(:,:), rReq(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), ptr(:), rA(:,:),
+     2   rReq(:)
 
 !     Free memory if already allocated
       CALL DESTROY(ib%cm)
@@ -3278,12 +3257,12 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER :: a, b, e, Ac, iM, jM
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, iM, jM
 
-      REAL(KIND=8), ALLOCATABLE :: rG(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: rG(:)
 
       ALLOCATE(rG(tnNo))
-      rG = 0D0
+      rG = 0._RKIND
 
 !     Update mesh and nodal ghost cell pointers based on iblank field
       DO iM=1, nMsh
@@ -3297,7 +3276,7 @@ c     2         "can be applied for Neumann boundaries only"
                msh(iM)%iGC(e) = 1
                DO a=1, msh(iM)%eNoN
                   Ac = msh(iM)%IEN(a,e)
-                  rG(Ac) = REAL(iblank(Ac), KIND=8)
+                  rG(Ac) = REAL(iblank(Ac), KIND=RKIND)
                END DO
             END IF
          END DO
@@ -3311,7 +3290,7 @@ c     2         "can be applied for Neumann boundaries only"
                jM = ib%msh(iM)%trc%ptr(2,b)
                DO a=1, msh(jM)%eNoN
                   Ac = msh(jM)%IEN(a,e)
-                  rG(Ac) = 1.0D0
+                  rG(Ac) = 1._RKIND
                END DO
             END DO
          END IF
@@ -3320,7 +3299,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       ighost = 0
       DO a=1, tnNo
-         IF (rG(a) .GT. 1D-6) ighost(a) = 1
+         IF (rG(a) .GT. 1.E-6_RKIND) ighost(a) = 1
       END DO
 
       RETURN
@@ -3332,20 +3311,19 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: lA(nsd,ib%tnNo), lY(nsd+1,ib%tnNo),
-     2   lU(nsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lA(nsd,ib%tnNo),
+     2   lY(nsd+1,ib%tnNo), lU(nsd,ib%tnNo)
 
       TYPE(dataType) :: d(ib%nMsh)
       TYPE(vtkXMLType) :: vtu
 
+      INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
+     2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut
       CHARACTER(LEN=stdL) :: fName
-      INTEGER :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo, nEl, s, l, ie,
-     2   is, nSh, oGrp, outDof, nOut, cOut
 
+      INTEGER(KIND=IKIND), ALLOCATABLE :: outS(:), tmpI(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
-      INTEGER, ALLOCATABLE :: outS(:), tmpI(:,:)
-      REAL(KIND=8), ALLOCATABLE :: tmpV(:,:)
 
       IF (ib%mthd .NE. ibMthd_IFEM) RETURN
 
@@ -3465,7 +3443,7 @@ c     2         "can be applied for Neumann boundaries only"
       s    = outS(iOut)
       e    = outS(iOut+1)-1
       nSh  = 0
-      tmpV = 0D0
+      tmpV = 0._RKIND
       DO iM=1, ib%nMsh
          DO a=1, d(iM)%nNo
             tmpV(1:nsd,a+nSh) = d(iM)%x(s:e,a)
@@ -3555,15 +3533,14 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(IN) :: lEq
       CHARACTER(LEN=stdL), INTENT(IN) :: fName(2)
       LOGICAL, INTENT(IN) :: wtn(2)
 
-      INTEGER, PARAMETER :: prL = 10
+      INTEGER(KIND=IKIND), PARAMETER :: prL = 10
 
       LOGICAL flag
-      INTEGER iM, iFa, fid, iDmn, i
+      INTEGER(KIND=IKIND) iM, iFa, fid, iDmn, i
       CHARACTER(LEN=stdL) stmp
 
       fid = 1
@@ -3624,17 +3601,16 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(IN) :: lEq
-      INTEGER, INTENT(IN) :: m
+      INTEGER(KIND=IKIND), INTENT(IN) :: m
       CHARACTER(LEN=stdL), INTENT(IN) :: fName(2)
-      REAL(KIND=8), INTENT(IN) :: tmpV(maxnsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: tmpV(maxnsd,ib%tnNo)
       LOGICAL, INTENT(IN) :: wtn(2), div
 
-      INTEGER, PARAMETER :: prL = 10
+      INTEGER(KIND=IKIND), PARAMETER :: prL = 10
 
-      INTEGER iM, iFa, fid, i, iDmn
-      REAL(KIND=8) tmp
+      INTEGER(KIND=IKIND) iM, iFa, fid, i, iDmn
+      REAL(KIND=RKIND) tmp
 
       fid = 1
       DO i=1, 2
@@ -3687,15 +3663,14 @@ c     2         "can be applied for Neumann boundaries only"
       SUBROUTINE IB_SETBCDIR(Ab, Yb, Ub)
       USE COMMOD
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(INOUT) :: Ab(nsd,ib%tnNo),
+     2   Yb(nsd+1,ib%tnNo), Ub(nsd,ib%tnNo)
 
-      REAL(KIND=8), INTENT(INOUT) :: Ab(nsd,ib%tnNo), Yb(nsd+1,ib%tnNo),
-     2   Ub(nsd,ib%tnNo)
-
-      INTEGER :: iFa, iM, iEq, iBc, a, Ac, nNo, lDof, i
       LOGICAL :: eDir(maxnsd)
+      INTEGER(KIND=IKIND) :: iFa, iM, iEq, iBc, a, Ac, nNo, lDof, i
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: nV(:,:), tmpA(:,:), tmpY(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: nV(:,:), tmpA(:,:), tmpY(:,:)
 
       iEq = ib%cEq
       IF (iEq .EQ. 0) RETURN
@@ -3749,7 +3724,7 @@ c     2         "can be applied for Neumann boundaries only"
                         lDof = lDof + 1
                         Yb(i,Ac) = tmpA(lDof,a)
                         Ub(i,Ac) = tmpY(lDof,a)
-                        Ab(i,Ac) = (1.0D0/dt) * (Yb(i,Ac) - ib%Yo(i,Ac))
+                        Ab(i,Ac) = (Yb(i,Ac)-ib%Yo(i,Ac))/dt
                      END IF
                   END DO
                ELSE
@@ -3770,8 +3745,7 @@ c     2         "can be applied for Neumann boundaries only"
                IF (BTEST(eq(iEq)%bcIB(iBc)%bType,bType_impD)) THEN
                   Yb(1:nsd,Ac) = tmpA(:,a)
                   Ub(1:nsd,Ac) = tmpY(:,a)
-                  Ab(1:nsd,Ac) = (1.0D0/dt) *
-     2               (Yb(1:nsd,Ac) - ib%Yo(1:nsd,Ac))
+                  Ab(1:nsd,Ac) = (Yb(1:nsd,Ac)-ib%Yo(1:nsd,Ac))/dt
                ELSE
                   Ab(1:nsd,Ac) = tmpA(:,a)
                   Yb(1:nsd,Ac) = tmpY(:,a)
@@ -3789,14 +3763,13 @@ c     2         "can be applied for Neumann boundaries only"
       SUBROUTINE IB_SETBCDIRL(lBc, nNo, lDof, nvL, lA, lY)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
-      INTEGER, INTENT(IN) :: lDof, nNo
-      REAL(KIND=8), INTENT(IN) :: nvL(nsd,nNo)
-      REAL(KIND=8), INTENT(INOUT) :: lA(lDof,nNo), lY(lDof,nNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: lDof, nNo
+      REAL(KIND=RKIND), INTENT(IN) :: nvL(nsd,nNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lA(lDof,nNo), lY(lDof,nNo)
 
-      INTEGER :: a, i
-      REAL(KIND=8) :: dirY, dirA, nV(nsd)
+      INTEGER(KIND=IKIND) :: a, i
+      REAL(KIND=RKIND) :: dirY, dirA, nV(nsd)
 
       IF (BTEST(lBc%bType,bType_gen)) THEN
          IF (lDof .NE. lBc%gm%dof) err = "Inconsistent DOF to apply "//
@@ -3808,7 +3781,7 @@ c     2         "can be applied for Neumann boundaries only"
       ELSE IF (BTEST(lBc%bType,bType_ustd)) THEN
          CALL IFFT(lBc%gt, dirY, dirA)
       ELSE ! std / cpl
-         dirA = 0D0
+         dirA = 0._RKIND
          dirY = lBc%g
       END IF
 
@@ -3836,15 +3809,15 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
       LOGICAL l1, l2, l3, l4
-      INTEGER a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM, eNoNb, eNoN
-      REAL(KIND=8) w, Jac, rt, xp(nsd), xi(nsd), xiL(2), Nl(2),
+      INTEGER(KIND=IKIND) a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
+     2   eNoNb, eNoN
+      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), xiL(2), Nl(2),
      2   Gmat(nsd,nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
+      REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
      2   Nx(:,:), xbl(:,:), xl(:,:), abl(:,:), ybl(:,:), ubl(:,:),
      3   fNl(:,:), lR(:,:)
 
@@ -3884,7 +3857,7 @@ c     2         "can be applied for Neumann boundaries only"
      2         CALL NRBNNX(ib%msh(iM), e)
 
 !           Transfer to element-level local arrays
-            fNl = 0D0
+            fNl = 0._RKIND
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc)
@@ -3909,7 +3882,7 @@ c     2         "can be applied for Neumann boundaries only"
 !           with respect to the background mesh
 
 !           Get IB integration point
-            xp = 0D0
+            xp = 0._RKIND
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xp(:) = xp(:) + Nb(b)*(xbl(:,b) + ib%Uo(:,Bc))
@@ -3925,27 +3898,27 @@ c     2         "can be applied for Neumann boundaries only"
             END DO
 
 !           Initialize the parameteric coordinate
-            xi = 0D0
+            xi = 0._RKIND
             DO a=1, msh(jM)%nG
                xi = xi + msh(jM)%xi(:,a)
             END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=8)
+            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
 
 !           Set bounds on the parameteric coordinates
-            xiL(1) = -1.0001D0
-            xiL(2) =  1.0001D0
+            xiL(1) = -1.0001_RKIND
+            xiL(2) =  1.0001_RKIND
             IF (msh(jM)%eType .EQ. eType_TRI .OR.
      2          msh(jM)%eType .EQ. eType_TET) THEN
-               xiL(1) = -0.0001D0
+               xiL(1) = -1.E-4_RKIND
             END IF
 
 !           Set bounds on shape functions
-            Nl(1) = -0.0001D0
-            Nl(2) =  1.0001d0
+            Nl(1) = -0.0001_RKIND
+            Nl(2) =  1.0001_RKIND
             IF (msh(jM)%eType .EQ. eType_QUD .OR.
      2          msh(jM)%eType .EQ. eType_BIQ) THEN
-               Nl(1) = -0.1251D0
-               Nl(2) =  1.0001D0
+               Nl(1) = -0.1251_RKIND
+               Nl(2) =  1.0001_RKIND
             END IF
 
 !           Identify the parameteric coordinate of the IB integration
@@ -3964,13 +3937,13 @@ c     2         "can be applied for Neumann boundaries only"
 
 !           Check if shape functions are within bounds and sum to unity
             b  = 0
-            rt = 0D0
+            rt = 0._RKIND
             DO a=1, eNoN
                rt = rt + N(a)
                IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) b = b + 1
             END DO
             l3 = b .EQ. eNoN
-            l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
 
             l1 = ALL((/l1, l2, l3, l4/))
             IF (.NOT.l1) err = " IB tracer pointing to wrong fluid "//
@@ -3980,7 +3953,7 @@ c     2         "can be applied for Neumann boundaries only"
             CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Gmat)
 
 !           Compute the local residue due to IB-FSI forcing
-            lR = 0D0
+            lR = 0._RKIND
             IF (nsd .EQ. 3) THEN
                CALL IB_FFSI3D(eNoNb, eNoN, w, Jac, Nb, Nbx, N, Nx, Gmat,
      2            abl, ybl, ubl, fNl, lR)
@@ -4012,29 +3985,29 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoNb, eNoN
-      REAL(KIND=8), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(3,eNoNb),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(3,eNoNb),
      2   N(eNoN), Nx(3,eNoN), Gm(3,3), al(3,eNoNb), yl(4,eNoNb),
      3   ul(3,eNoNb), fNl(3*ib%nFn,eNoNb)
-      REAL(KIND=8), INTENT(OUT) :: lR(4,eNoN)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct_f(2) = (/1D0, 3D0/), ct_p = 1D0
+      REAL(KIND=RKIND), PARAMETER :: ct_f(2) = (/1._RKIND, 3._RKIND/),
+     2   ct_p = 1._RKIND
 
       LOGICAL :: incompFlag
-      INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: fb(3), vd(3), v(3), p, px(3), vx(3,3), divV,
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn, iFn
+      REAL(KIND=RKIND) :: fb(3), vd(3), v(3), p, px(3), vx(3,3), divV,
      2   vVx(3), rt, rV(3), rM(3,3)
 
 !     Solid domain parameters
-      REAL(KIND=8) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(3,3), Fi(3,3),
-     2   S(3,3), PFt(3,3), CC(3,3,3,3), fl(3,ib%nFn), tauM_s, tauC_s,
-     3   vp_s(3)
+      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(3,3),
+     2   Fi(3,3), S(3,3), PFt(3,3), CC(3,3,3,3), fl(3,ib%nFn), tauM_s,
+     3   tauC_s, vp_s(3)
       TYPE(stModelType) :: stModel
 
 !     Fluid domain parameters
-      REAL(KIND=8) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f, tauB,
-     2   gam, vp_f(3), va_f(3), es(3,3), mu_x
+      REAL(KIND=RKIND) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f,
+     2   tauB, gam, vp_f(3), va_f(3), es(3,3), mu_x
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4046,7 +4019,7 @@ c     2         "can be applied for Neumann boundaries only"
       mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
 
       incompFlag = .FALSE.
-      IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
+      IF (ISZERO(nu_s - 0.5_RKIND)) incompFlag = .TRUE.
 
 !     Define fluid parameters
       rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
@@ -4058,15 +4031,15 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Inertia, body force and deformation tensor (F)
       vd     = -fb
-      v      = 0D0
-      p      = 0D0
-      px     = 0D0
-      vx     = 0D0
-      fl     = 0D0
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
-      F(3,3) = 1D0
+      v      = 0._RKIND
+      p      = 0._RKIND
+      px     = 0._RKIND
+      vx     = 0._RKIND
+      fl     = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
       DO b=1, eNoNb
 !        Acceleration (dv_i/dt)
          vd(1) = vd(1) + al(1,b)*Nb(b)
@@ -4169,7 +4142,7 @@ c     2         "can be applied for Neumann boundaries only"
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
      2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
      3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, nu_f, mu_x)
@@ -4184,8 +4157,8 @@ c     2         "can be applied for Neumann boundaries only"
      2   + Gm(2,1)*Gm(2,1) + Gm(2,2)*Gm(2,2) + Gm(2,3)*Gm(2,3)
      3   + Gm(3,1)*Gm(3,1) + Gm(3,2)*Gm(3,2) + Gm(3,3)*Gm(3,3)
 
-      rt = 2D0*ct_f(1)/dt
-      tauM_f = 1D0/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
+      rt = 2._RKIND*ct_f(1)/dt
+      tauM_f = 1._RKIND/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
 
       vp_f(1) = -tauM_f * (vd(1) + vVx(1) + px(1)/rho_f)
       vp_f(2) = -tauM_f * (vd(2) + vVx(2) + px(2)/rho_f)
@@ -4196,8 +4169,8 @@ c     2         "can be applied for Neumann boundaries only"
       va_f(3) = v(3) + vp_f(3)
 
       rt = Gm(1,1) + Gm(2,2) + Gm(3,3)
-      rt = 16.0D0*rt*tauM_f
-      tauC_f = 1D0/(rt)
+      rt = 16._RKIND*rt*tauM_f
+      tauC_f = 1._RKIND/(rt)
 
       tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
      2     + vp_f(1)*vp_f(3)*Gm(1,3)
@@ -4207,7 +4180,7 @@ c     2         "can be applied for Neumann boundaries only"
      6     + vp_f(3)*vp_f(3)*Gm(3,3)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1D0/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB)
 
 !     Solid stabilization parameters
       CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
@@ -4306,7 +4279,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     pressure difference between solid and fluid with Lagrange
 !     multiplier to weakly enforce their equality. Note that the solid
 !     pressure returned is the one defined in Holzapfel book.
-      ps = 0D0
+      ps = 0._RKIND
       CALL GETSVOLP(stModel, Jac, ps, rt)
       DO a=1, eNoN
          lR(1,a) = lR(1,a) - w*p*Nx(1,a)*Jac
@@ -4324,29 +4297,29 @@ c     2         "can be applied for Neumann boundaries only"
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoNb, eNoN
-      REAL(KIND=8), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(2,eNoNb),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(2,eNoNb),
      2   N(eNoN), Nx(2,eNoN), Gm(2,2), al(2,eNoNb), yl(3,eNoNb),
      3   ul(2,eNoNb), fNl(2*ib%nFn,eNoNb)
-      REAL(KIND=8), INTENT(OUT) :: lR(3,eNoN)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct_f(2) = (/1D0, 3D0/), ct_p = 1D0
+      REAL(KIND=RKIND), PARAMETER :: ct_f(2) = (/1._RKIND, 3._RKIND/),
+     2   ct_p = 1._RKIND
 
       LOGICAL :: incompFlag
-      INTEGER :: a, b, iEq, iDmn, iFn
-      REAL(KIND=8) :: fb(2), vd(2), v(2), p, px(2), vx(2,2), divV,
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn, iFn
+      REAL(KIND=RKIND) :: fb(2), vd(2), v(2), p, px(2), vx(2,2), divV,
      2   vVx(2), rt, rV(2), rM(2,2)
 
 !     Solid domain parameters
-      REAL(KIND=8) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(2,2), Fi(2,2),
-     2   S(2,2), PFt(2,2), CC(2,2,2,2), fl(2,ib%nFn), tauM_s, tauC_s,
-     3   vp_s(2)
+      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(2,2),
+     2   Fi(2,2), S(2,2), PFt(2,2), CC(2,2,2,2), fl(2,ib%nFn), tauM_s,
+     3   tauC_s, vp_s(2)
       TYPE(stModelType) :: stModel
 
 !     Fluid domain parameters
-      REAL(KIND=8) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f, tauB,
-     2   gam, vp_f(2), va_f(2), es(2,2), mu_x
+      REAL(KIND=RKIND) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f,
+     2   tauB, gam, vp_f(2), va_f(2), es(2,2), mu_x
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4358,7 +4331,7 @@ c     2         "can be applied for Neumann boundaries only"
       mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
 
       incompFlag = .FALSE.
-      IF (ISZERO(nu_s - 0.5D0)) incompFlag = .TRUE.
+      IF (ISZERO(nu_s - 0.5_RKIND)) incompFlag = .TRUE.
 
 !     Define fluid parameters
       rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
@@ -4369,14 +4342,14 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Inertia, body force and deformation tensor (F)
       vd     = -fb
-      v      = 0D0
-      p      = 0D0
-      px     = 0D0
-      vx     = 0D0
-      fl     = 0D0
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
+      v      = 0._RKIND
+      p      = 0._RKIND
+      px     = 0._RKIND
+      vx     = 0._RKIND
+      fl     = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
       DO b=1, eNoNb
 !        Acceleration (dv_i/dt)
          vd(1) = vd(1) + al(1,b)*Nb(b)
@@ -4445,7 +4418,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Shear-rate := (2*e_ij*e_ij)^.5
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
      2    + es(2,2)*es(2,2)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, nu_f, mu_x)
@@ -4458,8 +4431,8 @@ c     2         "can be applied for Neumann boundaries only"
       kS = Gm(1,1)*Gm(1,1) + Gm(1,2)*Gm(1,2)
      2   + Gm(2,1)*Gm(2,1) + Gm(2,2)*Gm(2,2)
 
-      rt = 2D0*ct_f(1)/dt
-      tauM_f = 1D0/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
+      rt = 2._RKIND*ct_f(1)/dt
+      tauM_f = 1._RKIND/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
 
       vp_f(1) = -tauM_f * (vd(1) + vVx(1) + px(1)/rho_f)
       vp_f(2) = -tauM_f * (vd(2) + vVx(2) + px(2)/rho_f)
@@ -4468,14 +4441,14 @@ c     2         "can be applied for Neumann boundaries only"
       va_f(2) = v(2) + vp_f(2)
 
       rt = Gm(1,1) + Gm(2,2)
-      rt = 16.0D0*rt*tauM_f
-      tauC_f = 1D0/(rt)
+      rt = 16._RKIND*rt*tauM_f
+      tauC_f = 1._RKIND/(rt)
 
       tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
      2     + vp_f(2)*vp_f(1)*Gm(2,1) + vp_f(2)*vp_f(2)*Gm(2,2)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1D0/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB)
 
 !     Solid stabilization parameters
       CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
@@ -4538,7 +4511,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     pressure difference between solid and fluid with Lagrange
 !     multiplier to weakly enforce their equality. Note that the solid
 !     pressure returned is the one defined in Holzapfel book.
-      ps = 0D0
+      ps = 0._RKIND
       CALL GETSVOLP(stModel, Jac, ps, rt)
       DO a=1, eNoN
          lR(1,a) = lR(1,a) - w*p*Nx(1,a)*Jac
@@ -4556,9 +4529,9 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER iEq, iBc, iM, iFa, a, i
+      INTEGER(KIND=IKIND) iEq, iBc, iM, iFa, a, i
 
-      REAL(KIND=8), ALLOCATABLE :: sF(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sF(:,:)
 
 !     Return if fluid phys is not solved
       IF (ib%cEq .EQ. 0) RETURN
@@ -4568,7 +4541,7 @@ c     2         "can be applied for Neumann boundaries only"
       ALLOCATE(sF(nsd,ib%tnNo))
       CALL IB_SETBCDIR(ib%Ao, ib%Yo, sF)
 !     Reset sF to 0
-      sF = 0D0
+      sF = 0._RKIND
 
 !     Compute penalty forces due to mismatch in velocity at IB
       iEq = ib%cEq
@@ -4599,15 +4572,15 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(INOUT) :: sF(nsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: sF(nsd,ib%tnNo)
 
-      INTEGER :: a, e, g, Ac, eNoN
-      REAL(KIND=8) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd), fb(nsd)
+      INTEGER(KIND=IKIND) :: a, e, g, Ac, eNoN
+      REAL(KIND=RKIND) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd),
+     2   fb(nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), ul(:,:), ubl(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), ul(:,:), ubl(:,:)
 
 !     Get penalty constants
       tauF = lBc%tauF
@@ -4634,8 +4607,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             w  = lFa%w(g)*Jac
             N  = lFa%N(:,g)
 
-            u  = 0D0
-            ub = 0D0
+            u  = 0._RKIND
+            ub = 0._RKIND
             DO a=1, eNoN
                u  = u  + N(a)*ul(:,a)
                ub = ub + N(a)*ubl(:,a)
@@ -4666,16 +4639,15 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(INOUT) :: sF(nsd,tnNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: sF(nsd,tnNo)
 
-      INTEGER :: a, e, g, Ac, eNoN
-      REAL(KIND=8) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd), fb(nsd),
-     2   gC(nsd,nsd-1)
+      INTEGER(KIND=IKIND) :: a, e, g, Ac, eNoN
+      REAL(KIND=RKIND) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd),
+     2   fb(nsd), gC(nsd,nsd-1)
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), xl(:,:), ul(:,:), ubl(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), xl(:,:), ul(:,:), ubl(:,:)
 
 !     Get penalty constants
       tauF  = lBc%tauF
@@ -4702,8 +4674,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             w   = lM%w(g) * Jac
             N   = lM%N(:,g)
 
-            u  = 0D0
-            ub = 0D0
+            u  = 0._RKIND
+            ub = 0._RKIND
             DO a=1, eNoN
                u(:)  = u(:)  + N(a)*ul(:,a)
                ub(:) = ub(:) + N(a)*ubl(:,a)
@@ -4737,14 +4709,14 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(INOUT) :: Yg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo), Yb(nsd+1,ib%tnNo)
 
-      REAL(KIND=8), INTENT(INOUT) :: Yg(tDof,tnNo)
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo), Yb(nsd+1,ib%tnNo)
+      INTEGER(KIND=IKIND) a, b, i, g, e, s, Ac, Bc, Ec, iM, jM, iFa,
+     2   iEq, eNoN
+      REAL(KIND=RKIND) :: w, xe(nsd), xp(nsd), yp(nsd)
 
-      INTEGER a, b, i, g, e, s, Ac, Bc, Ec, iM, jM, iFa, iEq, eNoN
-      REAL(KIND=8) :: w, xe(nsd), xp(nsd), yp(nsd)
-
-      REAL(KIND=8), ALLOCATABLE :: sA(:), sV(:,:), xl(:,:), yl(:,:),
+      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sV(:,:), xl(:,:), yl(:,:),
      2   N(:)
 
       iEq = ib%cEq
@@ -4755,8 +4727,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
 !     weighted interpolation operator on the ghost nodes.
       ib%callD(1) = CPUT()
       ALLOCATE(sA(tnNo), sV(nsd,tnNo))
-      sV = 0D0
-      sA = 0D0
+      sV = 0._RKIND
+      sA = 0._RKIND
       DO iM=1, ib%nMsh
          IF (ib%msh(iM)%lShl) THEN
             eNoN = ib%msh(iM)%eNoN
@@ -4771,8 +4743,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                   N(a)    = ib%msh(iM)%N(a,g)
                END DO
 
-               xp = 0D0
-               yp = 0D0
+               xp = 0._RKIND
+               yp = 0._RKIND
                DO a=1, eNoN
                   xp = xp + N(a)*xl(:,a)
                   yp = yp + N(a)*yl(:,a)
@@ -4785,9 +4757,9 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                   IF (ighost(Bc) .EQ. 1) THEN
                      xe = x(:,Bc)
                      IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
-                     w = SQRT(SUM( (xe - xp)**2 ))
+                     w = SQRT(SUM( (xe - xp)**2._RKIND ))
                      IF (ISZERO(w)) w = eps
-                     w = 1D0/w
+                     w = 1._RKIND/w
                      sA(Bc) = sA(Bc) + w
                      sV(:,Bc) = sV(:,Bc) + w*yp(:)
                   END IF
@@ -4808,8 +4780,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                      N(a)    = ib%msh(iM)%fa(iFa)%N(a,g)
                   END DO
 
-                  xp = 0D0
-                  yp = 0D0
+                  xp = 0._RKIND
+                  yp = 0._RKIND
                   DO a=1, eNoN
                      xp = xp + N(a)*xl(:,a)
                      yp = yp + N(a)*yl(:,a)
@@ -4822,9 +4794,9 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                      IF (ighost(Bc) .EQ. 1) THEN
                         xe = x(:,Bc)
                         IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
-                        w = SQRT(SUM( (xe - xp)**2 ))
+                        w = SQRT(SUM( (xe - xp)**2._RKIND ))
                         IF (ISZERO(w)) w = eps
-                        w = 1D0/w
+                        w = 1._RKIND/w
                         sA(Bc) = sA(Bc) + w
                         sV(:,Bc) = sV(:,Bc) + w*yp(:)
                      END IF
@@ -4858,7 +4830,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER a
+      INTEGER(KIND=IKIND) a
 
       DO a=1, tnNo
          R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
@@ -4872,23 +4844,23 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
-      REAL(KIND=8), INTENT(OUT) :: Ab(nsd,ib%tnNo), Yb(nsd+1,ib%tnNo),
-     2   Ub(nsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(OUT) :: Ab(nsd,ib%tnNo),
+     2   Yb(nsd+1,ib%tnNo), Ub(nsd,ib%tnNo)
 
       LOGICAL :: l1, l2, l3, l4
-      INTEGER :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM, eNoN, eNoNb
-      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), ap(nsd), yp(nsd+1),
+      INTEGER(KIND=IKIND) :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
+     2   eNoN, eNoNb
+      REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), ap(nsd), yp(nsd+1),
      2   Ks(nsd,nsd), rt, xiL(2), Nl(2)
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
      2   xl(:,:), xbl(:,:), al(:,:), yl(:,:), sA(:)
 
-      Ab = 0D0
-      Yb = 0D0
-      Ub = 0D0
+      Ab = 0._RKIND
+      Yb = 0._RKIND
+      Ub = 0._RKIND
       IF (ib%cEq.EQ.0 .OR. ib%mthd.NE.ibMthd_IFEM) RETURN
 
       is = eq(ib%cEq)%s
@@ -4898,7 +4870,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
 !     Use L2 projection with mass lumping to project flow variables from
 !     background fluid mesh to IB
       ALLOCATE(sA(ib%tnNo))
-      sA = 0D0
+      sA = 0._RKIND
 !     Loop over each IB mesh
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
@@ -4922,7 +4894,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             w = ib%msh(iM)%w(g) * Jac
 
 !           Coordinates of the integration point
-            xp = 0D0
+            xp = 0._RKIND
             DO b=1, eNoNb
                xp = xp + Nb(b)*xbl(:,b)
             END DO
@@ -4931,8 +4903,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             eNoN = msh(jM)%eNoN
             ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN), al(nsd,eNoN),
      2         yl(nsd+1,eNoN))
-            al = 0D0
-            yl = 0D0
+            al = 0._RKIND
+            yl = 0._RKIND
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
                al(:,a) = Ag(is:ie,Ac)
@@ -4942,26 +4914,26 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             END DO
 
 !           Initialize parameteric coordinate for Newton's iterations
-            xi = 0D0
+            xi = 0._RKIND
             DO a=1, msh(jM)%nG
                xi = xi + msh(jM)%xi(:,a)
             END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=8)
+            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
 
 !           Set bounds on the parameteric coordinates
-            xiL(1) = -1.0001D0
-            xiL(2) =  1.0001D0
+            xiL(1) = -1.0001_RKIND
+            xiL(2) =  1.0001_RKIND
             IF (msh(jM)%eType .EQ. eType_TRI .OR.
      2          msh(jM)%eType .EQ. eType_TET) THEN
-               xiL(1) = -0.0001D0
+               xiL(1) = -1.E-4_RKIND
             END IF
 
 !           Set bounds on shape functions
-            Nl(1) = -0.0001D0
-            Nl(2) =  1.0001d0
+            Nl(1) = -0.0001_RKIND
+            Nl(2) =  1.0001_RKIND
             IF (msh(jM)%eType .EQ. eType_BIQ) THEN
-               Nl(1) = -0.1251D0
-               Nl(2) =  1.0001D0
+               Nl(1) = -0.1251_RKIND
+               Nl(2) =  1.0001_RKIND
             END IF
 
             CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, l1)
@@ -4978,13 +4950,13 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
 
 !           Check if shape functions are within bounds and sum to unity
             b  = 0
-            rt = 0D0
+            rt = 0._RKIND
             DO a=1, eNoN
                rt = rt + N(a)
                IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) b = b + 1
             END DO
             l3 = b .EQ. eNoN
-            l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
 
             l1 = ALL((/l1, l2, l3, l4/))
             IF (.NOT.l1) err = " IB tracer pointing to wrong fluid "//
@@ -4992,8 +4964,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
 
 !           Use the computed shape functions to interpolate flow var at
 !           the IB integration point
-            ap = 0D0
-            yp = 0D0
+            ap = 0._RKIND
+            yp = 0._RKIND
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
                ap = ap + N(a)*al(:,a)
@@ -5039,16 +5011,19 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       IMPLICIT NONE
 
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) sOut
 
       std = REPEAT("-",55)
       WRITE(sOut,'(F6.2)') ib%callD(1)
       WRITE(sOut,'(A)') " IB call duration: "//TRIM(sOut)//' sec'
       IF (ib%mthd .NE. ibMthd_SSM) THEN
+         rtmp = 100._RKIND*ib%callD(3)/ib%callD(1)
          WRITE(sOut,'(A)') TRIM(sOut)//" (comm."//
-     2      STR(NINT(1D2*ib%callD(3)/ib%callD(1)),3)//"%)"
+     2      STR(NINT(rtmp, KIND=IKIND),3)//"%)"
+         rtmp = 100._RKIND*ib%callD(2)/ib%callD(1)
          WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
-     2      STR(NINT(1D2*ib%callD(2)/ib%callD(1)),3)//"%)"
+     2      STR(NINT(rtmp, KIND=IKIND),3)//"%)"
       END IF
       std = sOut
       std = REPEAT("-",55)
@@ -5061,15 +5036,14 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: incNd(ib%tnNo)
 
-      INTEGER, INTENT(IN) :: incNd(ib%tnNo)
-
-      INTEGER :: a, i, Ac, iM, fid
-      REAL(KIND=8) :: s, lo, hi, av
+      INTEGER(KIND=IKIND) :: a, i, Ac, iM, fid
+      REAL(KIND=RKIND) :: s, lo, hi, av
       CHARACTER(LEN=stdL) :: fName
 
-      INTEGER, ALLOCATABLE :: lI(:), gI(:)
-      REAL(KIND=8), ALLOCATABLE :: lR(:,:), gR(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: lI(:), gI(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lR(:,:), gR(:,:)
 
 !     DEBUG ib%R
       fid = 1289
@@ -5090,7 +5064,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
          ELSE
             ALLOCATE(gR(0,0), gI(0))
          END IF
-         lR = 0D0
+         lR = 0._RKIND
          lI = 0
          DO a=1, msh(iM)%nNo
             Ac = msh(iM)%gN(a)
@@ -5103,27 +5077,27 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
 
          IF (cm%mas()) THEN
 !           first, momentum residue
-            av = 0D0
-            lo = 10000000.0D0
-            hi = -9999999.0D0
+            av =  0._RKIND
+            lo =  1.E+6_RKIND
+            hi = -1.E+6_RKIND
             DO a=1, msh(iM)%gnNo
                IF (gI(a) .EQ. 0) CYCLE
-               s = 0D0
+               s = 0._RKIND
                DO i=1, nsd
-                  s = s + gR(i,a)**2
+                  s = s + gR(i,a)**2._RKIND
                END DO
                s = SQRT(s)
                av = av + s
                IF (s .LT. lo) lo = s
                IF (s .GT. hi) hi = s
             END DO
-            av = av / REAL(SUM(gI(:)), KIND=8)
+            av = av / REAL(SUM(gI(:)), KIND=RKIND)
             WRITE(fid,'(A)',ADVANCE='NO') " "//STR(av)//" "//STR(hi-lo)
 
 !           Pressure/continuity
-            av = 0D0
-            lo = 10000000.0D0
-            hi = -9999999.0D0
+            av =  0._RKIND
+            lo =  1.E+6_RKIND
+            hi = -1.E+6_RKIND
             DO a=1, msh(iM)%gnNo
                IF (gI(a) .EQ. 0) CYCLE
                s = gR(nsd+1,a)
@@ -5131,7 +5105,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                IF (s .LT. lo) lo = s
                IF (s .GT. hi) hi = s
             END DO
-            av = av / REAL(SUM(gI(:)), KIND=8)
+            av = av / REAL(SUM(gI(:)), KIND=RKIND)
             WRITE(fid,'(A)') " "//STR(av)//" "//STR(hi-lo)
             CLOSE(fid)
          END IF
@@ -5148,16 +5122,15 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
 
-      INTEGER :: i, a, e, g, n, Ac, Ec, iM, fid, ierr
+      INTEGER(KIND=IKIND) :: i, a, e, g, n, Ac, Ec, iM, fid, ierr
       CHARACTER(LEN=stdL) :: fName
-      REAL(KIND=8) xp(nsd)
+      REAL(KIND=RKIND) xp(nsd)
 
-      INTEGER, ALLOCATABLE :: sCount(:), disps(:), lE(:), gE(:),
-     2   eptr(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disps(:), lE(:),
+     2   gE(:), eptr(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:)
 
       ALLOCATE(sCount(cm%np()), disps(cm%np()))
       sCount = 0
@@ -5213,7 +5186,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                Ec = ePtr(1,g,e)
                iM = ePtr(2,g,e)
                IF (Ec.EQ.0 .OR. iM.EQ.0) THEN
-                  xp = 0D0
+                  xp = 0._RKIND
                   DO a=1, lM%eNoN
                      xp(:) = xp(:) + lM%N(a,g)*xl(:,a)
                   END DO
@@ -5244,16 +5217,15 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER :: i, a, e, g, n, Ac, Ec, iM, fid, ierr
+      INTEGER(KIND=IKIND) :: i, a, e, g, n, Ac, Ec, iM, fid, ierr
+      REAL(KIND=RKIND) xp(nsd)
       CHARACTER(LEN=stdL) :: fName
-      REAL(KIND=8) xp(nsd)
 
-      INTEGER, ALLOCATABLE :: sCount(:), disps(:), lE(:), gE(:),
-     2   eptr(:,:,:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disps(:), lE(:),
+     2   gE(:), eptr(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:)
 
       ALLOCATE(sCount(cm%np()), disps(cm%np()))
       sCount = 0
@@ -5309,7 +5281,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                Ec = ePtr(1,g,e)
                iM = ePtr(2,g,e)
                IF (Ec.EQ.0 .OR. iM.EQ.0) THEN
-                  xp = 0D0
+                  xp = 0._RKIND
                   DO a=1, lFa%eNoN
                      xp(:) = xp(:) + lFa%N(a,g)*xl(:,a)
                   END DO

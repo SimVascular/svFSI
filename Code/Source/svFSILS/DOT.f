@@ -54,17 +54,15 @@
 !     been done before calling this function (or the ansesters of U and
 !     V are passed through COMMU)
       FUNCTION FSILS_DOTV(dof, nNo, commu, U, V)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: dof, nNo
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      REAL(KIND=8), INTENT(IN) :: V(dof,nNo), U(dof,nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: V(dof,nNo), U(dof,nNo)
 
-      INTEGER i, ierr
-      REAL(KIND=8) tmp, FSILS_DOTV
+      INTEGER(KIND=LSIP) i, ierr
+      REAL(KIND=LSRP) tmp, FSILS_DOTV
 
-      FSILS_DOTV = 0D0
+      FSILS_DOTV = 0._LSRP
       SELECT CASE(dof)
       CASE(1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
@@ -113,21 +111,17 @@
 
       RETURN
       END FUNCTION FSILS_DOTV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       FUNCTION FSILS_DOTS(nNo, commu, U, V)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: nNo
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      REAL(KIND=8), INTENT(IN) :: V(nNo), U(nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: V(nNo), U(nNo)
 
-      INTEGER i, ierr
-      REAL(KIND=8) tmp, FSILS_DOTS
+      INTEGER(KIND=LSIP) i, ierr
+      REAL(KIND=LSRP) tmp, FSILS_DOTS
 
-      FSILS_DOTS = 0D0
+      FSILS_DOTS = 0._LSRP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
 !$OMP&   REDUCTION(+:FSILS_DOTS)
       DO i=1, nNo
@@ -143,20 +137,16 @@
 
       RETURN
       END FUNCTION FSILS_DOTS
-
 !####################################################################
-
       FUNCTION FSILS_NCDOTV(dof, nNo, U, V) RESULT(FSILS_DOTV)
-
       INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
+      REAL(KIND=LSRP), INTENT(IN) :: V(dof,nNo), U(dof,nNo)
 
-      INTEGER, INTENT(IN) :: dof, nNo
-      REAL(KIND=8), INTENT(IN) :: V(dof,nNo), U(dof,nNo)
+      INTEGER(KIND=LSIP) i, ierr
+      REAL(KIND=LSRP) tmp, FSILS_DOTV
 
-      INTEGER i, ierr
-      REAL(KIND=8) tmp, FSILS_DOTV
-
-      FSILS_DOTV = 0D0
+      FSILS_DOTV = 0._LSRP
       SELECT CASE(dof)
       CASE(1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
@@ -199,20 +189,16 @@
 
       RETURN
       END FUNCTION FSILS_NCDOTV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       FUNCTION FSILS_NCDOTS(nNo, U, V) RESULT(FSILS_DOTS)
-
       INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo
+      REAL(KIND=LSRP), INTENT(IN) :: V(nNo), U(nNo)
 
-      INTEGER, INTENT(IN) :: nNo
-      REAL(KIND=8), INTENT(IN) :: V(nNo), U(nNo)
+      INTEGER(KIND=LSIP) i, ierr
+      REAL(KIND=LSRP) tmp, FSILS_DOTS
 
-      INTEGER i, ierr
-      REAL(KIND=8) tmp, FSILS_DOTS
-
-      FSILS_DOTS = 0D0
+      FSILS_DOTS = 0._LSRP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
 !$OMP&   REDUCTION(+:FSILS_DOTS)
       DO i=1, nNo
@@ -222,22 +208,18 @@
 
       RETURN
       END FUNCTION FSILS_NCDOTS
-
 !####################################################################
-
       SUBROUTINE FSILS_MULTDOTV(dof, nNo, tnNo, nV, commu, U, V, res)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: dof, nNo, tnNo, nV
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo, tnNo, nV
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      REAL(KIND=8), INTENT(IN) :: U(dof,tnNo,nV), V(dof,tnNo)
-      REAL(KIND=8), INTENT(OUT) :: res(nV)
+      REAL(KIND=LSRP), INTENT(IN) :: U(dof,tnNo,nV), V(dof,tnNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: res(nV)
 
-      INTEGER i, j, ierr, iV
-      REAL(KIND=8) tmp(nV)
+      INTEGER(KIND=LSIP) i, j, ierr, iV
+      REAL(KIND=LSRP) tmp(nV)
 
-      res = 0D0
+      res = 0._LSRP
       SELECT CASE(dof)
       CASE(1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,iV) SCHEDULE(GUIDED)
@@ -297,22 +279,18 @@
 
       RETURN
       END SUBROUTINE FSILS_MULTDOTV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE FSILS_MULTDOTS(nNo, tnNo, nV, commu, U, V, res)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: nNo, tnNo, nV
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo, tnNo, nV
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      REAL(KIND=8), INTENT(IN) :: U(tnNo,nV), V(tnNo)
-      REAL(KIND=8), INTENT(OUT) :: res(nV)
+      REAL(KIND=LSRP), INTENT(IN) :: U(tnNo,nV), V(tnNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: res(nV)
 
-      INTEGER i, ierr, iV
-      REAL(KIND=8) tmp(nV)
+      INTEGER(KIND=LSIP) i, ierr, iV
+      REAL(KIND=LSRP) tmp(nV)
 
-      res = 0D0
+      res = 0._LSRP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i,iV) SCHEDULE(GUIDED)
 !$OMP&   REDUCTION(+:res)
       DO iV=1, nV
@@ -329,3 +307,4 @@
 
       RETURN
       END SUBROUTINE FSILS_MULTDOTS
+!####################################################################

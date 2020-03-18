@@ -42,16 +42,16 @@
 
 !     Channels cases: standard output, error output, warning output,
 !     debugging output
-      INTEGER, PARAMETER :: CHNL_O = 601
-      INTEGER, PARAMETER :: CHNL_E = 602
-      INTEGER, PARAMETER :: CHNL_W = 603
-      INTEGER, PARAMETER :: CHNL_D = 604
+      INTEGER(KIND=IKIND), PARAMETER :: CHNL_O = 601
+      INTEGER(KIND=IKIND), PARAMETER :: CHNL_E = 602
+      INTEGER(KIND=IKIND), PARAMETER :: CHNL_W = 603
+      INTEGER(KIND=IKIND), PARAMETER :: CHNL_D = 604
 
 !     Whether to use color in printing outputs
       LOGICAL :: pClr = .TRUE.
 
 !     A general counter for file ID
-      INTEGER :: gFID = 314
+      INTEGER(KIND=IKIND) :: gFID = 314
 
 !     Appended path to all files that are going to be saved
       CHARACTER(LEN=stdL) :: appPath = ""
@@ -63,9 +63,9 @@
 !        Whether it is open to the file
          LOGICAL :: oTF = .FALSE.
 !        Channel identifier
-         INTEGER id
+         INTEGER(KIND=IKIND) id
 !        File ID
-         INTEGER fId
+         INTEGER(KIND=IKIND) fId
 !        File address
          CHARACTER(LEN=stdL) :: fName = "histor"
 !        Channel tag
@@ -107,11 +107,10 @@
       CONTAINS
 
 !####################################################################
-
       SUBROUTINE newChnl(chnl,id,fName,tag,oTS,oTF)
       IMPLICIT NONE
       CLASS(chnlType), INTENT(OUT) :: chnl
-      INTEGER, INTENT(IN) :: id
+      INTEGER(KIND=IKIND), INTENT(IN) :: id
       CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: fName, tag
       LOGICAL, INTENT(IN), OPTIONAL :: oTS, oTF
 
@@ -163,7 +162,7 @@
 
       RETURN
       END SUBROUTINE closeChnl
-!--------------------------------------------------------------------
+!####################################################################
       SUBROUTINE chnlAssignChnl(s,r)
       IMPLICIT NONE
       CLASS(chnlType), INTENT(OUT) :: s
@@ -192,7 +191,6 @@
 
       RETURN
       END SUBROUTINE ioAssignIO
-
 !####################################################################
 !     Sending strings to correct channel
       SUBROUTINE chnlAssign(chnl,sInp)
@@ -319,9 +317,7 @@
 
       RETURN
       END SUBROUTINE CHNLDEBUGGING
-
 !####################################################################
-
       SUBROUTINE newIO(io, iflag)
       IMPLICIT NONE
       CLASS(ioType), INTENT(OUT) :: io
@@ -352,6 +348,6 @@
 
       RETURN
       END SUBROUTINE closeIO
-
+!####################################################################
       END MODULE CHNLMOD
-
+!####################################################################

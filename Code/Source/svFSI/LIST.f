@@ -44,9 +44,9 @@
 !        Whether this line has been used sofar
          LOGICAL :: used = .FALSE.
 !        Length of sub list
-         INTEGER :: l = 0
+         INTEGER(KIND=IKIND) :: l = 0
 !        Line number associated with this list
-         INTEGER line
+         INTEGER(KIND=IKIND) line
 !        Command
          CHARACTER(LEN=stdL) :: kwd = 'NONE'
 !        Value associated with the command
@@ -78,20 +78,18 @@
 
 !####################################################################
       FUNCTION NEWLIST(fileName, inIO)
-
       IMPLICIT NONE
-
       CHARACTER(LEN=*), INTENT(IN) :: fileName
       TYPE(ioType), TARGET, INTENT(IN) :: inIO
       TYPE(listType) NEWLIST
 
-      INTEGER, PARAMETER :: maxL = 100
+      INTEGER(KIND=IKIND), PARAMETER :: maxL = 100
 
       LOGICAL flag
-      INTEGER s, e, l, i, j, A, fNl, lInd(stdL), lvl, fid
+      INTEGER(KIND=IKIND) s, e, l, i, j, A, fNl, lInd(stdL), lvl, fid
       CHARACTER(LEN=stdL) ctmp, sTmp
 
-      INTEGER, ALLOCATABLE :: fInd(:), fLineN(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: fInd(:), fLineN(:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: fCon(:)
 
       NEWLIST%io   => inIO
@@ -200,14 +198,12 @@
 !     level as first line. To call this, you need to provide the list
 !     structure, first line number (s) and last line number (e)
       RECURSIVE SUBROUTINE SETSUBLIST(s, e, list)
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: s, e
+      INTEGER(KIND=IKIND), INTENT(IN) :: s, e
       TYPE(listType), INTENT(INOUT) :: list
 
       LOGICAL flag
-      INTEGER lvl, i, j, k, l
+      INTEGER(KIND=IKIND) lvl, i, j, k, l
       CHARACTER(LEN=stdL) sTmp
 
 !     Counting the numebr of lines to be allocated
@@ -248,23 +244,21 @@
 
       RETURN
       END SUBROUTINE SETSUBLIST
+!--------------------------------------------------------------------
       END FUNCTION NEWLIST
-
 !####################################################################
 !     This function search through list for "cmnd" and returns the line
 !     number that is found. The index of the searched line can be
 !     inputted by iInd. If iInd is provided, a line is not found, error
 !     is thrown
       FUNCTION LSRCH(list, cmnd, iInd)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: iInd
-      INTEGER LSRCH
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: iInd
+      INTEGER(KIND=IKIND) LSRCH
 
-      INTEGER i, n, ind
+      INTEGER(KIND=IKIND) i, n, ind
 
       ind = 1
       IF (PRESENT(iInd)) ind = iInd
@@ -290,15 +284,13 @@
       END FUNCTION LSRCH
 !--------------------------------------------------------------------
       FUNCTION SRCH(list, cmnd, ll, ul)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(IN) :: list
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ll, ul
-      INTEGER SRCH
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ll, ul
+      INTEGER(KIND=IKIND) SRCH
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       SRCH = 0
       DO i=1, list%l
@@ -316,12 +308,9 @@
 
       RETURN
       END FUNCTION SRCH
-
 !####################################################################
       FUNCTION PING(list, cmnd, subL)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(IN) :: list
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
       TYPE(listType), OPTIONAL :: subL
@@ -339,17 +328,14 @@
 
       RETURN
       END FUNCTION PING
-
 !####################################################################
 !     This routine checks all the lines of the list to make sure they
 !     have been used
       RECURSIVE SUBROUTINE CHECKLIST(list)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(IN) :: list
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       IF (.NOT.list%used) list%io%e = "Near line "//list%line//
      2   " keyword <"//TRIM(list%kwd)//"> is not recognized"
@@ -360,24 +346,21 @@
 
       RETURN
       END SUBROUTINE CHECKLIST
-
 !####################################################################
 !     This is for reading logical
       FUNCTION GFLL(list, lVal, cmnd, ind)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
       LOGICAL, INTENT(OUT) :: lVal
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
       TYPE(listType), POINTER :: GFLL
 
       CHARACTER(*), PARAMETER :: true(5)= (/"t   ", "T   ", "1   ",
      2   "True", "true"/), false(5) = (/"f    ", "F    ", "0    ",
      3   "False", "false"/)
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
       CHARACTER(LEN=stdL) c
 
       IF (PRESENT(ind)) THEN
@@ -409,16 +392,14 @@
 !     (ind) if ll/lb or ul/ub are specified, the value is checked
 !     to be in that specified range. This is for reading integers.
       FUNCTION GFLIS(list, iVal, cmnd, ind, ll, ul)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
-      INTEGER, INTENT(OUT) :: iVal
+      INTEGER(KIND=IKIND), INTENT(OUT) :: iVal
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind, ll, ul
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind, ll, ul
       TYPE(listType), POINTER :: GFLIS
 
-      INTEGER i, ioS
+      INTEGER(KIND=IKIND) i, ioS
 
       IF (PRESENT(ind)) THEN
          i = list%LSRCH(cmnd, ind)
@@ -451,16 +432,14 @@
 !--------------------------------------------------------------------
 !     This is for reading a vector. The results are returned into v
       FUNCTION GFLIV(list, vVal, cmnd, ind)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
-      INTEGER, INTENT(OUT) :: vVal(:)
+      INTEGER(KIND=IKIND), INTENT(OUT) :: vVal(:)
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
       TYPE(listType), POINTER :: GFLIV
 
-      INTEGER i, ioS, n, nToks
+      INTEGER(KIND=IKIND) i, ioS, n, nToks
       CHARACTER(LEN=stdL), DIMENSION(1024) :: tokList
 
       n = SIZE(vVal)
@@ -487,8 +466,8 @@
       END DO
 
       DO i=1, n
-         list%io%d = TRIM(list%ping(cmnd,GFLIV))//" Read vector value "
-     2      //vVal(i)
+         list%io%d = TRIM(list%ping(cmnd,GFLIV))//" Read integer "//
+     2      "vector value "//vVal(i)
       END DO
 
       RETURN
@@ -496,17 +475,15 @@
 !--------------------------------------------------------------------
 !     This is for reading real numbers
       FUNCTION GFLRS(list, rVal, cmnd, ind, ll, ul, lb, ub)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
-      REAL(KIND=8), INTENT(OUT) :: rVal
+      REAL(KIND=RKIND), INTENT(OUT) :: rVal
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: ll, ul, lb, ub
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
+      REAL(KIND=RKIND), INTENT(IN), OPTIONAL :: ll, ul, lb, ub
       TYPE(listType), POINTER :: GFLRS
 
-      INTEGER i, ioS
+      INTEGER(KIND=IKIND) i, ioS
 
       IF (PRESENT(ind)) THEN
          i = list%LSRCH(cmnd, ind)
@@ -547,16 +524,14 @@
 !--------------------------------------------------------------------
 !     This is for reading a vector. The results are returned into v
       FUNCTION GFLRV(list, vVal, cmnd, ind)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
-      REAL(KIND=8), INTENT(OUT) :: vVal(:)
+      REAL(KIND=RKIND), INTENT(OUT) :: vVal(:)
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
       TYPE(listType), POINTER :: GFLRV
 
-      INTEGER i, ioS, n, nToks
+      INTEGER(KIND=IKIND) i, ioS, n, nToks
       CHARACTER(LEN=stdL), DIMENSION(1024) :: tokList
 
       n = SIZE(vVal)
@@ -583,8 +558,8 @@
       END DO
 
       DO i=1, n
-         list%io%d = TRIM(list%ping(cmnd,GFLRV))//" Read vector value "
-     2      //vVal(i)
+         list%io%d = TRIM(list%ping(cmnd,GFLRV))//" Read real "//
+     2      "vector value "//vVal(i)
       END DO
 
       RETURN
@@ -592,16 +567,14 @@
 !--------------------------------------------------------------------
 !     This is for reading strings
       FUNCTION GFLS(list, sVal, cmnd, ind)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(OUT) :: sVal
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
       TYPE(listType), POINTER :: GFLS
 
-      INTEGER i, ioS
+      INTEGER(KIND=IKIND) i, ioS
 
       IF (PRESENT(ind)) THEN
          i = list%LSRCH(cmnd, ind)
@@ -626,16 +599,14 @@
 !--------------------------------------------------------------------
 !     This function opens a file and returns the handle to the file
       FUNCTION GFLF(list, file, cmnd, ind)
-
       IMPLICIT NONE
-
       CLASS(listType), INTENT(INOUT) :: list
       TYPE(fileType), INTENT(INOUT) :: file
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
-      INTEGER, INTENT(IN), OPTIONAL :: ind
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
       TYPE(listType), POINTER :: GFLF
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
       CHARACTER(LEN=stdL) fName
 
       IF (PRESENT(ind)) THEN
@@ -657,12 +628,11 @@
 
       RETURN
       END FUNCTION GFLF
-
 !####################################################################
       RECURSIVE SUBROUTINE DESTROYLIST(list)
       IMPLICIT NONE
       TYPE(listType), INTENT(INOUT) :: list
-      INTEGER :: stat, i
+      INTEGER(KIND=IKIND) :: stat, i
 
       DO i=1, list%l
          IF (list%sub(i)%l /= 0) THEN
@@ -677,5 +647,5 @@
 
       END SUBROUTINE DESTROYLIST
 !####################################################################
-
       END MODULE LISTMOD
+!####################################################################

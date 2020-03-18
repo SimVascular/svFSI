@@ -42,21 +42,20 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(3,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, N(eNoN), Nx(3,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
      3   fN(3,nFn), ya_l(eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*3,eNoN,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lKd(dof*3,eNoN,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, k, l, a, b
-      REAL(KIND=8) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p, pd,
-     2   px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, Siso(3,3),
-     3   CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6), Pdev(3,3),
-     4   Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3), PxFi(3),
-     5   VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku,
-     6   ya_g, Ja
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b
+      REAL(KIND=RKIND) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p,
+     2   pd, px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta,
+     3   Siso(3,3), CCiso(3,3,3,3), tauM, tauC, rC, rCl, rM(3), Dm(6,6),
+     4   Pdev(3,3), Bm(6,3,eNoN), DBm(6,3), NxFi(3,eNoN), VxFi(3,3),
+     5   PxFi(3), VxNx(3,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2,
+     6   T3, Ku, ya_g, Ja
 
       TYPE (stModelType) :: stModel
 
@@ -77,17 +76,17 @@
 
 !     Inertia (velocity and acceleration), body force, fiber directions,
 !     and deformation tensor (F) at integration point
-      v  = 0D0
+      v  = 0._RKIND
       vd = -fb
-      vx = 0D0
-      p  = 0D0
-      pd = 0D0
-      px = 0D0
-      F  = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
-      F(3,3) = 1D0
-      ya_g   = 0D0
+      vx = 0._RKIND
+      p  = 0._RKIND
+      pd = 0._RKIND
+      px = 0._RKIND
+      F  = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      ya_g   = 0._RKIND
       DO a=1, eNoN
          v(1)    = v(1)  + N(a)*yl(i,a)
          v(2)    = v(2)  + N(a)*yl(j,a)
@@ -422,7 +421,7 @@
             lK(15,a,b) = lK(15,a,b) + w*Jac*T2 + afm*Ku
 
 !           dM_1/dP
-            T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1.0D0)
+            T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1._RKIND)
             T2 = T1*NxFi(1,a)*N(b) + af*drho*vd(1)*N(a)*N(b)
             lK(4,a,b) = lK(4,a,b) + w*Jac*T2
 
@@ -450,21 +449,20 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, Je, N(eNoN), Nx(2,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, N(eNoN), Nx(2,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN),
      3   fN(2,nFn), ya_l(eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*2,eNoN,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lKd(dof*2,eNoN,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, k, a, b
-      REAL(KIND=8) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p, pd,
-     2   px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, Siso(2,2),
-     3   CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3), Pdev(2,2),
-     4   Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2), PxFi(2),
-     5   VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2, T3, Ku,
-     6   ya_g, Ja
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
+      REAL(KIND=RKIND) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p,
+     2   pd, px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta,
+     3   Siso(2,2), CCiso(2,2,2,2), tauM, tauC, rC, rCl, rM(2), Dm(3,3),
+     4   Pdev(2,2), Bm(3,2,eNoN), DBm(3,2), NxFi(2,eNoN), VxFi(2,2),
+     5   PxFi(2), VxNx(2,eNoN), BtDB, NxNx, NxSNx, rMNx(eNoN), T1, T2,
+     6   T3, Ku, ya_g, Ja
 
       TYPE (stModelType) :: stModel
 
@@ -483,16 +481,16 @@
 
 !     Inertia (velocity and acceleration), body force, fiber directions,
 !     and deformation tensor (F) at integration point
-      v  = 0D0
+      v  = 0._RKIND
       vd = -fb
-      vx = 0D0
-      p  = 0D0
-      pd = 0D0
-      px = 0D0
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
-      ya_g   = 0D0
+      vx = 0._RKIND
+      p  = 0._RKIND
+      pd = 0._RKIND
+      px = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      ya_g   = 0._RKIND
       DO a=1, eNoN
          v(1)    = v(1)  + N(a)*yl(i,a)
          v(2)    = v(2)  + N(a)*yl(j,a)
@@ -693,7 +691,7 @@
             lK(8,a,b) = lK(8,a,b) + w*Jac*T2 + afm*Ku
 
 !           dM_1/dP
-            T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1.0D0)
+            T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1._RKIND)
             T2 = T1*NxFi(1,a)*N(b) + af*drho*vd(1)*N(a)*N(b)
             lK(3,a,b) = lK(3,a,b) + w*Jac*T2
 
@@ -716,48 +714,48 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
-      INTEGER, INTENT(IN) :: eNoN, e, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: xl(nsd,eNoN), dl(tDof,eNoN), hl(eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, e, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: xl(nsd,eNoN), dl(tDof,eNoN),
+     2   hl(eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN),
      2   lKd(dof*nsd,eNoN,eNoN)
 
-      INTEGER :: a, b, g, Ac, iM, eNoNb
-      REAL(KIND=8) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
+      LOGICAL :: l1, l2, l3, l4
+      INTEGER(KIND=IKIND) :: a, b, g, Ac, iM, eNoNb
+      REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
      2   ksix(nsd,nsd), rt, xib(2), Nb(2), N(eNoN), Nxi(nsd,eNoN),
      3   Nx(nsd,eNoN)
-      LOGICAL :: l1, l2, l3, l4
 
       iM    = lFa%iM
       eNoNb = lFa%eNoN
 
 !     Initialize parameteric coordinate for Newton's iterations
-      xi0 = 0D0
+      xi0 = 0._RKIND
       DO g=1, msh(iM)%nG
          xi0 = xi0 + msh(iM)%xi(:,g)
       END DO
-      xi0 = xi0 / REAL(msh(iM)%nG,KIND=8)
+      xi0 = xi0 / REAL(msh(iM)%nG, KIND=RKIND)
 
 !     Set bounds on the parameteric coordinates
-      xib(1) = -1.0001D0
-      xib(2) =  1.0001D0
+      xib(1) = -1.0001_RKIND
+      xib(2) =  1.0001_RKIND
       IF (msh(iM)%eType .EQ. eType_TRI .OR.
      2    msh(iM)%eType .EQ. eType_TET) THEN
-         xib(1) = -0.0001D0
+         xib(1) = -1.E-4_RKIND
       END IF
 
 !     Set bounds on shape functions
-      Nb(1) = -0.0001D0
-      Nb(2) =  1.0001d0
+      Nb(1) = -0.0001_RKIND
+      Nb(2) =  1.0001_RKIND
       IF (msh(iM)%eType.EQ.eType_QUD .OR.
      2    msh(iM)%eType.EQ.eType_BIQ) THEN
-         Nb(1) = -0.1251D0
-         Nb(2) =  1.0001D0
+         Nb(1) = -0.1251_RKIND
+         Nb(2) =  1.0001_RKIND
       END IF
 
       DO g=1, lFa%nG
-         xp = 0D0
+         xp = 0._RKIND
          DO a=1, eNoNb
             Ac = lFa%IEN(a,e)
             xp = xp + x(:,Ac)*lFa%N(a,g)
@@ -777,13 +775,13 @@
 
 !        Check if shape functions are within bounds and sum to unity
          b  = 0
-         rt = 0D0
+         rt = 0._RKIND
          DO a=1, eNoN
             rt = rt + N(a)
             IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) b = b + 1
          END DO
          l3 = b .EQ. eNoN
-         l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+         l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
 
          l1 = ALL((/l1, l2, l3, l4/))
          IF (.NOT.l1) err =
@@ -813,16 +811,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), hl(eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), hl(eNoN),
      2   dl(tDof,eNoN), nV(3)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*3,eNoN,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lKd(dof*3,eNoN,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, k, a, b
-      REAL(KIND=8) :: af, afm, h, Jac, wl, Ku, F(3,3), Fi(3,3), nFi(3),
-     2   NxFi(3,eNoN)
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
+      REAL(KIND=RKIND) :: af, afm, h, Jac, wl, Ku, F(3,3), Fi(3,3),
+     2   nFi(3), NxFi(3,eNoN)
 
       af     = eq(cEq)%af*eq(cEq)%gam*dt
       afm    = af / eq(cEq)%am
@@ -830,14 +827,13 @@
       j      = i + 1
       k      = j + 1
 
-      h      = 0D0
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
-      F(3,3) = 1D0
+      h      = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
       DO a=1, eNoN
          h       = h      + N(a)*hl(a)
-
          F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
          F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
          F(1,3)  = F(1,3) + Nx(3,a)*dl(i,a)
@@ -898,29 +894,27 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), hl(eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), hl(eNoN),
      2   dl(tDof,eNoN), nV(2)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lKd(dof*2,eNoN,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lKd(dof*2,eNoN,eNoN), lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, a, b
-      REAL(KIND=8) :: af, afm, h, Jac, wl, Ku, F(2,2), Fi(2,2), nFi(2),
-     2   NxFi(2,eNoN)
+      INTEGER(KIND=IKIND) :: i, j, a, b
+      REAL(KIND=RKIND) :: af, afm, h, Jac, wl, Ku, F(2,2), Fi(2,2),
+     2   nFi(2), NxFi(2,eNoN)
 
       af     = eq(cEq)%af*eq(cEq)%gam*dt
       afm    = af / eq(cEq)%am
       i      = eq(cEq)%s
       j      = i + 1
 
-      h      = 0D0
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
+      h      = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
       DO a=1, eNoN
          h       = h      + N(a)*hl(a)
-
          F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
          F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
          F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
@@ -956,14 +950,14 @@
       END SUBROUTINE BVMS_STRUCT2D
 !####################################################################
       SUBROUTINE VMS_STRUCT_DOASSEM(d, eqN, lKd, lK, lR)
+      USE TYPEMOD
       USE COMMOD, ONLY: dof, nsd, rowPtr, colPtr, idMap, Kd, Val, R
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: d, eqN(d)
-      REAL(KIND=8), INTENT(IN) :: lKd(dof*nsd,d,d), lK(dof*dof,d,d),
+      INTEGER(KIND=IKIND), INTENT(IN) :: d, eqN(d)
+      REAL(KIND=RKIND), INTENT(IN) :: lKd(dof*nsd,d,d), lK(dof*dof,d,d),
      2   lR(dof,d)
 
-      INTEGER a, b, ptr, rowN, colN
+      INTEGER(KIND=IKIND) a, b, ptr, rowN, colN
 
       DO a=1, d
 !        Momentum equation residue is assembled at mapped rows
@@ -1074,7 +1068,7 @@
          SUBROUTINE GETCOLPTR()
          IMPLICIT NONE
 
-         INTEGER left, right
+         INTEGER(KIND=IKIND) left, right
 
          left  = rowPtr(rowN)
          right = rowPtr(rowN+1)
@@ -1097,23 +1091,22 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Yg(tDof,tnNo)
+      INTEGER(KIND=IKIND) :: a, i, c, s
+      REAL(KIND=RKIND) :: amg, ami
 
-      INTEGER :: a, i, c, s
-      REAL(KIND=8) :: amg, ami
-
-      REAL(KIND=8), ALLOCATABLE :: KU(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: KU(:,:)
 
       IF (eq(cEq)%phys .NE. phys_vms_struct .AND.
      2    eq(cEq)%phys .NE. phys_FSI) RETURN
 
       s   = eq(cEq)%s
-      amg = (eq(cEq)%gam-eq(cEq)%am) / (eq(cEq)%gam-1D0)
-      ami = 1D0/eq(cEq)%am
+      amg = (eq(cEq)%gam-eq(cEq)%am) / (eq(cEq)%gam-1._RKIND)
+      ami = 1._RKIND/eq(cEq)%am
 
       IF (eq(cEq)%itr .GT. 1) THEN
-         Rd = 0D0
+         Rd = 0._RKIND
          RETURN
       END IF
 
@@ -1126,7 +1119,7 @@
 
       IF (nsd .EQ. 3) THEN
          ALLOCATE(KU(4,tnNo))
-         KU = 0D0
+         KU = 0._RKIND
          DO a=1, tnNo
             IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
 
@@ -1154,7 +1147,7 @@
          DEALLOCATE(KU)
       ELSE
          ALLOCATE(KU(3,tnNo))
-         KU = 0D0
+         KU = 0._RKIND
          DO a=1, tnNo
             IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
 

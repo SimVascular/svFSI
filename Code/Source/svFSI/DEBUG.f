@@ -42,11 +42,11 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER a, i, Ac, fid, iM, nNo, gnNo, s, e, ldof
+      INTEGER(KIND=IKIND) a, i, Ac, fid, iM, nNo, gnNo, s, e, ldof
       CHARACTER(LEN=stdL) fName
 
-      REAL(KIND=8), ALLOCATABLE :: lX(:,:), lA(:,:), lY(:,:), lD(:,:),
-     2   lR(:,:), gX(:,:), gA(:,:), gY(:,:), gD(:,:), gR(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), lA(:,:), lY(:,:),
+     2   lD(:,:), lR(:,:), gX(:,:), gA(:,:), gY(:,:), gD(:,:), gR(:,:)
 
       fid = 1889
       WRITE(fName,'(A)') TRIM(appPath)//"dbgR_"//TRIM(eq(cEq)%sym)//
@@ -67,11 +67,11 @@
          ELSE
             ALLOCATE(gX(0,0), gA(0,0), gY(0,0), gD(0,0), gR(0,0))
          END IF
-         lX = 0D0
-         lA = 0D0
-         lY = 0D0
-         lD = 0D0
-         lR = 0D0
+         lX = 0._RKIND
+         lA = 0._RKIND
+         lY = 0._RKIND
+         lD = 0._RKIND
+         lR = 0._RKIND
          DO a=1, msh(iM)%nNo
             Ac = msh(iM)%gN(a)
             lX(:,a) = x(:,Ac)
@@ -123,7 +123,7 @@
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER a, b, i, j, k, fid
+      INTEGER(KIND=IKIND) a, b, i, j, k, fid
       CHARACTER(LEN=stdL) fName
 
       fid = 1256 + cm%tF()
@@ -179,17 +179,16 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: K(dof*dof,lhs%nnz), U(dof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz), U(dof,tnNo)
-
-      INTEGER a, b, i, Ac, iM, nNo, gnNo, fid
-      REAL(KIND=8) :: KU(dof,tnNo)
+      INTEGER(KIND=IKIND) a, b, i, Ac, iM, nNo, gnNo, fid
+      REAL(KIND=RKIND) :: KU(dof,tnNo)
       CHARACTER(LEN=stdL) fName
 
-      REAL(KIND=8), ALLOCATABLE :: lX(:,:), gX(:,:), lR(:,:), gR(:,:),
-     2   lU(:,:), gU(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), gX(:,:), lR(:,:),
+     2   gR(:,:), lU(:,:), gU(:,:)
 
-      KU(:,:) = 0D0
+      KU(:,:) = 0._RKIND
       SELECT CASE (dof)
       CASE (1)
          DO a=1, tnNo

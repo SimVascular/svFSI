@@ -39,36 +39,39 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(OUT) :: timeP(3)
+      REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
       LOGICAL :: flag
-      INTEGER :: i, a, iEq, iDmn, iM, ierr, nnz, gnnz
+      INTEGER(KIND=IKIND) :: i, a, iEq, iDmn, iM, ierr, nnz, gnnz
       CHARACTER(LEN=stdL) :: fTmp, sTmp
-      REAL(KIND=8) :: am
+      REAL(KIND=RKIND) :: am
       TYPE(FSILS_commuType) :: communicator
 
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: s
+      REAL(KIND=RKIND), ALLOCATABLE, DIMENSION(:,:) :: s
 
       tDof  = 0
       dFlag = .FALSE.
 
 !     Set faces for linear solver
       nFacesLS = SUM(eq%nBc)
+
 !     Remove LS pointer for faces with weakly applied Dir. BC
       DO iEq=1, nEq
          DO i=1, eq(iEq)%nBc
             IF (eq(iEq)%bc(i)%weakDir) nFacesLS = nFacesLS - 1
          END DO
       END DO
+
 !     Pointer to all immersed solid nodes (iblank=1)
       ibLSptr  = 0
       IF (ibFlag) THEN
          nFacesLS = nFacesLS + 1
          ibLSptr  = nFacesLS
       END IF
+
 !     For FSI simulations, LS pointer to structure nodes
       IF (mvMsh) nFacesLS = nFacesLS + 1
+
 !     For initializing CMM, LS pointer to fixed edge nodes
       IF (cmmInit) nFacesLS = nFacesLS + 1
 
@@ -77,10 +80,10 @@
       flag = .FALSE.
       DO iEq=1, nEq
 !     This would be the default value of am for first order equations
-         eq(iEq)%am = 5D-1*(3D0 - eq(iEq)%roInf) /
-     2                (1D0 + eq(iEq)%roInf)
+         eq(iEq)%am = 0.5_RKIND*(3._RKIND - eq(iEq)%roInf) /
+     2                (1._RKIND + eq(iEq)%roInf)
 !     If the equation is second order, am is calculated as follows
-         am = (2D0 - eq(iEq)%roInf)/(1D0 + eq(iEq)%roInf)
+         am = (2._RKIND - eq(iEq)%roInf)/(1._RKIND + eq(iEq)%roInf)
          SELECT CASE (eq(iEq)%phys)
          CASE (phys_fluid)
             eq(iEq)%dof = nsd + 1
@@ -132,9 +135,10 @@
          END SELECT
 
          eq(iEq)%pNorm = HUGE(eq(iEq)%pNorm)
-         eq(iEq)%af    = 1D0/(1D0 + eq(iEq)%roInf)
-         eq(iEq)%beta  = 25D-2*(1D0 + eq(iEq)%am - eq(iEq)%af)**2D0
-         eq(iEq)%gam   = 5D-1 + eq(iEq)%am - eq(iEq)%af
+         eq(iEq)%af    = 1._RKIND/(1._RKIND + eq(iEq)%roInf)
+         eq(iEq)%beta  = 0.25_RKIND*(1._RKIND + eq(iEq)%am -
+     2      eq(iEq)%af)**2._RKIND
+         eq(iEq)%gam   = 0.5_RKIND + eq(iEq)%am - eq(iEq)%af
          eq(iEq)%s     = tDof + 1
          eq(iEq)%e     = tDof + eq(iEq)%dof
          tDof          = eq(iEq)%e
@@ -158,9 +162,9 @@
          i = i + nXion
          IF (cem%cpld) i = i + 1
       END IF
-      i = 4*(1+SIZE(stamp)) + 8*(2+nEq+cplBC%nX+i*tnNo)
+      i = IKIND*(1+SIZE(stamp)) + RKIND*(2+nEq+cplBC%nX+i*tnNo)
 
-      IF (ibFlag) i = i + 8*(4*nsd+1)*ib%tnNo
+      IF (ibFlag) i = i + RKIND*(4*nsd+1)*ib%tnNo
       IF (cm%seq()) THEN
          recLn = i
       ELSE
@@ -224,9 +228,9 @@
 !     VMS_STRUCT phys
       IF (sstEq) THEN
          ALLOCATE(Ad(nsd,tnNo), Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
-         Ad = 0D0
-         Rd = 0D0
-         Kd = 0D0
+         Ad = 0._RKIND
+         Rd = 0._RKIND
+         Kd = 0._RKIND
       END IF
 
 !     PRESTRESS phys
@@ -234,22 +238,22 @@
          IF (ALLOCATED(pS0)) err = "Prestress already allocated. "//
      2      "Correction needed"
          ALLOCATE(pS0(nstd,tnNo), pSn(nstd,tnNo), pSa(tnNo))
-         pS0 = 0D0
-         pSn = 0D0
-         pSa = 0D0
+         pS0 = 0._RKIND
+         pSn = 0._RKIND
+         pSa = 0._RKIND
       END IF
 
 !     Electrophysiology
       IF (cepEq) THEN
          ALLOCATE(Xion(nXion,tnNo))
-         Xion(:,:) = 0D0
+         Xion(:,:) = 0._RKIND
 
          CALL CEPINIT()
 
 !        Electro-Mechanics
          IF (cem%cpld) THEN
             ALLOCATE(cem%Ya(tnNo))
-            cem%Ya = 0D0
+            cem%Ya = 0._RKIND
          END IF
       END IF
 
@@ -353,7 +357,7 @@
 
 !     Calculating the volume of each domain
       ALLOCATE(s(1,tnNo))
-      s = 1D0
+      s = 1._RKIND
       DO iEq=1, nEq
          IF (.NOT.shlEq .AND. .NOT.cmmInit) std = " Eq. <"//
      2      CLR(eq(iEq)%sym, iEq)//">"
@@ -393,38 +397,38 @@
       SUBROUTINE ZEROINIT(timeP)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(OUT) :: timeP(3)
+      REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
-      INTEGER a
+      INTEGER(KIND=IKIND) a
 
       std = " Initializing state variables to zero"
 
 !     This cTS corresponds to old variables. As soon as incrementing it
 !     by one, it will be associated to new variables.
       cTS      = startTS
-      time     = 0D0
-      timeP(1) = 0D0
-      eq%iNorm = 0D0
+      time     = 0._RKIND
+      timeP(1) = 0._RKIND
+      eq%iNorm = 0._RKIND
 
-      Ao = 0D0
-      Yo = 0D0
-      Do = 0D0
+      Ao = 0._RKIND
+      Yo = 0._RKIND
+      Do = 0._RKIND
 
       IF (rmsh%isReqd) THEN
-         rmsh%A0 = 0D0
-         rmsh%Y0 = 0D0
-         rmsh%D0 = 0D0
+         rmsh%A0 = 0._RKIND
+         rmsh%Y0 = 0._RKIND
+         rmsh%D0 = 0._RKIND
       END IF
 
       IF (ibFlag) THEN
-         ib%R   = 0D0
-         ib%Rfb = 0D0
-         ib%Ao  = 0D0
-         ib%An  = 0D0
-         ib%Yo  = 0D0
-         ib%Yn  = 0D0
-         ib%Uo  = 0D0
-         ib%Un  = 0D0
+         ib%R   = 0._RKIND
+         ib%Rfb = 0._RKIND
+         ib%Ao  = 0._RKIND
+         ib%An  = 0._RKIND
+         ib%Yo  = 0._RKIND
+         ib%Yn  = 0._RKIND
+         ib%Uo  = 0._RKIND
+         ib%Un  = 0._RKIND
       END IF
 
 !     Load any explicitly provided solution variables
@@ -454,12 +458,11 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
-      REAL(KIND=8), INTENT(OUT) :: timeP(3)
+      REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
-      INTEGER l
-      REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:)
+      INTEGER(KIND=IKIND) l
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:)
 
       l = LEN(TRIM(fName))
       IF (fName(l-2:l) .NE. "vtu") err = "Format of <"//
@@ -473,9 +476,9 @@
       std = " Initializing from "//fName
 
       cTS      = 0
-      time     = 0D0
-      timeP(1) = 0D0
-      eq%iNorm = 0D0
+      time     = 0._RKIND
+      timeP(1) = 0._RKIND
+      eq%iNorm = 0._RKIND
 
       IF (cm%mas()) THEN
          ALLOCATE(tmpA(tDof,gtnNo), tmpY(tDof,gtnNo), tmpD(tDof,gtnNo))
@@ -497,10 +500,10 @@
       USE ALLFUN
       IMPLICIT NONE
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
-      REAL(KIND=8), INTENT(OUT) :: timeP(3)
+      REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
-      INTEGER, PARAMETER :: fid = 1
-      INTEGER tStamp(SIZE(stamp)), a, i
+      INTEGER(KIND=IKIND), PARAMETER :: fid = 1
+      INTEGER(KIND=IKIND) tStamp(SIZE(stamp)), a, i
 
       i = 0
       IF (.NOT.bin2VTK) THEN
@@ -610,7 +613,7 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER iM, iEq
+      INTEGER(KIND=IKIND) iM, iEq
 
 !     Deallocating meshes
       IF (ALLOCATED(msh)) THEN

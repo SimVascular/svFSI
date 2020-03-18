@@ -42,11 +42,15 @@
       IMPLICIT NONE
 
       LOGICAL l1, l2, l3, l4
-      INTEGER i, iM, iBc, ierr, iEqOld
-      REAL(KIND=8) timeP(3)
+      INTEGER(KIND=IKIND) i, iM, iBc, ierr, iEqOld
+      REAL(KIND=RKIND) timeP(3)
 
-      INTEGER, ALLOCATABLE :: incL(:)
-      REAL(KIND=8), ALLOCATABLE :: Ag(:,:), Yg(:,:), Dg(:,:), res(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incL(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Ag(:,:), Yg(:,:), Dg(:,:), res(:)
+
+      IF (IKIND.NE.LSIP .OR. RKIND.NE.LSRP) THEN
+         STOP "Incompatible datatype precision between solver and FSILS"
+      END IF
 
       l1 = .FALSE.
       l2 = .FALSE.
@@ -81,11 +85,11 @@
 !--------------------------------------------------------------------
 !     Outer loop for marching in time. When entring this loop, all old
 !     variables are completely set and satisfy BCs.
-      IF (cTS .LE. nITS) dt = dt/1D1
+      IF (cTS .LE. nITS) dt = dt/10._RKIND
       DO
 !     Adjusting the time step size once initialization stage is over
          IF (cTS .EQ. nITS) THEN
-            dt = dt*1D1
+            dt = dt*10._RKIND
             std = " New time step size: "//dt
          END IF
 !     Incrementing time step, hence cTS will be associated with new
@@ -120,8 +124,8 @@
 !     Initiator step (quantities at n+am, n+af)
             CALL PICI(Ag, Yg, Dg)
             IF (ALLOCATED(Rd)) THEN
-               Rd = 0D0
-               Kd = 0D0
+               Rd = 0._RKIND
+               Kd = 0._RKIND
             END IF
 
             dbg = 'Allocating the RHS and LHS'

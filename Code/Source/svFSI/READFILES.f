@@ -43,9 +43,9 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER :: i, iEq
-      INTEGER :: tArray(8)
-      REAL(KIND=8) :: roInf
+      INTEGER(KIND=IKIND) :: i, iEq
+      INTEGER(KIND=IKIND) :: tArray(8)
+      REAL(KIND=RKIND) :: roInf
       CHARACTER(LEN=8) :: date
       CHARACTER(LEN=stdL) :: ctmp
       CHARACTER(LEN=stdL) :: mfsIn
@@ -84,7 +84,7 @@
          saveIncr     = 10
          nITs         = 0
          startTS      = 0
-         roInf        = 2D-1
+         roInf        = 0.2_RKIND
          stFileName   = "stFile"
          iniFilePath  = ""
          stopTrigName = "STOP_SIM"
@@ -171,11 +171,11 @@
 
          lPtr => list%get(nTs,"Number of time steps",1,ll=1)
          lPtr => list%get(startTS,"Starting time step",ll=0)
-         lPtr => list%get(dt,"Time step size",1,lb=0D0)
+         lPtr => list%get(dt,"Time step size",1,lb=0._RKIND)
          lPtr => list%get(nITs,"Number of initialization time steps",
      2      ll=0)
          lPtr => list%get(roInf,"Spectral radius of infinite time step",
-     2      ll=0D0,ul=1D0)
+     2      ll=0._RKIND,ul=1._RKIND)
 
          lPtr =>list%get(stopTrigName,
      2      "Searched file name to trigger stop")
@@ -332,17 +332,15 @@
       USE ALLFUN
       USE LISTMOD
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER, PARAMETER :: maxOutput = 19
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 19
 
-      INTEGER fid, iBc, iBf, iM, iFa, phys(4), propL(maxNProp,10),
-     2   outPuts(maxOutput), nDOP(4)
+      INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
+     2   propL(maxNProp,10), outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
-
       TYPE(listType), POINTER :: lPtr, lPBC, lPBF
       TYPE(fileType) fTmp
 
@@ -352,7 +350,7 @@
       lPtr => list%get(lEq%coupled,"Coupled")
       lPtr => list%get(lEq%minItr,"Min iterations",ll=1)
       lPtr => list%get(lEq%maxItr,"Max iterations",ll=1)
-      lPtr => list%get(lEq%tol,"Tolerance",ll=0D0)
+      lPtr => list%get(lEq%tol,"Tolerance",ll=0._RKIND)
 
 !     Coupled BC stuff
 !     Initializing coupled BC if neccessary
@@ -388,7 +386,7 @@
             ELSE
                lPtr => lPBC%get(cplBC%nX,"Number of unknowns",1,ll=0)
                ALLOCATE(cplBC%xo(cplBC%nX))
-               cplBC%xo = 0D0
+               cplBC%xo = 0._RKIND
 
                lPtr => lPBC%get(fTmp,"0D code file path",1)
                cplBC%binPath = fTmp%fname
@@ -640,7 +638,7 @@
             cmmVarWall = .TRUE.
             IF (.NOT.ALLOCATED(varWallProps)) THEN
                ALLOCATE(varWallProps(2,gtnNo))
-               varWallProps = 0D0
+               varWallProps = 0._RKIND
             END IF
 
             iM  = 0
@@ -697,7 +695,7 @@
          END IF
 
          CALL READDOMAIN(lEq, propL, list)
-         IF (cmmInit) lEq%dmn(:)%prop(solid_density) = 0D0
+         IF (cmmInit) lEq%dmn(:)%prop(solid_density) = 0._RKIND
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -781,15 +779,15 @@
 
          propL(1,1) = poisson_ratio
          CALL READDOMAIN(lEq, propL, list)
-         lEq%dmn%prop(solid_density) = 0D0
-         lEq%dmn%prop(elasticity_modulus) = 1D0
+         lEq%dmn%prop(solid_density) = 0._RKIND
+         lEq%dmn%prop(elasticity_modulus) = 1._RKIND
 
          nDOP = (/3,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_velocity
          outPuts(3) = out_acceleration
 
-         lEq%ls%reltol = 2D-1
+         lEq%ls%reltol = 0.2_RKIND
          CALL READLS(LS_TYPE_CG, lEq, list)
 
 !     Basset-Boussinesq-Oseen equation solver------------------------
@@ -852,8 +850,8 @@
          IF (ALLOCATED(cplBC%xo)) err = "ERROR: cplBC structure is "//
      2      "already initialized. Unexpected behavior."
          ALLOCATE(cplBc%xo(cplBc%nX), cplBC%xp(cplBC%nXp))
-         cplBC%xo = 0D0
-         cplBC%xp = 0D0
+         cplBC%xo = 0._RKIND
+         cplBC%xp = 0._RKIND
          cplBC%saveName = TRIM(appPath)//"RCR.dat"
       END IF
 !--------------------------------------------------------------------
@@ -882,18 +880,18 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(INOUT) :: lEq
-      INTEGER, INTENT(IN) :: propList(maxNProp,10)
+      INTEGER(KIND=IKIND), INTENT(IN) :: propList(maxNProp,10)
       TYPE (listType), TARGET, INTENT(INOUT) :: list
-      INTEGER, INTENT(IN), OPTIONAL :: physI(:)
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: physI(:)
 
       LOGICAL flag
-      INTEGER i, iDmn, iPhys, iProp, prop, nPhys
-      REAL(KIND=8) rtmp
+      INTEGER(KIND=IKIND) i, iDmn, iPhys, iProp, prop, nPhys
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPD
-      INTEGER, ALLOCATABLE :: phys(:)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: phys(:)
 
       IF (PRESENT(physI)) THEN
          nPhys = SIZE(physI)
@@ -961,29 +959,30 @@
          IF (iPhys .GT. nPhys) err = "Undefined phys is used"
 
          DO iProp=1, maxNProp
-            rtmp = 0D0
+            rtmp = 0._RKIND
             prop = propList(iProp,iPhys)
             SELECT CASE (prop)
             CASE (prop_NA)
                EXIT
             CASE (fluid_density)
                IF(lEq%phys .EQ. phys_CMM) THEN
-                  lPtr => lPD%get(rtmp,"Fluid density",1,lb=0D0)
+                  lPtr => lPD%get(rtmp,"Fluid density",1,lb=0._RKIND)
                ELSE
-                  lPtr => lPD%get(rtmp,"Density",1,lb=0D0)
+                  lPtr => lPD%get(rtmp,"Density",1,lb=0._RKIND)
                END IF
             CASE (solid_density)
                IF(lEq%phys .EQ. phys_CMM) THEN
-                  lPtr => lPD%get(rtmp,"Solid density",1,ll=0D0)
+                  lPtr => lPD%get(rtmp,"Solid density",1,ll=0._RKIND)
                ELSE
-                  lPtr => lPD%get(rtmp,"Density",ll=0D0)
+                  lPtr => lPD%get(rtmp,"Density",ll=0._RKIND)
                END IF
             CASE (elasticity_modulus)
-               lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0D0)
+               lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0._RKIND)
             CASE (poisson_ratio)
-               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0D0,ul=5D-1)
+               lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0._RKIND,
+     2            ul=0.5_RKIND)
             CASE (conductivity)
-               lPtr => lPD%get(rtmp,"Conductivity",1,ll=0D0)
+               lPtr => lPD%get(rtmp,"Conductivity",1,ll=0._RKIND)
             CASE (f_x)
                lPtr => lPD%get(rtmp,"Force_X")
             CASE (f_y)
@@ -991,26 +990,26 @@
             CASE (f_z)
                lPtr => lPD%get(rtmp,"Force_Z")
             CASE (permeability)
-               rtmp = 100000000000.0D0
-               lPtr => lPD%get(rtmp,"Permeability",lb=0D0)
+               rtmp = 1.E+6_RKIND
+               lPtr => lPD%get(rtmp,"Permeability",lb=0._RKIND)
             CASE (backflow_stab)
-               rtmp = 2D-1
+               rtmp = 0.2_RKIND
                lPtr => lPD%get(rtmp,"Backflow stabilization coefficient"
-     2            ,ll=0D0)
+     2            ,ll=0._RKIND)
             CASE (source_term)
                lPtr => lPD%get(rtmp,"Source term")
             CASE (damping)
                lPtr => lPD%get(rtmp,"Mass damping")
             CASE (shell_thickness)
-               lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0D0)
+               lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0._RKIND)
             CASE (ctau_M)
                lPtr => lPD%get(rtmp,
      2            "Momentum stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.001D0
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1.E-3_RKIND
             CASE (ctau_C)
                lPtr => lPD%get(rtmp,
      2            "Continuity stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0.0D0
+               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0._RKIND
             CASE DEFAULT
                err = "Undefined properties"
             END SELECT
@@ -1043,12 +1042,11 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: ilsType
+      INTEGER(KIND=IKIND), INTENT(IN) :: ilsType
       TYPE(eqType), INTENT(INOUT) :: lEq
       TYPE(listType), INTENT(INOUT) :: list
 
-      INTEGER lSolverType, FSILSType
+      INTEGER(KIND=IKIND) lSolverType, FSILSType
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPL
 
@@ -1146,11 +1144,12 @@
          lPtr => lPL%get(lEq%ls%mItr,"Max iterations",ll=1)
          lEq%FSILS%RI%mItr = lEq%ls%mItr
 
-         lPtr => lPL%get(lEq%ls%relTol,"Tolerance",lb=0D0,ub=1D0)
+         lPtr => lPL%get(lEq%ls%relTol,"Tolerance",lb=0._RKIND,
+     2      ub=1._RKIND)
          IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%relTol = lEq%ls%relTol
 
          lPtr => lPL%get(lEq%ls%absTol,"Absolute tolerance",
-     2      lb=0D0,ub=1D0)
+     2      lb=0._RKIND,ub=1._RKIND)
          IF (ASSOCIATED(lPtr)) lEq%FSILS%RI%absTol = lEq%ls%absTol
 
          lPtr => lPL%get(lEq%ls%sD,"Krylov space dimension",ll=1)
@@ -1163,14 +1162,14 @@
      2         ll=1)
 
             lPtr => lPL%get(lEq%FSILS%RI%relTol,"Tolerance",
-     2         lb=0D0,ub=1D0)
+     2         lb=0._RKIND,ub=1._RKIND)
             lPtr => lPL%get(lEq%FSILS%GM%relTol,"NS-GM tolerance",
-     2         lb=0D0,ub=1D0)
+     2         lb=0._RKIND,ub=1._RKIND)
             lPtr => lPL%get(lEq%FSILS%CG%relTol,"NS-CG tolerance",
-     2         lb=0D0,ub=1D0)
+     2         lb=0._RKIND,ub=1._RKIND)
 
             lPtr =>lPL%get(lEq%FSILS%RI%absTol,"Absolute tolerance",
-     2         lb=0D0,ub=1D0)
+     2         lb=0._RKIND,ub=1._RKIND)
             lEq%FSILS%GM%absTol = lEq%FSILS%RI%absTol
             lEq%FSILS%CG%absTol = lEq%FSILS%RI%absTol
 
@@ -1190,12 +1189,11 @@
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(INOUT) :: lEq
-      INTEGER, INTENT(IN) :: nDOP(4), outputs(nDOP(1))
+      INTEGER(KIND=IKIND), INTENT(IN) :: nDOP(4), outputs(nDOP(1))
       TYPE(listType), INTENT(INOUT) :: list
 
-      INTEGER nOut, iOut, i, j
+      INTEGER(KIND=IKIND) nOut, iOut, i, j
       CHARACTER(LEN=stdL) ctmp, stmp
       TYPE(listType), POINTER :: lPtr, lPO
 
@@ -1379,19 +1377,18 @@
       USE ALLFUN
       USE LISTMOD
       IMPLICIT NONE
-
       TYPE(bcType), INTENT(INOUT) :: lBc
       TYPE(listType), INTENT(INOUT) :: list
-      INTEGER, INTENT(IN) :: phys
+      INTEGER(KIND=IKIND), INTENT(IN) :: phys
 
       LOGICAL ltmp
-      INTEGER iFa, iM, a, b, fid, i, j, Ac
-      REAL(KIND=8) rtmp, RCR(3)
+      INTEGER(KIND=IKIND) iFa, iM, a, b, fid, i, j, Ac
+      REAL(KIND=RKIND) rtmp, RCR(3)
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr
       TYPE(fileType) fTmp
 
-      INTEGER, ALLOCATABLE :: ptr(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
 
 !     Reading the type: Dir/Neu/Per
       lPtr => list%get(ctmp,"Type")
@@ -1416,7 +1413,7 @@
             lBc%gm%nTP = j
             lBc%gm%dof = i
             ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
-            lBc%gm%t(1) = 0D0
+            lBc%gm%t(1) = 0._RKIND
             lBc%gm%t(2) = HUGE(rtmp)
 
             CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
@@ -1424,12 +1421,12 @@
             lBc%bType = IBSET(lBc%bType,bType_flat)
 
             lPtr => list%get(rtmp, "Traction multiplier")
-            IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1D0
+            IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1._RKIND
             lBc%gm%d(:,:,:) = lBc%gm%d(:,:,:) * rtmp
 
             ALLOCATE(lBc%eDrn(nsd), lBc%h(nsd))
             lBc%eDrn    = 0
-            lBc%h       = 0D0
+            lBc%h       = 0._RKIND
             lBc%weakDir = .FALSE.
             RETURN
          END IF
@@ -1444,7 +1441,7 @@
 
 !     Allocate traction
       ALLOCATE(lBc%h(nsd))
-      lBc%h = 0D0
+      lBc%h = 0._RKIND
 
       ALLOCATE(lBc%eDrn(nsd))
       lBc%eDrn = 0
@@ -1456,10 +1453,10 @@
       CASE ('Steady')
          lBc%bType = IBSET(lBc%bType,bType_std)
          IF (BTEST(lBc%bType, bType_trac)) THEN
-            lBc%h = 0D0
+            lBc%h = 0._RKIND
             lPtr => list%get(lBc%h,"Value")
          ELSE
-            lBc%g = 0D0
+            lBc%g = 0._RKIND
             lPtr => list%get(lBc%g,"Value")
          END IF
       CASE ('Unsteady')
@@ -1569,7 +1566,7 @@
             ALLOCATE(lBc%gm)
             ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(msh(iM)%gnNo))
 !     I am seting all the nodes to zero just in case a node is not set
-            lBc%gm%d   = 0D0
+            lBc%gm%d   = 0._RKIND
             lBc%gm%dof = i
             lBc%gm%nTP = j
             ptr        = 0
@@ -1591,8 +1588,9 @@
      2               " should be zero in <"//TRIM(ctmp)//">"
                ELSE
                   rtmp = rtmp - lBc%gm%t(i-1)
-                  IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err = "Non-incre"//
-     2               "asing time trend is found in <"//TRIM(ctmp)//">"
+                  IF (ISZERO(rtmp) .OR. rtmp.LT.0._RKIND) err =
+     2               "Non-increasing time trend is found in <"//
+     3               TRIM(ctmp)//">"
                END IF
             END DO
             lBc%gm%period = lBc%gm%t(j)
@@ -1661,7 +1659,7 @@
          ptr    = 0
 !     Preparing the pointer array
          DO a=1, msh(iM)%fa(iFa)%nNo
-            lBc%gx(a) = 0D0
+            lBc%gx(a) = 0._RKIND
             Ac        = msh(iM)%fa(iFa)%gN(a)
             Ac = msh(iM)%lN(Ac)
             IF (Ac .EQ. 0) err = "Incorrect global node number "//
@@ -1809,12 +1807,12 @@ c     2         "can be applied for Neumann boundaries only"
                iFa = lBc%iFa
                IF (.NOT.ALLOCATED(msh(iM)%fa(iFa)%x)) THEN
                   ALLOCATE(msh(iM)%fa(iFa)%x(nstd,msh(iM)%fa(iFa)%nNo))
-                  msh(iM)%fa(iFa)%x = 0D0
+                  msh(iM)%fa(iFa)%x = 0._RKIND
                END IF
                CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Stress",nstd,1)
                IF (.NOT.ALLOCATED(pS0)) THEN
                   ALLOCATE(pS0(nstd,gtnNo))
-                  pS0 = 0D0
+                  pS0 = 0._RKIND
                END IF
                DO a=1, msh(iM)%fa(iFa)%nNo
                   Ac = msh(iM)%fa(iFa)%gN(a)
@@ -1831,13 +1829,13 @@ c     2         "can be applied for Neumann boundaries only"
             iFa = lBc%iFa
             IF (.NOT.ALLOCATED(msh(iM)%fa(iFa)%x)) THEN
                ALLOCATE(msh(iM)%fa(iFa)%x(nsd,msh(iM)%fa(iFa)%nNo))
-               msh(iM)%fa(iFa)%x = 0D0
+               msh(iM)%fa(iFa)%x = 0._RKIND
             END IF
             CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Displacement",
      2         nsd, 1)
             IF (.NOT.ALLOCATED(Dinit)) THEN
                ALLOCATE(Dinit(nsd,gtnNo))
-               Dinit = 0D0
+               Dinit = 0._RKIND
             END IF
             DO a=1, msh(iM)%fa(iFa)%nNo
                Ac = msh(iM)%fa(iFa)%gN(a)
@@ -1866,13 +1864,12 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       USE LISTMOD
       IMPLICIT NONE
-
       TYPE(bfType), INTENT(INOUT) :: lBf
       TYPE(listType), INTENT(INOUT) :: list
 
       LOGICAL flag
-      INTEGER iM, a, i, j, Ac, fid
-      REAL(KIND=8) rtmp
+      INTEGER(KIND=IKIND) iM, a, i, j, Ac, fid
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr
       TYPE(fileType) fTmp
@@ -1903,7 +1900,7 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ('steady')
          lBf%bType = IBSET(lBf%bType,bfType_std)
          ALLOCATE(lBf%b(lBf%dof))
-         lBf%b = 0D0
+         lBf%b = 0._RKIND
          IF (lBf%dof .EQ. 1) THEN
             lPtr => list%get(lBf%b(1),"Value",1)
          ELSE
@@ -1952,11 +1949,11 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ('spatial')
          lBf%bType = IBSET(lBf%bType,bfType_spl)
          ALLOCATE(lBf%bx(lBf%dof,gtnNo))
-         lBf%bx = 0D0
+         lBf%bx = 0._RKIND
          lPtr => list%get(cTmp,"Spatial values file path")
 
          ALLOCATE(msh(iM)%x(lBf%dof,msh(iM)%gnNo))
-         msh(iM)%x = 0D0
+         msh(iM)%x = 0._RKIND
          IF (BTEST(lBf%bType,bfType_vol)) THEN
             CALL READVTUPDATA(msh(iM), ctmp, "Body_force", lBf%dof, 1)
          ELSE IF (BTEST(lBf%bType,bfType_trac)) THEN
@@ -1990,8 +1987,8 @@ c     2         "can be applied for Neumann boundaries only"
          lBf%bm%nTP = j
 
          ALLOCATE(lBf%bm%t(j), lBf%bm%d(lBf%dof,gtnNo,j))
-         lBf%bm%t = 0D0
-         lBf%bm%d = 0D0
+         lBf%bm%t = 0._RKIND
+         lBf%bm%d = 0._RKIND
 
          DO j=1, lBf%bm%nTP
             READ(fid,*) rtmp
@@ -2001,7 +1998,7 @@ c     2         "can be applied for Neumann boundaries only"
      2            "be 0 (body force for <"//TRIM(msh(iM)%name)//">)"
             ELSE
                rtmp = rtmp - lBf%bm%t(j-1)
-               IF (ISZERO(rtmp) .OR. rtmp.LT.0D0) err =
+               IF (ISZERO(rtmp) .OR. rtmp.LT.0._RKIND) err =
      2            "Non-increasing time trend found (body force for <"//
      3            TRIM(msh(iM)%name)//">)"
             END IF
@@ -2033,11 +2030,10 @@ c     2         "can be applied for Neumann boundaries only"
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(listType), INTENT(INOUT) :: list
 
+      INTEGER(KIND=IKIND) :: iM, jM
       CHARACTER(LEN=stdL) ctmp
-      INTEGER :: iM, jM
       TYPE(listType), POINTER :: lPtr, lPR, llP
 
       lPR => list%get(ctmp,"Remesher")
@@ -2057,9 +2053,9 @@ c     2         "can be applied for Neumann boundaries only"
 
       IF (ASSOCIATED(lPR)) THEN
          ALLOCATE(rmsh%maxEdgeSize(nMsh))
-         rmsh%maxEdgeSize(:) = 1.5D-1
-         rmsh%minDihedAng = 1.0D1
-         rmsh%maxRadRatio = 1.15D0
+         rmsh%maxEdgeSize(:) = 0.5_RKIND
+         rmsh%minDihedAng = 10._RKIND
+         rmsh%maxRadRatio = 0.5_RKIND
          rmsh%freq = 100
          rmsh%cpVar = 10
 
@@ -2073,7 +2069,8 @@ c     2         "can be applied for Neumann boundaries only"
             END IF
          END DO
          lPtr => lPR%get(rmsh%minDihedAng,"Min dihedral angle")
-         lPtr => lPR%get(rmsh%maxRadRatio,"Max radius ratio",ll=1D0)
+         lPtr => lPR%get(rmsh%maxRadRatio,"Max radius ratio",
+     2      ll=1._RKIND)
          lPtr => lPR%get(rmsh%cpVar,"Frequency for copying data")
          lPtr => lPR%get(rmsh%freq,"Remesh frequency")
       END IF
@@ -2087,14 +2084,13 @@ c     2         "can be applied for Neumann boundaries only"
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(dmnType), INTENT(INOUT) :: lDmn
       TYPE(listType), INTENT(INOUT) :: lPD
 
       TYPE(listType), POINTER :: lPtr, list
 
-      INTEGER i
-      REAL(KIND=8) rtmp
+      INTEGER(KIND=IKIND) i
+      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
 
       lPtr => lPD%get(ctmp, "Electrophysiology model")
@@ -2130,13 +2126,13 @@ c     2         "can be applied for Neumann boundaries only"
          nXion = lDmn%cep%nX + lDmn%cep%nG
       END IF
 
-      lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0D0)
+      lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0._RKIND)
       i = lPD%srch("Conductivity (ani)")
       lDmn%cep%nFn = i
       IF (i .EQ. 0) lDmn%cep%nFn = 1
 
       ALLOCATE(lDmn%cep%Dani(lDmn%cep%nFn))
-      lDmn%cep%Dani = 0D0
+      lDmn%cep%Dani = 0._RKIND
       IF (i .NE. 0) THEN
          DO i=1, lDmn%cep%nFn
             lPtr => lPD%get(lDmn%cep%Dani(i), "Conductivity (ani)", i)
@@ -2162,10 +2158,10 @@ c     2         "can be applied for Neumann boundaries only"
          END SELECT
       END IF
 
-      lDmn%cep%Istim%A  = 0.0d0
-      lDmn%cep%Istim%Ts = 9999999.0d0
-      lDmn%cep%Istim%CL = 9999999.0d0
-      lDmn%cep%Istim%Td = 0.0d0
+      lDmn%cep%Istim%A  = 0._RKIND
+      lDmn%cep%Istim%Ts = 99999._RKIND
+      lDmn%cep%Istim%CL = 99999._RKIND
+      lDmn%cep%Istim%Td = 0._RKIND
 
       list => lPD%get(ctmp, "Stimulus")
       IF (ASSOCIATED(list)) THEN
@@ -2175,7 +2171,7 @@ c     2         "can be applied for Neumann boundaries only"
             lPtr => list%get(lDmn%cep%Istim%Td, "Duration")
             lPtr => list%get(lDmn%cep%Istim%CL, "Cycle length")
             IF (.NOT.ASSOCIATED(lPtr)) THEN
-               lDmn%cep%Istim%CL = REAL(nTS, KIND=8) * dt
+               lDmn%cep%Istim%CL = REAL(nTS, KIND=RKIND) * dt
             END IF
          END IF
       END IF
@@ -2215,18 +2211,18 @@ c     2         "can be applied for Neumann boundaries only"
       IF (lDmn%cep%odes%tIntType .EQ. tIntType_CN2) THEN
          list => lPtr
          lDmn%cep%odes%maxItr = 5
-         lDmn%cep%odes%absTol = 1D-8
-         lDmn%cep%odes%relTol = 1D-4
+         lDmn%cep%odes%absTol = 1.E-8_RKIND
+         lDmn%cep%odes%relTol = 1.E-4_RKIND
          lPtr => list%get(lDmn%cep%odes%maxItr, "Maximum iterations")
          lPtr => list%get(lDmn%cep%odes%absTol, "Absolute tolerance")
          lPtr => list%get(lDmn%cep%odes%relTol, "Relative tolerance")
       END IF
 
-      lDmn%cep%Ksac = 0D0
+      lDmn%cep%Ksac = 0._RKIND
       lPtr => lPD%get(rtmp, "Feedback parameter for "//
      2   "stretch-activated-currents")
       IF (ASSOCIATED(lPtr)) lDmn%cep%Ksac = rtmp
-      IF (.NOT.cem%cpld) lDmn%cep%Ksac = 0D0
+      IF (.NOT.cem%cpld) lDmn%cep%Ksac = 0._RKIND
 
       RETURN
       END SUBROUTINE READCEP
@@ -2237,30 +2233,29 @@ c     2         "can be applied for Neumann boundaries only"
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(dmnType), INTENT(INOUT) :: lDmn
       TYPE(listType), INTENT(INOUT) :: lPD
 
-      TYPE(listType), POINTER :: lPtr, lSt
       LOGICAL incompFlag
+      REAL(KIND=RKIND) :: E, nu, lam, mu, kap, rtmp
       CHARACTER(LEN=stdL) ctmp
-      REAL(KIND=8) :: E, nu, lam, mu, kap, rtmp
+      TYPE(listType), POINTER :: lPtr, lSt
 
 !     Domain properties: elasticity modulus, poisson ratio
       E   = lDmn%prop(elasticity_modulus)
       nu  = lDmn%prop(poisson_ratio)
 
 !     Shear modulus
-      mu  = E/(1D0+nu)/2D0
+      mu  = E*0.5_RKIND/(1._RKIND+nu)
 
 !     Incompressible material
       incompFlag = .FALSE.
-      IF (ISZERO(nu-0.5D0)) incompFlag = .TRUE.
+      IF (ISZERO(nu-0.5_RKIND)) incompFlag = .TRUE.
 
 !     Bulk modulus for compressible case
       IF (.NOT.incompFlag) THEN
-         kap = E/(1D0-2D0*nu)/3D0
-         lam = E*nu/(1D0+nu)/(1D0-2D0*nu)
+         kap = E/(1._RKIND-2._RKIND*nu)/3._RKIND
+         lam = E*nu/(1._RKIND+nu)/(1._RKIND-2._RKIND*nu)
       END IF
 
       lSt => lPD%get(ctmp, "Constitutive model")
@@ -2268,7 +2263,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Default: NeoHookean model
       IF (.NOT.ASSOCIATED(lSt)) THEN
          lDmn%stM%isoType = stIso_nHook
-         lDmn%stM%C10 = mu/2.0D0
+         lDmn%stM%C10 = mu*0.5_RKIND
          RETURN
       END IF
 
@@ -2296,7 +2291,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       CASE ("nHK", "nHK91", "neoHookean", "neoHookeanSimo91")
          lDmn%stM%isoType = stIso_nHook
-         lDmn%stM%C10 = mu/2D0
+         lDmn%stM%C10 = mu*0.5_RKIND
 
       CASE ("MR", "Mooney-Rivlin")
          lDmn%stM%isoType = stIso_MR
@@ -2306,7 +2301,7 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("HGO")
       ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
          lDmn%stM%isoType = stIso_HGO
-         lDmn%stM%C10 = mu/2D0
+         lDmn%stM%C10 = mu*0.5_RKIND
          lPtr => lSt%get(lDmn%stM%aff, "a4")
          lPtr => lSt%get(lDmn%stM%bff, "b4")
          lPtr => lSt%get(lDmn%stM%ass, "a6")
@@ -2374,13 +2369,12 @@ c     2         "can be applied for Neumann boundaries only"
       USE LISTMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(dmnType), INTENT(INOUT) :: lDmn
       TYPE(listType), INTENT(INOUT) :: lPD
 
       TYPE(listType), POINTER :: lPtr, lVis
+      REAL(KIND=RKIND) :: rtmp
       CHARACTER(LEN=stdL) ctmp
-      REAL(KIND=8) :: rtmp
 
       lVis => lPD%get(ctmp,"Viscosity",1)
 
@@ -2388,20 +2382,21 @@ c     2         "can be applied for Neumann boundaries only"
       SELECT CASE (TRIM(ctmp))
       CASE ("constant", "const", "newtonian")
          lDmn%visc%viscType = viscType_Const
-         lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0D0)
+         lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0._RKIND)
          RETURN
 
       CASE ("carreau-yasuda", "cy")
          lDmn%visc%viscType = viscType_CY
          lPtr => lVis%get(lDmn%visc%mu_i,
-     2      "Limiting high shear-rate viscosity",1,lb=0D0)
+     2      "Limiting high shear-rate viscosity",1,lb=0._RKIND)
          lPtr => lVis%get(lDmn%visc%mu_o,
-     2      "Limiting low shear-rate viscosity",1,lb=0D0)
+     2      "Limiting low shear-rate viscosity",1,lb=0._RKIND)
          lPtr => lVis%get(lDmn%visc%lam,
-     2      "Shear-rate tensor multiplier (lamda)",1,lb=0D0)
+     2      "Shear-rate tensor multiplier (lamda)",1,lb=0._RKIND)
          lPtr => lVis%get(lDmn%visc%a,
-     2      "Shear-rate tensor exponent (a)",1,lb=0D0)
-         lPtr => lVis%get(lDmn%visc%n,"Power-law index (n)",1,lb=0D0)
+     2      "Shear-rate tensor exponent (a)",1,lb=0._RKIND)
+         lPtr => lVis%get(lDmn%visc%n,"Power-law index (n)",1,
+     2      lb=0._RKIND)
          IF (lDmn%visc%mu_i .GT. lDmn%visc%mu_o) THEN
             err = "Unexpected inputs for Carreau-Yasuda model. "//
      2         "High shear-rate viscosity value should be higher than"//
@@ -2412,10 +2407,10 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("cassons", "cass")
          lDmn%visc%viscType = viscType_Cass
          lPtr => lVis%get(lDmn%visc%mu_i,
-     2      "Asymptotic viscosity parameter",1,lb=0D0)
+     2      "Asymptotic viscosity parameter",1,lb=0._RKIND)
          lPtr => lVis%get(lDmn%visc%mu_o,
-     2      "Yield stress parameter",1,lb=0D0)
-         lDmn%visc%lam = 0.5D0
+     2      "Yield stress parameter",1,lb=0._RKIND)
+         lDmn%visc%lam = 0.5_RKIND
          lPtr => lVis%get(rtmp,"Low shear-rate threshold")
          IF (ASSOCIATED(lPtr)) lDmn%visc%lam = rtmp
          RETURN
@@ -2433,19 +2428,19 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(MBType), INTENT(INOUT) :: lMB
       TYPE(faceType), INTENT(IN) :: lFa
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       CHARACTER(LEN=*), PARAMETER :: shdr = "velocity_"
-      TYPE(vtkXMLType) :: vtp
-      INTEGER :: i, j, a, Ac, n, nNo, ntime, iM, istat
-      REAL(KIND=8) :: t
-      CHARACTER(LEN=stdL) :: stmp
 
-      INTEGER, ALLOCATABLE :: ptr(:), gN(:)
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+      INTEGER(KIND=IKIND) :: i, j, a, Ac, n, nNo, ntime, iM, istat
+      REAL(KIND=RKIND) :: t
+      CHARACTER(LEN=stdL) :: stmp
+      TYPE(vtkXMLType) :: vtp
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:), gN(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: namesL(:)
 
       iStat = 0
@@ -2482,8 +2477,8 @@ c     2         "can be applied for Neumann boundaries only"
       lMB%nTP = ntime
       iM = lFa%iM
       ALLOCATE(lMB%t(ntime), lMB%d(nsd,nNo,ntime), ptr(msh(iM)%gnNo))
-      lMB%t = 0D0
-      lMB%d = 0D0
+      lMB%t = 0._RKIND
+      lMB%d = 0._RKIND
       ptr   = 0
 
 !     Load time values from point data variable names
@@ -2501,8 +2496,8 @@ c     2         "can be applied for Neumann boundaries only"
      2         " in <bct.vtp>"
          ELSE
             t = t - lMB%t(ntime-1)
-            IF (ISZERO(t) .OR. t.LT.0D0) err = "Non-increasing time "//
-     2         "trend is found in <bct.vtp>"
+            IF (ISZERO(t) .OR. t.LT.0._RKIND) err =
+     2         "Non-increasing time trend is found in <bct.vtp>"
          END IF
       END DO
       lMB%period = lMB%t(ntime)
@@ -2540,7 +2535,7 @@ c     2         "can be applied for Neumann boundaries only"
          j = LEN(TRIM(namesL(i)))
          IF (j .EQ. 0) CYCLE
          ntime = ntime + 1
-         tmpR  = 0D0
+         tmpR  = 0._RKIND
          CALL getVTK_pointData(vtp, namesL(i), tmpR, istat)
          DO a=1, nNo
             Ac = gN(a)
@@ -2563,17 +2558,16 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(MBType), INTENT(INOUT) :: lMB
       TYPE(faceType), INTENT(INOUT) :: lFa
       CHARACTER(LEN=stdL) :: fName
 
+      INTEGER(KIND=IKIND) :: iStat, a, Ac
       TYPE(vtkXMLType) :: vtp
       TYPE(faceType) :: gFa
-      INTEGER :: iStat, a, Ac
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:)
 
 !     Read Traction data from VTP file
       iStat = 0
@@ -2625,23 +2619,23 @@ c     2         "can be applied for Neumann boundaries only"
       SUBROUTINE FACEMATCH(lFa, gFa, ptr)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa, gFa
-      INTEGER, INTENT(INOUT) :: ptr(lFa%nNo)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: ptr(lFa%nNo)
 
       TYPE blkType
-         INTEGER :: n = 0
-         INTEGER, ALLOCATABLE :: gN(:)
+         INTEGER(KIND=IKIND) :: n = 0
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:)
       END TYPE
 
       LOGICAL :: nFlt(nsd)
-      INTEGER :: i, a, b, iBlk, nBlk, nBlkd
-      REAL(KIND=8) :: ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
+      INTEGER(KIND=IKIND) :: i, a, b, iBlk, nBlk, nBlkd
+      REAL(KIND=RKIND) :: ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
 
-      INTEGER, ALLOCATABLE :: nodeBlk(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: nodeBlk(:)
       TYPE(blkType), ALLOCATABLE :: blk(:)
 
-      nBlkd = NINT((REAL(gFa%nNo,KIND=8)/1D3)**(3.33D-1))
+      nBlkd = NINT( (REAL(gFa%nNo, KIND=RKIND)/
+     2   1000._RKIND)**(0.333_RKIND), KIND=IKIND)
       IF (nBlkd .EQ. 0) nBlkd = 1
       nBlk = nBlkd**nsd
       ALLOCATE(nodeBlk(gFa%nNo), blk(nBlk))
@@ -2649,18 +2643,18 @@ c     2         "can be applied for Neumann boundaries only"
       DO i=1, nsd
          xMin(i) = MIN(MINVAL(lFa%x), MINVAL(gFa%x))
          xMax(i) = MAX(MAXVAL(lFa%x), MAXVAL(gFa%x))
-         IF (xMin(i) .LT. 0D0) THEN
-            xMin(i) = xMin(i)*(1D0+eps)
+         IF (xMin(i) .LT. 0._RKIND) THEN
+            xMin(i) = xMin(i)*(1._RKIND+eps)
          ELSE
-            xMin(i) = xMin(i)*(1D0-eps)
+            xMin(i) = xMin(i)*(1._RKIND-eps)
          END IF
-         IF (xMax(i) .LT. 0D0) THEN
-            xMax(i) = xMax(i)*(1D0-eps)
+         IF (xMax(i) .LT. 0._RKIND) THEN
+            xMax(i) = xMax(i)*(1._RKIND-eps)
          ELSE
-            xMax(i) = xMax(i)*(1D0+eps)
+            xMax(i) = xMax(i)*(1._RKIND+eps)
          END IF
       END DO
-      dx(:) = (xMax(:) - xMin(:))/REAL(nBlkd,KIND=8)
+      dx(:) = (xMax(:) - xMin(:))/REAL(nBlkd, KIND=RKIND)
 
       nFlt(:) = .TRUE.
       DO i=1, nsd
@@ -2688,7 +2682,7 @@ c     2         "can be applied for Neumann boundaries only"
          minS = HUGE(minS)
          DO i=1, blk(iBlk)%n
             b  = blk(iBlk)%gN(i)
-            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2 ) )
+            ds = SQRT( SUM( (lFa%x(:,a) - gFa%x(:,b))**2._RKIND ) )
             IF (ds .LT. minS) THEN
                minS = ds
                ptr(a) = b
@@ -2705,21 +2699,21 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       CONTAINS
 !--------------------------------------------------------------------
-         INTEGER FUNCTION FINDBLK(x)
+         INTEGER(KIND=IKIND) FUNCTION FINDBLK(x)
          IMPLICIT NONE
-         REAL(KIND=8), INTENT(IN) :: x(nsd)
+         REAL(KIND=RKIND), INTENT(IN) :: x(nsd)
 
-         INTEGER i, j, k
+         INTEGER(KIND=IKIND) i, j, k
 
          i = 1
          j = 1
          k = 1
-         IF (nFlt(1)) i = INT((x(1) - xMin(1))/dx(1))
-         IF (nFlt(2)) j = INT((x(2) - xMin(2))/dx(2))
+         IF (nFlt(1)) i = INT((x(1) - xMin(1))/dx(1), KIND=IKIND)
+         IF (nFlt(2)) j = INT((x(2) - xMin(2))/dx(2), KIND=IKIND)
          IF (i .EQ. nBlkd) i = nBlkd - 1
          IF (j .EQ. nBlkd) j = nBlkd - 1
          IF (nsd .EQ. 3) THEN
-            IF (nFlt(3)) k = INT((x(3) - xMin(3))/dx(3))
+            IF (nFlt(3)) k = INT((x(3) - xMin(3))/dx(3), KIND=IKIND)
             IF (k .EQ. nBlkd) k = nBlkd - 1
             FINDBLK = k + (j + i*nBlkd)*nBlkd + 1
          ELSE ! nsd .EQ. 2
@@ -2737,14 +2731,14 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(INOUT) :: bNds(gtnNo)
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: bNds(gtnNo)
 
-      INTEGER i, j, a, a1, b, b1, e, e1, Ac, Ac1, Bc, Bc1, nAdj
       LOGICAL flag
+      INTEGER(KIND=IKIND) i, j, a, a1, b, b1, e, e1, Ac, Ac1, Bc, Bc1,
+     2   nAdj
 
-      INTEGER, ALLOCATABLE :: incL(:), adjL(:,:), tmpI(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incL(:), adjL(:,:), tmpI(:,:)
 
-!--------------------------------------------------------------------
 !     First, get mesh adjacency
       ALLOCATE(incL(lM%gnNo))
       incL = 0
@@ -2882,17 +2876,16 @@ c     2         "can be applied for Neumann boundaries only"
       SUBROUTINE READWALLPROPSFF(fname, iM, iFa)
       USE COMMOD
       IMPLICIT NONE
-
+      INTEGER(KIND=IKIND), INTENT(IN) :: iM, iFa
       CHARACTER(LEN=stdL), INTENT(IN) :: fname
-      INTEGER, INTENT(IN) :: iM, iFa
 
-      INTEGER a, Ac
+      INTEGER(KIND=IKIND) a, Ac
 
       IF (cmmInit) THEN
          IF (ALLOCATED(msh(iM)%x)) DEALLOCATE(msh(iM)%x)
          ALLOCATE(msh(iM)%x(1,msh(iM)%gnNo))
 !        Read thickness
-         msh(iM)%x = 0D0
+         msh(iM)%x = 0._RKIND
          CALL READVTUPDATA(msh(iM), fname, "Thickness", 1, 1)
          DO a=1, msh(iM)%gnNo
             Ac = msh(iM)%gN(a)
@@ -2900,7 +2893,7 @@ c     2         "can be applied for Neumann boundaries only"
          END DO
 
 !        Read elasticity modulus
-         msh(iM)%x = 0D0
+         msh(iM)%x = 0._RKIND
          CALL READVTUPDATA(msh(iM), fname, "Elasticity_modulus", 1, 1)
          DO a=1, msh(iM)%gnNo
             Ac = msh(iM)%gN(a)
@@ -2911,7 +2904,7 @@ c     2         "can be applied for Neumann boundaries only"
          IF (ALLOCATED(msh(iM)%fa(iFa)%x)) DEALLOCATE(msh(iM)%fa(iFa)%x)
          ALLOCATE(msh(iM)%fa(iFa)%x(1,msh(iM)%fa(iFa)%nNo))
 !        Read thickness
-         msh(iM)%fa(iFa)%x = 0D0
+         msh(iM)%fa(iFa)%x = 0._RKIND
          CALL READVTPPDATA(msh(iM)%fa(iFa), fname, "Thickness", 1, 1)
          DO a=1, msh(iM)%fa(iFa)%nNo
             Ac = msh(iM)%fa(iFa)%gN(a)
@@ -2920,7 +2913,7 @@ c     2         "can be applied for Neumann boundaries only"
          END DO
 
 !        Read elasticity modulus
-         msh(iM)%fa(iFa)%x = 0D0
+         msh(iM)%fa(iFa)%x = 0._RKIND
          CALL READVTPPDATA(msh(iM)%fa(iFa), fname, "Elasticity_modulus",
      2      1, 1)
          DO a=1, msh(iM)%fa(iFa)%nNo

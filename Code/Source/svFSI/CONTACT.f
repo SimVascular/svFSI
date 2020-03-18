@@ -37,21 +37,19 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE CONTACTFORCES(Dg)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
-      INTEGER :: i, j, k, l, m, iM, jM, e, a, Ac, b, Bc, g, eNoN, insd,
-     2   nnb, maxNnb
-      REAL(KIND=8) :: kl, hl, w, Jac, al, c, d, pk, nV1(nsd), nV2(nsd),
-     2   x1(nsd), x2(nsd), x12(nsd), xmin(nsd), xmax(nsd)
       LOGICAL :: flag
+      INTEGER(KIND=IKIND) :: i, j, k, l, m, iM, jM, e, a, Ac, b, Bc, g,
+     2   eNoN, insd, nnb, maxNnb
+      REAL(KIND=RKIND) :: kl, hl, w, Jac, al, c, d, pk, nV1(nsd),
+     2   nV2(nsd), x1(nsd), x2(nsd), x12(nsd), xmin(nsd), xmax(nsd)
 
-      INTEGER, ALLOCATABLE :: incNd(:), bBox(:,:)
-      REAL(KIND=8), ALLOCATABLE :: sA(:), sF(:,:), N(:), Nx(:,:),
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), bBox(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), N(:), Nx(:,:),
      2   gCov(:,:), gCnv(:,:), xl(:,:), lR(:,:)
 
       IF (eq(cEq)%phys .NE. phys_shell) RETURN
@@ -64,8 +62,8 @@
 
 !     Compute normal vectors at each node in the current configuration
       ALLOCATE(sF(nsd,tnNo), sA(tnNo))
-      sF = 0D0
-      sA = 0D0
+      sF = 0._RKIND
+      sA = 0._RKIND
       DO iM=1, nMsh
          IF (.NOT.msh(iM)%lShl) CYCLE
          eNoN = msh(iM)%eNoN
@@ -160,7 +158,7 @@
 !     Check if any node is strictly involved in contact and compute
 !     corresponding penalty forces assembled to the residue
       ALLOCATE(lR(dof,tnNo), incNd(tnNo))
-      lR    = 0D0
+      lR    = 0._RKIND
       incNd = 0
       DO Ac=1, tnNo
          IF (bBox(1,Ac) .EQ. 0) CYCLE
@@ -184,14 +182,14 @@
             IF (c.LE.cntctM%c .AND. al.GE.cntctM%al) THEN
                d = NORM(x12, nV2)
                flag = .FALSE.
-               IF (d.GE.-cntctM%h .AND. d.LT.0D0) THEN
-                  pk = 5D-1*kl/hl * (d + hl)**2
+               IF (d.GE.-cntctM%h .AND. d.LT.0._RKIND) THEN
+                  pk = 0.5_RKIND*kl/hl * (d + hl)**2._RKIND
                   flag = .TRUE.
-               ELSE IF (d .GE. 0D0) THEN
-                  pk = 5D-1*kl * (hl + d)
+               ELSE IF (d .GE. 0._RKIND) THEN
+                  pk = 0.5_RKIND*kl * (hl + d)
                   flag = .TRUE.
                ELSE
-                  pk = 0D0
+                  pk = 0._RKIND
                END IF
                IF (flag) THEN
                   incNd(Ac) = 1
@@ -200,7 +198,7 @@
                END IF
             END IF
          END DO
-         IF (nNb .NE. 0) lR(:,Ac) = lR(:,Ac) / REAL(nNb,KIND=8)
+         IF (nNb .NE. 0) lR(:,Ac) = lR(:,Ac) / REAL(nNb, KIND=RKIND)
       END DO
       DEALLOCATE(sA, sF, bBox)
 
@@ -216,5 +214,4 @@
 
       RETURN
       END SUBROUTINE CONTACTFORCES
-
 !####################################################################

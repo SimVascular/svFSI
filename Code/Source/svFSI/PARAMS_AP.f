@@ -37,38 +37,38 @@
 
 !     Scaling factors
 !     Voltage scaling
-      REAL(KIND=8) :: Vscale  = 100.0D0
+      REAL(KIND=RKIND) :: Vscale  = 100._RKIND
 !     Time scaling
-      REAL(KIND=8) :: Tscale  = 12.9D0
+      REAL(KIND=RKIND) :: Tscale  = 12.9_RKIND
 !     Voltage offset parameter
-      REAL(KIND=8) :: Voffset = -80.0D0
+      REAL(KIND=RKIND) :: Voffset = -80._RKIND
 !-----------------------------------------------------------------------
 !     Model parameters
-      REAL(KIND=8) :: alpha = 0.01D0
-      REAL(KIND=8) :: a     = 0.002D0
-      REAL(KIND=8) :: b     = 0.15D0
-      REAL(KIND=8) :: c     = 8.0D0
-      REAL(KIND=8) :: mu1   = 0.2D0
-      REAL(KIND=8) :: mu2   = 0.3D0
+      REAL(KIND=RKIND) :: alpha = 1.E-2_RKIND
+      REAL(KIND=RKIND) :: a     = 2.E-3_RKIND
+      REAL(KIND=RKIND) :: b     = 0.15_RKIND
+      REAL(KIND=RKIND) :: c     = 8._RKIND
+      REAL(KIND=RKIND) :: mu1   = 0.2_RKIND
+      REAL(KIND=RKIND) :: mu2   = 0.3_RKIND
 !-----------------------------------------------------------------------
 !     Electromechanics coupling parameters: active stress model
 !     Resting voltage (mV)
-      REAL(KIND=8) :: Vrest = -80.0D0
+      REAL(KIND=RKIND) :: Vrest = -80._RKIND
 !     Critical voltage (mV)
-      REAL(KIND=8) :: Vcrit = -30.0D0
+      REAL(KIND=RKIND) :: Vcrit = -30._RKIND
 !     Saturation potential
-      REAL(KIND=8) :: eta_T = 0.005D0
+      REAL(KIND=RKIND) :: eta_T = 5.E-3_RKIND
 !     Minimum activation (ms^{-1})
-      REAL(KIND=8) :: eps_0 = 0.1D0
+      REAL(KIND=RKIND) :: eps_0 = 0.1_RKIND
 !     Maximum activation (ms^{-1})
-      REAL(KIND=8) :: eps_i = 1.0D0
+      REAL(KIND=RKIND) :: eps_i = 1._RKIND
 !     Transition rate (mV^{-1})
-      REAL(KIND=8) :: xi_T  = 1.0D0
+      REAL(KIND=RKIND) :: xi_T  = 1._RKIND
 
 !     Cm: Cell capacitance per unit surface area
-      REAL(KIND=8) :: Cm  = 1.0D0
+      REAL(KIND=RKIND) :: Cm  = 1._RKIND
 !     sV: Surface to volume ratio
-      REAL(KIND=8) :: sV  = 1.0D0
+      REAL(KIND=RKIND) :: sV  = 1._RKIND
 !     rho: Cellular resistivity
-      REAL(KIND=8) :: rho = 1.0D0
+      REAL(KIND=RKIND) :: rho = 1._RKIND
 !#######################################################################
