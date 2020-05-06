@@ -40,22 +40,22 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
 
       LOGICAL :: bFlag, setIt(3)
-      INTEGER :: i, j, k, a, b, g
-      REAL(KIND=8) :: rho, dmp, elM, nu, ht, T1, amd, afl, w, Jac0, Jac,
-     2   ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2), gCov(3,2),
-     3   gCnv(3,2), x0(3,eNoN), xc(3,eNoN), eLoc(3,3), Jm(2,2), Qm(3,3),
-     4   Dm(3,3), Em(3), Eb(3), DEm(3), DEb(3), Bm(3,3,eNoN),
-     5   Bb(3,3,eNoN), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDE, BtDB, NxSNx
+      INTEGER(KIND=IKIND) :: i, j, k, a, b, g
+      REAL(KIND=RKIND) :: rho, dmp, elM, nu, ht, T1, amd, afl, w, Jac0,
+     2   Jac, ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2),
+     3   gCov(3,2), gCnv(3,2), x0(3,eNoN), xc(3,eNoN), eLoc(3,3),
+     4   Jm(2,2), Qm(3,3), Dm(3,3), Em(3), Eb(3), DEm(3), DEb(3),
+     5   Bm(3,3,eNoN), Bb(3,3,eNoN), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDE,
+     6   BtDB, NxSNx
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:),
-     2   tmpX(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:),
+     2   lK(:,:,:), tmpX(:,:)
 
 !     Note that for triangular elements, eNoN=6 and lM%eNoN=3
       ALLOCATE(N(lM%eNoN), Nx(2,lM%eNoN), lR(dof,eNoN),
@@ -125,22 +125,22 @@
       Jm(2,1) = NORM(gCov0(:,1), eLoc(:,2))
       Jm(2,2) = NORM(gCov0(:,2), eLoc(:,2))
 
-      Qm = 0D0
-      Qm(1,1) = 1D0/Jm(1,1)**2
-      Qm(2,1) = (-Jm(1,2)/(Jm(1,1)*Jm(2,2)))**2
-      Qm(2,2) = 1D0/Jm(2,2)**2
-      Qm(2,3) = -Jm(1,2)/(Jm(1,1)*Jm(2,2)**2)
-      Qm(3,1) = -2D0*Jm(1,2)/(Jm(2,2)*Jm(1,1)**2)
-      Qm(3,3) = 1D0/(Jm(1,1)*Jm(2,2))
+      Qm = 0._RKIND
+      Qm(1,1) = 1._RKIND/(Jm(1,1)*Jm(1,1))
+      Qm(2,1) = (-Jm(1,2)/(Jm(1,1)*Jm(2,2)))**2._RKIND
+      Qm(2,2) = 1._RKIND/(Jm(2,2)*Jm(2,2))
+      Qm(2,3) = -Jm(1,2)/(Jm(1,1)*Jm(2,2)**2._RKIND)
+      Qm(3,1) = -2._RKIND*Jm(1,2)/(Jm(2,2)*Jm(1,1)*Jm(1,1))
+      Qm(3,3) = 1._RKIND/(Jm(1,1)*Jm(2,2))
 
 !     Material tensor D, isotropic St Venant Kirchhoff model
-      Dm = 0D0
-      Dm(1,1) = 1D0
+      Dm = 0._RKIND
+      Dm(1,1) = 1._RKIND
       Dm(1,2) = nu
       Dm(2,1) = nu
-      Dm(2,2) = 1D0
-      Dm(3,3) = 5D-1*(1D0-nu)
-      Dm = elM/(1D0-nu**2) * Dm
+      Dm(2,2) = 1._RKIND
+      Dm(3,3) = 0.5_RKIND*(1._RKIND-nu)
+      Dm = elM/(1._RKIND-(nu*nu)) * Dm
 
 !     Compute Qt * D * Q
       Dm = MATMUL(Dm, Qm)
@@ -148,17 +148,17 @@
 
 !     Membrane strain and its variation
 !     Define membrane strain tensor (Em), Voigt notation
-      Em = 0D0
+      Em = 0._RKIND
       DO g=1, nsd
          Em(1) = Em(1) + gCov(g,1)*gCov(g,1) - gCov0(g,1)*gCov0(g,1)
          Em(2) = Em(2) + gCov(g,2)*gCov(g,2) - gCov0(g,2)*gCov0(g,2)
          Em(3) = Em(3) + gCov(g,1)*gCov(g,2) - gCov0(g,1)*gCov0(g,2)
       END DO
-      Em(1) = 5D-1 * Em(1)
-      Em(2) = 5D-1 * Em(2)
+      Em(1) = 0.5_RKIND * Em(1)
+      Em(2) = 0.5_RKIND * Em(2)
 
 !     Define variation in membrane strain only for the main element
-      Bm = 0D0
+      Bm = 0._RKIND
       DO a=1, lM%eNoN
          Bm(1,1,a) = Nx(1,a)*gCov(1,1)
          Bm(1,2,a) = Nx(1,a)*gCov(2,1)
@@ -187,7 +187,7 @@
             IF (setIt(a)) THEN
                DO b=1, lM%eNoN
                   IF (a .EQ. b) CYCLE
-                  Bm(:,:,b) = 0D0
+                  Bm(:,:,b) = 0._RKIND
                END DO
             END IF
          END DO
@@ -258,8 +258,8 @@
 
 !     Contribution to residue and stiffness matrices due to inertia and
 !     body forces
-      lR = 0D0
-      lK = 0D0
+      lR = 0._RKIND
+      lK = 0._RKIND
       DO g=1, lM%nG
          N = lM%N(:,g)
          w = lM%w(g)*Jac0*ht
@@ -291,7 +291,7 @@
 
 !     Contribution from membrane strain related terms only on the main
 !     triangular element
-      T1 = Jac0 * ht/2D0
+      T1 = Jac0 * ht * 0.5_RKIND
       DO a=1, lM%eNoN
          BtDE = Bm(1,1,a)*DEm(1) + Bm(2,1,a)*DEm(2) + Bm(3,1,a)*DEm(3)
          lR(1,a) = lR(1,a) + T1*BtDE
@@ -348,7 +348,7 @@
 
 !     Contribution from bending strain related terms for the main
 !     triangle and its neighbors. Geometric stiffness is ignored
-      T1 = Jac0 * ht**3 /24D0
+      T1 = Jac0 * ht**3._RKIND /24._RKIND
       DO a=1, eNoN
          BtDE = Bb(1,1,a)*DEb(1) + Bb(2,1,a)*DEb(2) + Bb(3,1,a)*DEb(3)
          lR(1,a) = lR(1,a) + T1*BtDE
@@ -417,27 +417,25 @@
 !     This subroutine computes bending strain, Eb, and its variational
 !     derivative, Bb, for triangular shell elements
       SUBROUTINE SHELLBENDTRI(lM, e, ptr, x0, xc, Eb, Bb)
-
       USE COMMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, ptr(6)
-      REAL(KIND=8), INTENT(INOUT) ::  x0(3,6), xc(3,6), Eb(3), Bb(3,3,6)
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, ptr(6)
+      REAL(KIND=RKIND), INTENT(INOUT) ::  x0(3,6), xc(3,6), Eb(3),
+     2   Bb(3,3,6)
 
       LOGICAL :: bFlag, lFix(3)
-      INTEGER :: i, j, p, f, eNoN
+      INTEGER(KIND=IKIND) :: i, j, p, f, eNoN
 
-      REAL(KIND=8) :: Jac0, Jac, cI, aIi, nV0(3), nV(3), eI(3), nI(3),
-     2   eIeI(3,3), nInI(3,3), eIaP(3,3), Im(3,3), gCov(3,2), gCnv(3,2),
-     3   gCov0(3,2), gCnv0(3,2)
+      REAL(KIND=RKIND) :: Jac0, Jac, cI, aIi, nV0(3), nV(3), eI(3),
+     2   nI(3), eIeI(3,3), nInI(3,3), eIaP(3,3), Im(3,3), gCov(3,2),
+     3   gCnv(3,2), gCov0(3,2), gCnv0(3,2)
 
-      REAL(KIND=8) :: a0(3,6), a(3,6), adg0(3,3), adg(3,3), xi0(3,3),
-     2   xi(3,3), Tm0(3,3), Tm(3,3), v0(3), v(3), B1b(3,6), Nm(3,3),
-     2   Mm(3,3,2), H1(6,18), H2(18,18), H3(3,18), H1H2(6,18),
-     3   H3H2(3,18), Bb1(3,18), tmpA(3,3)
+      REAL(KIND=RKIND) :: a0(3,6), a(3,6), adg0(3,3), adg(3,3),
+     2   xi0(3,3), xi(3,3), Tm0(3,3), Tm(3,3), v0(3), v(3), B1b(3,6),
+     3   Nm(3,3), Mm(3,3,2), H1(6,18), H2(18,18), H3(3,18), H1H2(6,18),
+     4   H3H2(3,18), Bb1(3,18), tmpA(3,3)
 
       eNoN = 2*lM%eNoN
 !     Boundary element check
@@ -480,7 +478,7 @@
             IF (i .EQ. 1) p = 3
 !           Reference config
 !           eI = eI0 = aI0/|aI0| (reference config)
-            aIi   = 1D0/SQRT(NORM(a0(:,i)))
+            aIi   = 1._RKIND/SQRT(NORM(a0(:,i)))
             eI(:) = a0(:,i) * aIi
 !           nI = nI0 = eI0 x n0 (reference config)
             nI(1) = eI(2)*nV0(3) - eI(3)*nV0(2)
@@ -488,16 +486,16 @@
             nI(3) = eI(1)*nV0(2) - eI(2)*nV0(1)
 !           xJ = xI + 2(nI \ctimes nI)aP
             nInI    = MAT_DYADPROD(nI, nI, 3)
-            x0(1,j) = 2D0*(nInI(1,1)*a0(1,p) + nInI(1,2)*a0(2,p) +
+            x0(1,j) = 2._RKIND*(nInI(1,1)*a0(1,p) + nInI(1,2)*a0(2,p) +
      2         nInI(1,3)*a0(3,p)) + x0(1,i)
-            x0(2,j) = 2D0*(nInI(2,1)*a0(1,p) + nInI(2,2)*a0(2,p) +
+            x0(2,j) = 2._RKIND*(nInI(2,1)*a0(1,p) + nInI(2,2)*a0(2,p) +
      2         nInI(2,3)*a0(3,p)) + x0(2,i)
-            x0(3,j) = 2D0*(nInI(3,1)*a0(1,p) + nInI(3,2)*a0(2,p) +
+            x0(3,j) = 2._RKIND*(nInI(3,1)*a0(1,p) + nInI(3,2)*a0(2,p) +
      2         nInI(3,3)*a0(3,p)) + x0(3,i)
 
 !           Current config
 !           eI = aI/|aI| (current config)
-            aIi   = 1D0/SQRT(NORM(a(:,i)))
+            aIi   = 1._RKIND/SQRT(NORM(a(:,i)))
             eI(:) = a(:,i)*aIi
 !           nI = eI x n (currnt config)
             nI(1) = eI(2)*nV(3) - eI(3)*nV(2)
@@ -505,11 +503,11 @@
             nI(3) = eI(1)*nV(2) - eI(2)*nV(1)
 !           xJ = xI + 2(nI \ctimes nI)aP
             nInI    = MAT_DYADPROD(nI, nI, 3)
-            xc(1,j) = 2D0*(nInI(1,1)*a(1,p) + nInI(1,2)*a(2,p) +
+            xc(1,j) = 2._RKIND*(nInI(1,1)*a(1,p) + nInI(1,2)*a(2,p) +
      2         nInI(1,3)*a(3,p)) + xc(1,i)
-            xc(2,j) = 2D0*(nInI(2,1)*a(1,p) + nInI(2,2)*a(2,p) +
+            xc(2,j) = 2._RKIND*(nInI(2,1)*a(1,p) + nInI(2,2)*a(2,p) +
      2         nInI(2,3)*a(3,p)) + xc(2,i)
-            xc(3,j) = 2D0*(nInI(3,1)*a(1,p) + nInI(3,2)*a(2,p) +
+            xc(3,j) = 2._RKIND*(nInI(3,1)*a(1,p) + nInI(3,2)*a(2,p) +
      2         nInI(3,3)*a(3,p)) + xc(3,i)
 
             IF (BTEST(lM%sbc(i,e),bType_fix)) xc(:,j) = x0(:,j)
@@ -554,27 +552,27 @@
 
 !     Xi matrix (reference config)
       xi0(:,:)  = adg0(:,:)
-      xi0(1,1)  = adg0(1,1) + 1D0
-      xi0(2,2)  = adg0(2,2) + 1D0
+      xi0(1,1)  = adg0(1,1) + 1._RKIND
+      xi0(2,2)  = adg0(2,2) + 1._RKIND
 
 !     Xi matrix (current config)
       xi(:,:)   = adg(:,:)
-      xi(1,1)   = adg(1,1) + 1D0
-      xi(2,2)   = adg(2,2) + 1D0
+      xi(1,1)   = adg(1,1) + 1._RKIND
+      xi(2,2)   = adg(2,2) + 1._RKIND
 
 !     Tmat and inverse (reference config)
       DO i=1, 3
-         Tm0(i,1) = xi0(1,i)**2 - xi0(1,i) ! xi**2 - xi
-         Tm0(i,2) = xi0(2,i)**2 - xi0(2,i) ! eta**2 - eta
-         Tm0(i,3) = xi0(1,i)*xi0(2,i)      ! xi * eta
+         Tm0(i,1) = xi0(1,i)*(xi0(1,i) - 1._RKIND) ! xi**2 - xi
+         Tm0(i,2) = xi0(2,i)*(xi0(2,i) - 1._RKIND) ! eta**2 - eta
+         Tm0(i,3) = xi0(1,i)*xi0(2,i)              ! xi * eta
       END DO
       Tm0 = MAT_INV(Tm0, 3)
 
 !     Tmat and inverse (current config)
       DO i=1, 3
-         Tm(i,1) = xi(1,i)**2 - xi(1,i) ! xi**2 - xi
-         Tm(i,2) = xi(2,i)**2 - xi(2,i) ! eta**2 - eta
-         Tm(i,3) = xi(1,i)*xi(2,i)      ! xi * eta
+         Tm(i,1) = xi(1,i)*(xi(1,i) - 1._RKIND)    ! xi**2 - xi
+         Tm(i,2) = xi(2,i)*(xi(2,i) - 1._RKIND)    ! eta**2 - eta
+         Tm(i,3) = xi(1,i)*xi(2,i)                 ! xi * eta
       END DO
       Tm = MAT_INV(Tm, 3)
 
@@ -589,21 +587,27 @@
       v(3) = Tm(3,1)*xi(3,1) + Tm(3,2)*xi(3,2) + Tm(3,3)*xi(3,3)
 
 !     Bending strain, Eb = 2*(v0-v) = 2*(Tinv0*z0 - Tinv*z)
-      Eb(:) = 2D0 * (v0(:) - v(:))
+      Eb(:) = 2._RKIND * (v0(:) - v(:))
 
 !     Now compute variation in bending strain
 !     B1 bar
-      B1b(:,1) = -Tm(:,1) * ((2D0*xi(1,1)-1D0)*v(1) + xi(2,1)*v(3))
-      B1b(:,2) = -Tm(:,1) * ((2D0*xi(2,1)-1D0)*v(2) + xi(1,1)*v(3))
+      B1b(:,1) = -Tm(:,1) * ((2._RKIND*xi(1,1)-1._RKIND)*v(1) +
+     2   xi(2,1)*v(3))
+      B1b(:,2) = -Tm(:,1) * ((2._RKIND*xi(2,1)-1._RKIND)*v(2) +
+     2   xi(1,1)*v(3))
 
-      B1b(:,3) = -Tm(:,2) * ((2D0*xi(1,2)-1D0)*v(1) + xi(2,2)*v(3))
-      B1b(:,4) = -Tm(:,2) * ((2D0*xi(2,2)-1D0)*v(2) + xi(1,2)*v(3))
+      B1b(:,3) = -Tm(:,2) * ((2._RKIND*xi(1,2)-1._RKIND)*v(1) +
+     2   xi(2,2)*v(3))
+      B1b(:,4) = -Tm(:,2) * ((2._RKIND*xi(2,2)-1._RKIND)*v(2) +
+     2   xi(1,2)*v(3))
 
-      B1b(:,5) = -Tm(:,3) * ((2D0*xi(1,3)-1D0)*v(1) + xi(2,3)*v(3))
-      B1b(:,6) = -Tm(:,3) * ((2D0*xi(2,3)-1D0)*v(2) + xi(1,3)*v(3))
+      B1b(:,5) = -Tm(:,3) * ((2._RKIND*xi(1,3)-1._RKIND)*v(1) +
+     2   xi(2,3)*v(3))
+      B1b(:,6) = -Tm(:,3) * ((2._RKIND*xi(2,3)-1._RKIND)*v(2) +
+     2   xi(1,3)*v(3))
 
 !     H1
-      H1 = 0D0
+      H1 = 0._RKIND
       H1(1, 4: 6) =  gCnv(:,1)*adg(2,1)
       H1(2, 4: 6) =  gCnv(:,2)*adg(2,1)
       H1(3, 4: 6) =  gCnv(:,1)*adg(2,2)
@@ -626,44 +630,44 @@
       H1(6,16:18) =  gCnv(:,2)
 
 !     H2
-      H2 = 0D0
-      H2( 1, 4) = -1D0
-      H2( 2, 5) = -1D0
-      H2( 3, 6) = -1D0
-      H2( 4, 7) = -1D0
-      H2( 5, 8) = -1D0
-      H2( 6, 9) = -1D0
-      H2( 7, 1) = -1D0
-      H2( 8, 2) = -1D0
-      H2( 9, 3) = -1D0
+      H2 = 0._RKIND
+      H2( 1, 4) = -1._RKIND
+      H2( 2, 5) = -1._RKIND
+      H2( 3, 6) = -1._RKIND
+      H2( 4, 7) = -1._RKIND
+      H2( 5, 8) = -1._RKIND
+      H2( 6, 9) = -1._RKIND
+      H2( 7, 1) = -1._RKIND
+      H2( 8, 2) = -1._RKIND
+      H2( 9, 3) = -1._RKIND
 
-      H2( 1, 7) =  1D0
-      H2( 2, 8) =  1D0
-      H2( 3, 9) =  1D0
-      H2( 4, 1) =  1D0
-      H2( 5, 2) =  1D0
-      H2( 6, 3) =  1D0
-      H2( 7, 4) =  1D0
-      H2( 8, 5) =  1D0
-      H2( 9, 6) =  1D0
+      H2( 1, 7) =  1._RKIND
+      H2( 2, 8) =  1._RKIND
+      H2( 3, 9) =  1._RKIND
+      H2( 4, 1) =  1._RKIND
+      H2( 5, 2) =  1._RKIND
+      H2( 6, 3) =  1._RKIND
+      H2( 7, 4) =  1._RKIND
+      H2( 8, 5) =  1._RKIND
+      H2( 9, 6) =  1._RKIND
 
-      H2(10, 4) = -1D0
-      H2(11, 5) = -1D0
-      H2(12, 6) = -1D0
-      H2(13, 7) = -1D0
-      H2(14, 8) = -1D0
-      H2(15, 9) = -1D0
-      H2(16, 1) = -1D0
-      H2(17, 2) = -1D0
-      H2(18, 3) = -1D0
+      H2(10, 4) = -1._RKIND
+      H2(11, 5) = -1._RKIND
+      H2(12, 6) = -1._RKIND
+      H2(13, 7) = -1._RKIND
+      H2(14, 8) = -1._RKIND
+      H2(15, 9) = -1._RKIND
+      H2(16, 1) = -1._RKIND
+      H2(17, 2) = -1._RKIND
+      H2(18, 3) = -1._RKIND
       do i=10, 18
-         H2(i,i) = 1D0
+         H2(i,i) = 1._RKIND
       end do
 
 !     N matrix
       Nm = MAT_ID(3) - MAT_DYADPROD(nV, nV, 3)
 !     M1, M2 matrices
-      Mm(:,:,:) = 0D0
+      Mm(:,:,:) = 0._RKIND
       DO i=1, 2
          Mm(1,2,i) = -gCov(3,i)
          Mm(1,3,i) =  gCov(2,i)
@@ -676,7 +680,7 @@
       END DO
 
 !     H3 matrix
-      H3 = 0D0
+      H3 = 0._RKIND
       tmpA = MATMUL(Nm, Mm(:,:,1))
       tmpA = -tmpA / Jac
       H3(1,4) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
@@ -713,8 +717,7 @@
       H1H2 = MATMUL(H1, H2)
       Bb1  = MATMUL(B1b, H1H2)
       H3H2 = MATMUL(H3, H2)
-      Bb1  = -2D0*(Bb1 + MATMUL(Tm, H3H2))
-
+      Bb1  = -2._RKIND*(Bb1 + MATMUL(Tm, H3H2))
       Bb   = RESHAPE(Bb1, SHAPE(Bb))
 
 !     Update Bb for boundary elements
@@ -730,7 +733,7 @@
             IF (i .EQ. 3) f = 1
             IF (BTEST(lM%sbc(i,e),bType_fix)) THEN
 !              eI = eI0 = aI0/|aI0| (reference config)
-               aIi   = 1D0/SQRT(NORM(a0(:,i)))
+               aIi   = 1._RKIND/SQRT(NORM(a0(:,i)))
                eI(:) = a0(:,i) * aIi
 !              nI = nI0 = eI0 x n0 (reference config)
                nI(1) = eI(2)*nV0(3) - eI(3)*nV0(2)
@@ -739,7 +742,7 @@
                nInI  = MAT_DYADPROD(nI, nI, 3)
             ELSE
 !              eI = aI/|aI| (current config)
-               aIi   = 1D0/SQRT(NORM(a(:,i)))
+               aIi   = 1._RKIND/SQRT(NORM(a(:,i)))
                eI(:) = a(:,i)*aIi
 !              nI = eI x n (currnt config)
                nI(1) = eI(2)*nV(3) - eI(3)*nV(2)
@@ -755,53 +758,54 @@
             IF (BTEST(lM%sbc(i,e),bType_free)) THEN
 !              E_I
                IF (.NOT.lFix(i)) THEN
-                  tmpA = -Im + 2D0*eIeI
+                  tmpA = -Im + 2._RKIND*eIeI
                   Bb(:,:,i) = Bb(:,:,i) + MATMUL(Bb(:,:,j), tmpA)
                END IF
 !              E_P
                IF (.NOT.lFix(p)) THEN
-                  tmpA = -2D0*(cI*Im - 2D0*cI*eIeI + aIi*eIaP)
+                  tmpA = -2._RKIND*(cI*Im - 2._RKIND*cI*eIeI + aIi*eIaP)
                   Bb(:,:,p) = Bb(:,:,p) + MATMUL(Bb(:,:,j), tmpA)
                END IF
 !              E_F
                IF (.NOT.lFix(f)) THEN
-                  tmpA = 2D0*((1D0-cI)*Im - (1D0-2D0*cI)*eIeI -aIi*eIaP)
+                  tmpA = 2._RKIND*((1._RKIND-cI)*Im -
+     2               (1._RKIND-2._RKIND*cI)*eIeI -aIi*eIaP)
                   Bb(:,:,f) = Bb(:,:,f) + MATMUL(Bb(:,:,j), tmpA)
                END IF
-               Bb(:,:,j) = 0D0
+               Bb(:,:,j) = 0._RKIND
             ELSE IF (BTEST(lM%sbc(i,e),bType_hing)) THEN
 !              E_I
                IF (.NOT.lFix(i)) THEN
-                  tmpA = -Im + 2D0*eIeI
+                  tmpA = -Im + 2._RKIND*eIeI
                   Bb(:,:,i) = Bb(:,:,i) + MATMUL(Bb(:,:,j), tmpA)
                END IF
                lFix(p)   = .TRUE.
                lFix(f)   = .TRUE.
-               Bb(:,:,p) = 0D0
-               Bb(:,:,f) = 0D0
-               Bb(:,:,j) = 0D0
+               Bb(:,:,p) = 0._RKIND
+               Bb(:,:,f) = 0._RKIND
+               Bb(:,:,j) = 0._RKIND
             ELSE IF (BTEST(lM%sbc(i,e),bType_fix)) THEN
                IF (.NOT.lFix(i)) THEN
-                  tmpA = Im - 2D0*nInI
+                  tmpA = Im - 2._RKIND*nInI
                   Bb(:,:,i) = Bb(:,:,i) + MATMUL(Bb(:,:,j), tmpA)
                END IF
                lFix(p)   = .TRUE.
                lFix(f)   = .TRUE.
-               Bb(:,:,f) = 0D0
-               Bb(:,:,p) = 0D0
+               Bb(:,:,f) = 0._RKIND
+               Bb(:,:,p) = 0._RKIND
             ELSE IF (BTEST(lM%sbc(i,e),bType_symm)) THEN
                IF (.NOT.lFix(i)) THEN
-                  tmpA = Im - 2D0*nInI
+                  tmpA = Im - 2._RKIND*nInI
                   Bb(:,:,i) = Bb(:,:,i) + MATMUL(Bb(:,:,j), tmpA)
                END IF
-               Bb(:,:,j) = 0D0
+               Bb(:,:,j) = 0._RKIND
                tmpA(:,1) = eI(:)
                tmpA(:,2) = nV(:)
                tmpA(:,3) = nI(:)
                Bb(:,:,f) = MATMUL(Bb(:,:,f), tmpA)
-               Bb(:,3,f) = 0D0
+               Bb(:,3,f) = 0._RKIND
                Bb(:,:,p) = MATMUL(Bb(:,:,p), tmpA)
-               Bb(:,3,p) = 0D0
+               Bb(:,3,p) = 0._RKIND
             END IF
          END DO
       END IF
@@ -814,14 +818,14 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   dl(tDof,eNoN), xl(3,eNoN), tfl(eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), dl(tDof,eNoN),
-     2   xl(3,eNoN), tfl(eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER :: i, j, k, a, b
-      REAL(KIND=8) :: T1, afl, wl, tfn, nV(3), gCov(3,2), gCnv(3,2),
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
+      REAL(KIND=RKIND) :: T1, afl, wl, tfn, nV(3), gCov(3,2), gCnv(3,2),
      2   xc(3,eNoN), lKP(3)
 
       afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
@@ -830,7 +834,7 @@
       k    = j + 1
 
 !     Get the current configuration and traction vector
-      tfn = 0D0
+      tfn = 0._RKIND
       DO a=1, eNoN
          xc(1,a) = xl(1,a) + dl(i,a)
          xc(2,a) = xl(2,a) + dl(j,a)
@@ -852,7 +856,7 @@
 
 !     Local stiffness: mass matrix and stiffness contribution due to
 !     follower traction load
-      T1 = afl*wl*5D-1
+      T1 = afl*wl*0.5_RKIND
       DO b=1, eNoN
          DO a=1, eNoN
             lKp(:) = gCov(:,1)*(N(b)*Nx(2,a) - N(a)*Nx(2,b))
@@ -876,21 +880,22 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: g, eNoN
-      REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER :: i, j, k, l, a, b
-      REAL(KIND=8) :: rho, dmp, elM, nu, ht, amd, afl, w, wb, Jac0, Jac,
-     2   ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2), gCov(3,2),
-     3   gCnv(3,2), N(eNoN), Nx(2,eNoN), Nxx(3,eNoN), x0(3,eNoN),
-     4   xc(3,eNoN),Jm(2,2), eLoc(3,3), Qm(3,3), Dm(3,3), Em(3), Eb(3),
-     5   DEm(3), DEb(3), Bm(3,3,eNoN), Bb(3,3,eNoN), K0(3,3), Kc(3,3),
-     6   Nm(3,3), Mm(3,3,2), NmMm(3,3,2), KNmMm(3,3,2), DBm(3,3,eNoN),
-     7   DBb(3,3,eNoN), BtDEm, BtDEb, NxSNx, BtDBm, BtDBb, T1
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b
+      REAL(KIND=RKIND) :: rho, dmp, elM, nu, ht, amd, afl, w, wb, Jac0,
+     2   Jac, ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2),
+     3   gCov(3,2), gCnv(3,2), N(eNoN), Nx(2,eNoN), Nxx(3,eNoN),
+     3   x0(3,eNoN), xc(3,eNoN),Jm(2,2), eLoc(3,3), Qm(3,3), Dm(3,3),
+     4   Em(3), Eb(3), DEm(3), DEb(3), Bm(3,3,eNoN), Bb(3,3,eNoN),
+     5   K0(3,3), Kc(3,3), Nm(3,3), Mm(3,3,2), NmMm(3,3,2),
+     6   KNmMm(3,3,2), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDEm, BtDEb,
+     7   NxSNx, BtDBm, BtDBb, T1
 
 !     Define parameters
       rho   = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -947,22 +952,22 @@
       Jm(2,1) = NORM(gCov0(:,1), eLoc(:,2))
       Jm(2,2) = NORM(gCov0(:,2), eLoc(:,2))
 
-      Qm = 0D0
-      Qm(1,1) = 1D0/Jm(1,1)**2
-      Qm(2,1) = (-Jm(1,2)/(Jm(1,1)*Jm(2,2)))**2
-      Qm(2,2) = 1D0/Jm(2,2)**2
-      Qm(2,3) = -Jm(1,2)/(Jm(1,1)*Jm(2,2)**2)
-      Qm(3,1) = -2D0*Jm(1,2)/(Jm(2,2)*Jm(1,1)**2)
-      Qm(3,3) = 1D0/(Jm(1,1)*Jm(2,2))
+      Qm = 0._RKIND
+      Qm(1,1) = 1._RKIND/(Jm(1,1)*Jm(1,1))
+      Qm(2,1) = (-Jm(1,2)/(Jm(1,1)*Jm(2,2)))**2._RKIND
+      Qm(2,2) = 1._RKIND/(Jm(2,2)*Jm(2,2))
+      Qm(2,3) = -Jm(1,2)/(Jm(1,1)*Jm(2,2)**2._RKIND)
+      Qm(3,1) = -2._RKIND*Jm(1,2)/(Jm(2,2)*Jm(1,1)*Jm(1,1))
+      Qm(3,3) = 1._RKIND/(Jm(1,1)*Jm(2,2))
 
 !     Material tensor D, isotropic St Venant Kirchhoff model
-      Dm = 0D0
-      Dm(1,1) = 1D0
+      Dm = 0._RKIND
+      Dm(1,1) = 1._RKIND
       Dm(1,2) = nu
       Dm(2,1) = nu
-      Dm(2,2) = 1D0
-      Dm(3,3) = 5D-1*(1D0-nu)
-      Dm = elM/(1D0-nu**2) * Dm
+      Dm(2,2) = 1._RKIND
+      Dm(3,3) = 0.5_RKIND*(1._RKIND-nu)
+      Dm = elM/(1._RKIND-(nu*nu)) * Dm
 
 !     Compute Qt * D * Q
       Dm = MATMUL(Dm, Qm)
@@ -970,17 +975,17 @@
 
 !     Membrane strain and its variation
 !     Define membrane strain tensor (Em), Voigt notation
-      Em = 0D0
+      Em = 0._RKIND
       DO l=1, nsd
          Em(1) = Em(1) + gCov(l,1)*gCov(l,1) - gCov0(l,1)*gCov0(l,1)
          Em(2) = Em(2) + gCov(l,2)*gCov(l,2) - gCov0(l,2)*gCov0(l,2)
          Em(3) = Em(3) + gCov(l,1)*gCov(l,2) - gCov0(l,1)*gCov0(l,2)
       END DO
-      Em(1) = 5D-1 * Em(1)
-      Em(2) = 5D-1 * Em(2)
+      Em(1) = 0.5_RKIND * Em(1)
+      Em(2) = 0.5_RKIND * Em(2)
 
 !     Define variation in membrane strain
-      Bm = 0D0
+      Bm = 0._RKIND
       DO a=1, eNoN
          Bm(1,1,a) = Nx(1,a)*gCov(1,1)
          Bm(1,2,a) = Nx(1,a)*gCov(2,1)
@@ -998,20 +1003,20 @@
 !     Bending strain and its variation
 !     Second derivative of x, reference and current configurations
 !     Compute second derivatives of x in reference and current configs
-      K0 = 0D0
-      Kc = 0D0
+      K0 = 0._RKIND
+      Kc = 0._RKIND
       DO a=1, eNoN
          K0(1,:) = K0(1,:) + Nxx(1,a)*x0(:,a)
          K0(2,:) = K0(2,:) + Nxx(2,a)*x0(:,a)
-         K0(3,:) = K0(3,:) + Nxx(3,a)*x0(:,a)*2D0
+         K0(3,:) = K0(3,:) + Nxx(3,a)*x0(:,a)*2._RKIND
 
          Kc(1,:) = Kc(1,:) + Nxx(1,a)*xc(:,a)
          Kc(2,:) = Kc(2,:) + Nxx(2,a)*xc(:,a)
-         Kc(3,:) = Kc(3,:) + Nxx(3,a)*xc(:,a)*2D0
+         Kc(3,:) = Kc(3,:) + Nxx(3,a)*xc(:,a)*2._RKIND
       END DO
 
 !     Define bending strain tensor (Eb), Voigt notation
-      Eb = 0D0
+      Eb = 0._RKIND
       DO l=1, nsd
          Eb(1) = Eb(1) + K0(l,1)*nV0(l) - Kc(l,1)*nV(l)
          Eb(2) = Eb(2) + K0(l,2)*nV0(l) - Kc(l,2)*nV(l)
@@ -1023,7 +1028,7 @@
       Nm = MAT_ID(3) - MAT_DYADPROD(nV, nV, 3)
       Nm = Nm / Jac
 !     M1, M2 matrices
-      Mm(:,:,:) = 0D0
+      Mm(:,:,:) = 0._RKIND
       DO l=1, 2
          Mm(1,2,l) = -gCov(3,l)
          Mm(1,3,l) =  gCov(2,l)
@@ -1039,11 +1044,11 @@
       END DO
 
 !     Define variation in bending strain tensor (Bb), Voigt notation
-      Bb = 0D0
+      Bb = 0._RKIND
       DO a=1, eNoN
          Bb(1,:,a) = -Nxx(1,a)*nV(:)
          Bb(2,:,a) = -Nxx(2,a)*nV(:)
-         Bb(3,:,a) = -Nxx(3,a)*nV(:)*2D0
+         Bb(3,:,a) = -Nxx(3,a)*nV(:)*2._RKIND
       END DO
 
       DO a=1, eNoN
@@ -1121,7 +1126,7 @@
 
 !     Local residue
       w  = lM%w(g)*Jac0*ht
-      wb = w*ht**2 / 12D0
+      wb = w*ht*ht/12._RKIND
       DO a=1, eNoN
          BtDEm = Bm(1,1,a)*DEm(1) + Bm(2,1,a)*DEm(2) + Bm(3,1,a)*DEm(3)
          BtDEb = Bb(1,1,a)*DEb(1) + Bb(2,1,a)*DEb(2) + Bb(3,1,a)*DEb(3)

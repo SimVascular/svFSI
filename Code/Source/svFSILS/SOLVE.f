@@ -49,21 +49,19 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, isS, incL, res)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(INOUT) :: Ri(dof,lhs%nNo)
-      REAL(KIND=8), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
       LOGICAL, INTENT(IN), OPTIONAL :: isS(lhs%nNo)
-      INTEGER, INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
+      INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
+      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
 
       LOGICAL flag
-      INTEGER faIn, a, nNo, nnz, nFaces
-      REAL(KIND=8), ALLOCATABLE :: R(:,:), W(:,:)
+      INTEGER(KIND=LSIP) faIn, a, nNo, nnz, nFaces
+      REAL(KIND=LSRP), ALLOCATABLE :: R(:,:), W(:,:)
 
       nNo    = lhs%nNo
       nnz    = lhs%nnz
@@ -86,7 +84,7 @@
             lhs%face(faIn)%coupledFlag = .FALSE.
             IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
             flag = lhs%face(faIn)%bGrp .EQ. BC_TYPE_Neu
-            IF (flag .AND. res(faIn).NE.0D0) THEN
+            IF (flag .AND. res(faIn).NE.0._LSRP) THEN
                lhs%face(faIn)%res = res(faIn)
                lhs%face(faIn)%coupledFlag = .TRUE.
             END IF
@@ -98,7 +96,7 @@
          R(:,lhs%map(a)) = Ri(:,a)
       END DO
 
-      CALL PRECOND(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, Val,
+      CALL PRECOND(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, Val,  &
      &   R, W)
 
       SELECT CASE (ls%LS_type)
@@ -136,4 +134,4 @@
 
       RETURN
       END SUBROUTINE FSILS_SOLVE
-
+!####################################################################

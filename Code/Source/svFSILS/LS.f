@@ -49,14 +49,13 @@
 
       SUBROUTINE FSILS_LS_CREATE(ls, LS_type, relTol, absTol, maxItr,   &
      &   dimKry, relTolIn, absTolIn, maxItrIn)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-      INTEGER, INTENT(IN) :: LS_type
-      REAL(KIND=8), INTENT(IN), OPTIONAL :: relTol, absTol, relTolIn(2),&
-     &   absTolIn(2)
-      INTEGER, INTENT(IN), OPTIONAL :: maxItr, dimKry, maxItrIn(2)
+      INTEGER(KIND=LSIP), INTENT(IN) :: LS_type
+      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: relTol, absTol,          &
+     &   relTolIn(2), absTolIn(2)
+      INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: maxItr, dimKry,       &
+     &   maxItrIn(2)
 
       IF (ls%foC) THEN
          PRINT *, "FSILS: LS is not free You may use FSILS_LS_FREE to", &
@@ -69,30 +68,30 @@
 
       SELECT CASE (LS_type)
          CASE (LS_TYPE_NS)
-            ls%RI%relTol = 4D-1
-            ls%GM%relTol = 1D-2
-            ls%CG%relTol = 2D-1
+            ls%RI%relTol = 0.4_LSRP
+            ls%GM%relTol = 1.E-2_LSRP
+            ls%CG%relTol = 0.2_LSRP
             ls%RI%mItr = 10
             ls%GM%mItr = 2
             ls%CG%mItr = 500
             ls%GM%sD   = 100
          CASE (LS_TYPE_GMRES)
-            ls%RI%relTol = 1D-1
+            ls%RI%relTol = 0.1_LSRP
             ls%RI%mItr   = 4
             ls%RI%sD     = 250
          CASE (LS_TYPE_CG)
-            ls%RI%reltol = 1D-2
+            ls%RI%reltol = 1.E-2_LSRP
             ls%RI%mItr   = 1000
          CASE (LS_TYPE_BICGS)
-            ls%RI%reltol = 1D-2
+            ls%RI%reltol = 1.E-2_LSRP
             ls%RI%mItr   = 500
          CASE DEFAULT
             PRINT *, 'FSILS: LS_TYPE is not defined'
             STOP "FSILS: FATAL ERROR"
       END SELECT
-      ls%RI%absTol = 1D-10
-      ls%GM%absTol = 1D-10
-      ls%CG%absTol = 1D-10
+      ls%RI%absTol = 1.E-10_LSRP
+      ls%GM%absTol = 1.E-10_LSRP
+      ls%CG%absTol = 1.E-10_LSRP
 
       IF (PRESENT(relTol)) ls%RI%relTol = relTol
       IF (PRESENT(absTol)) ls%RI%absTol = absTol
@@ -117,13 +116,9 @@
 
       RETURN
       END SUBROUTINE FSILS_LS_CREATE
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE FSILS_LS_FREE (ls)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
 
       IF (.NOT.ls%foC) THEN
@@ -135,4 +130,4 @@
 
       RETURN
       END SUBROUTINE FSILS_LS_FREE
-
+!####################################################################

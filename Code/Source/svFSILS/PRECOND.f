@@ -48,18 +48,16 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE PRECOND(lhs, rowPtr, colPtr, diagPtr, dof, Val, R, W)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz),        &
-     &   diagPtr(lhs%nNo)
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(INOUT) :: Val(dof*dof,lhs%nnz),              &
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),              &
+     &  colPtr(lhs%nnz), diagPtr(lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz),           &
      &   R(dof,lhs%nNo)
-      REAL(KIND=8), INTENT(OUT) :: W(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: W(dof,lhs%nNo)
 
-      INTEGER nNo, i, j, a, b, d, Ac, faIn
+      INTEGER(KIND=LSIP) nNo, i, j, a, b, d, Ac, faIn
 
       nNo = lhs%nNo
 
@@ -105,11 +103,11 @@
       DO Ac=1, nNo
          d = diagPtr(Ac)
          DO i=1, dof
-            IF (W(i,Ac) .EQ. 0D0) W(i,Ac) = 1D0
+            IF (W(i,Ac) .EQ. 0._LSRP) W(i,Ac) = 1._LSRP
          END DO
       END DO
 
-      W = 1D0/SQRT(ABS(W))
+      W = 1._LSRP/SQRT(ABS(W))
       DO faIn=1, lhs%nFaces
          IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
          i = MIN(lhs%face(faIn)%dof,dof)
@@ -229,3 +227,4 @@
 
       RETURN
       END SUBROUTINE PRECOND
+!####################################################################

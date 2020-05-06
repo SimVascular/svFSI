@@ -44,18 +44,16 @@
 !     MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 !
 !--------------------------------------------------------------------
-!     To broadcast a variable to all processors      
+!     To broadcast a variable to all processors
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_BCAST(u, commu)
-
       INCLUDE "FSILS_STD.h"
-
-      REAL(KIND=8), INTENT(INOUT) :: u
+      REAL(KIND=LSRP), INTENT(INOUT) :: u
       TYPE(FSILS_commuType), INTENT(IN) :: commu
 
-      INTEGER ierr
-      REAL(KIND=8) uG
+      INTEGER(KIND=LSIP) ierr
+      REAL(KIND=LSRP) uG
 
       IF (commu%nTasks .GT. 1) THEN
          CALL MPI_ALLREDUCE(u, uG, 1, mpreal, MPI_SUM, commu%comm, ierr)
@@ -64,19 +62,15 @@
 
       RETURN
       END SUBROUTINE FSILS_BCAST
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE FSILS_BCASTV(n, u, commu)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: n
-      REAL(KIND=8), INTENT(INOUT) :: u(n)
+      INTEGER(KIND=LSIP), INTENT(IN) :: n
+      REAL(KIND=LSRP), INTENT(INOUT) :: u(n)
       TYPE(FSILS_commuType), INTENT(IN) :: commu
 
-      INTEGER ierr
-      REAL(KIND=8), ALLOCATABLE :: uG(:)
+      INTEGER(KIND=LSIP) ierr
+      REAL(KIND=LSRP), ALLOCATABLE :: uG(:)
 
       IF (commu%nTasks .GT. 1) THEN
          ALLOCATE(uG(n))
@@ -86,3 +80,4 @@
 
       RETURN
       END SUBROUTINE FSILS_BCASTV
+!####################################################################

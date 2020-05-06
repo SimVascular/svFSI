@@ -37,24 +37,21 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE REMESHRESTART(timeP)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: timeP(3)
+      REAL(KIND=RKIND), INTENT(IN) :: timeP(3)
 
       TYPE(mshType)  :: tMsh
 
-      INTEGER, PARAMETER :: fid=1
-      INTEGER :: iM, i, e, a, Ac, Ec, ierr, iEq, lDof
-      REAL(KIND=8) :: t1, t2
+      INTEGER(KIND=IKIND), PARAMETER :: fid=1
+      INTEGER(KIND=IKIND) :: iM, i, e, a, Ac, Ec, ierr, iEq, lDof
+      REAL(KIND=RKIND) :: t1, t2
       CHARACTER(LEN=stdL) :: sTmp, fTmp
 
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: tempX,gX,gtX
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: tempD,gD,gnD,gtD
+      REAL(KIND=RKIND), ALLOCATABLE, DIMENSION(:,:) :: tempX, gX, gtX,
+     2   tempD, gD, gnD, gtD
 
       INTERFACE
          SUBROUTINE INTERP(lDof, iM, tMsh, sD, tgD)
@@ -63,9 +60,9 @@
          USE ALLFUN
          IMPLICIT NONE
          TYPE(mshType), INTENT(INOUT) :: tMsh
-         INTEGER, INTENT(IN) :: lDof, iM
-         REAL(KIND=8), DIMENSION(:,:), INTENT(IN)  :: sD
-         REAL(KIND=8), DIMENSION(:,:), INTENT(OUT) :: tgD
+         INTEGER(KIND=IKIND), INTENT(IN) :: lDof, iM
+         REAL(KIND=RKIND), DIMENSION(:,:), INTENT(IN)  :: sD
+         REAL(KIND=RKIND), DIMENSION(:,:), INTENT(OUT) :: tgD
          END SUBROUTINE INTERP
       END INTERFACE
 
@@ -94,7 +91,6 @@
       gtnNo = 0
       lDof = 3*tDof
       DO iM=1, nMsh
-
          IF (rmsh%flag(iM)) THEN
             std = " "
             std = "cccccccccccccccccccccccccccccccccccccccccccccccccc"//
@@ -309,7 +305,6 @@
             DEALLOCATE(gX, gD)
             CALL DESTROY(tMsh)
          END IF ! reMesh flag
-
       END DO
       CALL cm%bcast(gtnNo)
       DEALLOCATE(x, rmsh%A0, rmsh%Y0, rmsh%D0)
@@ -401,21 +396,20 @@
      2   "cccccccc"
       std = " "
 
+      RETURN
       END SUBROUTINE REMESHRESTART
 !--------------------------------------------------------------------
       SUBROUTINE INTMSHSRF(lM, lFa)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
-      INTEGER :: a, e, Ac, iFa, eNoNb, eoff
-      INTEGER, ALLOCATABLE :: incNd(:)
+      INTEGER(KIND=IKIND) :: a, e, Ac, iFa, eNoNb, eoff
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:)
 
       eNoNb = lM%fa(1)%eNoN
       lFa%eNoN = eNoNb
@@ -464,20 +458,17 @@
       END SUBROUTINE INTMSHSRF
 !--------------------------------------------------------------------
       SUBROUTINE REMESHER_3D(iM, lFa, lM)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: iM
+      INTEGER(KIND=IKIND), INTENT(IN) :: iM
       TYPE(faceType), INTENT(INOUT) :: lFa
       TYPE(mshType),  INTENT(INOUT) :: lM
 
+      INTEGER(KIND=IKIND) :: e, i, Ac, fid, iOK
+      REAL(KIND=RKIND) :: rparams(3)
       TYPE(fileType) :: fTmp
-      INTEGER :: e, i, Ac, fid, iOK
-      REAL(KIND=8) :: rparams(3)
 
       rparams(1) = rmsh%maxRadRatio
       rparams(2) = rmsh%minDihedAng
@@ -537,21 +528,20 @@
       END SUBROUTINE REMESHER_3D
 !--------------------------------------------------------------------
       SUBROUTINE SETFACEEBC(lFa, lM)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
       TYPE(mshType),  INTENT(INOUT) :: lM
 
-      INTEGER :: i, j, e, a, b
-      INTEGER :: Ac, maxAssocEl
-      INTEGER, ALLOCATABLE :: nAssocEl(:), bin(:,:), assocEl(:,:)
-      REAL(KIND=8) :: sn, Jac
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), v(:,:)
+      INTEGER(KIND=IKIND) :: i, j, e, a, b
+      INTEGER(KIND=IKIND) :: Ac, maxAssocEl
+      REAL(KIND=RKIND) :: sn, Jac
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: nAssocEl(:), bin(:,:),
+     2   assocEl(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), v(:,:)
 
       dbg = " Finding global surface elems"
       ALLOCATE(nAssocEl(lM%gnNo))
@@ -645,22 +635,19 @@ c     Check mesh quality and reset IEN if necessary
       END SUBROUTINE SETFACEEBC
 !--------------------------------------------------------------------
       SUBROUTINE DISTMSHSRF(lFa, lM, iOpt)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
       TYPE(mshType),  INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: iOpt
+      INTEGER(KIND=IKIND), INTENT(IN) :: iOpt
 
-      CHARACTER(LEN=stdL) :: sTmp, fTmp
-      INTEGER :: e, a, Ac, iFa, eoff
       LOGICAL :: flag
+      INTEGER(KIND=IKIND) :: e, a, Ac, iFa, eoff
+      CHARACTER(LEN=stdL) :: sTmp, fTmp
 
-      INTEGER, ALLOCATABLE :: incNd(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:)
 
       dbg = " Distributing surface mesh"
       sTmp = TRIM(appPath)//".remesh_tmp.dir"
@@ -731,35 +718,33 @@ c     Check mesh quality and reset IEN if necessary
          END IF
       END DO
 
+      RETURN
       END SUBROUTINE DISTMSHSRF
 !--------------------------------------------------------------------
 !     Interpolation of data variables from source mesh to target mesh
       SUBROUTINE INTERP(lDof, iM, tMsh, sD, tgD)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: tMsh
-      INTEGER, INTENT(IN) :: lDof, iM
-      REAL(KIND=8), DIMENSION(:,:), INTENT(IN)  :: sD
-      REAL(KIND=8), DIMENSION(:,:), INTENT(OUT) :: tgD(:,:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: lDof, iM
+      REAL(KIND=RKIND), DIMENSION(:,:), INTENT(IN)  :: sD
+      REAL(KIND=RKIND), DIMENSION(:,:), INTENT(OUT) :: tgD(:,:)
 
-      INTEGER :: a, e, b, i, iFa, ierr, Ac, Bc, Ec, nn, ne, try, nbnd
-      INTEGER :: nNo, nEl, eNon, gnNo, gnEl, maxKNE, maxKNN, probe, bTag
-      REAL(KIND=8) :: dS
       LOGICAL :: flag
-
+      INTEGER(KIND=IKIND) :: a, e, b, i, iFa, ierr, Ac, Bc, Ec, nn, ne,
+     2   try, nbnd, nNo, nEl, eNon, gnNo, gnEl, maxKNE, maxKNN, probe,
+     3   bTag
+      REAL(KIND=RKIND) :: dS
       TYPE(queueType) :: rootNdQ
-      INTEGER, ALLOCATABLE :: gN(:), gE(:), tagNd(:), masEList(:),
-     2 srcAdjEl(:,:), tgtAdjNd(:,:), eList(:), rootEl(:), srfNds(:),
-     3 sCount(:), disp(:), tmpL(:)
-      REAL(KIND=8), ALLOCATABLE :: Xp(:), Nsf(:), gNsf(:,:)
-      LOGICAL, ALLOCATABLE :: chckNp(:)
 
-      REAL(KIND=8), ALLOCATABLE :: Dg(:,:), tmpX(:,:), vec(:), gvec(:)
+      LOGICAL, ALLOCATABLE :: chckNp(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:), gE(:), tagNd(:),
+     2   masEList(:), srcAdjEl(:,:), tgtAdjNd(:,:), eList(:), rootEl(:),
+     3   srfNds(:), sCount(:), disp(:), tmpL(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Xp(:), Nsf(:), gNsf(:,:),
+     2   Dg(:,:), tmpX(:,:), vec(:), gvec(:)
 
       INTERFACE
          SUBROUTINE DISTRN(iM, lM, Dg, nNo, gN)
@@ -768,10 +753,10 @@ c     Check mesh quality and reset IEN if necessary
          USE ALLFUN
          IMPLICIT NONE
          TYPE(mshType), INTENT(INOUT) :: lM
-         INTEGER, INTENT(IN) :: iM
-         INTEGER, INTENT(OUT) :: nNo
-         INTEGER, ALLOCATABLE :: gN(:)
-         REAL(KIND=8), INTENT(IN) :: Dg(nsd,tnNo)
+         INTEGER(KIND=IKIND), INTENT(IN) :: iM
+         INTEGER(KIND=IKIND), INTENT(OUT) :: nNo
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:)
+         REAL(KIND=RKIND), INTENT(IN) :: Dg(nsd,tnNo)
          END SUBROUTINE DISTRN
       END INTERFACE
 
@@ -782,8 +767,8 @@ c     Check mesh quality and reset IEN if necessary
          USE ALLFUN
          IMPLICIT NONE
          TYPE(mshType), INTENT(INOUT) :: lM
-         INTEGER, INTENT(OUT) :: nEl
-         INTEGER, ALLOCATABLE :: gE(:)
+         INTEGER(KIND=IKIND), INTENT(OUT) :: nEl
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gE(:)
          END SUBROUTINE DISTRE
       END INTERFACE
 
@@ -794,7 +779,7 @@ c     Check mesh quality and reset IEN if necessary
          USE ALLFUN
          IMPLICIT NONE
          TYPE(mshType), INTENT(IN) :: lM
-         INTEGER, ALLOCATABLE :: kneList(:,:)
+         INTEGER(KIND=IKIND), ALLOCATABLE :: kneList(:,:)
          END SUBROUTINE GETADJESRC
       END INTERFACE
 
@@ -805,8 +790,8 @@ c     Check mesh quality and reset IEN if necessary
          USE ALLFUN
          IMPLICIT NONE
          TYPE(mshType), INTENT(IN) :: lM
-         INTEGER, INTENT(IN) :: nNo, nEl, gN(nNo), gE(nEl)
-         INTEGER, ALLOCATABLE :: knnList(:,:)
+         INTEGER(KIND=IKIND), INTENT(IN) :: nNo, nEl, gN(nNo), gE(nEl)
+         INTEGER(KIND=IKIND), ALLOCATABLE :: knnList(:,:)
          END SUBROUTINE GETADJNTGT
       END INTERFACE
 
@@ -816,10 +801,10 @@ c     Check mesh quality and reset IEN if necessary
          USE UTILMOD
          USE ALLFUN
          IMPLICIT NONE
-         INTEGER, INTENT(IN) :: iM, eList(:)
-         INTEGER, INTENT(OUT) :: Ec
-         REAL(KIND=8), INTENT(IN) :: xp(nsd+1), Dg(nsd,tnNo)
-         REAL(KIND=8), INTENT(OUT) :: Nsf(msh(iM)%eNoN)
+         INTEGER(KIND=IKIND), INTENT(IN) :: iM, eList(:)
+         INTEGER(KIND=IKIND), INTENT(OUT) :: Ec
+         REAL(KIND=RKIND), INTENT(IN) :: xp(nsd+1), Dg(nsd,tnNo)
+         REAL(KIND=RKIND), INTENT(OUT) :: Nsf(msh(iM)%eNoN)
          END SUBROUTINE FINDN
       END INTERFACE
 
@@ -856,7 +841,7 @@ c     Check mesh quality and reset IEN if necessary
       ALLOCATE(Xp(nsd+1), Nsf(eNoN), gNsf(eNoN,nNo), tagNd(gnNo),
      2 gE(nNo), rootEl(nNo), chckNp(nNo), masEList(msh(iM)%nEl))
 
-      gNsf   = 0D0
+      gNsf   = 0._RKIND
       gE     = 0
       tagNd  = 0
       rootEl = 0
@@ -891,7 +876,7 @@ c     Check mesh quality and reset IEN if necessary
             chckNp(a) = .TRUE.
             tagNd(Ac) = bTag
             gE(a)     = 0
-            gNsf(:,a) = 0D0
+            gNsf(:,a) = 0._RKIND
          END IF
       END DO
 
@@ -900,7 +885,7 @@ c     Check mesh quality and reset IEN if necessary
       DO a=1, nNo
          IF (chckNp(a)) CYCLE
          Ac = gN(a)
-         Xp = 1D0
+         Xp = 1._RKIND
          Xp(1:nsd) = tMsh%x(:,Ac)
          CALL FINDN(Xp, iM, Dg, masEList, Ec, Nsf)
          chckNp(a) = .TRUE.
@@ -929,7 +914,7 @@ c     Check mesh quality and reset IEN if necessary
          IF (ALL(chckNp(:))) EXIT
          IF (chckNp(probe)) CYCLE
          Ac = gN(probe)
-         Xp = 1D0
+         Xp = 1._RKIND
          Xp(1:nsd) = tMsh%x(:,Ac)
          eList = 0
          DO e=1, maxKNE
@@ -1020,7 +1005,7 @@ c     Check mesh quality and reset IEN if necessary
       DO a=1, nNo
          Ac = gN(a)
          IF (tagNd(Ac) .EQ. 0) THEN
-            Xp = 1D0
+            Xp = 1._RKIND
             Xp(1:nsd) = tMsh%x(:,Ac)
             CALL FINDN(Xp, iM, Dg, masElist, Ec, Nsf)
             IF (Ec .GT. 0) THEN
@@ -1037,7 +1022,7 @@ c     Check mesh quality and reset IEN if necessary
          IF (tagNd(Ac).NE.cm%tF() .AND. tagNd(Ac).NE.bTag) THEN
             gE(a) = 0
             tagNd(Ac) = 0
-            gNsf(:,a) = 0D0
+            gNsf(:,a) = 0._RKIND
          END IF
       END DO
       DEALLOCATE(tmpL)
@@ -1045,7 +1030,7 @@ c     Check mesh quality and reset IEN if necessary
 !     Now that all the elements have been found, data is interpolated
 !     from the source to the target mesh
       ALLOCATE(tmpX(lDof,nNo))
-      tmpX = 0D0
+      tmpX = 0._RKIND
       DO a=1, nNo
          Ac = gN(a)
          IF (tagNd(Ac) .EQ. cm%tF()) THEN
@@ -1071,8 +1056,9 @@ c     Check mesh quality and reset IEN if necessary
             DO iFa=1, msh(iM)%nFa
                DO b=1, msh(iM)%fa(iFa)%nNo
                   Bc = msh(iM)%fa(iFa)%gN(b)
-                  dS = SQRT(SUM( (x(:,Bc)+Dg(:,Bc)- tMsh%x(:,Ac))**2 ))
-                  IF (dS .LT. 1E-12) THEN
+                  dS = SQRT(SUM( (x(:,Bc)+Dg(:,Bc) -
+     2               tMsh%x(:,Ac))**2._RKIND ))
+                  IF (dS .LT. 1.E-12_RKIND) THEN
                      tmpL(a) = Bc
                      flag = .TRUE.
                      EXIT
@@ -1148,7 +1134,7 @@ c     Check mesh quality and reset IEN if necessary
       e = 0
       DO a=1, nn
          e = e + 1
-         vec(e) = REAL(tmpL(a), KIND=8)
+         vec(e) = REAL(tmpL(a), KIND=RKIND)
          DO b=1, lDof
             e = e + 1
             vec(e) = gNsf(b,a)
@@ -1160,12 +1146,12 @@ c     Check mesh quality and reset IEN if necessary
      2   mpreal, master, cm%com(), ierr)
 
       IF (cm%mas()) THEN
-         tgD = 0D0
+         tgD = 0._RKIND
          nn = SUM(sCount(:))
          i = 0
          DO
             i = i + 1
-            Ac = NINT(gvec(i))
+            Ac = NINT(gvec(i), KIND=IKIND)
             DO b=1, lDof
                i = i + 1
                tgD(b,Ac) = gvec(i)
@@ -1180,39 +1166,37 @@ c     Check mesh quality and reset IEN if necessary
 !--------------------------------------------------------------------
 !     Distribute the new mesh nodes among all the processors
       SUBROUTINE DISTRN(iM, lM, Dg, nNo, gN)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN) :: iM
-      INTEGER, INTENT(OUT) :: nNo
-      INTEGER, ALLOCATABLE :: gN(:)
-      REAL(KIND=8), INTENT(IN) :: Dg(nsd,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: iM
+      INTEGER(KIND=IKIND), INTENT(OUT) :: nNo
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:)
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(nsd,tnNo)
 
-      INTEGER :: i, a, b, Ac, gnNo, ierr
-      REAL(KIND=8) :: f, tol, dS, minS
-      INTEGER, ALLOCATABLE :: part(:), tmpI(:)
+      INTEGER(KIND=IKIND) :: i, a, b, Ac, gnNo, ierr
+      REAL(KIND=RKIND) :: f, tol, dS, minS
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), tmpI(:)
 
       gnNo = lM%gnNo
       i = 0
-      f = 2.5D-2
+      f = 2.5E-2_RKIND
       ALLOCATE(part(gnNo), tmpI(gnNo))
  003  part  = 0
       tmpI  = 0
       nNo   = 0
-      f     = 2D0*f
-      tol   = (1D0+f) * rmsh%maxEdgeSize(iM)
+      f     = 2._RKIND*f
+      tol   = (1._RKIND+f) * rmsh%maxEdgeSize(iM)
       i = i+1
       DO a=1, gnNo
          IF (part(a) .NE. 0) CYCLE
          minS  = HUGE(minS)
          DO b=1, msh(iM)%nNo
             Ac = msh(iM)%gN(b)
-            dS = SQRT(SUM( (x(:,Ac) + Dg(:,Ac) - lM%x(:,a))**2 ))
+            dS = SQRT(SUM((x(:,Ac)+Dg(:,Ac)-lM%x(:,a))**2._RKIND))
             IF (minS .GT. dS) minS = dS
          END DO
          IF (minS .LT. tol) THEN
@@ -1254,19 +1238,17 @@ c     Check mesh quality and reset IEN if necessary
 !--------------------------------------------------------------------
 !     Distribute the new mesh elements to all processors
       SUBROUTINE DISTRE(lM, nEl, gE)
-
       USE COMMOD
       USE ALLFUN
       USE UTILMOD
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(OUT) :: nEl
-      INTEGER, ALLOCATABLE :: gE(:)
+      INTEGER(KIND=IKIND), INTENT(OUT) :: nEl
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gE(:)
 
-      INTEGER :: e, a, i, Ac, gnEl, eNoN
-      INTEGER, ALLOCATABLE :: part(:)
+      INTEGER(KIND=IKIND) :: e, a, i, Ac, gnEl, eNoN
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: part(:)
 
       gnEL = lM%gnEl
       eNoN = lM%eNoN
@@ -1303,20 +1285,17 @@ c     Check mesh quality and reset IEN if necessary
 !--------------------------------------------------------------------
 !     Create list of connected/adjacent elements for old/source mesh
       SUBROUTINE GETADJESRC(lM, kneList)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, ALLOCATABLE :: kneList(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: kneList(:,:)
 
-      INTEGER :: a, b, e, Ac, i, j, maxKNE
       LOGICAL :: flag
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, i, j, maxKNE
 
-      INTEGER, ALLOCATABLE :: nL(:), tmpList(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: nL(:), tmpList(:,:)
 
 !     First get elements around all nodes
       ALLOCATE(nL(lM%nNo))
@@ -1393,21 +1372,18 @@ c     Check mesh quality and reset IEN if necessary
 !--------------------------------------------------------------------
 !     Create list of connected/adjacent nodes for new/target mesh
       SUBROUTINE GETADJNTGT(lM, nNo, nEl, gN, gE, knnList)
-
       USE COMMOD
       USE UTILMOD
       USE ALLFUN
-
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: nNo, nEl, gN(nNo), gE(nEl)
-      INTEGER, ALLOCATABLE :: knnList(:,:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nNo, nEl, gN(nNo), gE(nEl)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: knnList(:,:)
 
-      INTEGER :: a, b, e, Ac, Bc, Ec, i, j, n, maxKNN
       LOGICAL :: flag
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, Ec, i, j, n, maxKNN
 
-      INTEGER, ALLOCATABLE :: lN(:), nL(:), tmpList(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: lN(:), nL(:), tmpList(:,:)
 
       ALLOCATE(lN(lM%gnNo))
       lN = 0
@@ -1472,27 +1448,25 @@ c     Check mesh quality and reset IEN if necessary
 !--------------------------------------------------------------------
 !     Find element in the old mesh for each node in the new mesh
       SUBROUTINE FINDN(xp, iM, Dg, eList, Ec, Nsf)
-
       USE COMMOD
       USE MATFUN
-
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: iM, eList(:)
+      INTEGER(KIND=IKIND), INTENT(OUT) :: Ec
+      REAL(KIND=RKIND), INTENT(IN) :: xp(nsd+1), Dg(nsd,tnNo)
+      REAL(KIND=RKIND), INTENT(OUT) :: Nsf(msh(iM)%eNoN)
 
-      INTEGER, INTENT(IN) :: iM, eList(:)
-      INTEGER, INTENT(OUT) :: Ec
-      REAL(KIND=8), INTENT(IN) :: xp(nsd+1), Dg(nsd,tnNo)
-      REAL(KIND=8), INTENT(OUT) :: Nsf(msh(iM)%eNoN)
+      INTEGER(KIND=IKIND) :: e, a, i, j, ne, Ac
 
-      INTEGER :: e, a, i, j, ne, Ac
-      REAL(KIND=8), ALLOCATABLE :: Amat(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Amat(:,:)
 
       ne = size(eList)
       ALLOCATE(Amat(nsd+1,msh(iM)%eNoN))
-      Nsf(:) = 0D0
+      Nsf(:) = 0._RKIND
       DO e=1, ne
          Ec = eList(e)
          IF (Ec .EQ. 0) EXIT
-         Amat = 1D0
+         Amat = 1._RKIND
          DO a=1, msh(iM)%eNoN
             Ac = msh(iM)%IEN(a,Ec)
             Amat(1:nsd,a) = x(:,Ac) + Dg(:,Ac)
@@ -1500,11 +1474,12 @@ c     Check mesh quality and reset IEN if necessary
          Amat = MAT_INV(Amat, msh(iM)%eNoN)
          a = 0
          DO i=1, nsd+1
-            Nsf(i) = 0D0
+            Nsf(i) = 0._RKIND
             DO j=1, msh(iM)%eNoN
                Nsf(i) = Nsf(i) + Amat(i,j)*Xp(j)
             END DO
-            IF (Nsf(i).GT.-1E-14 .AND. Nsf(i).LT.(1D0+1E-14)) THEN
+            IF (Nsf(i).GT.-1.E-14_RKIND .AND.
+     2          Nsf(i).LT.(1._RKIND+1.E-14_RKIND)) THEN
                a = a + 1
             END IF
          END DO
@@ -1513,7 +1488,7 @@ c     Check mesh quality and reset IEN if necessary
          END IF
       END DO
       Ec = 0
-      Nsf(:) = 0D0
+      Nsf(:) = 0._RKIND
 
       RETURN
       END SUBROUTINE FINDN

@@ -47,12 +47,16 @@
 !     The data structures used in FSILS.
 !--------------------------------------------------------------------
 
-!     Some definitions
-      INTEGER, PARAMETER :: LS_TYPE_CG=798, LS_TYPE_GMRES=797,
-     &   LS_TYPE_NS=796, LS_TYPE_BICGS=795
+      INCLUDE "FSILS_TYPEDEF.h"
 
-      INTEGER, PARAMETER :: BC_TYPE_Dir = 0, BC_TYPE_Neu = 1
-      INTEGER, PARAMETER :: BCOP_TYPE_ADD = 0, BCOP_TYPE_PRE = 1
+!     Some definitions
+      INTEGER(KIND=LSIP), PARAMETER :: LS_TYPE_CG = 798,
+     &   LS_TYPE_GMRES = 797, LS_TYPE_NS = 796, LS_TYPE_BICGS = 795
+
+      INTEGER(KIND=LSIP), PARAMETER :: BC_TYPE_Dir = 0, BC_TYPE_Neu = 1
+
+      INTEGER(KIND=LSIP), PARAMETER :: BCOP_TYPE_ADD = 0,
+     &   BCOP_TYPE_PRE = 1
 
 !     Communication structure
       TYPE FSILS_commuType
@@ -62,17 +66,17 @@
 !        If this the master       (USE)
          LOGICAL masF
 !        Master ID                (USE)
-         INTEGER master
+         INTEGER(KIND=LSIP) master
 !        ID of this proc.         (USE)
-         INTEGER task
+         INTEGER(KIND=LSIP) task
 !        Task in FORTRAN indexing (USE)
-         INTEGER tF
+         INTEGER(KIND=LSIP) tF
 !        Total number of tasks    (USE)
-         INTEGER nTasks
+         INTEGER(KIND=LSIP) nTasks
 !        MPI communicator         (IN)
-         INTEGER comm
+         INTEGER(KIND=LSIP) comm
 !        Only for data alignment
-         INTEGER reserved
+         INTEGER(KIND=LSIP) reserved
       END TYPE FSILS_commuType
 
 !     LHS matrix related data
@@ -87,34 +91,34 @@
 !        Included in the computations   (IN)
          LOGICAL incFlag
 !        Number of nodes                (IN)
-         INTEGER :: nNo = 0
+         INTEGER(KIND=LSIP) :: nNo = 0
 !        Degrees of freedom for val     (IN)
-         INTEGER dof
+         INTEGER(KIND=LSIP) dof
 !        Dir/Neu                        (IN)
-         INTEGER :: bGrp = BC_TYPE_Dir
+         INTEGER(KIND=LSIP) :: bGrp = BC_TYPE_Dir
 !        Only for data alignment
-         INTEGER reserved
+         INTEGER(KIND=LSIP) reserved
 !        Global node number             (IN)
-         INTEGER, ALLOCATABLE :: glob(:)
-!        ||Sai||**2D0                   (USE)
-         REAL(KIND=8) nS
+         INTEGER(KIND=LSIP), ALLOCATABLE :: glob(:)
+!        ||Sai||**2._LSRP                   (USE)
+         REAL(KIND=LSRP) nS
 !        Neu: P = res*Q                 (IN)
-         REAL(KIND=8) :: res = 0D0
+         REAL(KIND=LSRP) :: res = 0._LSRP
 !        nodal Sai for Neu              (IN)
-         REAL(KIND=8), ALLOCATABLE :: val(:,:)
+         REAL(KIND=LSRP), ALLOCATABLE :: val(:,:)
 !        Neu W*Sai                      (TMP)
-         REAL(KIND=8), ALLOCATABLE :: valM(:,:)
+         REAL(KIND=LSRP), ALLOCATABLE :: valM(:,:)
       END TYPE FSILS_faceType
 
 !     All following are in (USE)
       TYPE FSILS_cSType
          SEQUENCE
 !        The processor to communicate with
-         INTEGER iP
+         INTEGER(KIND=LSIP) iP
 !        Number of data to be commu
-         INTEGER n
+         INTEGER(KIND=LSIP) n
 !        Pointer to the data for commu
-         INTEGER, ALLOCATABLE :: ptr(:)
+         INTEGER(KIND=LSIP), ALLOCATABLE :: ptr(:)
       END TYPE FSILS_cSType
 
       TYPE FSILS_lhsType
@@ -122,27 +126,27 @@
 !        Free of created                     (USE)
          LOGICAL :: foC = .FALSE.
 !        Global number of nodes              (IN)
-         INTEGER :: gnNo = 0
+         INTEGER(KIND=LSIP) :: gnNo = 0
 !        Number of nodes                     (IN)
-         INTEGER :: nNo = 0
+         INTEGER(KIND=LSIP) :: nNo = 0
 !        Number of non-zero in lhs           (IN)
-         INTEGER :: nnz = 0
+         INTEGER(KIND=LSIP) :: nnz = 0
 !        Number of faces                     (IN)
-         INTEGER :: nFaces = 0
+         INTEGER(KIND=LSIP) :: nFaces = 0
 !        nNo of this proc                    (USE)
-         INTEGER mynNo
+         INTEGER(KIND=LSIP) mynNo
 !        nNo of shared with lower proc       (USE)
-         INTEGER shnNo
+         INTEGER(KIND=LSIP) shnNo
 !        Number of communication requests    (USE)
-         INTEGER :: nReq = 0
+         INTEGER(KIND=LSIP) :: nReq = 0
 !        Column pointer                      (USE)
-         INTEGER, ALLOCATABLE :: colPtr(:)
+         INTEGER(KIND=LSIP), ALLOCATABLE :: colPtr(:)
 !        Row pointer                         (USE)
-         INTEGER, ALLOCATABLE :: rowPtr(:,:)
+         INTEGER(KIND=LSIP), ALLOCATABLE :: rowPtr(:,:)
 !        Diagonal pointer                    (USE)
-         INTEGER, ALLOCATABLE :: diagPtr(:)
+         INTEGER(KIND=LSIP), ALLOCATABLE :: diagPtr(:)
 !        Mapping of nodes                    (USE)
-         INTEGER, ALLOCATABLE :: map(:)
+         INTEGER(KIND=LSIP), ALLOCATABLE :: map(:)
          TYPE(FSILS_commuType) commu
          TYPE(FSILS_cSType), ALLOCATABLE :: cS(:)
          TYPE(FSILS_faceType), ALLOCATABLE :: face(:)
@@ -154,31 +158,31 @@
 !        Successful solving            (OUT)
          LOGICAL suc
 !        Maximum iteration             (IN)
-         INTEGER mItr
+         INTEGER(KIND=LSIP) mItr
 !        Space dimension               (IN)
-         INTEGER sD
+         INTEGER(KIND=LSIP) sD
 !        Number of iteration           (OUT)
-         INTEGER itr
+         INTEGER(KIND=LSIP) itr
 !        Number of Ax multiply         (OUT)
-         INTEGER cM
+         INTEGER(KIND=LSIP) cM
 !        Number of |x| norms           (OUT)
-         INTEGER cN
+         INTEGER(KIND=LSIP) cN
 !        Number of <x.y> dot products  (OUT)
-         INTEGER cD
+         INTEGER(KIND=LSIP) cD
 !        Only for data alignment       (-)
-         INTEGER reserve
+         INTEGER(KIND=LSIP) reserve
 !        Absolute tolerance            (IN)
-         REAL(KIND=8) absTol
+         REAL(KIND=LSRP) absTol
 !        Relative tolerance            (IN)
-         REAL(KIND=8) relTol
+         REAL(KIND=LSRP) relTol
 !        Initial norm of residual      (OUT)
-         REAL(KIND=8) iNorm
+         REAL(KIND=LSRP) iNorm
 !        Final norm of residual        (OUT)
-         REAL(KIND=8) fNorm
+         REAL(KIND=LSRP) fNorm
 !        Res. rduction in last itr.    (OUT)
-         REAL(KIND=8) dB
+         REAL(KIND=LSRP) dB
 !        Calling duration              (OUT)
-         REAL(KIND=8) callD
+         REAL(KIND=LSRP) callD
       END TYPE FSILS_subLsType
 
       TYPE FSILS_lsType
@@ -186,12 +190,14 @@
 !        Free of created             (USE)
          LOGICAL :: foC = .FALSE.
 !        Which one of LS             (IN)
-         INTEGER LS_type
+         INTEGER(KIND=LSIP) LS_type
 !        Contribution of mom. res.   (OUT)
-         INTEGER Resm
+         INTEGER(KIND=LSIP) Resm
 !        Contribution of cont. res.  (OUT)
-         INTEGER Resc
+         INTEGER(KIND=LSIP) Resc
          TYPE(FSILS_subLsType) GM
          TYPE(FSILS_subLsType) CG
          TYPE(FSILS_subLsType) RI
       END TYPE FSILS_lsType
+
+!####################################################################

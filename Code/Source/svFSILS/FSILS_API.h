@@ -52,7 +52,7 @@
          SUBROUTINE FSILS_COMMU_CREATE(commu, commi)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_commuType), INTENT(INOUT) :: commu
-            INTEGER, INTENT(IN) :: commi
+            INTEGER(KIND=LSIP), INTENT(IN) :: commi
          END SUBROUTINE FSILS_COMMU_CREATE
          SUBROUTINE FSILS_COMMU_FREE(commu)
             INCLUDE "FSILS_STRUCT.h"
@@ -64,19 +64,19 @@
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
             TYPE(FSILS_commuType), INTENT(IN) :: commu
-            INTEGER, INTENT(IN) :: gnNo, nNo, nnz
-            INTEGER, INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1),          &
-     &         colPtr(nnz)
-            INTEGER, INTENT(IN) :: nFaces
+            INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
+            INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo),              &
+     &         rowPtr(nNo+1), colPtr(nnz)
+            INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
          END SUBROUTINE FSILS_LHS_CREATE
          SUBROUTINE external_LHS_CREATE(lhs, commu, gnNo, nNo,          &
      &      gNodes, nFaces)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
             TYPE(FSILS_commuType), INTENT(IN) :: commu
-            INTEGER, INTENT(IN) :: gnNo, nNo
-            INTEGER, INTENT(IN) :: gNodes(nNo)
-            INTEGER, INTENT(IN) :: nFaces
+            INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo
+            INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
+            INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
          END SUBROUTINE external_LHS_CREATE
          SUBROUTINE FSILS_LHS_FREE(lhs)
             INCLUDE "FSILS_STRUCT.h"
@@ -87,10 +87,11 @@
      &      dimKry, relTolIn, absTolIn, maxItrIn)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-            INTEGER, INTENT(IN) :: LS_type
-            REAL(KIND=8), INTENT(IN), OPTIONAL :: relTol, absTol,       &
+            INTEGER(KIND=LSIP), INTENT(IN) :: LS_type
+            REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: relTol, absTol,    &
      &         relTolIn(2), absTolIn(2)
-            INTEGER, INTENT(IN), OPTIONAL :: maxItr, dimKry, maxItrIn(2)
+            INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: maxItr, dimKry, &
+     &         maxItrIn(2)
          END SUBROUTINE FSILS_LS_CREATE
          SUBROUTINE FSILS_LS_FREE(ls)
             INCLUDE "FSILS_STRUCT.h"
@@ -101,58 +102,67 @@
      &         gNodes, Val)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: faIn, nNo, dof
-            INTEGER, INTENT(IN) :: BC_type
-            INTEGER, INTENT(IN) :: gNodes(nNo)
-            REAL(KIND=8), INTENT(IN), OPTIONAL :: Val(dof,nNo)
+            INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
+            INTEGER(KIND=LSIP), INTENT(IN) :: BC_type
+            INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
+            REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
          END SUBROUTINE FSILS_BC_CREATE
+         SUBROUTINE external_BC_CREATE(lhs, faIn, nNo, dof, BC_type,    &
+     &         gNodes, Val)
+            INCLUDE "FSILS_STRUCT.h"
+            TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
+            INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
+            INTEGER(KIND=LSIP), INTENT(IN) :: BC_type
+            INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
+            REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
+         END SUBROUTINE external_BC_CREATE
          SUBROUTINE FSILS_BC_FREE(lhs, faIn)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: faIn
+            INTEGER(KIND=LSIP), INTENT(IN) :: faIn
          END SUBROUTINE FSILS_BC_FREE
 
          SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, isS, incL, res)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
             TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-            INTEGER, INTENT(IN) :: dof
-            REAL(KIND=8), INTENT(INOUT) :: Ri(dof,lhs%nNo)
-            REAL(KIND=8), INTENT(IN) :: Val(dof*dof,lhs%nnz)
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof
+            REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
+            REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz)
             LOGICAL, INTENT(IN), OPTIONAL :: isS(lhs%nNo)
-            INTEGER, INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
-            REAL(KIND=8), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
+            INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
+            REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
          END SUBROUTINE FSILS_SOLVE
       END INTERFACE
 
       INTERFACE FSILS_INP
          FUNCTION FSILS_DOTV(dof, nNo, commu, U, V)
             INCLUDE "FSILS_STRUCT.h"
-            INTEGER, INTENT(IN) :: dof, nNo
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
             TYPE(FSILS_commuType), INTENT(IN) :: commu
-            REAL(KIND=8), INTENT(IN) :: V(dof,nNo), U(dof,nNo)
-            REAL(KIND=8) FSILS_DOTV
+            REAL(KIND=LSRP), INTENT(IN) :: V(dof,nNo), U(dof,nNo)
+            REAL(KIND=LSRP) FSILS_DOTV
          END FUNCTION FSILS_DOTV
          FUNCTION FSILS_DOTS(nNo, commu, U, V)
             INCLUDE "FSILS_STRUCT.h"
-            INTEGER, INTENT(IN) :: nNo
+            INTEGER(KIND=LSIP), INTENT(IN) :: nNo
             TYPE(FSILS_commuType), INTENT(IN) :: commu
-            REAL(KIND=8), INTENT(IN) :: V(nNo), U(nNo)
-            REAL(KIND=8) FSILS_DOTS
+            REAL(KIND=LSRP), INTENT(IN) :: V(nNo), U(nNo)
+            REAL(KIND=LSRP) FSILS_DOTS
          END FUNCTION FSILS_DOTS
          FUNCTION FSILS_NORMV(dof, nNo, commu, U)
             INCLUDE "FSILS_STRUCT.h"
-            INTEGER, INTENT(IN) :: dof, nNo
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
             TYPE(FSILS_commuType), INTENT(IN) :: commu
-            REAL(KIND=8), INTENT(IN) :: U(dof,nNo)
-            REAL(KIND=8) FSILS_NORMV
+            REAL(KIND=LSRP), INTENT(IN) :: U(dof,nNo)
+            REAL(KIND=LSRP) FSILS_NORMV
          END FUNCTION FSILS_NORMV
          FUNCTION FSILS_NORMS(nNo, commu, U)
             INCLUDE "FSILS_STRUCT.h"
-            INTEGER, INTENT(IN) :: nNo
+            INTEGER(KIND=LSIP), INTENT(IN) :: nNo
             TYPE(FSILS_commuType), INTENT(IN) :: commu
-            REAL(KIND=8), INTENT(IN) :: U(nNo)
-            REAL(KIND=8) FSILS_NORMS
+            REAL(KIND=LSRP), INTENT(IN) :: U(nNo)
+            REAL(KIND=LSRP) FSILS_NORMS
          END FUNCTION FSILS_NORMS
       END INTERFACE FSILS_INP
 
@@ -160,13 +170,13 @@
          SUBROUTINE FSILS_COMMUV(lhs, dof, R)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: dof
-            REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof
+            REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
          END SUBROUTINE FSILS_COMMUV
          SUBROUTINE FSILS_COMMUS(lhs, R)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
+            REAL(KIND=LSRP), INTENT(INOUT) :: R(lhs%nNo)
          END SUBROUTINE FSILS_COMMUS
       END INTERFACE FSILS_COMMU
 
@@ -174,45 +184,52 @@
          SUBROUTINE FSILS_SPARMULVV(lhs, rowPtr, colPtr, dof, K, U, KU)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-            INTEGER, INTENT(IN) :: dof
-            REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz),             &
+            INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),        &
+     &         colPtr(lhs%nnz)
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof
+            REAL(KIND=LSRP), INTENT(IN) :: K(dof*dof,lhs%nnz),          &
      &         U(dof,lhs%nNo)
-            REAL(KIND=8), INTENT(OUT) :: KU(dof,lhs%nNo)
+            REAL(KIND=LSRP), INTENT(OUT) :: KU(dof,lhs%nNo)
          END SUBROUTINE FSILS_SPARMULVV
          SUBROUTINE FSILS_SPARMULVS(lhs, rowPtr, colPtr, dof, K, U, KU)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-            INTEGER, INTENT(IN) :: dof
-            REAL(KIND=8), INTENT(IN) :: K(dof,lhs%nnz), U(dof,lhs%nNo)
-            REAL(KIND=8), INTENT(OUT) :: KU(lhs%nNo)
+            INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),        &
+     &         colPtr(lhs%nnz)
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof
+            REAL(KIND=LSRP), INTENT(IN) :: K(dof,lhs%nnz),              &
+     &         U(dof,lhs%nNo)
+            REAL(KIND=LSRP), INTENT(OUT) :: KU(lhs%nNo)
          END SUBROUTINE FSILS_SPARMULVS
          SUBROUTINE FSILS_SPARMULSV(lhs, rowPtr, colPtr, dof, K, U, KU)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-            INTEGER, INTENT(IN) :: dof
-            REAL(KIND=8), INTENT(IN) :: K(dof,lhs%nnz), U(lhs%nNo)
-            REAL(KIND=8), INTENT(OUT) :: KU(dof,lhs%nNo)
+            INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),        &
+     &         colPtr(lhs%nnz)
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof
+            REAL(KIND=LSRP), INTENT(IN) :: K(dof,lhs%nnz), U(lhs%nNo)
+            REAL(KIND=LSRP), INTENT(OUT) :: KU(dof,lhs%nNo)
          END SUBROUTINE FSILS_SPARMULSV
          SUBROUTINE FSILS_SPARMULSS(lhs, rowPtr, colPtr, K, U, KU)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-            INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-            REAL(KIND=8), INTENT(IN) :: K(lhs%nnz), U(lhs%nNo)
-            REAL(KIND=8), INTENT(OUT) :: KU(lhs%nNo)
+            INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),        &
+     &         colPtr(lhs%nnz)
+            REAL(KIND=LSRP), INTENT(IN) :: K(lhs%nnz), U(lhs%nNo)
+            REAL(KIND=LSRP), INTENT(OUT) :: KU(lhs%nNo)
          END SUBROUTINE FSILS_SPARMULSS
       END INTERFACE FSILS_SPARMUL
 
       INTERFACE FSILS_CPUT
          FUNCTION FSILS_CPUT()
-            REAL(KIND=8) FSILS_CPUT
+            INCLUDE "FSILS_STRUCT.h"
+            REAL(KIND=LSRP) FSILS_CPUT
          END FUNCTION FSILS_CPUT
       END INTERFACE FSILS_CPUT
 
       INTERFACE FSILS_HRCPUT
          FUNCTION FSILS_HRCPUT()
-            REAL(KIND=8) FSILS_HRCPUT
+            INCLUDE "FSILS_STRUCT.h"
+            REAL(KIND=LSRP) FSILS_HRCPUT
          END FUNCTION FSILS_HRCPUT
       END INTERFACE FSILS_HRCPUT

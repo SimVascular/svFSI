@@ -40,16 +40,16 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      INTEGER a, b, e, i, j, k, Ac, ibl, eNoN, nFn
+      INTEGER(KIND=IKIND) a, b, e, i, j, k, Ac, ibl, eNoN, nFn
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:), dl(:,:),
-     2   dol(:,:), fN(:,:), pS0l(:,:), bfl(:,:), ya_l(:), vwpl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   dl(:,:), dol(:,:), fN(:,:), pS0l(:,:), bfl(:,:), ya_l(:),
+     3   vwpl(:,:)
 
 !     For shells, consider extended patch around an element
       IF (shlEq .AND. lM%eType.EQ.eType_TRI)THEN
@@ -68,17 +68,17 @@
       i = nsd + 2
       j = 2*nsd + 1
       DO e=1, lM%nEl
-         xl   = 0D0
-         al   = 0D0
-         yl   = 0D0
-         dl   = 0D0
-         dol  = 0D0
-         fN   = 0D0
-         pS0l = 0D0
-         bfl  = 0D0
-         ya_l = 0D0
+         xl   = 0._RKIND
+         al   = 0._RKIND
+         yl   = 0._RKIND
+         dl   = 0._RKIND
+         dol  = 0._RKIND
+         fN   = 0._RKIND
+         pS0l = 0._RKIND
+         bfl  = 0._RKIND
+         ya_l = 0._RKIND
          ibl  = 0
-         vwpl = 0D0
+         vwpl = 0._RKIND
          DO a=1, eNoN
             IF (a .LE. lM%eNoN) THEN
                Ac     = lM%IEN(a,e)
@@ -124,19 +124,18 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, nFn, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), dol(nsd,eNoN), bfl(nsd,eNoN), fN(nsd,nFn),
      3   vwpl(2,eNoN), ya_l(eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN), pS0l(nstd,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: xl(nsd,eNoN), pS0l(nstd,eNoN)
 
-      INTEGER a, g, Ac, cPhys, insd
-      REAL(KIND=8) w, Jac, vwp(2), ksix(nsd,nsd)
+      INTEGER(KIND=IKIND) a, g, Ac, cPhys, insd
+      REAL(KIND=RKIND) w, Jac, vwp(2), ksix(nsd,nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:), Nx(:,:),
-     2   dc(:,:), pSl(:), lKd(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lK(:,:,:), lR(:,:), N(:),
+     2   Nx(:,:), dc(:,:), pSl(:), lKd(:,:,:)
 
       insd = nsd
       IF (lM%lFib) insd = 1
@@ -151,14 +150,14 @@
       IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !     Setting intial values
-      lK    = 0D0
-      lR    = 0D0
-      pSl   = 0D0
+      lK    = 0._RKIND
+      lR    = 0._RKIND
+      pSl   = 0._RKIND
       cPhys = eq(cEq)%dmn(cDmn)%phys
 
       IF (cPhys .EQ. phys_vms_struct) THEN
          ALLOCATE(lKd(dof*nsd,eNoN,eNoN))
-         lKd = 0D0
+         lKd = 0._RKIND
       END IF
 
 !     If neccessary correct X, if mesh is moving
@@ -204,14 +203,14 @@
 
 !     CMM initialization
       IF (cmmInit) THEN
-         pSl(:) = 0D0
-         vwp(:) = 0D0
+         pSl(:) = 0._RKIND
+         vwp(:) = 0._RKIND
          DO a=1, eNoN
             pSl(:) = pSl(:) + pS0l(:,a)
             vwp(:) = vwp(:) + vwpl(:,a)
          END DO
-         pSl(:) = pSl(:)/REAL(eNoN,KIND=8)
-         vwp(:) = vwp(:)/REAL(eNoN,KIND=8)
+         pSl(:) = pSl(:)/REAL(eNoN, KIND=RKIND)
+         vwp(:) = vwp(:)/REAL(eNoN, KIND=RKIND)
          CALL CMMi(lM, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)
          DEALLOCATE(lR, lK, N, Nx, dc, pSl)
          RETURN
@@ -234,7 +233,7 @@
             END IF
 
          CASE (phys_CMM)
-            CALL CMM3D(eNoN, w, N, Nx, al, yl, bfl, ksix, ptr, lR, lK)
+            CALL CMM3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
 
          CASE (phys_heatS)
             IF (nsd .EQ. 3) THEN
@@ -279,7 +278,7 @@
 
          CASE (phys_mesh)
             w = w/Jac
-            pS0l = 0D0
+            pS0l = 0._RKIND
             IF (nsd .EQ. 3) THEN
                dc(5:7,:) = dl(5:7,:) - dol
                CALL LELAS3D(eNoN, w, N, Nx, al, dc, bfl, pS0l, pSl, lR,
@@ -289,7 +288,7 @@
                CALL LELAS2D(eNoN, w, N, Nx, al, dc, bfl, pS0l, pSl, lR,
      2            lK)
             END IF
-            pSl = 0D0
+            pSl = 0._RKIND
 
          CASE (phys_CEP)
             IF (insd .EQ. 3) THEN
@@ -342,15 +341,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: hg(tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: hg(tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
 
-      INTEGER a, e, g, Ac, Ec, iM, cPhys, eNoN
-      REAL(KIND=8) w, h, nV(nsd), y(tDof), Jac
+      INTEGER(KIND=IKIND) a, e, g, Ac, Ec, iM, cPhys, eNoN
+      REAL(KIND=RKIND) w, h, nV(nsd), y(tDof), Jac
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:), hl(:), xl(:,:), yl(:,:),
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), hl(:), xl(:,:), yl(:,:),
      2   dl(:,:), lR(:,:), lK(:,:,:), lKd(:,:,:)
 
       iM = lFa%iM
@@ -368,9 +367,9 @@
             ALLOCATE(ptr(eNoN), hl(eNoN), xl(nsd,eNoN), dl(tDof,eNoN),
      2         lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
      3         lKd(dof*nsd,eNoN,eNoN))
-            lR  = 0D0
-            lK  = 0D0
-            lKd = 0D0
+            lR  = 0._RKIND
+            lK  = 0._RKIND
+            lKd = 0._RKIND
             DO a=1, msh(iM)%eNoN
                Ac      = msh(iM)%IEN(a,Ec)
                ptr(a)  = Ac
@@ -387,8 +386,8 @@
 
             ALLOCATE(ptr(eNoN), N(eNoN), hl(eNoN), yl(tDof,eNoN),
      2         lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
-            lK = 0D0
-            lR = 0D0
+            lK = 0._RKIND
+            lR = 0._RKIND
             DO a=1, eNoN
                Ac      = lFa%IEN(a,e)
                ptr(a)  = Ac
@@ -406,8 +405,8 @@
                w   = lFa%w(g)*Jac
                N   = lFa%N(:,g)
 
-               h = 0D0
-               y = 0D0
+               h = 0._RKIND
+               y = 0._RKIND
                DO a=1, eNoN
                   h = h + N(a)*hl(a)
                   y = y + N(a)*yl(:,a)

@@ -54,15 +54,14 @@
 !     4 - R    {in slave}  = rTmp       {from master}
 
       SUBROUTINE FSILS_COMMUV(lhs, dof, R)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(INOUT) :: R(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(dof,lhs%nNo)
 
-      INTEGER nReq, i, j, k, ierr, stat(mpsts*lhs%nReq)
-      REAL(KIND=8), ALLOCATABLE :: sB(:,:,:), rB(:,:,:), sReq(:),       &
+      INTEGER(KIND=LSIP) nReq, i, j, k, ierr, stat(mpsts*lhs%nReq)
+
+      REAL(KIND=LSRP), ALLOCATABLE :: sB(:,:,:), rB(:,:,:), sReq(:),    &
      &   rReq(:)
 
       IF (lhs%commu%nTasks .EQ. 1) RETURN
@@ -102,18 +101,15 @@
 
       RETURN
       END SUBROUTINE FSILS_COMMUV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE FSILS_COMMUS(lhs, R)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      REAL(KIND=8), INTENT(INOUT) :: R(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: R(lhs%nNo)
 
-      INTEGER nReq, i, j, k, ierr, stat(mpsts*lhs%nReq)
-      REAL(KIND=8), ALLOCATABLE :: sB(:,:), rB(:,:), sReq(:), rReq(:)
+      INTEGER(KIND=LSIP) nReq, i, j, k, ierr, stat(mpsts*lhs%nReq)
+
+      REAL(KIND=LSRP), ALLOCATABLE :: sB(:,:), rB(:,:), sReq(:), rReq(:)
 
       IF (lhs%commu%nTasks .EQ. 1) RETURN
 
@@ -152,4 +148,4 @@
 
       RETURN
       END SUBROUTINE FSILS_COMMUS
-
+!####################################################################

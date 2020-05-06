@@ -50,21 +50,19 @@
 
       SUBROUTINE FSILS_LHS_CREATE(lhs, commu, gnNo, nNo, nnz, gNodes,   &
      &   rowPtr, colPtr, nFaces)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      INTEGER, INTENT(IN) :: gnNo, nNo, nnz
-      INTEGER, INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1), colPtr(nnz)
-      INTEGER, INTENT(IN) :: nFaces
+      INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
+      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1),     &
+     &   colPtr(nnz)
+      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
 
-      INTEGER ip, i, j, a, Ac, ai, s, e, nTasks, tF, maxnNo, ierr,      &
-     &   comm, stat(mpsts)
+      INTEGER(KIND=LSIP) ip, i, j, a, Ac, ai, s, e, nTasks, tF, maxnNo, &
+     &   ierr, comm, stat(mpsts)
 
-      INTEGER, ALLOCATABLE :: aNodes(:,:), gtlPtr(:), ltg(:), part(:),  &
-     &   sCount(:), disp(:)
-
+      INTEGER(KIND=LSIP), ALLOCATABLE :: aNodes(:,:), gtlPtr(:), ltg(:),&
+     &   part(:), sCount(:), disp(:)
 
       IF (lhs%foC) THEN
          PRINT *, "FSILS: LHS is not free You may use FSILS_LHS_FREE",  &
@@ -293,25 +291,21 @@
 
       RETURN
       END SUBROUTINE FSILS_LHS_CREATE
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE external_LHS_CREATE(lhs, commu, gnNo, nNo, gNodes,     &
      &   nFaces)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      INTEGER, INTENT(IN) :: gnNo, nNo
-      INTEGER, INTENT(IN) :: gNodes(nNo)
-      INTEGER, INTENT(IN) :: nFaces
+      INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo
+      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
 
-      INTEGER ip, i, j, a, Ac, ai, nTasks, tF, maxnNo, ierr,            &
+      INTEGER(KIND=LSIP) ip, i, j, a, Ac, ai, nTasks, tF, maxnNo, ierr, &
      &   comm, stat(mpsts)
 
-      INTEGER, ALLOCATABLE :: aNodes(:,:), gtlPtr(:), ltg(:), part(:),  &
-     &   sCount(:), disp(:)
+      INTEGER(KIND=LSIP), ALLOCATABLE :: aNodes(:,:), gtlPtr(:), ltg(:),&
+     &   part(:), sCount(:), disp(:)
 
       IF (lhs%foC) THEN
          PRINT *, "FSILS: LHS is not free You may use FSILS_LHS_FREE",  &
@@ -492,15 +486,12 @@
 
       RETURN
       END SUBROUTINE external_LHS_CREATE
-!====================================================================
-
+!####################################################################
       SUBROUTINE FSILS_LHS_FREE(lhs)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
 
-      INTEGER faIn, i
+      INTEGER(KIND=LSIP) faIn, i
 
       IF (.NOT.lhs%foC) THEN
          PRINT *, 'FSILS: LHS is not created yet to be freed'
@@ -530,19 +521,16 @@
 
       RETURN
       END SUBROUTINE FSILS_LHS_FREE
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE FSILS_LHS_CREATE_C(pLHS, commu, gnNo, nNo, nnz, gNodes,&
      &   rowPtr, colPtr, nFaces)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), POINTER, INTENT(OUT) :: pLHS
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      INTEGER, INTENT(IN) :: gnNo, nNo, nnz
-      INTEGER, INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1), colPtr(nnz)
-      INTEGER, INTENT(IN) :: nFaces
+      INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo, nnz
+      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo), rowPtr(nNo+1),     &
+     &   colPtr(nnz)
+      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
 
       TYPE(FSILS_lhsType), TARGET, SAVE :: lhs
 
@@ -553,3 +541,4 @@
 
       RETURN
       END SUBROUTINE FSILS_LHS_CREATE_C
+!####################################################################

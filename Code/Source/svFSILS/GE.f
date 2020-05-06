@@ -49,28 +49,27 @@
 !--------------------------------------------------------------------
 
       FUNCTION GE (nV, N, A, B)
+      INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP), INTENT(IN) :: nV, N
+      REAL(KIND=LSRP), INTENT(IN) :: A(nV,N)
+      REAL(KIND=LSRP), INTENT(INOUT) :: B(N)
 
-      IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: nV, N
-      REAL(KIND=8), INTENT(IN) :: A(nV,N)
-      REAL(KIND=8), INTENT(INOUT) :: B(N)
       LOGICAL GE
+      INTEGER(KIND=LSIP) m, ipv, i, j
+      REAL(KIND=LSRP) pivot, saveEl
 
-      INTEGER m, ipv, i, j
-      REAL(KIND=8) pivot, saveEl
-      REAL(KIND=8), ALLOCATABLE :: C(:,:), W(:)
+      REAL(KIND=LSRP), ALLOCATABLE :: C(:,:), W(:)
 
 !     Constructing a preconditioner. This is to prevent latter problem
 !     with singular matrix
       ALLOCATE(W(N))
       DO i=1, N
          IF (ABS(A(i,i)) .LT. TINY(A(1,1))) THEN
-            B  = 0D0
+            B  = 0._LSRP
             GE = .FALSE.
             RETURN
          END IF
-         W(i) = 1D0/SQRT(ABS(A(i,i)))
+         W(i) = 1._LSRP/SQRT(ABS(A(i,i)))
       END DO
 
       ALLOCATE(C(N,N+1))
@@ -93,7 +92,7 @@
          pivot = C(1,1)*C(2,2) - C(2,1)*C(1,2)
          IF (ABS(pivot) .LT. EPSILON(pivot)) THEN
 !     Singular matrix
-            B  = 0D0
+            B  = 0._LSRP
             GE = .FALSE.
             RETURN
          END IF
@@ -115,7 +114,7 @@
          END DO
          IF (ABS(pivot) .LT. EPSILON(pivot)) THEN
 !     Singular matrix
-            B  = 0D0
+            B  = 0._LSRP
             GE = .FALSE.
             RETURN
          END IF
@@ -129,7 +128,7 @@
 
          DO i=m+1, N
             saveEl = C(i,m)/C(m,m)
-            C(i,m) = 0D0
+            C(i,m) = 0._LSRP
             DO j=m+1, N+1
                C(i,j) = C(i,j) - saveEl*C(m,j)
             END DO
@@ -150,3 +149,4 @@
 
       RETURN
       END FUNCTION GE
+!####################################################################

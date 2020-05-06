@@ -41,35 +41,33 @@
 !     the knot "ni".
 !     Reference: The NURBS Book, Les Piegl & Wayne Tiller
       PURE SUBROUTINE BSPNNX(ni, bs, N, Nx, Nxx)
-
+      USE TYPEMOD
       USE COMMOD, ONLY: bsType, gXi
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: ni
+      INTEGER(KIND=IKIND), INTENT(IN) :: ni
       TYPE(bsType), INTENT(IN) :: bs
-      REAL(KIND=8), INTENT(OUT) :: N(bs%p+1,bs%nG), Nx(bs%p+1,bs%nG),
+      REAL(KIND=RKIND), INTENT(OUT) :: N(bs%p+1,bs%nG),Nx(bs%p+1,bs%nG),
      2   Nxx(bs%p+1,bs%nG)
 
-      INTEGER p, i, g, j, k, ik, pk, s1, s2, j1, j2
-      REAL(KIND=8) xi, dxi, saved, tmp, d
-      REAL(KIND=8), ALLOCATABLE :: l(:), r(:), NdX(:,:), a(:,:),
+      INTEGER(KIND=IKIND) p, i, g, j, k, ik, pk, s1, s2, j1, j2
+      REAL(KIND=RKIND) xi, dxi, saved, tmp, d
+      REAL(KIND=RKIND), ALLOCATABLE :: l(:), r(:), NdX(:,:), a(:,:),
      2   ders(:,:)
 
-      dxi = (bs%xi(ni+1) - bs%xi(ni))/2D0
+      dxi = (bs%xi(ni+1) - bs%xi(ni))*0.5_RKIND
       DO g=1, bs%nG
          xi = (bs%xi(ni+1) + bs%xi(ni)
-     2      + (bs%xi(ni+1) - bs%xi(ni))*gXi(g,bs%nG))/2D0
+     2      + (bs%xi(ni+1) - bs%xi(ni))*gXi(g,bs%nG))*0.5_RKIND
 
 !        NdXi: stores basis functions and knot differences
 !        ders: stores (p+1) derivatives of (p+1) basis functions
          ALLOCATE(l(bs%p), r(bs%p), NdX(0:bs%p,0:bs%p), a(0:bs%p,2),
      2      ders(0:bs%p,0:bs%p))
-         NdX(0,0) = 1D0
+         NdX(0,0) = 1._RKIND
          DO p=1, bs%p
             l(p)  = xi - bs%xi(ni+1-p)
             r(p)  = bs%xi(ni+p) - xi
-            saved = 0D0
+            saved = 0._RKIND
             DO i=0, p-1
                NdX(i,p) = (r(i+1) + l(p-i))
                tmp    = NdX(p-1,i)/NdX(i,p)
@@ -84,9 +82,9 @@
 !        Now compute derivatives
          DO i=0, bs%p
             s1 = 1; s2 = 2
-            a(0,1) = 1D0
+            a(0,1) = 1._RKIND
             DO k=1, bs%p
-               d = 0D0
+               d = 0._RKIND
                ik = i - k
                pk = bs%p - k
                IF (i .ge. k) THEN
@@ -122,13 +120,13 @@
          i = bs%p
          DO k=1, bs%p
             DO j=0, bs%p
-               ders(j,k) = ders(j,k)*real(i,kind=8)*(dxi**k)
+               ders(j,k) = ders(j,k)*REAL(i, KIND=RKIND)*(dxi**k)
             END DO
             i = i * (bs%p-k)
          END DO
 
 !        Copy basis functions and first two derivatives at each Gauss pt
-         Nxx(:,g) = 0D0
+         Nxx(:,g) = 0._RKIND
          DO p=1, bs%p+1
             N(p,g)   = ders(p-1,0)
             Nx(p,g)  = ders(p-1,1)
@@ -144,23 +142,21 @@
 !     Calculates shape function values "NG" and derivative "NxiG"
 !     of NURB "nrb" at the Gauss points, given the element "e"
       SUBROUTINE NRBNNX(lM, e)
-
       USE COMMOD
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: e
+      INTEGER(KIND=IKIND), INTENT(IN) :: e
       TYPE(mshType), INTENT(INOUT) :: lM
 
       TYPE dType
-         REAL(KIND=8), ALLOCATABLE :: N(:,:)
-         REAL(KIND=8), ALLOCATABLE :: Nx(:,:)
-         REAL(KIND=8), ALLOCATABLE :: Nxx(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Nx(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Nxx(:,:)
       END TYPE dType
 
-      INTEGER insd, i, Ac, a, ax, ay, az, g, gx, gy, gz, p, nG
-      REAL(KIND=8) s, sx, sy, sz, sxx, syy, szz, sxy, syz, szx, Nx, Ny,
-     2   Nz
+      INTEGER(KIND=IKIND) insd, i, Ac, a, ax, ay, az, g, gx, gy, gz, p,
+     2   nG
+      REAL(KIND=RKIND) s, sx, sy, sz, sxx, syy, szz, sxy, syz, szx, Nx,
+     2   Ny, Nz
       TYPE(dType), ALLOCATABLE :: d(:)
 
       insd = nsd
@@ -182,12 +178,12 @@
             DO gy=1, lM%bs(2)%nG
                g   = g + 1
                a   = 0
-               s   = 0D0
-               sx  = 0D0
-               sy  = 0D0
-               sxx = 0D0
-               syy = 0D0
-               sxy = 0D0
+               s   = 0._RKIND
+               sx  = 0._RKIND
+               sy  = 0._RKIND
+               sxx = 0._RKIND
+               syy = 0._RKIND
+               sxy = 0._RKIND
                DO ax=1, lM%bs(1)%p + 1
                   DO ay=1, lM%bs(2)%p + 1
                      a  = a + 1
@@ -224,11 +220,11 @@
                   lM%Nx(2,a,g)  = ( lM%Nx(2,a,g) - lM%N(a,g)*sy ) / s
 
                   lM%Nxx(1,a,g) = ( lM%Nxx(1,a,g) - lM%N(a,g)*sxx
-     2               - 2D0*lM%Nx(1,a,g)*sx ) / s
+     2               - 2._RKIND*lM%Nx(1,a,g)*sx ) / s
                   lM%Nxx(2,a,g) = ( lM%Nxx(2,a,g) - lM%N(a,g)*syy
-     2               - 2D0*lM%Nx(2,a,g)*sy ) / s
+     2               - 2._RKIND*lM%Nx(2,a,g)*sy ) / s
                   lM%Nxx(3,a,g) = ( lM%Nxx(3,a,g)*s + lM%N(a,g)*
-     2               (2D0*sx*sy - sxy*s) - sx*Ny - sy*Nx ) / s**2
+     2               (2._RKIND*sx*sy - sxy*s) - sx*Ny - sy*Nx ) / (s*s)
                END DO
                lM%w(g) = gW(gx,lM%bs(1)%nG)*gW(gy,lM%bs(2)%nG)
             END DO
@@ -239,16 +235,16 @@
                DO gz=1, lM%bs(3)%nG
                   g   = g + 1
                   a   = 0
-                  s   = 0D0
-                  sx  = 0D0
-                  sy  = 0D0
-                  sz  = 0D0
-                  sxx = 0D0
-                  syy = 0D0
-                  szz = 0D0
-                  sxy = 0D0
-                  syz = 0D0
-                  szx = 0D0
+                  s   = 0._RKIND
+                  sx  = 0._RKIND
+                  sy  = 0._RKIND
+                  sz  = 0._RKIND
+                  sxx = 0._RKIND
+                  syy = 0._RKIND
+                  szz = 0._RKIND
+                  sxy = 0._RKIND
+                  syz = 0._RKIND
+                  szx = 0._RKIND
                   DO ax=1, lM%bs(1)%p + 1
                      DO ay=1, lM%bs(2)%p + 1
                         DO az=1, lM%bs(3)%p + 1
@@ -301,17 +297,17 @@
                      lM%Nx(3,a,g)  = ( lM%Nx(3,a,g) - lM%N(a,g)*sz ) / s
 
                      lM%Nxx(1,a,g) = ( lM%Nxx(1,a,g) - lM%N(a,g)*sxx
-     2                  - 2D0*lM%Nx(1,a,g)*sx ) / s
+     2                  - 2._RKIND*lM%Nx(1,a,g)*sx ) / s
                      lM%Nxx(2,a,g) = ( lM%Nxx(2,a,g) - lM%N(a,g)*syy
-     2                  - 2D0*lM%Nx(2,a,g)*sy ) / s
+     2                  - 2._RKIND*lM%Nx(2,a,g)*sy ) / s
                      lM%Nxx(3,a,g) = ( lM%Nxx(3,a,g) - lM%N(a,g)*szz
-     2                  - 2D0*lM%Nx(3,a,g)*sz ) / s
+     2                  - 2._RKIND*lM%Nx(3,a,g)*sz ) / s
                      lM%Nxx(4,a,g) = ( lM%Nxx(4,a,g)*s + lM%N(a,g)*
-     2                  (2D0*sx*sy - sxy*s) - sx*Ny - sy*Nx ) / s**2
+     2                  (2._RKIND*sx*sy - sxy*s) - sx*Ny - sy*Nx )/(s*s)
                      lM%Nxx(5,a,g) = ( lM%Nxx(5,a,g)*s + lM%N(a,g)*
-     2                  (2D0*sy*sz - syz*s) - sy*Nz - sz*Ny ) / s**2
+     2                  (2._RKIND*sy*sz - syz*s) - sy*Nz - sz*Ny )/(s*s)
                      lM%Nxx(6,a,g) = ( lM%Nxx(6,a,g)*s + lM%N(a,g)*
-     2                  (2D0*sz*sx - szx*s) - sz*Nx - sx*Nz ) / s**2
+     2                  (2._RKIND*sz*sx - szx*s) - sz*Nx - sx*Nz )/(s*s)
                   END DO
                   lM%w(g) = gW(gx,lM%bs(1)%nG)*gW(gy,lM%bs(2)%nG)
      2                    * gW(gz,lM%bs(3)%nG)
@@ -327,23 +323,21 @@
 !     Calculates shape function values "N" and derivative "Nx"
 !     of NURB "lM" at boundary the Gauss points, given the element "e"
       SUBROUTINE NRBNNXB(lM, lFa, e)
-
       USE COMMOD
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: e
+      INTEGER(KIND=IKIND), INTENT(IN) :: e
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
       TYPE dType
-         REAL(KIND=8), ALLOCATABLE :: N(:,:)
-         REAL(KIND=8), ALLOCATABLE :: Nx(:,:)
-         REAL(KIND=8), ALLOCATABLE :: Nxx(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Nx(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Nxx(:,:)
       END TYPE dType
 
-      INTEGER insd, i, j, Ac, a, ax, ay, g, gx, gy, Ec, p, nG
-      REAL(KIND=8) s, sx, sy, sxx, syy, sxy, Nx, Ny
+      INTEGER(KIND=IKIND) insd, i, j, Ac, a, ax, ay, g, gx, gy, Ec, p,
+     2   nG
+      REAL(KIND=RKIND) s, sx, sy, sxx, syy, sxy, Nx, Ny
       TYPE(dType), ALLOCATABLE :: d(:)
 
       insd = nsd
@@ -366,9 +360,9 @@
          IF (lFa%d .EQ. 1) i = 2
          IF (lFa%d .EQ. 2) i = 1
          DO g=1, lM%bs(i)%nG
-            s   = 0D0
-            sx  = 0D0
-            sxx = 0D0
+            s   = 0._RKIND
+            sx  = 0._RKIND
+            sxx = 0._RKIND
             DO a=1, lM%bs(i)%p + 1
                Ac = lFa%IEN(a,e)
                Ac = lM%lN(Ac)
@@ -385,7 +379,7 @@
                lFa%N(a,g)     = lFa%N(a,g)/s
                lFa%Nx(1,a,g)  = ( lFa%Nx(1,a,g) - lFa%N(a,g)*sx ) / s
                lFa%Nxx(1,a,g) = ( lFa%Nxx(1,a,g) - lFa%N(a,g)*sxx
-     2            - 2D0*lFa%Nx(1,a,g)*sx ) / s
+     2            - 2._RKIND*lFa%Nx(1,a,g)*sx ) / s
             END DO
             lFa%w(g) = gW(g,lM%bs(i)%nG)
          END DO
@@ -403,12 +397,12 @@
             DO gy=1, lM%bs(j)%nG
                g   = g + 1
                a   = 0
-               s   = 0D0
-               sx  = 0D0
-               sy  = 0D0
-               sxx = 0D0
-               syy = 0D0
-               sxy = 0D0
+               s   = 0._RKIND
+               sx  = 0._RKIND
+               sy  = 0._RKIND
+               sxx = 0._RKIND
+               syy = 0._RKIND
+               sxy = 0._RKIND
                DO ax=1, lM%bs(i)%p + 1
                   DO ay=1, lM%bs(j)%p + 1
                      a  = a + 1
@@ -445,11 +439,11 @@
                   lFa%Nx(2,a,g) = ( lFa%Nx(2,a,g) - lFa%N(a,g)*sy ) / s
 
                   lFa%Nxx(1,a,g) = ( lFa%Nxx(1,a,g) - lFa%N(a,g)*sxx
-     2               - 2D0*lFa%Nx(1,a,g)*sx ) / s
+     2               - 2._RKIND*lFa%Nx(1,a,g)*sx ) / s
                   lFa%Nxx(2,a,g) = ( lFa%Nxx(2,a,g) - lFa%N(a,g)*syy
-     2               - 2D0*lFa%Nx(2,a,g)*sy ) / s
+     2               - 2._RKIND*lFa%Nx(2,a,g)*sy ) / s
                   lFa%Nxx(3,a,g) = ( lFa%Nxx(3,a,g)*s + lFa%N(a,g)*
-     2               (2D0*sx*sy - sxy*s) - sx*Ny - sy*Nx ) / s**2
+     2               (2._RKIND*sx*sy - sxy*s) - sx*Ny - sy*Nx ) / (s*s)
                END DO
                lFa%w(g) = gW(gx,lM%bs(i)%nG)*gW(gy,lM%bs(j)%nG)
             END DO
@@ -464,29 +458,27 @@
 !     sample points uniformly distributed between the knot "ni" and
 !     "ni+1"
       PURE SUBROUTINE BSPNNS(ni, bs, N)
-
+      USE TYPEMOD
       USE COMMOD, ONLY: bsType
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: ni
+      INTEGER(KIND=IKIND), INTENT(IN) :: ni
       TYPE(bsType), INTENT(IN) :: bs
-      REAL(KIND=8), INTENT(OUT) :: N(bs%p+1,bs%nSl)
+      REAL(KIND=RKIND), INTENT(OUT) :: N(bs%p+1,bs%nSl)
 
-      INTEGER p, i, s
-      REAL(KIND=8) xi, saved, tmp, c
-      REAL(KIND=8), ALLOCATABLE :: l(:), r(:)
+      INTEGER(KIND=IKIND) p, i, s
+      REAL(KIND=RKIND) xi, saved, tmp, c
+      REAL(KIND=RKIND), ALLOCATABLE :: l(:), r(:)
 
-      c = (bs%xi(ni+1) - bs%xi(ni))/REAL(bs%nSl - 1,8)
+      c = (bs%xi(ni+1) - bs%xi(ni))/REAL(bs%nSl - 1,KIND=RKIND)
       ALLOCATE(l(bs%p), r(bs%p))
       DO s=1, bs%nSl
-         xi = bs%xi(ni) + c*REAL(s-1,8)
+         xi = bs%xi(ni) + c*REAL(s-1,KIND=RKIND)
 
-         N(1,s) = 1D0
+         N(1,s) = 1._RKIND
          DO p=1, bs%p
             l(p) = xi - bs%xi(ni-p+1)
             r(p) = bs%xi(ni+p) - xi
-            saved = 0D0
+            saved = 0._RKIND
             DO i=1, p
                tmp = N(i,s)/(r(i) + l(p-i+1))
                N(i,s) = saved + tmp*r(i)
@@ -502,21 +494,18 @@
 !     Calculates shape function values "N" of NURB "nrb" at "nSl"
 !     Sample points, given the element "e"
       SUBROUTINE NRBNNS(lM, N, e)
-
       USE COMMOD
-
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: e
+      INTEGER(KIND=IKIND), INTENT(IN) :: e
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(OUT) :: N(lM%eNoN,lM%nSl)
+      REAL(KIND=RKIND), INTENT(OUT) :: N(lM%eNoN,lM%nSl)
 
       TYPE dType
-         REAL(KIND=8), ALLOCATABLE :: N(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
       END TYPE dType
 
-      INTEGER insd, i, Ac, a, ax, ay, az, g, gx, gy, gz
-      REAL(KIND=8) s
+      INTEGER(KIND=IKIND) insd, i, Ac, a, ax, ay, az, g, gx, gy, gz
+      REAL(KIND=RKIND) s
       TYPE(dType), ALLOCATABLE :: d(:)
 
       insd = nsd
@@ -536,7 +525,7 @@
             DO gy=1, lM%bs(2)%nSl
                g = g + 1
                a = 0
-               s = 0D0
+               s = 0._RKIND
                DO ax=1, lM%bs(1)%p + 1
                   DO ay=1, lM%bs(2)%p + 1
                      a      = a + 1
@@ -555,7 +544,7 @@
                DO gz=1, lM%bs(3)%nSl
                   g = g + 1
                   a = 0
-                  s = 0D0
+                  s = 0._RKIND
                   DO ax=1, lM%bs(1)%p + 1
                      DO ay=1, lM%bs(2)%p + 1
                         DO az=1, lM%bs(3)%p + 1

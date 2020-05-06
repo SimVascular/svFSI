@@ -54,9 +54,11 @@
       INCLUDE "FSILS_STRUCT.h"
       INCLUDE "mpif.h"
 
-      INTEGER, PARAMETER :: mplog  = MPI_LOGICAL, mpint  = MPI_INTEGER, &
-     &   mpreal = MPI_DOUBLE_PRECISION, mpchar = MPI_CHARACTER,         &
-     &   mpsts = MPI_STATUS_SIZE
+      INTEGER(KIND=LSIP), PARAMETER :: mplog  = MPI_LOGICAL,
+     &   mpint  = MPI_INTEGER, mpreal = MPI_DOUBLE_PRECISION,
+     &   mpchar = MPI_CHARACTER, mpsts = MPI_STATUS_SIZE
 
 !     Communication parameters
-      INTEGER, PARAMETER :: stdout = OUTPUT_UNIT
+      INTEGER(KIND=LSIP), PARAMETER :: stdout = OUTPUT_UNIT
+
+!####################################################################

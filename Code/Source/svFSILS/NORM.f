@@ -53,17 +53,15 @@
 !     been done before calling this function (or the ansesters of U
 !     are passed through COMMU)
       FUNCTION FSILS_NORMV(dof, nNo, commu, U)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: dof, nNo
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, nNo
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      REAL(KIND=8), INTENT(IN) :: U(dof,nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: U(dof,nNo)
 
-      INTEGER i, ierr
-      REAL(KIND=8) tmp, FSILS_NORMV
+      INTEGER(KIND=LSIP) i, ierr
+      REAL(KIND=LSRP) tmp, FSILS_NORMV
 
-      FSILS_NORMV = 0D0
+      FSILS_NORMV = 0._LSRP
       SELECT CASE(dof)
       CASE(1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
@@ -113,21 +111,17 @@
 
       RETURN
       END FUNCTION FSILS_NORMV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       FUNCTION FSILS_NORMS(nNo, commu, U)
-
       INCLUDE "FSILS_STD.h"
-
-      INTEGER, INTENT(IN) :: nNo
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo
       TYPE(FSILS_commuType), INTENT(IN) :: commu
-      REAL(KIND=8), INTENT(IN) :: U(nNo)
+      REAL(KIND=LSRP), INTENT(IN) :: U(nNo)
 
-      INTEGER i, ierr
-      REAL(KIND=8) tmp, FSILS_NORMS
+      INTEGER(KIND=LSIP) i, ierr
+      REAL(KIND=LSRP) tmp, FSILS_NORMS
 
-      FSILS_NORMS = 0D0
+      FSILS_NORMS = 0._LSRP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i) SCHEDULE(GUIDED)
 !$OMP&   REDUCTION(+:FSILS_NORMS)
       DO i=1, nNo
@@ -144,5 +138,4 @@
 
       RETURN
       END FUNCTION FSILS_NORMS
-
-
+!####################################################################

@@ -39,13 +39,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(OUT) :: nnz
+      INTEGER(KIND=IKIND), INTENT(OUT) :: nnz
 
       LOGICAL flag
-      INTEGER a, b, e, i, j, rowN, colN, iM, iFa, masN, mnnzeic
+      INTEGER(KIND=IKIND) a, b, e, i, j, rowN, colN, iM, iFa, masN,
+     2   mnnzeic
 
-      INTEGER, ALLOCATABLE :: uInd(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: uInd(:,:)
 
       ALLOCATE(idMap(tnNo))
       DO a=1, tnNo
@@ -204,9 +204,9 @@
 !--------------------------------------------------------------------
          SUBROUTINE ADDCOL(row, col)
          IMPLICIT NONE
-         INTEGER, INTENT(IN) :: row, col
+         INTEGER(KIND=IKIND), INTENT(IN) :: row, col
 
-         INTEGER i, j
+         INTEGER(KIND=IKIND) i, j
 
          i = 0
          DO
@@ -243,8 +243,8 @@
          SUBROUTINE RESIZ()
          IMPLICIT NONE
 
-         INTEGER n
-         INTEGER, ALLOCATABLE :: tmp(:,:)
+         INTEGER(KIND=IKIND) n
+         INTEGER(KIND=IKIND), ALLOCATABLE :: tmp(:,:)
 
          n = mnnzeic
          ALLOCATE(tmp(n,tnNo))
@@ -264,13 +264,13 @@
 !     This subroutine assembels the element stiffness matrix into the
 !     global stiffness matrix (Val sparse matrix formatted as a vector)
       SUBROUTINE DOASSEM (d, eqN, lK, lR)
+      USE TYPEMOD
       USE COMMOD, ONLY: dof, rowPtr, colPtr, R, Val
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: d, eqN(d)
+      REAL(KIND=RKIND), INTENT(IN) :: lK(dof*dof,d,d), lR(dof,d)
 
-      INTEGER, INTENT(IN) :: d, eqN(d)
-      REAL(KIND=8), INTENT(IN) :: lK(dof*dof,d,d), lR(dof,d)
-
-      INTEGER a, b, ptr, rowN, colN, left, right
+      INTEGER(KIND=IKIND) a, b, ptr, rowN, colN, left, right
 
       DO a=1, d
          rowN = eqN(a)

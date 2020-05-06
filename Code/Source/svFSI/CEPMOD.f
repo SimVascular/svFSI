@@ -62,21 +62,21 @@
 !        Max. iterations for Newton-Raphson method
          INTEGER :: maxItr = 5
 !        Absolute tolerance
-         REAL(KIND=8) :: absTol = 1D-8
+         REAL(KIND=RKIND) :: absTol = 1.E-8_RKIND
 !        Relative tolerance
-         REAL(KIND=8) :: relTol = 1D-4
+         REAL(KIND=RKIND) :: relTol = 1.E-4_RKIND
       END TYPE odeType
 
 !     External stimulus type
       TYPE stimType
 !        start time
-         REAL(KIND=8) :: Ts = 0D0
+         REAL(KIND=RKIND) :: Ts = 0._RKIND
 !        duration of stimulus
-         REAL(KIND=8) :: Td = 0D0
+         REAL(KIND=RKIND) :: Td = 0._RKIND
 !        cycle length
-         REAL(KIND=8) :: CL = 0D0
+         REAL(KIND=RKIND) :: CL = 0._RKIND
 !        stimulus amplitude
-         REAL(KIND=8) :: A = 0D0
+         REAL(KIND=RKIND) :: A = 0._RKIND
       END TYPE stimType
 
 !     Cardiac electrophysiology model type
@@ -92,13 +92,13 @@
 !        Myocardium zone id
          INTEGER :: imyo
 !        Time step for integration
-         REAL(KIND=8) :: dt
+         REAL(KIND=RKIND) :: dt
 !        Constant for stretch-activated-currents
-         REAL(KIND=8) :: Ksac
+         REAL(KIND=RKIND) :: Ksac
 !        Isotropic conductivity
-         REAL(KIND=8) :: Diso = 0D0
+         REAL(KIND=RKIND) :: Diso = 0._RKIND
 !        Anisotropic conductivity
-         REAL(KIND=8), ALLOCATABLE :: Dani(:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Dani(:)
 !        External stimulus
          TYPE(stimType) :: Istim
 !        Time integration options
@@ -116,7 +116,7 @@
 !        Local variable integrated in time
 !          := activation force for active stress model
 !          := fiber stretch for active strain model
-         REAL(KIND=8), ALLOCATABLE :: Ya(:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ya(:)
       END TYPE cemModelType
 
 !     Whether cardiac electrophysiology is solved
@@ -124,7 +124,7 @@
 !     Max. dof in cellular activation model
       INTEGER :: nXion = 0
 !     Unknowns stored at all nodes
-      REAL(KIND=8), ALLOCATABLE :: Xion(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Xion(:,:)
 !     Cardiac electromechanics type
       TYPE(cemModelType) :: cem
 

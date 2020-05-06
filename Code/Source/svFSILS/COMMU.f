@@ -48,13 +48,11 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_COMMU_CREATE(commu, commi)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_commuType), INTENT(INOUT) :: commu
-      INTEGER, INTENT(IN) :: commi
+      INTEGER(KIND=LSIP), INTENT(IN) :: commi
 
-      INTEGER ierr
+      INTEGER(KIND=LSIP) ierr
 
       IF (commu%foC) THEN
          PRINT *, "FSILS: COMMU is not free, you may use",              &
@@ -86,13 +84,9 @@
 
       RETURN
       END SUBROUTINE FSILS_COMMU_CREATE
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE FSILS_COMMU_FREE(commu)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_commuType), INTENT(INOUT) :: commu
 
       IF (.NOT.commu%foC) STOP 'COMMU is not created yet to be freed'
@@ -100,3 +94,4 @@
 
       RETURN
       END SUBROUTINE FSILS_COMMU_FREE
+!####################################################################

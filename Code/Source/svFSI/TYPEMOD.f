@@ -31,22 +31,33 @@
 !
 !--------------------------------------------------------------------
 !
-!     Parameters used for Fitzhugh-Nagumo Myocyte Activation Model.
+!     This module defines data types in Fortran
 !
 !--------------------------------------------------------------------
+      MODULE TYPEMOD
 
-!     Scaling factors
-!     Voltage scaling
-      REAL(KIND=RKIND) :: Vscale  = 1._RKIND
-!     Time scaling
-      REAL(KIND=RKIND) :: Tscale  = 1._RKIND
-!     Voltage offset parameter
-      REAL(KIND=RKIND) :: Voffset = 0._RKIND
-!-----------------------------------------------------------------------
-!     Model parameters
-      REAL(KIND=RKIND) :: alpha = -0.5_RKIND
-      REAL(KIND=RKIND) :: a = 0._RKIND
-      REAL(KIND=RKIND) :: b = -0.6_RKIND
-      REAL(KIND=RKIND) :: c = 50._RKIND
+c     Integer, 8 bits
+      INTEGER, PARAMETER :: IKIND1  = SELECTED_INT_KIND(2)
+c     Integer, 16 bits
+      INTEGER, PARAMETER :: IKIND2  = SELECTED_INT_KIND(4)
+c     Integer, 32 bits
+      INTEGER, PARAMETER :: IKIND4  = SELECTED_INT_KIND(9)
+c     Integer, 64 bits
+      INTEGER, PARAMETER :: IKIND8  = SELECTED_INT_KIND(18)
+
+c     Real 32 bits (single)
+      INTEGER, PARAMETER :: RKIND4  = SELECTED_REAL_KIND(6, 37)
+c     Real 64 bits (double)
+      INTEGER, PARAMETER :: RKIND8  = SELECTED_REAL_KIND(15, 307)
+c     Real 128 bits (long double)
+      INTEGER, PARAMETER :: RKIND16 = SELECTED_REAL_KIND(33, 4931)
+
+c     Default integer precision
+      INTEGER, PARAMETER :: IKIND = IKIND4
+c     Default real precision
+      INTEGER, PARAMETER :: RKIND = RKIND8
+c     Default complex precision
+      INTEGER, PARAMETER :: CXKIND = 2*RKIND
+
+      END MODULE TYPEMOD
 !#######################################################################
-

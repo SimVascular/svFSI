@@ -31,34 +31,28 @@
 !
 !--------------------------------------------------------------------
 !
-!     These subroutines implement the Coupled Momentum Method (CMM)
-!     as an extension of the tools inside MUPFES already. I have made
-!     modifications to add CMM as an equation type, and a new boundary
-!     type. The boundary treatment will be considered in these
-!     subroutines. I chose to implement CMM as a new top level BC
-!     that is in the same "category" as Dirichlet or Neumann BC's
-!     so that I can have more freedom in what data I can pass to
-!     the subroutines, and to avoid breaking the existing code.
+!     These subroutines implement the Coupled Momentum Method (CMM).
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE CMM3D (eNoN, w, N, Nx, al, yl, bfl, ksix, ptr, lR, lK)
+      SUBROUTINE CMM3D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: ct(2) = (/1D0,36D0/)
-      INTEGER a, b
-      REAL(KIND=8) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3, divU,
-     2  amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3), ua(3),
-     3  ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3), rM(3,3),
-     4  NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN), bdry(eNoN)
+      REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
+
+      INTEGER(KIND=IKIND) a, b
+      REAL(KIND=RKIND) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3,
+     2  divU, amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3),
+     3  ua(3), ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3),
+     4  rM(3,3), NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN),
+     5  bdry(eNoN)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -71,18 +65,18 @@
       wrl  = wr*T1
       wl   = w*T1
 
-      bdry = 0D0
+      bdry = 0._RKIND
 c      DO a=1, eNoN
-c         bdry(a) = REAL(cmmBdry(ptr(a)), KIND=8)
+c         bdry(a) = REAL(cmmBdry(ptr(a)), KIND=RKIND)
 c      END DO
 
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first
-      p  = 0D0
-      u  = 0D0
+      p  = 0._RKIND
+      u  = 0._RKIND
       ud = -f
-      px = 0D0
-      ux = 0D0
+      px = 0._RKIND
+      ux = 0._RKIND
       DO a=1, eNoN
          p  = p + N(a)*yl(4,a)
 
@@ -98,9 +92,9 @@ c      END DO
          u(2) = u(2) + N(a)*yl(2,a)
          u(3) = u(3) + N(a)*yl(3,a)
 
-c         u(1) = u(1) + N(a)*yl(1,a)*(1D0-bdry(a))
-c         u(2) = u(2) + N(a)*yl(2,a)*(1D0-bdry(a))
-c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
+c         u(1) = u(1) + N(a)*yl(1,a)*(1._RKIND-bdry(a))
+c         u(2) = u(2) + N(a)*yl(2,a)*(1._RKIND-bdry(a))
+c         u(3) = u(3) + N(a)*yl(3,a)*(1._RKIND-bdry(a))
 
          ux(1,1) = ux(1,1) + Nx(1,a)*yl(1,a)
          ux(2,1) = ux(2,1) + Nx(2,a)*yl(1,a)
@@ -136,14 +130,14 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
      2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
      3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-      gam = SQRT(0.5D0*gam)
+      gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
       CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
       nu   = nu/rho
       nu_s = nu_s/rho
       IF (ISZERO(gam)) THEN
-         nu_x = 0D0
+         nu_x = 0._RKIND
       ELSE
          nu_x = nu_x/rho/gam
       END IF
@@ -161,7 +155,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
      4   + ksix(1,3)*ksix(1,3) + ksix(2,3)*ksix(2,3)
      5   + ksix(3,3)*ksix(3,3)
 
-      tauM = 1D0/SQRT((2D0*ct(1)/dt)**2D0 + kU +
+      tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
      2   ct(2)*nu_s*nu_s*kS + s*s)
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
@@ -172,7 +166,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
      2      + u(3)*ux(3,3) + s*u(3))
 
       tauC = ksix(1,1) + ksix(2,2) + ksix(3,3)
-      tauC = 1D0/tauM/tauC
+      tauC = 1._RKIND/tauM/tauC
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2)
@@ -181,7 +175,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
      5     + up(3)*up(3)*ksix(3,3)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1D0/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB)
 
       divU = ux(1,1) + ux(2,2) + ux(3,3)
 
@@ -287,23 +281,23 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       RETURN
       END SUBROUTINE CMM3D
 !####################################################################
+!     CMM initialization (interior)
       SUBROUTINE CMMi(lM, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: eNoN, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
      2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
 
-      INTEGER a, g, Ac
-      REAL(KIND=8) :: w, Jac, nV(3), pSl(6), gC(3,2)
+      INTEGER(KIND=IKIND) a, g, Ac
+      REAL(KIND=RKIND) :: w, Jac, nV(3), pSl(6), gC(3,2)
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
       ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
-      lK  = 0D0
-      lR  = 0D0
+      lK  = 0._RKIND
+      lR  = 0._RKIND
 
       Nx  = lM%Nx(:,:,1)
       CALL GNNS(eNoN, Nx, xl, nV, gC, gC)
@@ -311,7 +305,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       nV  = nV / Jac
 
 !     Internal stresses (stiffness) contribution
-      pSl = 0D0
+      pSl = 0._RKIND
       CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
 
 !     Inertia and body forces (mass) contribution
@@ -346,26 +340,26 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       RETURN
       END SUBROUTINE CMMi
 !--------------------------------------------------------------------
+!     CMM initialization (boundary elements)
       SUBROUTINE CMMb(lFa, e, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
-      INTEGER, INTENT(IN) :: e, eNoN, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
      2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
 
-      INTEGER g
-      REAL(KIND=8) :: w, Jac, nV(3), pSl(6)
+      INTEGER(KIND=IKIND) g
+      REAL(KIND=RKIND) :: w, Jac, nV(3), pSl(6)
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
       ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
-      lK  = 0D0
-      lR  = 0D0
+      lK  = 0._RKIND
+      lR  = 0._RKIND
 
 !     Internal stresses (stiffness) contribution
-      pSl = 0D0
+      pSl = 0._RKIND
       Nx  = lFa%Nx(:,:,1)
       CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
 
@@ -395,25 +389,24 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       RETURN
       END SUBROUTINE CMMb
 !####################################################################
-!     Contribution from internal stresses to residue and tangents
+!     Contribution from internal stresses (stiffness)
       SUBROUTINE CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: Nx(2,eNoN), xl(3,eNoN), dl(tDof,eNoN),
-     2   pS0l(6), vwp(2)
-      REAL(KIND=8), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(2,eNoN), xl(3,eNoN),
+     2   dl(tDof,eNoN), pS0l(6), vwp(2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=8), PARAMETER :: kT = 0.833333333333D0
+      REAL(KIND=RKIND), PARAMETER :: kT = 5._RKIND/6._RKIND
 
-      INTEGER :: a, b, i, j, k
-      REAL(KIND=8) :: elM, nu, ht, lam, mu, afl, Jac, Jaci, T1, nV(3),
-     2   gC(3,2), gCi(3,2), thet(3,3), thetT(3,3), phi(9,9), xloc(3,3),
-     3   ul(9), Bm(5,9), BmT(9,5), Dm(5,5), DBm(5,9), pSm(3,3), S0l(5),
-     4   Sl(5), BtS(9), Ke(9,9)
+      INTEGER(KIND=IKIND) :: a, b, i, j, k
+      REAL(KIND=RKIND) :: elM, nu, ht, lam, mu, afl, Jac, Jaci, T1,
+     2   nV(3), gC(3,2), gCi(3,2), thet(3,3), thetT(3,3), phi(9,9),
+     3   xloc(3,3), ul(9), Bm(5,9), BmT(9,5), Dm(5,5), DBm(5,9),
+     4   pSm(3,3), S0l(5), Sl(5), BtS(9), Ke(9,9)
 
       nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       IF (cmmVarWall) THEN
@@ -424,8 +417,8 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
          elM = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
       END IF
 
-      lam = elM/(1D0 - nu*nu)
-      mu  = 0.5D0*elM/(1D0 + nu)
+      lam = elM/(1._RKIND - nu*nu)
+      mu  = 0.5_RKIND*elM/(1._RKIND + nu)
 
       afl = eq(cEq)%af*eq(cEq)%beta*dt*dt
       i   = eq(cEq)%s
@@ -434,7 +427,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
 
       CALL GNNS(eNoN, Nx, xl, nV, gC, gCi)
       Jac   = SQRT(NORM(nV))
-      Jaci  = 1.0D0/Jac
+      Jaci  = 1._RKIND/Jac
       nV(:) = nV(:) * Jaci
 
 !     Rotation matrix
@@ -446,7 +439,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       thetT = TRANSPOSE(thet)
 
 !     Define phi matrix
-      phi = 0D0
+      phi = 0._RKIND
       phi(1:3,1:3) = thet
       phi(4:6,4:6) = thet
       phi(7:9,7:9) = thet
@@ -469,7 +462,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
 
 !     If prestress is present, convert into full matrix, and transform
 !     into local coordinates, convert back into voigt notation
-      pSm = 0D0
+      pSm = 0._RKIND
       pSm(1,1) = pS0l(1)
       pSm(2,2) = pS0l(2)
       pSm(3,3) = pS0l(3)
@@ -481,8 +474,8 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       pSm(3,1) = pSm(1,3)
       pSm(3,2) = pSm(2,3)
 
-      pSm = MATMUL(pSm,  thetT)
-      pSm = MATMUL(thet,   pSm)
+      pSm = MATMUL(pSm, thetT)
+      pSm = MATMUL(thet, pSm)
 
       S0l(1) = pSm(1,1)
       S0l(2) = pSm(2,2)
@@ -491,7 +484,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       S0l(5) = pSm(2,3)
 
 !     B matrix
-      Bm = 0D0
+      Bm = 0._RKIND
       Bm(1,1) = (xloc(2,2) - xloc(2,3))*Jaci  ! y23 = y2 - y3
       Bm(1,4) = (xloc(2,3) - xloc(2,1))*Jaci  ! y31 = y3 - y1
       Bm(1,7) = (xloc(2,1) - xloc(2,2))*Jaci  ! y12 = y1 - y2
@@ -520,7 +513,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       BmT = TRANSPOSE(Bm)
 
 !     Material tensor, D
-      Dm  = 0D0
+      Dm  = 0._RKIND
       Dm(1,1) = lam
       Dm(1,2) = lam*nu
       Dm(3,3) = mu
@@ -534,7 +527,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       DBm = MATMUL(Dm, Bm)
 
 !     Stress tensor in local frame
-      Sl = 0D0
+      Sl = 0._RKIND
       DO a=1, 9
          Sl(1) = Sl(1) + DBm(1,a)*ul(a)
          Sl(2) = Sl(2) + DBm(2,a)*ul(a)
@@ -544,9 +537,9 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       END DO
 
 !     Prestress is updated with new stress and pulled to global frame
-      pSl = 0D0
+      pSl = 0._RKIND
       IF (pstEq) THEN
-         pSm(:,:) = 0D0
+         pSm(:,:) = 0._RKIND
          pSm(1,1) = Sl(1)
          pSm(2,2) = Sl(2)
          pSm(1,2) = Sl(3)
@@ -570,7 +563,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
 
 !     Internal stress contribution to residue together with prestress
       Sl(:) = Sl(:) + S0l(:)
-      BtS = 0D0
+      BtS = 0._RKIND
       DO a=1, 5
          BtS(1) = BtS(1) + BmT(1,a)*Sl(a)
          BtS(2) = BtS(2) + BmT(2,a)*Sl(a)
@@ -585,7 +578,7 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
 
 !     Now all the required tensors are defined, contributions to
 !     residue and stiffness can be computed
-      T1 = ht*Jac/2.0D0
+      T1 = ht*Jac*0.5_RKIND
       DO a=1, eNoN
          b = (a-1)*eNoN
          lR(1,a) = lR(1,a) + T1*BtS(b+1)
@@ -618,20 +611,18 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       RETURN
       END SUBROUTINE CMM_STIFFNESS
 !--------------------------------------------------------------------
-!     Contribution from inertia and body forces to residue and tangent
-!     matrix
+!     Contribution from inertia and body forces
       SUBROUTINE CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
       USE COMMOD
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), al(tDof,eNoN),bfl(3,eNoN),
-     2   vwp(2)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), al(tDof,eNoN),
+     2   bfl(3,eNoN), vwp(2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER a, b, i, j, k
-      REAL(KIND=8) rho, ht, wl, am, T1, f(3), ud(3)
+      INTEGER(KIND=IKIND) a, b, i, j, k
+      REAL(KIND=RKIND) rho, ht, wl, am, T1, f(3), ud(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -644,11 +635,11 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
          ht = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
       END IF
 
-      wl   = w * ht * rho
-      am   = eq(cEq)%am
-      i    = eq(cEq)%s
-      j    = i + 1
-      k    = j + 1
+      wl = w * ht * rho
+      am = eq(cEq)%am
+      i  = eq(cEq)%s
+      j  = i + 1
+      k  = j + 1
 
       ud = -f
       DO a=1, eNoN
@@ -676,26 +667,25 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1D0-bdry(a))
       END SUBROUTINE CMM_MASS
 !####################################################################
 !     Set traction on CMM wall during initialization. The load
-!     applied is not a usual follower pressure load aka load does not
+!     applied is not a usual follower pressure load, aka, load does not
 !     follow deformation (acceptable for small strains - CMM)
       SUBROUTINE BCMMi(eNoN, idof, w, N, Nx, xl, tfl, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, idof
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   xl(3,eNoN), tfl(idof,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN, idof
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), xl(3,eNoN),
-     2   tfl(idof,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN)
+      INTEGER(KIND=IKIND) a
+      REAL(KIND=RKIND) :: wl, nV(3), gC(3,2)
 
-      INTEGER a
-      REAL(KIND=8) :: wl, nV(3), gC(3,2)
-
-      REAL(KIND=8), ALLOCATABLE :: tfn(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tfn(:)
 
 !     Get traction vector
       ALLOCATE(tfn(idof))
-      tfn = 0D0
+      tfn = 0._RKIND
       DO a=1, eNoN
          tfn = tfn + N(a)*tfl(:,a)
       END DO

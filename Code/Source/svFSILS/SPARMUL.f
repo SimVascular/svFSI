@@ -49,20 +49,19 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_SPARMULVV(lhs, rowPtr, colPtr, dof, K, U, KU)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: K(dof*dof,lhs%nnz), U(dof,lhs%nNo)
-      REAL(KIND=8), INTENT(OUT) :: KU(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),              &
+     &   colPtr(lhs%nnz)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: K(dof*dof,lhs%nnz), U(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: KU(dof,lhs%nNo)
 
-      INTEGER nNo, i, j, l, col, s, e
+      INTEGER(KIND=LSIP) nNo, i, j, l, col, s, e
 
       nNo = lhs%nNo
 
-      KU = 0D0
+      KU = 0._LSRP
       SELECT CASE (dof)
       CASE (1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, j) SCHEDULE(GUIDED)
@@ -132,24 +131,21 @@
 
       RETURN
       END SUBROUTINE FSILS_SPARMULVV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE FSILS_SPARMULVS(lhs, rowPtr, colPtr, dof, K, U, KU)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: K(dof,lhs%nnz), U(dof,lhs%nNo)
-      REAL(KIND=8), INTENT(OUT) :: KU(lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),              &
+     &   colPtr(lhs%nnz)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: K(dof,lhs%nnz), U(dof,lhs%nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: KU(lhs%nNo)
 
-      INTEGER nNo, i, j, col
+      INTEGER(KIND=LSIP) nNo, i, j, col
 
       nNo = lhs%nNo
 
-      KU = 0D0
+      KU = 0._LSRP
       SELECT CASE (dof)
       CASE (1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, j) SCHEDULE(GUIDED)
@@ -202,24 +198,21 @@
 
       RETURN
       END SUBROUTINE FSILS_SPARMULVS
-
-!====================================================================
-
+!####################################################################
       SUBROUTINE FSILS_SPARMULSV(lhs, rowPtr, colPtr, dof, K, U, KU)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-      INTEGER, INTENT(IN) :: dof
-      REAL(KIND=8), INTENT(IN) :: K(dof,lhs%nnz), U(lhs%nNo)
-      REAL(KIND=8), INTENT(OUT) :: KU(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),              &
+     &   colPtr(lhs%nnz)
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      REAL(KIND=LSRP), INTENT(IN) :: K(dof,lhs%nnz), U(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: KU(dof,lhs%nNo)
 
-      INTEGER nNo, i, j, col
+      INTEGER(KIND=LSIP) nNo, i, j, col
 
       nNo = lhs%nNo
 
-      KU = 0D0
+      KU = 0._LSRP
       SELECT CASE (dof)
       CASE (1)
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, j) SCHEDULE(GUIDED)
@@ -276,23 +269,20 @@
 
       RETURN
       END SUBROUTINE FSILS_SPARMULSV
-
-!====================================================================
-
+!--------------------------------------------------------------------
       SUBROUTINE FSILS_SPARMULSS(lhs, rowPtr, colPtr, K, U, KU)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: rowPtr(2,lhs%nNo), colPtr(lhs%nnz)
-      REAL(KIND=8), INTENT(IN) :: K(lhs%nnz), U(lhs%nNo)
-      REAL(KIND=8), INTENT(OUT) :: KU(lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),              &
+     &   colPtr(lhs%nnz)
+      REAL(KIND=LSRP), INTENT(IN) :: K(lhs%nnz), U(lhs%nNo)
+      REAL(KIND=LSRP), INTENT(OUT) :: KU(lhs%nNo)
 
-      INTEGER nNo, i, j
+      INTEGER(KIND=LSIP) nNo, i, j
 
       nNo = lhs%nNo
 
-      KU = 0D0
+      KU = 0._LSRP
 !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(i, j) SCHEDULE(GUIDED)
       DO i=1, nNo
          DO j=rowPtr(1,i), rowPtr(2,i)
@@ -305,4 +295,4 @@
 
       RETURN
       END SUBROUTINE FSILS_SPARMULSS
-
+!####################################################################

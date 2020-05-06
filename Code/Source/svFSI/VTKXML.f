@@ -42,13 +42,13 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
       CHARACTER(LEN=stdL) :: fName
 
+      INTEGER(KIND=IKIND) :: iStat
       TYPE(vtkXMLType) :: vtu
-      INTEGER :: iStat
-      REAL(KIND=8), ALLOCATABLE, DIMENSION(:,:) :: tmpX
+
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:)
 
       iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
@@ -86,14 +86,13 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
       CHARACTER(LEN=stdL) :: fName
 
+      INTEGER(KIND=IKIND) :: iStat, a, e, Ac
       TYPE(vtkXMLType) :: vtp
-      INTEGER :: iStat, a, e, Ac
 
-      REAL(KIND=8), ALLOCATABLE :: tmpX(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:)
 
       iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
@@ -155,16 +154,16 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(INOUT) :: lA(tDof,gtnNo), lY(tDof,gtnNo),
+      REAL(KIND=RKIND), INTENT(INOUT) :: lA(tDof,gtnNo), lY(tDof,gtnNo),
      2   lD(tDof,gtnNo)
-      CHARACTER(LEN=STDL) :: fName
+      CHARACTER(LEN=stdL) :: fName
 
+      INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, l, s, e, a, b, Ac,
+     2   nNo, oGrp
+      CHARACTER(LEN=stdL) :: varName
       TYPE(vtkXMLType) :: vtu
 
-      INTEGER :: iStat, iEq, iOut, iM, l, s, e, a, b, Ac, nNo, oGrp
-      CHARACTER(LEN=stdL) :: varName
-      REAL(KIND=8), ALLOCATABLE :: tmpS(:,:), tmpGS(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpS(:,:), tmpGS(:,:)
 
       iStat = 0
       CALL loadVTK(vtu, fName, iStat)
@@ -244,14 +243,14 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER(KIND=IKIND), INTENT(IN) :: m, idx
       CHARACTER(LEN=*) :: fName, kwrd
-      INTEGER, INTENT(IN) :: m, idx
 
+      INTEGER(KIND=IKIND) :: iStat, a
       TYPE(vtkXMLType) :: vtu
-      INTEGER :: iStat, a
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
 
       iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
@@ -264,7 +263,7 @@
 
       IF (m .EQ. nsd) THEN
          ALLOCATE(tmpR(maxNSD,lM%gnNo))
-         tmpR = 0D0
+         tmpR = 0._RKIND
          CALL getVTK_pointData(vtu, TRIM(kwrd), tmpR, iStat)
          IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
          DO a=1, lM%gnNo
@@ -289,15 +288,14 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(INOUT) :: lFa
+      INTEGER(KIND=IKIND), INTENT(IN) :: m, idx
       CHARACTER(LEN=*) :: fName, kwrd
-      INTEGER, INTENT(IN) :: m, idx
 
+      INTEGER(KIND=IKIND) :: iStat, a
       TYPE(vtkXMLType) :: vtp
-      INTEGER :: iStat, a
 
-      REAL(KIND=8), ALLOCATABLE :: tmpR(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
 
       iStat = 0
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
@@ -310,7 +308,7 @@
 
       IF (m .EQ. nsd) THEN
          ALLOCATE(tmpR(maxNSD,lFa%nNo))
-         tmpR = 0D0
+         tmpR = 0._RKIND
          CALL getVTK_pointData(vtp, TRIM(kwrd), tmpR, iStat)
          IF (iStat .LT. 0) err = "VTP file read error "//TRIM(kwrd)
          DO a=1, lFa%nNo
@@ -332,12 +330,11 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
+      INTEGER(KIND=IKIND) :: iStat
       TYPE(vtkXMLType) :: vtu
-      INTEGER :: iStat
 
       CALL vtkInitWriter(vtu, TRIM(fName), iStat)
       IF (iStat .LT. 0) err = "VTU file write error (init)"
@@ -360,12 +357,11 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
       TYPE(faceType), INTENT(IN) :: lFa
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
+      INTEGER(KIND=IKIND) :: iStat, vtkType
       TYPE(vtkXMLType) :: vtp
-      INTEGER :: iStat, vtkType
 
       IF (nsd .EQ. 3) THEN
          SELECT CASE (lFa%eNoN)
@@ -414,21 +410,20 @@
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-
-      REAL(KIND=8), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
+      REAL(KIND=RKIND), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
      2   lD(tDof,tnNo)
 
+      LOGICAL :: l1, l2, l3
+      INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
+     2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, itmp, ne,
+     3   iFn, nFn
+      CHARACTER(LEN=stdL) :: fName
       TYPE(dataType) :: d(nMsh)
       TYPE(vtkXMLType) :: vtu
 
-      CHARACTER(LEN=stdL) :: fName
-      INTEGER :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo, nEl, s, l, ie,
-     2   is, nSh, oGrp, outDof, nOut, cOut, itmp, ne, iFn, nFn
-      LOGICAL :: l1, l2, l3
-
+      INTEGER(KIND=IKIND), ALLOCATABLE :: outS(:), tmpI(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
-      INTEGER, ALLOCATABLE :: outS(:), tmpI(:,:)
-      REAL(KIND=8), ALLOCATABLE :: tmpV(:,:)
 
       l1 = .FALSE.
       itmp = SUM(iblank(:))
@@ -559,7 +554,7 @@
                CASE (outGrp_stress)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nstd,msh(iM)%nNo))
-                  tmpV = 0D0
+                  tmpV = 0._RKIND
                   IF (pstEq) THEN
                      DO a=1, msh(iM)%nNo
                         Ac = msh(iM)%gN(a)
@@ -590,7 +585,7 @@
                   cOut = cOut - 1
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nFn*nsd,msh(iM)%nNo))
-                  tmpV = 0D0
+                  tmpV = 0._RKIND
                   IF (msh(iM)%nFn .NE. 0)
      2               CALL FIBDIRPOST(msh(iM), nFn, tmpV, lD, iEq)
                   DO iFn=1, nFn
@@ -610,7 +605,7 @@
                CASE (outGrp_fA)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
-                  tmpV = 0D0
+                  tmpV = 0._RKIND
                   IF (msh(iM)%nFn .EQ. 2)
      2               CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
                   DO a=1, msh(iM)%nNo
@@ -621,7 +616,7 @@
                CASE (outGrp_J)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
-                  tmpV = 0D0
+                  tmpV = 0._RKIND
                   CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is,a) = tmpV(1,a)
@@ -631,7 +626,7 @@
                CASE (outGrp_F)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nsd*nsd,msh(iM)%nNo))
-                  tmpV = 0D0
+                  tmpV = 0._RKIND
                   CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
@@ -641,7 +636,7 @@
                CASE (outGrp_divV)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
-                  tmpV = 0D0
+                  tmpV = 0._RKIND
                   CALL DIVPOST(msh(iM), tmpV, lY, lD, iEq)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is,a) = tmpV(1,a)
@@ -662,7 +657,7 @@
             outNames(cOut) = "IBLANK"
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
-               d(iM)%x(is:ie,a) = REAL(iblank(Ac), KIND=8)
+               d(iM)%x(is:ie,a) = REAL(iblank(Ac), KIND=RKIND)
             END DO
          END IF
 
@@ -674,7 +669,7 @@
             outNames(cOut) = "IGHOST"
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
-               d(iM)%x(is:ie,a) = REAL(ighost(Ac), KIND=8)
+               d(iM)%x(is:ie,a) = REAL(ighost(Ac), KIND=RKIND)
             END DO
          END IF
       END DO
@@ -717,7 +712,7 @@
       s   = outS(iOut)
       e   = outS(iOut+1)-1
       nSh  = 0
-      tmpV = 0D0
+      tmpV = 0._RKIND
       DO iM=1, nMsh
          DO a=1, d(iM)%nNo
             tmpV(1:nsd,a+nSh) = d(iM)%gx(s:e,a)
@@ -842,13 +837,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(dataType), INTENT(INOUT) :: d
-      INTEGER, INTENT(IN) :: outDof
+      INTEGER(KIND=IKIND), INTENT(IN) :: outDof
 
-      INTEGER :: e, i, ierr, Ec, m
-      INTEGER, ALLOCATABLE :: sCount(:)
+      INTEGER(KIND=IKIND) :: e, i, ierr, Ec, m
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:)
 
       d%eNoN    = lM%eNoN
       d%vtkType = lM%vtkType
@@ -957,17 +952,17 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(dataType), INTENT(INOUT) :: d
-      INTEGER, INTENT(IN) :: outDof
+      INTEGER(KIND=IKIND), INTENT(IN) :: outDof
 
       LOGICAL flag, clcDmn
-      INTEGER ie, e, ex, ey, ez, s, sx, sy, sz, ia, Ac, a, ax, ay, az,
-     2   jx, jy, jz, ierr, i, nShft, insd
-      INTEGER, ALLOCATABLE :: IEN(:,:), tDmnId(:), sCe(:), dise(:),
-     2   sCn(:), disn(:)
-      REAL(KIND=8), ALLOCATABLE :: N(:,:), tmpX(:,:)
+      INTEGER(KIND=IKIND) ie, e, ex, ey, ez, s, sx, sy, sz, ia, Ac, a,
+     2   ax, ay, az, jx, jy, jz, ierr, i, nShft, insd
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: IEN(:,:), tDmnId(:), sCe(:),
+     2   dise(:), sCn(:), disn(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:,:), tmpX(:,:)
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -1083,7 +1078,7 @@
                   s  = s + 1
                   ay = ay + 1
                   ia = (ax - 1)*jy + ay
-                  tmpX(:,ia) = 0D0
+                  tmpX(:,ia) = 0._RKIND
                   DO a=1, lM%eNoN
                      Ac = lM%IEN(a,e)
                      Ac = lM%lN(Ac)
@@ -1138,7 +1133,7 @@
                      az = az + 1
                      s  = s + 1
                      ia = ((ax - 1)*jy + ay - 1)*jz + az
-                     tmpX(:,ia) = 0D0
+                     tmpX(:,ia) = 0._RKIND
                      DO a=1, lM%eNoN
                         Ac = lM%IEN(a,e)
                         Ac = lM%lN(Ac)
@@ -1180,17 +1175,17 @@
       IMPLICIT NONE
 
       LOGICAL :: lExist
-      INTEGER :: fid, n, lTS, fTS, iTS
+      INTEGER(KIND=IKIND) :: fid, n, lTS, fTS, iTS
+      REAL(KIND=RKIND) :: cntr
       CHARACTER(LEN=stdL) fName
-      REAL(KIND=8) :: cntr
 
-      REAL(KIND=8), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:),
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpA(:,:), tmpY(:,:), tmpD(:,:),
      2   Ag(:,:), Yg(:,:), Dg(:,:)
 
       fid  = 1
       fTS  = nTS
       lTS  = 0
-      cntr = 0D0
+      cntr = 0._RKIND
       iTS  = 0
       IF (zeroAve) iTS = rsTS
       IF (cm%mas()) THEN
@@ -1201,15 +1196,15 @@
       END IF
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo))
 
-      Ag   = 0D0
-      Yg   = 0D0
-      Dg   = 0D0
+      Ag   = 0._RKIND
+      Yg   = 0._RKIND
+      Dg   = 0._RKIND
       std = " Computing average quantities"
       DO n=iTS, nTS, saveIncr
          IF (n .LT. saveATS) CYCLE
          IF (n .LT. fTS) fTS = n
          IF (n .GT. lTS) lTS = n
-         cntr = cntr + 1D0
+         cntr = cntr + 1._RKIND
          IF (cm%mas()) THEN
             IF (n .GE. 1000) THEN
                fName = STR(n)
@@ -1228,7 +1223,7 @@
          Yg = Yg + LOCAL(tmpY)
          Dg = Dg + LOCAL(tmpD)
       END DO
-      n = NINT(cntr)
+      n = NINT(cntr, KIND=IKIND)
       IF (n .EQ. 0) RETURN
       Ag = Ag/cntr
       Yg = Yg/cntr

@@ -41,18 +41,18 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
+     3   fN(3,nFn), pS0l(6,eNoN), ya_l(eNoN)
+      REAL(KIND=RKIND), INTENT(OUT) :: pSl(6)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN), fN(3,nFn),
-     3   pS0l(6,eNoN), ya_l(eNoN)
-      REAL(KIND=8), INTENT(OUT) :: pSl(6)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER :: a, b, i, j, k
-      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3), NxSNx,
-     2   BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3), Bm(6,3,eNoN),
-     3   CC(3,3,3,3), S0(3,3)
+      INTEGER(KIND=IKIND) :: a, b, i, j, k
+      REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3),
+     2   NxSNx, BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3),
+     3   Bm(6,3,eNoN), CC(3,3,3,3), S0(3,3)
       TYPE (stModelType) :: stModel
 
 !     Define parameters
@@ -70,12 +70,12 @@
 
 !     Inertia, body force and deformation tensor (F)
       ud     = -rho*fb
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
-      F(3,3) = 1D0
-      S0     = 0D0
-      ya_g   = 0D0
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      S0     = 0._RKIND
+      ya_g   = 0._RKIND
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
@@ -258,18 +258,18 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN),
+     3   fN(2,nFn), pS0l(3,eNoN), ya_l(eNoN)
+      REAL(KIND=RKIND), INTENT(OUT) :: pSl(3)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN, nFn
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
-     2   yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN), fN(2,nFn),
-     3   pS0l(3,eNoN), ya_l(eNoN)
-      REAL(KIND=8), INTENT(OUT) :: pSl(3)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN,eNoN)
-
-      INTEGER :: a, b, i, j
-      REAL(KIND=8) :: rho, dmp, T1, amd, afl, ya_g, fb(2), ud(2), NxSNx,
-     2   BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2), Bm(3,2,eNoN),
-     3   CC(2,2,2,2), S0(2,2)
+      INTEGER(KIND=IKIND) :: a, b, i, j
+      REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(2), ud(2),
+     2   NxSNx, BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2),
+     3   Bm(3,2,eNoN), CC(2,2,2,2), S0(2,2)
       TYPE (stModelType) :: stModel
 
 !     Define parameters
@@ -285,11 +285,11 @@
 
 !     Inertia, body force and deformation tensor (F)
       ud     = -rho*fb
-      F      = 0D0
-      F(1,1) = 1D0
-      F(2,2) = 1D0
-      S0     = 0D0
-      ya_g   = 0D0
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      S0     = 0._RKIND
+      ya_g   = 0._RKIND
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))

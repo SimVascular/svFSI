@@ -42,17 +42,17 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER a, iEq, iDmn, cPhys, dID, nX, nG
+      INTEGER(KIND=IKIND) a, iEq, iDmn, cPhys, dID, nX, nG
 
-      REAL(KIND=8), ALLOCATABLE :: Xl(:), Xgl(:), sA(:), sF(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Xl(:), Xgl(:), sA(:), sF(:,:)
 
       DO iEq=1, nEq
          IF (eq(iEq)%phys .NE. phys_CEP) CYCLE
 
          IF (ALLOCATED(dmnId)) THEN
             ALLOCATE(sA(tnNo), sF(nXion,tnNo))
-            sA = 0D0
-            sF = 0D0
+            sA = 0._RKIND
+            sF = 0._RKIND
             DO a=1, tnNo
                IF (.NOT.ISDOMAIN(iEq, a, phys_CEP)) CYCLE
                DO iDmn=1, eq(iEq)%nDmn
@@ -64,7 +64,7 @@
                   nG = eq(iEq)%dmn(iDmn)%cep%nG
                   ALLOCATE(Xl(nX), Xgl(nG))
                   CALL CEPINITL(eq(iEq)%dmn(iDmn)%cep, nX, nG, Xl, Xgl)
-                  sA(a) = sA(a) + 1.0D0
+                  sA(a) = sA(a) + 1._RKIND
                   sF(1:nX,a)  = sF(1:nX,a) + Xl(:)
                   sF(nX+1:nX+nG,a) = sF(nX+1:nX+nG,a) + Xgl(:)
                   DEALLOCATE(Xl, Xgl)
@@ -97,10 +97,9 @@
       SUBROUTINE CEPINITL(cep, nX, nG, X, Xg)
       USE CEPMOD
       IMPLICIT NONE
-
       TYPE(cepModelType), INTENT(IN) :: cep
-      INTEGER, INTENT(IN) :: nX, nG
-      REAL(KIND=8), INTENT(OUT) :: X(nX), Xg(nG)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nX, nG
+      REAL(KIND=RKIND), INTENT(OUT) :: X(nX), Xg(nG)
 
       SELECT CASE (cep%cepType)
       CASE (cepModel_AP)
@@ -125,27 +124,26 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: iEq, iDof
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, iDof
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
       LOGICAL :: IPASS = .TRUE.
-      INTEGER :: a, Ac, iM, iDmn, cPhys, dID, nX, nG
-      REAL(KIND=8) :: yl
+      INTEGER(KIND=IKIND) :: a, Ac, iM, iDmn, cPhys, dID, nX, nG
+      REAL(KIND=RKIND) :: yl
 
-      REAL(KIND=8), ALLOCATABLE :: I4f(:), Xl(:), Xgl(:), sA(:), sY(:),
-     2   sF(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: I4f(:), Xl(:), Xgl(:), sA(:),
+     2   sY(:), sF(:,:)
       SAVE IPASS
 
       ALLOCATE(I4f(tnNo))
-      I4f = 0D0
+      I4f = 0._RKIND
 
 !     Electromechanics: get fiber stretch for stretch activated currents
       IF (cem%cpld) THEN
          DO iM=1, nMsh
             IF (msh(iM)%nFn .NE. 0) THEN
                ALLOCATE(sA(msh(iM)%nNo))
-               sA = 0D0
+               sA = 0._RKIND
                CALL FIBSTRETCH(iEq, msh(iM), Dg, sA)
                DO a=1, msh(iM)%nNo
                   Ac = msh(iM)%gN(a)
@@ -169,9 +167,9 @@
 !     Integrate electric potential based on cellular activation model
       IF (ALLOCATED(dmnId)) THEN
          ALLOCATE(sA(tnNo), sF(nXion,tnNo), sY(tnNo))
-         sA = 0D0
-         sF = 0D0
-         sY = 0D0
+         sA = 0._RKIND
+         sF = 0._RKIND
+         sY = 0._RKIND
          DO Ac=1, tnNo
             IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
             DO iDmn=1, eq(iEq)%nDmn
@@ -184,11 +182,11 @@
                ALLOCATE(Xl(nX), Xgl(nG))
                Xl  = Xion(1:nX,Ac)
                Xgl = Xion(nX+1:nX+nG,Ac)
-               yl  = 0D0
+               yl  = 0._RKIND
                IF (cem%cpld) yl = cem%Ya(Ac)
                CALL CEPINTEGL(eq(iEq)%dmn(iDmn)%cep, nX, nG, Xl, Xgl,
      2            time-dt, yl, I4f(Ac))
-               sA(Ac) = sA(Ac) + 1.0D0
+               sA(Ac) = sA(Ac) + 1._RKIND
                sF(1:nX,Ac) = sF(1:nX,Ac) + Xl(:)
                sF(nX+1:nX+nG,Ac) = sF(nX+1:nX+nG,Ac) + Xgl(:)
                IF (cem%cpld) sY(Ac) = sY(Ac) + yl
@@ -213,10 +211,10 @@
             ALLOCATE(Xl(nX), Xgl(nG))
             Xl  = Xion(1:nX,Ac)
             Xgl = Xion(nX+1:nX+nG,Ac)
-            yl = 0D0
+            yl = 0._RKIND
             IF (cem%cpld) yl = cem%Ya(Ac)
-            CALL CEPINTEGL(eq(iEq)%dmn(1)%cep, nX, nG, Xl, Xgl, time-dt,
-     2         yl, I4f(Ac))
+            CALL CEPINTEGL(eq(iEq)%dmn(1)%cep, nX, nG, Xl, Xgl,
+     2         time-dt, yl, I4f(Ac))
             Xion(1:nX,Ac) = Xl(:)
             Xion(nX+1:nX+nG,Ac) = Xgl(:)
             IF (cem%cpld) cem%Ya(Ac) = yl
@@ -242,29 +240,29 @@
       USE COMMOD, ONLY : dt
       IMPLICIT NONE
       TYPE(cepModelType), INTENT(IN) :: cep
-      INTEGER, INTENT(IN) :: nX, nG
-      REAL(KIND=8), INTENT(IN) :: t1, I4f
-      REAL(KIND=8), INTENT(INOUT) :: X(nX), Xg(nG), yl
+      INTEGER(KIND=IKIND), INTENT(IN) :: nX, nG
+      REAL(KIND=RKIND), INTENT(IN) :: t1, I4f
+      REAL(KIND=RKIND), INTENT(INOUT) :: X(nX), Xg(nG), yl
 
-      INTEGER i, icl, nt
-      REAL(KIND=8) :: t, Ts, Te, Istim, Ksac, epsX
+      INTEGER(KIND=IKIND) i, icl, nt
+      REAL(KIND=RKIND) :: t, Ts, Te, Istim, Ksac, epsX
 
-      INTEGER, ALLOCATABLE :: IPAR(:)
-      REAL(KIND=8), ALLOCATABLE :: RPAR(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: IPAR(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: RPAR(:)
 
 !     Feedback coefficient for stretch-activated-currents
-      IF (I4f .GT. 1.0D0) THEN
-         Ksac = cep%Ksac * (SQRT(I4f) - 1.0D0)
+      IF (I4f .GT. 1._RKIND) THEN
+         Ksac = cep%Ksac * (SQRT(I4f) - 1._RKIND)
       ELSE
-         Ksac = 0D0
+         Ksac = 0._RKIND
       END IF
 
 !     Total time steps
-      nt = NINT(dt/cep%dt)
+      nt = NINT(dt/cep%dt, KIND=IKIND)
 
 !     External stimulus duration
-      icl = MAX(FLOOR(t1/cep%Istim%CL), 0)
-      Ts  = cep%Istim%Ts + REAL(icl, KIND=8)*cep%Istim%CL
+      icl = MAX( FLOOR(t1/cep%Istim%CL, KIND=IKIND), 0)
+      Ts  = cep%Istim%Ts + REAL(icl, KIND=RKIND)*cep%Istim%CL
       Te  = Ts + cep%Istim%Td
 
       SELECT CASE (cep%cepType)
@@ -272,18 +270,18 @@
          ALLOCATE(IPAR(2), RPAR(2))
          IPAR(1) = cep%odes%maxItr
          IPAR(2) = 0
-         RPAR(:) = 0D0
+         RPAR(:) = 0._RKIND
          RPAR(1) = cep%odes%absTol
          RPAR(2) = cep%odes%relTol
 
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL AP_INTEGFE(nX, X, t, cep%dt, Istim, Ksac)
 
@@ -295,11 +293,11 @@
 
          CASE (tIntType_RK4)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL AP_INTEGRK(nX, X, t, cep%dt, Istim, Ksac)
 
@@ -311,11 +309,11 @@
 
          CASE (tIntType_CN2)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL AP_INTEGCN2(nX, X, t, cep%dt, Istim, Ksac, IPAR,
      2            RPAR)
@@ -331,18 +329,18 @@
          ALLOCATE(IPAR(2), RPAR(5))
          IPAR(1) = cep%odes%maxItr
          IPAR(2) = 0
-         RPAR(:) = 0D0
+         RPAR(:) = 0._RKIND
          RPAR(1) = cep%odes%absTol
          RPAR(2) = cep%odes%relTol
 
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL BO_INTEGFE(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
      2            RPAR)
@@ -357,11 +355,11 @@
 
          CASE (tIntType_RK4)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL BO_INTEGRK(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
      2            RPAR)
@@ -376,11 +374,11 @@
 
          CASE (tIntType_CN2)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL BO_INTEGCN2(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
      2            IPAR, RPAR)
@@ -398,40 +396,40 @@
          ALLOCATE(IPAR(2), RPAR(2))
          IPAR(1) = cep%odes%maxItr
          IPAR(2) = 0
-         RPAR(:) = 0D0
+         RPAR(:) = 0._RKIND
          RPAR(1) = cep%odes%absTol
          RPAR(2) = cep%odes%relTol
 
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL FN_INTEGFE(nX, X, t, cep%dt, Istim)
             END DO
 
          CASE (tIntType_RK4)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL FN_INTEGRK(nX, X, t, cep%dt, Istim)
             END DO
 
          CASE (tIntType_CN2)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL FN_INTEGCN2(nX, X, t, cep%dt, Istim, IPAR, RPAR)
             END DO
@@ -441,18 +439,18 @@
          ALLOCATE(IPAR(2), RPAR(18))
          IPAR(1) = cep%odes%maxItr
          IPAR(2) = 0
-         RPAR(:) = 0D0
+         RPAR(:) = 0._RKIND
          RPAR(1) = cep%odes%absTol
          RPAR(2) = cep%odes%relTol
 
          SELECT CASE (cep%odes%tIntType)
          CASE (tIntType_FE)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL TTP_INTEGFE(cep%imyo, nX, nG, X, Xg, t, cep%dt,
      2            Istim, Ksac, RPAR)
@@ -467,11 +465,11 @@
 
          CASE (tIntType_RK4)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL TTP_INTEGRK(cep%imyo, nX, nG, X, Xg, t, cep%dt,
      2            Istim, Ksac, RPAR)
@@ -486,11 +484,11 @@
 
          CASE (tIntType_CN2)
             DO i=1, nt
-               t = t1 + REAL(i-1,KIND=8) * cep%dt
+               t = t1 + REAL(i-1, KIND=RKIND) * cep%dt
                IF (t.GE.Ts-eps .AND. t.LE.Te+eps) THEN
                   Istim = cep%Istim%A
                ELSE
-                  Istim = 0D0
+                  Istim = 0._RKIND
                END IF
                CALL TTP_INTEGCN2(cep%imyo, nX, nG, X, Xg, t, cep%dt,
      2            Istim, Ksac, IPAR, RPAR)

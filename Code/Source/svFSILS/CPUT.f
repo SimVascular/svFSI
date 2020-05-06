@@ -48,23 +48,17 @@
 !--------------------------------------------------------------------
 
       FUNCTION FSILS_CPUT()
+      INCLUDE "FSILS_STD.h"
+      INTEGER(KIND=LSIP) timeArray(8)
 
-      IMPLICIT NONE
-
-      INTEGER timeArray(8), i
-      INTEGER, PARAMETER::nD(12)=(/31,28,31,30,31,30,31,31,30,31,30,31/)
-
-      REAL(KIND=8) FSILS_CPUT
+      REAL(KIND=LSRP) FSILS_CPUT
 
       CALL DATE_AND_TIME (VALUES=timeArray)
-!     Year and Month
-      timeArray(3) = timeArray(3) + (timeArray(1) - 2010)*365
-      DO i=1, timeArray(2) - 1
-         timeArray(3) = timeArray(3) + nD(i)
-      END DO
-!     In order: day, hr, min, sec, msec
-      FSILS_CPUT = timeArray(3)*8.64D4 + timeArray(5)*3.6D3 +           &
-     &   timeArray(6)*6D1 + timeArray(7)*1D0 + timeArray(8)*1D-3
+
+!     In order: hr, min, sec, msec
+      FSILS_CPUT = timeArray(5)*3.6E+3_LSRP + timeArray(6)*60._LSRP +   &
+     &   timeArray(7)*1._LSRP + timeArray(8)*1.E-3_LSRP
 
       RETURN
       END FUNCTION FSILS_CPUT
+!####################################################################

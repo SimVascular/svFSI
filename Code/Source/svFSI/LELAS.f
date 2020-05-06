@@ -39,16 +39,15 @@
      2   lR, lK)
       USE COMMOD
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), al(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(3,eNoN), pS0l(6,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
+     2   al(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN), pS0l(6,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER a, b, i, j, k
-      REAL(KIND=8) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd, wl,
-     2   lDm, ed(6), ud(3), f(3), S0(6), S(6)
+      INTEGER(KIND=IKIND) a, b, i, j, k
+      REAL(KIND=RKIND) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd,
+     2   wl, lDm, ed(6), ud(3), f(3), S0(6), S(6)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -60,16 +59,16 @@
       j    = i + 1
       k    = j + 1
 
-      lambda = elM*nu/(1D0 + nu)/(1D0 - 2D0*nu)
-      mu     = elM/2D0/(1D0 + nu)
+      lambda = elM*nu / (1._RKIND+nu) / (1._RKIND-2._RKIND*nu)
+      mu     = elM * 0.5_RKIND / (1._RKIND+nu)
       lDm    = lambda/mu
       T1     = eq(cEq)%af*eq(cEq)%beta*dt*dt
       amd    = eq(cEq)%am/T1*rho
       wl     = w*T1*mu
 
-      ed = 0D0
+      ed = 0._RKIND
       ud = -f
-      S0 = 0D0
+      S0 = 0._RKIND
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
          ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
@@ -92,9 +91,9 @@
       divD = lambda*(ed(1) + ed(2) + ed(3))
 
 !     Stress in Voigt notation
-      S(1) = divD + 2D0*mu*ed(1)
-      S(2) = divD + 2D0*mu*ed(2)
-      S(3) = divD + 2D0*mu*ed(3)
+      S(1) = divD + 2._RKIND*mu*ed(1)
+      S(2) = divD + 2._RKIND*mu*ed(2)
+      S(3) = divD + 2._RKIND*mu*ed(3)
       S(4) = mu*ed(4)  ! 2*eps_12
       S(5) = mu*ed(5)  ! 2*eps_13
       S(6) = mu*ed(6)  ! 2*eps_23
@@ -119,7 +118,7 @@
             T1 = amd*N(a)*N(b)/mu + NxdNx
 
             lK(1,a,b) = lK(1,a,b) + wl*(T1
-     2         + (1D0 + lDm)*Nx(1,a)*Nx(1,b))
+     2         + (1._RKIND + lDm)*Nx(1,a)*Nx(1,b))
 
             lK(2,a,b) = lK(2,a,b) + wl*(lDm*Nx(1,a)*Nx(2,b)
      2         + Nx(2,a)*Nx(1,b))
@@ -131,7 +130,7 @@
      2         + Nx(1,a)*Nx(2,b))
 
             lK(dof+2,a,b) = lK(dof+2,a,b) + wl*(T1
-     2         + (1D0 + lDm)*Nx(2,a)*Nx(2,b))
+     2         + (1._RKIND + lDm)*Nx(2,a)*Nx(2,b))
 
             lK(dof+3,a,b) = lK(dof+3,a,b) + wl*(lDm*Nx(2,a)*Nx(3,b)
      2         + Nx(3,a)*Nx(2,b))
@@ -143,24 +142,23 @@
      2         + Nx(2,a)*Nx(3,b))
 
             lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + wl*(T1
-     2         + (1D0 + lDm)*Nx(3,a)*Nx(3,b))
+     2         + (1._RKIND + lDm)*Nx(3,a)*Nx(3,b))
          END DO
       END DO
 
       RETURN
       END SUBROUTINE LELAS3D
-!####################################################################
+!--------------------------------------------------------------------
 !     This is for boundary elasticity equation
       PURE SUBROUTINE BLELAS (eNoN, w, N, h, nV, lR)
       USE COMMOD
       IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), h, nV(nsd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN)
 
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), h, nV(nsd)
-      REAL(KIND=8), INTENT(INOUT) :: lR(dof,eNoN)
-
-      INTEGER a, i
-      REAL(KIND=8) hc(nsd)
+      INTEGER(KIND=IKIND) a, i
+      REAL(KIND=RKIND) hc(nsd)
 
       hc = h*nV
       DO a=1,eNoN
@@ -171,21 +169,20 @@
 
       RETURN
       END SUBROUTINE BLELAS
-!####################################################################
+!--------------------------------------------------------------------
       PURE SUBROUTINE LELAS2D (eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
      2   lR, lK)
       USE COMMOD
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: eNoN
-      REAL(KIND=8), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), al(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(2,eNoN), pS0l(3,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: pSl(3), lR(dof,eNoN),
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   al(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN), pS0l(3,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: pSl(3), lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER a, b, i, j
-      REAL(KIND=8) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd, wl,
-     2   lDm, ed(3), ud(2), f(2), S0(3), S(3)
+      INTEGER(KIND=IKIND) a, b, i, j
+      REAL(KIND=RKIND) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd,
+     2   wl, lDm, ed(3), ud(2), f(2), S0(3), S(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -195,16 +192,16 @@
       i    = eq(cEq)%s
       j    = i + 1
 
-      lambda = elM*nu/(1D0 + nu)/(1D0 - 2D0*nu)
-      mu     = elM/2D0/(1D0 + nu)
+      lambda = elM*nu / (1._RKIND+nu) / (1._RKIND-2._RKIND*nu)
+      mu     = elM * 0.5_RKIND / (1._RKIND+nu)
       lDm    = lambda/mu
       T1     = eq(cEq)%af*eq(cEq)%beta*dt*dt
       amd    = eq(cEq)%am/T1*rho
       wl     = w*T1*mu
 
-      ed = 0D0
+      ed = 0._RKIND
       ud = -f
-      S0 = 0D0
+      S0 = 0._RKIND
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
          ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
@@ -220,8 +217,8 @@
       divD = lambda*(ed(1) + ed(2))
 
 !     Stress in Voigt notation
-      S(1) = divD + 2D0*mu*ed(1)
-      S(2) = divD + 2D0*mu*ed(2)
+      S(1) = divD + 2._RKIND*mu*ed(1)
+      S(2) = divD + 2._RKIND*mu*ed(2)
       S(3) = mu*ed(3)  ! 2*eps_12
       pSl  = S
 
@@ -241,7 +238,7 @@
             T1 = amd*N(a)*N(b)/mu + NxdNx
 
             lK(1,a,b) = lK(1,a,b) + wl*(T1
-     2         + (1D0 + lDm)*Nx(1,a)*Nx(1,b))
+     2         + (1._RKIND + lDm)*Nx(1,a)*Nx(1,b))
 
             lK(2,a,b) = lK(2,a,b) + wl*(lDm*Nx(1,a)*Nx(2,b)
      2         + Nx(2,a)*Nx(1,b))
@@ -250,7 +247,7 @@
      2         + Nx(1,a)*Nx(2,b))
 
             lK(dof+2,a,b) = lK(dof+2,a,b) + wl*(T1
-     2         + (1D0 + lDm)*Nx(2,a)*Nx(2,b))
+     2         + (1._RKIND + lDm)*Nx(2,a)*Nx(2,b))
          END DO
       END DO
 

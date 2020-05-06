@@ -51,24 +51,23 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE ADDBCMUL(lhs, op_Type, dof, X, Y)
-
       INCLUDE "FSILS_STD.h"
-
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER, INTENT(IN) :: op_type, dof
-      REAL(KIND=8), INTENT(IN) :: X(dof, lhs%nNo)
-      REAL(KIND=8), INTENT(INOUT) :: Y(dof, lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: op_type, dof
+      REAL(KIND=LSRP), INTENT(IN) :: X(dof, lhs%nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: Y(dof, lhs%nNo)
 
-      INTEGER faIn, i, a, Ac, nsd
-      REAL(KIND=8) S, FSILS_DOTV
-      REAL(KIND=8), ALLOCATABLE :: v(:,:), coef(:)
+      INTEGER(KIND=LSIP) faIn, i, a, Ac, nsd
+      REAL(KIND=LSRP) S, FSILS_DOTV
+
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:), coef(:)
 
       ALLOCATE(coef(lhs%nFaces), v(dof,lhs%nNo))
 
       IF (op_Type .EQ. BCOP_TYPE_ADD) THEN
          coef = lhs%face%res
       ELSE IF(op_Type .EQ. BCOP_TYPE_PRE) THEN
-         coef = -lhs%face%res/(1D0 + lhs%face%res*lhs%face%nS)
+         coef = -lhs%face%res/(1._LSRP + (lhs%face%res*lhs%face%nS))
       ELSE
          PRINT *, "FSILS: op_Type is not defined"
          STOP "FSILS: FATAL ERROR"
@@ -78,7 +77,7 @@
          nsd = MIN(lhs%face(faIn)%dof,dof)
          IF (lhs%face(faIn)%coupledFlag) THEN
             IF (lhs%face(faIn)%sharedFlag) THEN
-               v = 0D0
+               v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
@@ -93,7 +92,7 @@
                   END DO
                END DO
             ELSE
-               S = 0D0
+               S = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
@@ -113,3 +112,4 @@
 
       RETURN
       END SUBROUTINE ADDBCMUL
+!####################################################################

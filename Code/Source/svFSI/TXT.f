@@ -40,14 +40,13 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       LOGICAL, INTENT(IN) :: flag
 
-      INTEGER fid, i, l, e, s, a, iOut, iEq, oGrp
+      LOGICAL ltmp, wtn(2), div
+      INTEGER(KIND=IKIND) fid, i, l, e, s, a, iOut, iEq, oGrp
       CHARACTER(LEN=stdL) fName(2)
 
-      LOGICAL ltmp, wtn(2), div
-      REAL(KIND=8), ALLOCATABLE :: tmpV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
 
       fid = 1
 
@@ -124,7 +123,7 @@
             CASE (outGrp_I)
                div = .FALSE.
                DO a=1, tnNo
-                  tmpV(1:l,a) = 1.0D0
+                  tmpV(1:l,a) = 1._RKIND
                END DO
             CASE DEFAULT
                err = "Undefined output"
@@ -167,20 +166,20 @@
                err = "NA outGrp in TXT"
             CASE (outGrp_A)
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%An(s:e,a)/REAL(cm%np(),KIND=8)
+                  tmpV(1:l,a) = ib%An(s:e,a)/REAL(cm%np(), KIND=RKIND)
                END DO
             CASE (outGrp_Y)
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%Yn(s:e,a)/REAL(cm%np(),KIND=8)
+                  tmpV(1:l,a) = ib%Yn(s:e,a)/REAL(cm%np(), KIND=RKIND)
                END DO
             CASE (outGrp_D)
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%Un(s:e,a)/REAL(cm%np(),KIND=8)
+                  tmpV(1:l,a) = ib%Un(s:e,a)/REAL(cm%np(), KIND=RKIND)
                END DO
             CASE (outGrp_I)
                div = .FALSE.
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = 1.0D0
+                  tmpV(1:l,a) = 1._RKIND
                END DO
             CASE DEFAULT
                err = "Undefined output"
@@ -213,15 +212,14 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(IN) :: lEq
       CHARACTER(LEN=stdL), INTENT(IN) :: fName(2)
       LOGICAL, INTENT(IN) :: wtn(2)
 
-      INTEGER, PARAMETER :: prL = 10
+      INTEGER(KIND=IKIND), PARAMETER :: prL = 10
 
       LOGICAL flag
-      INTEGER iM, iFa, fid, iDmn, i
+      INTEGER(KIND=IKIND) iM, iFa, fid, iDmn, i
       CHARACTER(LEN=stdL) stmp
 
       fid = 1
@@ -282,11 +280,10 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
-      INTEGER, INTENT(IN) :: n
+      INTEGER(KIND=IKIND), INTENT(IN) :: n
       CHARACTER(LEN=*), INTENT(IN) :: fileName
 
-      INTEGER i, fin, fout, ios
+      INTEGER(KIND=IKIND) i, fin, fout, ios
       CHARACTER(LEN=stdL) sTmp, fTmp
 
       fin = 1
@@ -345,17 +342,16 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(eqType), INTENT(IN) :: lEq
-      INTEGER, INTENT(IN) :: m
-      CHARACTER(LEN=stdL), INTENT(IN) :: fName(2)
-      REAL(KIND=8), INTENT(IN) :: tmpV(maxnsd,tnNo)
       LOGICAL, INTENT(IN) :: wtn(2), div
+      INTEGER(KIND=IKIND), INTENT(IN) :: m
+      REAL(KIND=RKIND), INTENT(IN) :: tmpV(maxnsd,tnNo)
+      CHARACTER(LEN=stdL), INTENT(IN) :: fName(2)
 
-      INTEGER, PARAMETER :: prL = 10
+      INTEGER(KIND=IKIND), PARAMETER :: prL = 10
 
-      INTEGER iM, iFa, fid, i, iDmn
-      REAL(KIND=8) tmp
+      INTEGER(KIND=IKIND) iM, iFa, fid, i, iDmn
+      REAL(KIND=RKIND) tmp
 
       fid = 1
       DO i=1, 2

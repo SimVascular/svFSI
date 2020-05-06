@@ -39,11 +39,11 @@
       SUBROUTINE SETBF(Dg)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      INTEGER iBf, iM
+      INTEGER(KIND=IKIND) iBf, iM
 
-      Bf(:,:) = 0D0
+      Bf(:,:) = 0._RKIND
       DO iBf=1, eq(cEq)%nBf
          iM = eq(cEq)%bf(iBf)%iM
          CALL SETBFL(eq(cEq)%bf(iBf), msh(iM), Dg)
@@ -55,17 +55,16 @@
       SUBROUTINE SETBFL(lBf, lM, Dg)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(bfType), INTENT(IN) :: lBf
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      INTEGER a, e, i, Ac, idof, nNo, eNoN
-      REAL(KIND=8) rtmp
+      INTEGER(KIND=IKIND) a, e, i, Ac, idof, nNo, eNoN
+      REAL(KIND=RKIND) rtmp
 
-      INTEGER, ALLOCATABLE :: ptr(:)
-      REAL(KIND=8), ALLOCATABLE :: f(:), bfl(:,:), bfg(:,:), xl(:,:),
-     2   dl(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: f(:), bfl(:,:), bfg(:,:),
+     2   xl(:,:), dl(:,:)
 
       nNo  = lM%nNo
       idof = lBf%dof
@@ -86,7 +85,7 @@
       END IF
 
       ALLOCATE(bfg(idof,tnNo))
-      bfg = 0D0
+      bfg = 0._RKIND
 
       IF (BTEST(lBf%bType,bfType_gen)) THEN
          DO a=1, lM%nNo
@@ -145,16 +144,15 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: e, eNoN, idof, ptr(eNoN)
-      REAL(KIND=8), INTENT(IN) :: dl(tDof,eNoN), bfl(idof,eNoN)
-      REAL(KIND=8), INTENT(INOUT) :: xl(nsd,eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, idof, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: dl(tDof,eNoN), bfl(idof,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: xl(nsd,eNoN)
 
-      INTEGER :: g, cPhys
-      REAL(KIND=8) :: w
+      INTEGER(KIND=IKIND) :: g, cPhys
+      REAL(KIND=RKIND) :: w
 
-      REAL(KIND=8), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
       IF (nsd .NE. 3) err = "Unexpected encounter. Correction needed "//
      2   "in BFCONSTRUCT"
@@ -168,8 +166,8 @@
       IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !     Setting intial values
-      lR = 0D0
-      lK = 0D0
+      lR = 0._RKIND
+      lK = 0._RKIND
 
       DO g=1, lM%nG
          w  = lM%w(g)

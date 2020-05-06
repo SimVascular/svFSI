@@ -92,12 +92,12 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: s(:)
-      REAL(KIND=8) IntegS
+      REAL(KIND=RKIND), INTENT(IN) :: s(:)
+      REAL(KIND=RKIND) IntegS
 
       LOGICAL isIB
-      INTEGER a, e, g, Ac, nNo
-      REAL(KIND=8) sHat, Jac, n(nsd)
+      INTEGER(KIND=IKIND) a, e, g, Ac, nNo
+      REAL(KIND=RKIND) sHat, Jac, n(nsd)
 
       nNo = SIZE(s)
       IF (nNo .NE. tnNo) THEN
@@ -114,7 +114,7 @@
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
       END IF
 
-      IntegS = 0D0
+      IntegS = 0._RKIND
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
          IF (lFa%eType .EQ. eType_NRB) THEN
@@ -134,7 +134,7 @@
             Jac = SQRT(NORM(n))
 
 !     Calculating the function value
-            sHat = 0D0
+            sHat = 0._RKIND
             DO a=1, lFa%eNoN
                Ac   = lFa%IEN(a,e)
                sHat = sHat + s(Ac)*lFa%N(a,g)
@@ -155,12 +155,12 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: s(:,:)
-      REAL(KIND=8) IntegV
+      REAL(KIND=RKIND), INTENT(IN) :: s(:,:)
+      REAL(KIND=RKIND) IntegV
 
       LOGICAL isIB
-      INTEGER a, i, e, Ac, g, nNo
-      REAL(KIND=8) sHat, n(nsd)
+      INTEGER(KIND=IKIND) a, i, e, Ac, g, nNo
+      REAL(KIND=RKIND) sHat, n(nsd)
 
       IF (SIZE(s,1) .NE. nsd) err = "Incompatible vector size in IntegV"
 
@@ -179,7 +179,7 @@
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
       END IF
 
-      IntegV = 0D0
+      IntegV = 0._RKIND
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
          IF (lFa%eType .EQ. eType_NRB) THEN
@@ -198,7 +198,7 @@
             END IF
 
 !     Calculating the function value
-            sHat = 0D0
+            sHat = 0._RKIND
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
                DO i=1, nsd
@@ -221,13 +221,13 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=8), INTENT(IN) :: s(:,:)
-      INTEGER, INTENT(IN) :: l
-      INTEGER, INTENT(IN), OPTIONAL :: uo
+      REAL(KIND=RKIND), INTENT(IN) :: s(:,:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: l
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: uo
 
-      INTEGER a, u, nNo
-      REAL(KIND=8) IntegG
-      REAL(KIND=8), ALLOCATABLE :: sclr(:), vec(:,:)
+      INTEGER(KIND=IKIND) a, u, nNo
+      REAL(KIND=RKIND) IntegG
+      REAL(KIND=RKIND), ALLOCATABLE :: sclr(:), vec(:,:)
 
       u = l
       IF (PRESENT(uo)) u = uo
@@ -242,7 +242,7 @@
          END  IF
       END IF
 
-      IntegG = 0D0
+      IntegG = 0._RKIND
       IF (u-l+1 .EQ. nsd) THEN
          ALLOCATE (vec(nsd,nNo))
          DO a=1, nNo
@@ -266,18 +266,18 @@
       FUNCTION vInteg(dId, s, l, u)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: s(:,:)
-      INTEGER, INTENT(IN) :: dId
-      INTEGER, INTENT(IN) :: l
-      INTEGER, INTENT(IN) :: u
-      REAL(KIND=8) vInteg
+      REAL(KIND=RKIND), INTENT(IN) :: s(:,:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: dId
+      INTEGER(KIND=IKIND), INTENT(IN) :: l
+      INTEGER(KIND=IKIND), INTENT(IN) :: u
+      REAL(KIND=RKIND) vInteg
 
       LOGICAL isIB
-      INTEGER a, e, g, Ac, iM, eNoN, insd, ibl, nNo
-      REAL(KIND=8) Jac, nV(nsd), sHat, tmp(nsd,nsd)
+      INTEGER(KIND=IKIND) a, e, g, Ac, iM, eNoN, insd, ibl, nNo
+      REAL(KIND=RKIND) Jac, nV(nsd), sHat, tmp(nsd,nsd)
 
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), sl(:), Nxi(:,:), Nx(:,:),
-     2   tmps(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sl(:), Nxi(:,:),
+     2   Nx(:,:), tmps(:,:)
 
       nNo = SIZE(s,2)
       IF (nNo .NE. tnNo) THEN
@@ -294,7 +294,7 @@
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
       END IF
 
-      vInteg = 0D0
+      vInteg = 0._RKIND
       IF (.NOT.isIB) THEN
          DO iM=1, nMsh
             eNoN = msh(iM)%eNoN
@@ -337,7 +337,7 @@
                   END IF
                   IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
-                  sHat = 0D0
+                  sHat = 0._RKIND
                   DO a=1, eNoN
                      Ac = msh(iM)%IEN(a,e)
                      sHat = sHat + sl(a)*msh(iM)%N(a,g)
@@ -388,7 +388,7 @@
                   END IF
                   IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
-                  sHat = 0D0
+                  sHat = 0._RKIND
                   DO a=1, eNoN
                      Ac = ib%msh(iM)%IEN(a,e)
                      sHat = sHat + sl(a)*ib%msh(iM)%N(a,g)
@@ -411,7 +411,7 @@
       SUBROUTINE COMMUS(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(INOUT) :: U(:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:)
 
       IF (cm%seq()) RETURN
 
@@ -428,9 +428,9 @@
       SUBROUTINE COMMUV(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(INOUT) :: U(:,:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:,:)
 
-      INTEGER m
+      INTEGER(KIND=IKIND) m
 
       IF (cm%seq()) RETURN
 
@@ -449,10 +449,10 @@
       FUNCTION MKCS(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: U(:)
-      REAL(KIND=8), ALLOCATABLE :: MKCS(:)
+      REAL(KIND=RKIND), INTENT(IN) :: U(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: MKCS(:)
 
-      INTEGER a
+      INTEGER(KIND=IKIND) a
 
       IF (SIZE(U,1) .NE. lhs%nNo) THEN
          err = "MKC is only specified for vector with size nNo"
@@ -472,10 +472,10 @@
       FUNCTION MKCV(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: U(:,:)
-      REAL(KIND=8), ALLOCATABLE :: MKCV(:,:)
+      REAL(KIND=RKIND), INTENT(IN) :: U(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: MKCV(:,:)
 
-      INTEGER m, a
+      INTEGER(KIND=IKIND) m, a
 
       m = SIZE(U,1)
       IF (SIZE(U,2) .NE. lhs%nNo) THEN
@@ -497,10 +497,10 @@
       SUBROUTINE MKCIS(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(INOUT) :: U(:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:)
 
-      INTEGER a
-      REAL(KIND=8), ALLOCATABLE :: tmp(:)
+      INTEGER(KIND=IKIND) a
+      REAL(KIND=RKIND), ALLOCATABLE :: tmp(:)
 
       IF (cm%seq()) RETURN
 
@@ -519,10 +519,10 @@
       SUBROUTINE MKCIV(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(INOUT) :: U(:,:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:,:)
 
-      INTEGER m, a
-      REAL(KIND=8), ALLOCATABLE :: tmp(:,:)
+      INTEGER(KIND=IKIND) m, a
+      REAL(KIND=RKIND), ALLOCATABLE :: tmp(:,:)
 
       IF (cm%seq()) RETURN
 
@@ -544,12 +544,12 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: U(:)
-      INTEGER, ALLOCATABLE :: GLOBALIS(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: U(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: GLOBALIS(:)
 
-      INTEGER Ac, a, e, i, ierr
-      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
-      INTEGER, ALLOCATABLE :: ienU(:,:), gienU(:,:)
+      INTEGER(KIND=IKIND) Ac, a, e, i, ierr
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disp(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ienU(:,:), gienU(:,:)
 
       ALLOCATE(sCount(cm%np()), disp(cm%np()))
       IF (SIZE(U,1) .NE. lM%nNo) THEN
@@ -601,12 +601,12 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: U(:)
-      REAL(KIND=8), ALLOCATABLE :: GLOBALRS(:)
+      REAL(KIND=RKIND), INTENT(IN) :: U(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: GLOBALRS(:)
 
-      INTEGER Ac, a, e, i, ierr
-      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
-      REAL(KIND=8), ALLOCATABLE :: ienU(:,:), gienU(:,:)
+      INTEGER(KIND=IKIND) Ac, a, e, i, ierr
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disp(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: ienU(:,:), gienU(:,:)
 
       ALLOCATE(sCount(cm%np()), disp(cm%np()))
       IF (SIZE(U,1) .NE. lM%nNo) THEN
@@ -658,12 +658,12 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(IN) :: U(:,:)
-      INTEGER, ALLOCATABLE :: GLOBALIV(:,:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: U(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: GLOBALIV(:,:)
 
-      INTEGER m, Ac, a, e, i, ierr
-      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
-      INTEGER, ALLOCATABLE :: ienU(:,:), gienU(:,:)
+      INTEGER(KIND=IKIND) m, Ac, a, e, i, ierr
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disp(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ienU(:,:), gienU(:,:)
 
       ALLOCATE(sCount(cm%np()), disp(cm%np()))
       m = SIZE(U,1)
@@ -721,12 +721,12 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=8), INTENT(IN) :: U(:,:)
-      REAL(KIND=8), ALLOCATABLE :: GLOBALRV(:,:)
+      REAL(KIND=RKIND), INTENT(IN) :: U(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: GLOBALRV(:,:)
 
-      INTEGER m, Ac, a, e, i, ierr
-      INTEGER, ALLOCATABLE :: sCount(:), disp(:)
-      REAL(KIND=8), ALLOCATABLE :: ienU(:,:), gienU(:,:)
+      INTEGER(KIND=IKIND) m, Ac, a, e, i, ierr
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disp(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: ienU(:,:), gienU(:,:)
 
       ALLOCATE(sCount(cm%np()), disp(cm%np()))
       m = SIZE(U,1)
@@ -785,11 +785,11 @@
       USE COMMOD
       USE UTILMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: U(:)
-      INTEGER, ALLOCATABLE :: LOCALIS(:)
+      INTEGER(KIND=IKIND), INTENT(IN) :: U(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: LOCALIS(:)
 
-      INTEGER Ac, a
-      INTEGER, ALLOCATABLE :: tmpU(:)
+      INTEGER(KIND=IKIND) Ac, a
+      INTEGER(KIND=IKIND), ALLOCATABLE :: tmpU(:)
 
       IF (.NOT.ALLOCATED(ltg)) err = "ltg is not set yet"
       IF (cm%mas()) THEN
@@ -817,11 +817,11 @@
       FUNCTION LOCALRV(U)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=8), INTENT(IN) :: U(:,:)
-      REAL(KIND=8), ALLOCATABLE :: LOCALRV(:,:)
+      REAL(KIND=RKIND), INTENT(IN) :: U(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: LOCALRV(:,:)
 
-      INTEGER m, s, e, a, Ac
-      REAL(KIND=8), ALLOCATABLE :: tmpU(:)
+      INTEGER(KIND=IKIND) m, s, e, a, Ac
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpU(:)
 
       IF (.NOT.ALLOCATED(ltg)) err = "ltg is not set yet"
       IF (cm%mas()) THEN
@@ -861,11 +861,11 @@
       FUNCTION DOMAIN(lM, iEq, e)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iEq, e
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, e
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER DOMAIN
+      INTEGER(KIND=IKIND) DOMAIN
 
-      INTEGER iDmn
+      INTEGER(KIND=IKIND) iDmn
 
       DOMAIN = 0
 !     Domain Id of -1 counts for the entire domain
@@ -890,10 +890,10 @@
       FUNCTION ISDOMAIN(iEq, node, phys)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iEq, node, phys
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, node, phys
       LOGICAL ISDOMAIN
 
-      INTEGER iDmn
+      INTEGER(KIND=IKIND) iDmn
 
       ISDOMAIN = .FALSE.
       IF (eq(iEq)%nDmn .EQ. 1) THEN
@@ -921,11 +921,11 @@
       FUNCTION IB_DOMAIN(lM, iEq, e)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iEq, e
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, e
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER IB_DOMAIN
+      INTEGER(KIND=IKIND) IB_DOMAIN
 
-      INTEGER iDmn
+      INTEGER(KIND=IKIND) iDmn
 
       IB_DOMAIN = 0
 !     Domain Id of -1 counts for the entire domain
@@ -950,10 +950,10 @@
       PURE FUNCTION IB_ISDOMAIN(iEq, node, phys)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iEq, node, phys
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, node, phys
       LOGICAL IB_ISDOMAIN
 
-      INTEGER iDmn
+      INTEGER(KIND=IKIND) iDmn
 
       IB_ISDOMAIN = .FALSE.
       IF (ALLOCATED(ib%dmnId)) THEN
@@ -980,11 +980,11 @@
       SUBROUTINE GTBLK(fid, kwd, n)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: fid
+      INTEGER(KIND=IKIND), INTENT(IN) :: fid
       CHARACTER(LEN=*), INTENT(IN) :: kwd
-      INTEGER, INTENT(OUT) :: n
+      INTEGER(KIND=IKIND), INTENT(OUT) :: n
 
-      INTEGER l
+      INTEGER(KIND=IKIND) l
       CHARACTER(LEN=stdL) rLine
 
       l = LEN(kwd)
@@ -1037,7 +1037,7 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(OUT) :: lM
 
-      INTEGER iFa, i, insd
+      INTEGER(KIND=IKIND) iFa, i, insd
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -1119,12 +1119,12 @@
       lBc%fbN      = .FALSE.
       lBc%bType    = 0
       lBc%cplBCptr = 0
-      lBc%g        = 0D0
-      lBc%r        = 0D0
-      lBc%k        = 0D0
-      lBc%k        = 0D0
-      lBc%tauB     = 0D0
-      lBc%tauF     = 0D0
+      lBc%g        = 0._RKIND
+      lBc%r        = 0._RKIND
+      lBc%k        = 0._RKIND
+      lBc%k        = 0._RKIND
+      lBc%tauB     = 0._RKIND
+      lBc%tauF     = 0._RKIND
 
       RETURN
       END SUBROUTINE DESTROYBC
@@ -1134,7 +1134,7 @@
       IMPLICIT NONE
       TYPE(bfType), INTENT(OUT) :: lBf
 
-      INTEGER i
+      INTEGER(KIND=IKIND) i
 
       IF (ALLOCATED(lBf%b))  DEALLOCATE(lBf%b)
       IF (ALLOCATED(lBf%bx)) DEALLOCATE(lBf%bx)
@@ -1149,7 +1149,7 @@
          CALL DESTROYMB(lBf%bm)
          DEALLOCATE(lBf%bm)
       END IF
-      lBf%bType    = 0
+      lBf%bType = 0
 
       RETURN
       END SUBROUTINE DESTROYBF
@@ -1160,38 +1160,38 @@
       TYPE(dmnType), INTENT(OUT) :: lDmn
 
       lDmn%Id   = -1
-      lDmn%v    = 0D0
-      lDmn%prop = 0D0
+      lDmn%v    = 0._RKIND
+      lDmn%prop = 0._RKIND
 
       ! lDmn%stM
       lDmn%stM%volType = stVol_NA
-      lDmn%stM%Kpen    = 0D0
+      lDmn%stM%Kpen    = 0._RKIND
       lDmn%stM%isoType = stIso_NA
-      lDmn%stM%C10     = 0D0
-      lDmn%stM%C01     = 0D0
-      lDmn%stM%a       = 0D0
-      lDmn%stM%b       = 0D0
-      lDmn%stM%aff     = 0D0
-      lDmn%stM%bff     = 0D0
-      lDmn%stM%ass     = 0D0
-      lDmn%stM%bss     = 0D0
-      lDmn%stM%afs     = 0D0
-      lDmn%stM%bfs     = 0D0
+      lDmn%stM%C10     = 0._RKIND
+      lDmn%stM%C01     = 0._RKIND
+      lDmn%stM%a       = 0._RKIND
+      lDmn%stM%b       = 0._RKIND
+      lDmn%stM%aff     = 0._RKIND
+      lDmn%stM%bff     = 0._RKIND
+      lDmn%stM%ass     = 0._RKIND
+      lDmn%stM%bss     = 0._RKIND
+      lDmn%stM%afs     = 0._RKIND
+      lDmn%stM%bfs     = 0._RKIND
 
       ! lDmn%cep
       lDmn%cep%cepType  = cepModel_NA
-      lDmn%cep%Diso     = 0D0
+      lDmn%cep%Diso     = 0._RKIND
       IF (ALLOCATED(lDmn%cep%Dani)) DEALLOCATE(lDmn%cep%Dani)
 
-      lDmn%cep%Istim%Ts = 0D0
-      lDmn%cep%Istim%Td = 0D0
-      lDmn%cep%Istim%CL = 0D0
-      lDmn%cep%Istim%A  = 0D0
+      lDmn%cep%Istim%Ts = 0._RKIND
+      lDmn%cep%Istim%Td = 0._RKIND
+      lDmn%cep%Istim%CL = 0._RKIND
+      lDmn%cep%Istim%A  = 0._RKIND
 
       lDmn%cep%odeS%tIntType = tIntType_NA
       lDmn%cep%odeS%maxItr   = 5
-      lDmn%cep%odeS%absTol   = 1D-8
-      lDmn%cep%odeS%relTol   = 1D-4
+      lDmn%cep%odeS%absTol   = 1.E-8_RKIND
+      lDmn%cep%odeS%relTol   = 1.E-4_RKIND
 
       RETURN
       END SUBROUTINE DESTROYDMN
@@ -1201,7 +1201,7 @@
       IMPLICIT NONE
       TYPE(eqType), INTENT(OUT) :: lEq
 
-      INTEGER iBc, iBf, iDmn
+      INTEGER(KIND=IKIND) iBc, iBf, iDmn
 
       IF (ALLOCATED(lEq%bc)) THEN
          DO iBc=1, lEq%nBc
@@ -1247,7 +1247,6 @@
       lEq%nBc     = 0
       lEq%nBcIB   = 0
       lEq%nBf     = 0
-      lEq%tol     = 1D64
       lEq%useTLS  = .FALSE.
       lEq%assmTLS = .FALSE.
 
@@ -1355,13 +1354,13 @@
 !     and "A" will store the distribution of jobs
       RECURSIVE SUBROUTINE SPLITJOBS(m,n,A,b)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: m, n
-      REAL(KIND=8), INTENT(IN) :: b(m)
-      REAL(KIND=8), INTENT(OUT) :: A(m,n)
+      INTEGER(KIND=IKIND), INTENT(IN) :: m, n
+      REAL(KIND=RKIND), INTENT(IN) :: b(m)
+      REAL(KIND=RKIND), INTENT(OUT) :: A(m,n)
 
-      INTEGER i, j, k, ml, nl, mr, nr
-      REAL(KIND=8) sb, sbl, sl, optsl
-      REAL(KIND=8), ALLOCATABLE :: Al(:,:), Ar(:,:), bl(:), br(:)
+      INTEGER(KIND=IKIND) i, j, k, ml, nl, mr, nr
+      REAL(KIND=RKIND) sb, sbl, sl, optsl
+      REAL(KIND=RKIND), ALLOCATABLE :: Al(:,:), Ar(:,:), bl(:), br(:)
 
       IF (m.LE.0 .OR. n.LE.0) RETURN
 
@@ -1378,7 +1377,7 @@
       IF (m .EQ. 1) THEN
          i = 1
          DO j=1, n
-            A(i,j) = b(i)/REAL(n,8)
+            A(i,j) = b(i)/REAL(n, KIND=RKIND)
          END DO
          RETURN
       END IF
@@ -1390,9 +1389,9 @@
 !     This is the total amount of work
       sb  = SUM(b)
 !     The work that suppose to be done by "l"
-      sbl = sb*REAL(nl,8)/REAL(n,8)
+      sbl = sb*REAL(nl, KIND=RKIND)/REAL(n, KIND=RKIND)
 
-      sl = 0D0
+      sl = 0._RKIND
       DO i=1, m
          IF (sl+b(i) .GT. sbl) EXIT
          sl = sl + b(i)
@@ -1426,7 +1425,7 @@
          bl = b(1:ml)
          br = b(ml+1:m)
       END IF
-      nl = NINT(REAL(n,8)*SUM(bl)/sb)
+      nl = NINT(REAL(n, KIND=RKIND)*SUM(bl)/sb, KIND=IKIND)
       IF (nl .EQ. 0) nl = 1
       IF (nl .EQ. n) nl = n - 1
       nr = n - nl
@@ -1435,7 +1434,7 @@
       CALL SPLITJOBS(ml,nl,Al,bl)
       CALL SPLITJOBS(mr,nr,Ar,br)
 
-      A = 0D0
+      A = 0._RKIND
       IF (j .NE. 0) THEN
          DO i=1, ml-1
             A(i,1:nl) = Al(i,:)
@@ -1461,11 +1460,11 @@
       SUBROUTINE SETDMNID(lM, iDmn, ifirst, ilast)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: iDmn
+      INTEGER(KIND=IKIND), INTENT(IN) :: iDmn
       TYPE(mshType), INTENT(INOUT) :: lM
-      INTEGER, INTENT(IN), OPTIONAL :: ifirst, ilast
+      INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ifirst, ilast
 
-      INTEGER e, first, last
+      INTEGER(KIND=IKIND) e, first, last
 
       first = 1
       IF (PRESENT(ifirst)) first = ifirst
@@ -1491,7 +1490,7 @@
       USE COMMOD
       IMPLICIT NONE
       CHARACTER(LEN=stdL) :: mshName
-      INTEGER, INTENT(OUT) :: iM
+      INTEGER(KIND=IKIND), INTENT(OUT) :: iM
 
       DO iM=1, nMsh
          IF (msh(iM)%name .EQ. mshName) EXIT
@@ -1506,7 +1505,7 @@
       USE COMMOD
       IMPLICIT NONE
       CHARACTER(LEN=stdL) :: faceName
-      INTEGER, INTENT(OUT) :: iM, iFa
+      INTEGER(KIND=IKIND), INTENT(OUT) :: iM, iFa
 
       iFa = 0
       MY_LOOP : DO iM=1, nMsh
@@ -1522,13 +1521,13 @@
 !     Computes the JACOBIAN of an element
       FUNCTION JACOBIAN(nDim, eNoN, x, Nxi) result(Jac)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nDim, eNoN
-      REAL(KIND=8), INTENT(IN) :: x(nDim,eNoN), Nxi(nDim,eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nDim, eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: x(nDim,eNoN), Nxi(nDim,eNoN)
 
-      INTEGER :: a
-      REAL(KIND=8) :: Jac, xXi(nDim,nDim)
+      INTEGER(KIND=IKIND) :: a
+      REAL(KIND=RKIND) :: Jac, xXi(nDim,nDim)
 
-      xXi = 0D0
+      xXi = 0._RKIND
       DO a=1, eNoN
          xXi(:,1) = xXi(:,1) + (x(:,a) * Nxi(1,a))
          xXi(:,2) = xXi(:,2) + (x(:,a) * Nxi(2,a))
@@ -1544,25 +1543,25 @@
 !     Computes the Skewness of an element
       FUNCTION SKEWNESS(nDim, eNoN, x) result(SkF)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nDim, eNoN
-      REAL(KIND=8), INTENT(IN) :: x(nDim,eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nDim, eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: x(nDim,eNoN)
 
-      INTEGER :: i,j,a,cnt
-      REAL(KIND=8) :: circumRad, integ_eq, integ_el
-      REAL(KIND=8) :: SkF, Dmat(eNoN,nDim+2), Dsub(eNoN,nDim+1)
-      REAL(KIND=8), DIMENSION(nDim+2) :: coeff,detD
+      INTEGER(KIND=IKIND) :: i,j,a,cnt
+      REAL(KIND=RKIND) :: circumRad, integ_eq, integ_el
+      REAL(KIND=RKIND) :: SkF, Dmat(eNoN,nDim+2), Dsub(eNoN,nDim+1)
+      REAL(KIND=RKIND), DIMENSION(nDim+2) :: coeff,detD
 
       IF (nDim .EQ. 2) THEN
-         coeff = (/1D0, -1D0, 1D0, -1D0/)
+         coeff = (/1._RKIND, -1._RKIND, 1._RKIND, -1._RKIND/)
       ELSE
-         coeff = (/1D0, 1D0, -1D0, 1D0, 1D0/)
+         coeff = (/1._RKIND, 1._RKIND, -1._RKIND, 1._RKIND, 1._RKIND/)
       END IF
 
-      Dmat(:,:) = 1D0
-      Dsub(:,:) = 0D0
+      Dmat(:,:) = 1._RKIND
+      Dsub(:,:) = 0._RKIND
 
       DO a=1, eNoN
-         Dmat(a,1) = sum(x(:,a)**2)
+         Dmat(a,1) = SUM(x(:,a)**2._RKIND)
          Dmat(a,2:nDim+1) = x(:,a)
       END DO
 
@@ -1576,16 +1575,15 @@
          detD(j) = coeff(j) * MAT_DET(Dsub,nDim+1)
       END DO
 
-      circumRad = SQRT( sum(detD(2:nDim+1)**2) -
-     2                  4D0*detD(1)*detD(nDim+2) ) /
-     3                ( 2D0*ABS(detD(1)) )
+      circumRad = SQRT(SUM(detD(2:nDim+1)**2._RKIND) -
+     2   4._RKIND*detD(1)*detD(nDim+2)) /(2._RKIND*ABS(detD(1)))
 
       IF (nDim .EQ. 2) THEN
-         integ_eq = 2.5D-1 * SQRT(27D0) * circumRad**2
-         integ_el =   5D-1 * ABS(detD(1))
+         integ_eq = 0.25_RKIND*SQRT(27._RKIND)*circumRad**2._RKIND
+         integ_el = 0.5_RKIND*ABS(detD(1))
       ELSE IF (nDim .EQ. 3) THEN
-         integ_eq = ( 8D0*circumRad**3 ) / SQRT(243D0)
-         integ_el = ABS(detD(1)) / 6D0
+         integ_eq = 80._RKIND*circumRad**3._RKIND /SQRT(243._RKIND)
+         integ_el = ABS(detD(1))/6._RKIND
       END IF
 
       SkF = ABS(integ_eq - integ_el) / integ_eq
@@ -1596,22 +1594,21 @@
 !     Computes the Aspect Ratio of an element
       FUNCTION ASPECTRATIO(nDim, eNoN, x) result(AR)
       IMPLICIT NONE
-      INTEGER, INTENT(IN) :: nDim,eNoN
-      REAL(KIND=8), INTENT(IN) :: x(nDim,eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nDim,eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: x(nDim,eNoN)
 
-      INTEGER :: i,j,ap,a,b,icol,irow
-      INTEGER :: rowM(eNoN,eNoN-1), colM(nDim,nDim-1)
-      REAL(KIND=8) :: AR, s(eNoN)
-      REAL(KIND=8) :: Dsub(nDim,nDim), detD(nDim)
+      INTEGER(KIND=IKIND) :: i,j,ap,a,b,icol,irow
+      INTEGER(KIND=IKIND) :: rowM(eNoN,eNoN-1), colM(nDim,nDim-1)
+      REAL(KIND=RKIND) :: AR, s(eNoN)
+      REAL(KIND=RKIND) :: Dsub(nDim,nDim), detD(nDim)
 
       IF (nDim .EQ. 2) THEN
-         s(:) = 0D0
+         s(:) = 0._RKIND
          DO a=1, eNoN
             ap = a+1
             IF (a .EQ. eNoN) ap = 1
-            s(a) = SQRT( sum( (x(:,a)-x(:,ap))**2 ) )
+            s(a) = SQRT(SUM((x(:,a)-x(:,ap))**2._RKIND))
          END DO
-
       ELSE IF (nDim .EQ. 3) THEN
          rowM = reshape( (/1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4/),
      2                   shape(rowM) )
@@ -1619,7 +1616,7 @@
 
          DO a=1, eNoN
             DO b=1, nDim
-               Dsub(:,:) = 1D0
+               Dsub(:,:) = 1._RKIND
                DO i=1, eNoN-1
                   irow = rowM(a,i)
                   DO j=1, nDim-1
@@ -1630,7 +1627,7 @@
 
                detD(b) = MAT_DET(Dsub,nDim)
             END DO ! b
-            s(a) = 5D-1 * SQRT( sum( detD(:)**2 ) )
+            s(a) = 0.5_RKIND*SQRT(SUM(detD(:)**2._RKIND))
          END DO ! a
       END IF
 
@@ -1644,13 +1641,12 @@
       SUBROUTINE GETNADJ_MSH(lM)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(mshType),  INTENT(INOUT) :: lM
 
-      INTEGER :: a, b, e, Ac, Bc, i, j, maxAdj
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, i, j, maxAdj
       LOGICAL :: flag
 
-      INTEGER, ALLOCATABLE :: incNd(:), adjL(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), adjL(:,:)
 
       ALLOCATE(incNd(lM%nNo))
       incNd = 0
@@ -1724,13 +1720,12 @@
       SUBROUTINE GETNADJ_FACE(lFa)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(faceType),  INTENT(INOUT) :: lFa
 
-      INTEGER :: a, b, e, Ac, Bc, i, j, maxAdj
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, i, j, maxAdj
       LOGICAL :: flag
 
-      INTEGER, ALLOCATABLE :: incNd(:), adjL(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), adjL(:,:)
 
       ALLOCATE(incNd(lFa%nNo))
       incNd = 0
@@ -1804,13 +1799,13 @@
       SUBROUTINE GETEADJ_MSH(lM)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(mshType),  INTENT(INOUT) :: lM
 
-      INTEGER :: a, b, e, Ac, i, j, maxAdj
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, i, j, maxAdj
       LOGICAL :: flag
 
-      INTEGER, ALLOCATABLE :: incNd(:), adjList(:,:), tmpI(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), adjList(:,:),
+     2   tmpI(:,:)
 
       ALLOCATE(incNd(lM%nNo))
       incNd = 0
@@ -1902,13 +1897,13 @@
       SUBROUTINE GETEADJ_FACE(lFa)
       USE COMMOD
       IMPLICIT NONE
-
       TYPE(faceType),  INTENT(INOUT) :: lFa
 
-      INTEGER :: a, b, e, Ac, i, j, maxAdj
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, i, j, maxAdj
       LOGICAL :: flag
 
-      INTEGER, ALLOCATABLE :: incNd(:), adjList(:,:), tmpI(:,:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), adjList(:,:),
+     2   tmpI(:,:)
 
       ALLOCATE(incNd(lFa%nNo))
       incNd = 0
@@ -2003,19 +1998,19 @@
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER, INTENT(IN) :: nNo, ne, eList(ne)
-      REAL(KIND=8), INTENT(IN) :: xp(nsd), xg(nsd,nNo), Dg(nsd,nNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: nNo, ne, eList(ne)
+      REAL(KIND=RKIND), INTENT(IN) :: xp(nsd), xg(nsd,nNo), Dg(nsd,nNo)
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER, INTENT(OUT) :: Ec
-      REAL(KIND=8), INTENT(OUT) :: xi(nsd)
+      INTEGER(KIND=IKIND), INTENT(OUT) :: Ec
+      REAL(KIND=RKIND), INTENT(OUT) :: xi(nsd)
       LOGICAL, INTENT(IN), OPTIONAL :: lDebug
 
       LOGICAL :: ldbg, l1, l2, l3, l4
-      INTEGER :: a, e, i, Ac, eNoN
-      REAL(KIND=8) :: rt, xi0(nsd), xib(2), Nb(2)
+      INTEGER(KIND=IKIND) :: a, e, i, Ac, eNoN
+      REAL(KIND=RKIND) :: rt, xi0(nsd), xib(2), Nb(2)
 
       LOGICAL, ALLOCATABLE :: eChck(:)
-      REAL(KIND=8), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:)
 
       IF (lM%lShl) err = " Finding traces is not applicable for shells"
 
@@ -2026,25 +2021,25 @@
       ALLOCATE(eChck(lM%nEl), xl(nsd,eNoN), N(eNoN), Nxi(nsd,eNoN))
 
 !     Initialize parameteric coordinate for Newton's iterations
-      xi0 = 0D0
+      xi0 = 0._RKIND
       DO i=1, lM%nG
          xi0 = xi0 + lM%xi(:,i)
       END DO
-      xi0 = xi0 / REAL(lM%nG,KIND=8)
+      xi0 = xi0 / REAL(lM%nG, KIND=RKIND)
 
 !     Set bounds on the parameteric coordinates
-      xib(1) = -1.0001D0
-      xib(2) =  1.0001D0
+      xib(1) = -1.0001_RKIND
+      xib(2) =  1.0001_RKIND
       IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
-         xib(1) = -0.0001D0
+         xib(1) = -1.E-4_RKIND
       END IF
 
 !     Set bounds on shape functions
-      Nb(1) = -0.0001D0
-      Nb(2) =  1.0001d0
+      Nb(1) = -1.E-4_RKIND
+      Nb(2) =  1.0001_RKIND
       IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
-         Nb(1) = -0.1251D0
-         Nb(2) =  1.0001D0
+         Nb(1) = -0.1251_RKIND
+         Nb(2) =  1.0001_RKIND
       END IF
 
       IF (ldbg) THEN
@@ -2122,20 +2117,20 @@
 
 !        Check if shape functions are within bounds and sum to unity
          i  = 0
-         rt = 0D0
+         rt = 0._RKIND
          DO a=1, eNoN
             rt = rt + N(a)
             IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) i = i + 1
          END DO
          l3 = i .EQ. eNoN
-         l4 = rt.GE.0.9999D0 .AND. rt.LE.1.0001D0
+         l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
 
          l1 = ALL((/l1, l2, l3, l4/))
          IF (l1) RETURN
       END DO
 
       Ec = 0
-      xi = 0D0
+      xi = 0._RKIND
 
       RETURN
       END SUBROUTINE FINDE
@@ -2144,12 +2139,12 @@
       USE COMMOD
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(INOUT) :: U(:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:)
 
-      INTEGER i, a, e, Ac, iM, iFa, nl, ng, ierr, tag
+      INTEGER(KIND=IKIND) i, a, e, Ac, iM, iFa, nl, ng, ierr, tag
 
-      INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
-      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
 
       IF (cm%seq()) RETURN
 
@@ -2199,7 +2194,7 @@
       IF (cm%mas()) THEN
          ALLOCATE(rReq(cm%np()))
          rReq = 0
-         gU   = 0D0
+         gU   = 0._RKIND
          ng   = 0
          DO i=1, cm%np()
             nl = ib%cm%n(i)
@@ -2219,7 +2214,7 @@
             CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
          END DO
 
-         U = 0D0
+         U = 0._RKIND
          DO a=1, ng
             Ac    = ib%cm%gE(a)
             U(Ac) = U(Ac) + gU(a)
@@ -2240,12 +2235,12 @@
       USE COMMOD
       IMPLICIT NONE
 
-      REAL(KIND=8), INTENT(INOUT) :: U(:,:)
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:,:)
 
-      INTEGER m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag
+      INTEGER(KIND=IKIND) m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag
 
-      INTEGER, ALLOCATABLE :: incNd(:), rReq(:)
-      REAL(KIND=8), ALLOCATABLE :: lU(:), gU(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
 
       IF (cm%seq()) RETURN
 
@@ -2298,7 +2293,7 @@
       IF (cm%mas()) THEN
          ALLOCATE(rReq(cm%np()))
          rReq = 0
-         gU   = 0D0
+         gU   = 0._RKIND
          ng   = 0
          DO i=1, cm%np()
             nl = ib%cm%n(i)
@@ -2322,7 +2317,7 @@
             CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
          END DO
 
-         U = 0D0
+         U = 0._RKIND
          DO a=1, ng
             Ac = ib%cm%gE(a)
             s  = (a-1)*m + 1
