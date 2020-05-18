@@ -82,12 +82,15 @@
      5   damping = 13, shell_thickness = 14, ctau_M = 15, ctau_C = 16
 !--------------------------------------------------------------------
 !     Types of accepted elements
-!     Linear (1D), triangle (2D), tetrahedral (3D), bilinear (2D), quad
-!     (1D), biquad (2D), brick (3D), general NURBS (1-3D)
+!     Linear (Q1-1D), triangle (P1-2D), tetrahedral (P1-3D), bilinear
+!     (Q1-2D), quad (Q2-1D), biquad (Q2-2D), brick (Q1-3D),
+!     general NURBS (1-3D), wedge, point (0D), quadratic triangle
+!     (P2-2D), quadratic tetrahedron (P2-3D)
       INTEGER(KIND=IKIND), PARAMETER :: eType_NA = 100, eType_LIN = 101,
      2   eType_TRI = 102, eType_TET = 103, eType_BIL = 104,
      3   eType_QUD = 105, eType_BIQ = 106, eType_BRK = 107,
-     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110
+     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110,
+     5   eType_QTR = 111, eType_QTE = 112
 !--------------------------------------------------------------------
 !     Types of equations that are included in this solver
 !     Fluid equation (Navier-Stokes), structure (non-linear), heat

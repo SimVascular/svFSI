@@ -80,6 +80,12 @@
             lM%vtkType = 10
             lM%nEf     = 4
             lM%lShpF   = .TRUE.
+         CASE(10)
+            lM%eType   = eType_QTE
+            lM%nG      = 5
+            lM%vtkType = 24
+            lM%nEf     = 4
+            lM%lShpF   = .FALSE.
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
          END SELECT
@@ -97,6 +103,12 @@
             lM%nG      = 4
             lM%vtkType = 9
             lM%nEf     = 4
+            lM%lShpF   = .FALSE.
+         CASE(6)
+            lM%eType   = eType_QTR
+            lM%nG      = 4
+            lM%vtkType = 22
+            lM%nEf     = 3
             lM%lShpF   = .FALSE.
          CASE(9)
             lM%eType   = eType_BIQ
@@ -176,6 +188,9 @@
          CASE(3)
             lFa%eType = eType_TRI
             lFa%nG    = 3
+         CASE(6)
+            lFa%eType = eType_QTR
+            lFa%nG    = 4
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
          END SELECT
@@ -253,6 +268,16 @@
          xi(1,4) = s; xi(2,4) = t; xi(3,4) = uz
          xi(1,5) = t; xi(2,5) = s; xi(3,5) = uz
          xi(1,6) = t; xi(2,6) = t; xi(3,6) = uz
+      CASE(eType_QTE)
+         w  = 0.45_RKIND/6._RKIND; w(1) = -0.8_RKIND/6._RKIND
+         s  = 0.25_RKIND
+         t  = 0.5_RKIND
+         uz = 1._RKIND/6._RKIND
+         xi(1,1) = s;  xi(2,1) = s;  xi(3,1) = s
+         xi(1,2) = t;  xi(2,2) = uz; xi(3,2) = uz
+         xi(1,3) = uz; xi(2,3) = t;  xi(3,3) = uz
+         xi(1,4) = uz; xi(2,4) = uz; xi(3,4) = t
+         xi(1,5) = uz; xi(2,5) = uz; xi(3,5) = uz
 
 !     2D elements
       CASE(eType_TRI)
@@ -290,6 +315,16 @@
          xi(1,7) = 0._RKIND; xi(2,7) =   s
          xi(1,8) =  -s;      xi(2,8) = 0._RKIND
          xi(1,9) = 0._RKIND; xi(2,9) = 0._RKIND
+      CASE(eType_QTR)
+         w(1)  = -0.5625_RKIND * 0.5_RKIND
+         w(2:) = 0.520833333333333_RKIND * 0.5_RKIND
+         s     = 1._RKIND/3._RKIND
+         t     = 0.6_RKIND
+         uz    = 0.2_RKIND
+         xi(1,1) = s;  xi(2,1) = s
+         xi(1,2) = t;  xi(2,2) = uz
+         xi(1,3) = uz; xi(2,3) = t
+         xi(1,4) = uz; xi(2,4) = uz
 
 !     1D elements
       CASE(eType_LIN)
@@ -497,6 +532,49 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(1,6) = -s
          Nxi(2,6) = -s
          Nxi(3,6) =  uz*0.5_RKIND
+      CASE(eType_QTE)
+         s     = 1._RKIND - xi(1) - xi(2) - xi(3)
+         N(1)  = xi(1)*(2._RKIND*xi(1) - 1._RKIND)
+         N(2)  = xi(2)*(2._RKIND*xi(2) - 1._RKIND)
+         N(3)  = xi(3)*(2._RKIND*xi(3) - 1._RKIND)
+         N(4)  = s    *(2._RKIND*s     - 1._RKIND)
+         N(5)  = 4._RKIND*xi(1)*xi(2)
+         N(6)  = 4._RKIND*xi(2)*xi(3)
+         N(7)  = 4._RKIND*xi(1)*xi(3)
+         N(8)  = 4._RKIND*xi(1)*s
+         N(9)  = 4._RKIND*xi(2)*s
+         N(10) = 4._RKIND*xi(3)*s
+
+         Nxi(1,1)  =  4._RKIND*xi(1) - 1._RKIND
+         Nxi(2,1)  =  0._RKIND
+         Nxi(3,1)  =  0._RKIND
+         Nxi(1,2)  =  0._RKIND
+         Nxi(2,2)  =  4._RKIND*xi(2) - 1._RKIND
+         Nxi(3,2)  =  0._RKIND
+         Nxi(1,3)  =  0._RKIND
+         Nxi(2,3)  =  0._RKIND
+         Nxi(3,3)  =  4._RKIND*xi(3) - 1._RKIND
+         Nxi(1,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(2,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(3,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(1,5)  =  4._RKIND*xi(2)
+         Nxi(2,5)  =  4._RKIND*xi(1)
+         Nxi(3,5)  =  0._RKIND
+         Nxi(1,6)  =  0._RKIND
+         Nxi(2,6)  =  4._RKIND*xi(3)
+         Nxi(3,6)  =  4._RKIND*xi(2)
+         Nxi(1,7)  =  4._RKIND*xi(3)
+         Nxi(2,7)  =  0._RKIND
+         Nxi(3,7)  =  4._RKIND*xi(1)
+         Nxi(1,8)  =  4._RKIND*( s - xi(1) )
+         Nxi(2,8)  = -4._RKIND*xi(1)
+         Nxi(3,8)  = -4._RKIND*xi(1)
+         Nxi(1,9)  = -4._RKIND*xi(2)
+         Nxi(2,9)  =  4._RKIND*( s - xi(2) )
+         Nxi(3,9)  = -4._RKIND*xi(2)
+         Nxi(1,10) = -4._RKIND*xi(3)
+         Nxi(2,10) = -4._RKIND*xi(3)
+         Nxi(3,10) =  4._RKIND*( s - xi(3) )
 
 !     2D elements
       CASE(eType_TRI)
@@ -565,6 +643,27 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(2,8) = -(ly - uy)*mx*lx*0.5_RKIND
          Nxi(1,9) =  (lx - ux)*ly*uy
          Nxi(2,9) =  (ly - uy)*lx*ux
+      CASE(eType_QTR)
+         s    = 1._RKIND - xi(1) - xi(2)
+         N(1) = xi(1)*( 2._RKIND*xi(1) - 1._RKIND )
+         N(2) = xi(2)*( 2._RKIND*xi(2) - 1._RKIND )
+         N(3) = s    *( 2._RKIND*s     - 1._RKIND )
+         N(4) = 4._RKIND*xi(1)*xi(2)
+         N(5) = 4._RKIND*xi(2)*s
+         N(6) = 4._RKIND*xi(1)*s
+
+         Nxi(1,1) =  4._RKIND*xi(1) - 1._RKIND
+         Nxi(2,1) =  0._RKIND
+         Nxi(1,2) =  0._RKIND
+         Nxi(2,2) =  4._RKIND*xi(2) - 1._RKIND
+         Nxi(1,3) =  1._RKIND - 4._RKIND*s
+         Nxi(2,3) =  1._RKIND - 4._RKIND*s
+         Nxi(1,4) =  4._RKIND*xi(2)
+         Nxi(2,4) =  4._RKIND*xi(1)
+         Nxi(1,5) = -4._RKIND*xi(2)
+         Nxi(2,5) =  4._RKIND*( s - xi(2) )
+         Nxi(1,6) =  4._RKIND*( s - xi(1) )
+         Nxi(2,6) = -4._RKIND*xi(1)
 
 !     1D elements
       CASE(eType_LIN)

@@ -1192,6 +1192,10 @@
             eNoNb = 1
          CASE(eType_QUD)
             eNoNb = 1
+         CASE(eType_QTE)
+            eNoNb = 6
+         CASE(eType_QTR)
+            eNoNb = 3
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT
