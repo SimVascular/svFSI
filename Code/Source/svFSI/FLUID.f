@@ -33,11 +33,89 @@
 !
 !     This is for solving fluid transport equation solving Navier-Stokes
 !     equations. Dirichlet boundary conditions are either treated
-!     strongly, weakly or using penalty methods for immersed boundaries.
+!     strongly or weakly.
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE FLUID3D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+      SUBROUTINE CONSTRUCT_FLUID(lM, Ag, Yg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys
+      REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   bfl(:,:), N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+
+      eNoN = lM%eNoN
+
+!     FLUID: dof = nsd+1
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
+     2   bfl(nsd,eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
+     3   lK(dof*dof,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_fluid) CYCLE
+
+!        Update shape functions for NURBS
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Create local copies
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+         END DO
+
+!        Gauss integration
+         lR = 0._RKIND
+         lK = 0._RKIND
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+            END IF
+            IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            w = lM%w(g) * Jac
+            N = lM%N(:,g)
+
+            IF (nsd .EQ. 3) THEN
+               CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+
+            ELSE IF (nsd .EQ. 2) THEN
+               CALL FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+
+            END IF
+         END DO ! g: loop
+
+!        Assembly
+#ifdef WITH_TRILINOS
+         IF (eq(cEq)%assmTLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, yl, bfl, N, Nx, lR, lK)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_FLUID
+!####################################################################
+      SUBROUTINE FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -280,7 +358,7 @@
       RETURN
       END SUBROUTINE FLUID3D
 !--------------------------------------------------------------------
-      SUBROUTINE FLUID2D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+      SUBROUTINE FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -466,7 +544,7 @@
       RETURN
       END SUBROUTINE FLUID2D
 !####################################################################
-      PURE SUBROUTINE BFLUID (eNoN, w, N, y, h, nV, lR, lK)
+      PURE SUBROUTINE BFLUID(eNoN, w, N, y, h, nV, lR, lK)
       USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
@@ -524,7 +602,7 @@
       RETURN
       END SUBROUTINE BFLUID
 !####################################################################
-      SUBROUTINE BWFLUID3D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
+      SUBROUTINE BWFLUID3D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
       USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
@@ -699,7 +777,7 @@ c     2         nu*(N(a)*Nx(3,b)*nV(2) + Nx(3,a)*N(b)*nV(2))
       RETURN
       END SUBROUTINE BWFLUID3D
 !--------------------------------------------------------------------
-      SUBROUTINE BWFLUID2D (eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
+      SUBROUTINE BWFLUID2D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
       USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN

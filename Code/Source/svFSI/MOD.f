@@ -48,6 +48,28 @@
 
 !--------------------------------------------------------------------
 !     Here comes subTypes definitions later used in other derived types
+!     Function spaces (basis) type
+      TYPE fsType
+!        Whether the basis function is linear
+         LOGICAL lShpF
+!        Element type
+         INTEGER(KIND=IKIND) :: eType = eType_NA
+!        Number of basis functions, typically equals msh%eNoN
+         INTEGER(KIND=IKIND) eNoN
+!        Number of Gauss points for integration
+         INTEGER(KIND=IKIND) nG
+!        Gauss weights
+         REAL(KIND=RKIND), ALLOCATABLE :: w(:)
+!        Gauss integration points in parametric space
+         REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Parent shape function
+         REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+!        Parent shape functions gradient
+         REAL(KIND=RKIND), ALLOCATABLE :: Nx(:,:,:)
+!        Second derivatives of shape functions - used for shells & IGA
+         REAL(KIND=RKIND), ALLOCATABLE :: Nxx(:,:,:)
+      END TYPE fsType
+
 !     This is the container for B-Splines
       TYPE bsType
 !        Number of knots (p + nNo + 1)
@@ -269,6 +291,8 @@
          INTEGER(KIND=IKIND) :: nEl = 0
 !        Global number of elements
          INTEGER(KIND=IKIND) :: gnEl = 0
+!        Number of function spaces
+         INTEGER(KIND=IKIND) nFs
 !        Number of Gauss points for integration
          INTEGER(KIND=IKIND) nG
 !        Number of nodes
@@ -307,6 +331,8 @@
          TYPE(adjType) :: eAdj
 !        IB: tracers
          TYPE(traceType) :: trc
+!        Function spaces (basis)
+         TYPE(fsType), ALLOCATABLE :: fs(:)
       END TYPE faceType
 
 !     Declared type for outputed variables
@@ -445,16 +471,18 @@
          INTEGER(KIND=IKIND) :: eType = eType_NA
 !        Number of nodes (control points) in a single element
          INTEGER(KIND=IKIND) eNoN
-!        Global number of elements (knot spanes)
+!        Global number of elements (knot spans)
          INTEGER(KIND=IKIND) :: gnEl = 0
 !        Global number of nodes (control points)
          INTEGER(KIND=IKIND) :: gnNo = 0
 !        Number of element face. Used for reading Gambit mesh files
          INTEGER(KIND=IKIND) nEf
-!        Number of elements (knot spanes)
+!        Number of elements (knot spans)
          INTEGER(KIND=IKIND) :: nEl = 0
 !        Number of faces
          INTEGER(KIND=IKIND) :: nFa = 0
+!        Number of function spaces
+         INTEGER(KIND=IKIND) :: nFs
 !        Number of Gauss points for integration
          INTEGER(KIND=IKIND) nG
 !        Number of nodes (control points)
@@ -519,6 +547,8 @@
          TYPE(adjType) :: nAdj
 !        Mesh element adjacency
          TYPE(adjType) :: eAdj
+!        Function spaces (basis)
+         TYPE(fsType), ALLOCATABLE :: fs(:)
 !        BSpline in different directions (NURBS)
          TYPE(bsType), ALLOCATABLE :: bs(:)
 !        Faces are stored in this variable
@@ -761,9 +791,9 @@
       LOGICAL cmmVarWall
 !     Whether shell equation is being solved
       LOGICAL shlEq
-!     Whether PRESTRESS equation is solved
+!     Whether PRESTRESS is being solved
       LOGICAL pstEq
-!     Whether stabilized structural dynamics solver is used
+!     Whether velocity-pressure based structural dynamics solver is used
       LOGICAL sstEq
 !     Whether to detect and apply any contact model
       LOGICAL iCntct

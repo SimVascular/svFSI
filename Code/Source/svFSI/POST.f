@@ -494,7 +494,7 @@
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_struct .AND.
-     2       cPhys .NE. phys_vms_struct .AND.
+     2       cPhys .NE. phys_ustruct .AND.
      3       cPhys .NE. phys_lElas) CYCLE
 
          IF (cPhys .EQ. phys_lElas) THEN
@@ -592,7 +592,7 @@
                      sigma(2,2) = detF + 2._RKIND*mu*ed(2)
                      sigma(1,2) = mu*ed(3)
                   END IF
-               ELSE IF (cPhys .EQ. phys_vms_struct) THEN
+               ELSE IF (cPhys .EQ. phys_ustruct) THEN
                   CALL GETPK2CCdev(stModel, F, nFn, fN, ya, S, CC, Ja)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
@@ -800,7 +800,7 @@
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_struct .AND.
-     2       cPhys .NE. phys_vms_struct) CYCLE
+     2       cPhys .NE. phys_ustruct) CYCLE
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
          DO a=1, eNoN
@@ -1024,7 +1024,7 @@
                   divV = vx(1,1) + vx(2,2)
                END IF
 
-            ELSE IF (cPhys .EQ. phys_vms_struct) THEN
+            ELSE IF (cPhys .EQ. phys_ustruct) THEN
                vx = 0._RKIND
                F  = MAT_ID(nsd)
                IF (nsd .EQ. 3) THEN

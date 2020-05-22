@@ -285,7 +285,7 @@
          DO iEq=1, nEq
             IF (eq(iEq)%phys .EQ. phys_CEP .OR.
      2          eq(iEq)%phys .EQ. phys_struct .OR.
-     3          eq(iEq)%phys .EQ. phys_vms_struct) i = i + 1
+     3          eq(iEq)%phys .EQ. phys_ustruct) i = i + 1
          END DO
          IF (i .NE. 2) err = "Both electrophysiology and struct have"//
      2      " to be solved for electro-mechanics"
@@ -298,7 +298,7 @@
      2         " only for 3D bodies"
             DO iEq=1, nEq
                DO i=1, eq(iEq)%nDmn
-                  IF (eq(iEq)%dmn(i)%phys .NE. phys_vms_struct .AND.
+                  IF (eq(iEq)%dmn(i)%phys .NE. phys_ustruct .AND.
      2                eq(iEq)%dmn(i)%phys .NE. phys_struct) CYCLE
                   IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO) err =
      2               "Active strain is allowed with Holzapfel-Ogden "//
@@ -338,6 +338,7 @@
 
       INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 19
 
+      LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
      2   propL(maxNProp,10), outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
@@ -419,6 +420,7 @@
 !     FLUID Navier-Stokes solver ------------------------------------
       CASE ('fluid')
          lEq%phys = phys_fluid
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
          propL(1,1) = fluid_density
          propL(2,1) = permeability
@@ -533,10 +535,11 @@
 
          CALL READLS(lSolver_CG, lEq, list)
 
-!     VMS-stabilized nonlinear STRUCTURAL mechanics solver ---
-      CASE ('vms_struct')
-         lEq%phys = phys_vms_struct
+!     STRUCTURAL with nonlinear velocity-pressure based equation solver
+      CASE ('ustruct')
+         lEq%phys = phys_ustruct
          sstEq    = .TRUE.
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
@@ -550,7 +553,7 @@
 
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
-            err = "Prestress for VMS_STRUCT is not implemented yet"
+            err = "Prestress for USTRUCT is not implemented yet"
             nDOP = (/2,2,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
@@ -701,13 +704,14 @@
 
 !     FLUID STRUCTURE INTERACTION equation solver---------------------
       CASE ('FSI')
-         mvMsh = .TRUE.
          lEq%phys = phys_FSI
+         mvMsh    = .TRUE.
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
-!        3 possible equations: fluid (must), struct/vms_struct/lElas
+!        3 possible equations: fluid (must), struct/ustruct/lElas
          phys(1) = phys_fluid
          phys(2) = phys_struct
-         phys(3) = phys_vms_struct
+         phys(3) = phys_ustruct
          phys(4) = phys_lElas
 
 !        fluid properties
@@ -727,7 +731,7 @@
          propL(6,2) = f_y
          IF (nsd .EQ. 3) propL(7,2) = f_z
 
-!        vms_struct properties
+!        ustruct properties
          propL(1,3) = solid_density
          propL(2,3) = elasticity_modulus
          propL(3,3) = poisson_ratio
@@ -821,6 +825,25 @@
          err = "Equation type "//TRIM(eqName)//" is not defined"
       END SELECT
       CALL READOUTPUTS(lEq, nDOP, outPuts, list)
+
+!     Set number of function spaces
+      DO iM=1, nMsh
+         IF (.NOT.THFlag) THEN
+            msh(iM)%nFs = 1
+         ELSE
+            IF (ibFlag) err = "Taylor-Hood basis is not implemented "//
+     2         "for immersed boundaries"
+            IF (msh(iM)%lShl .OR. msh(iM)%lFib .OR.
+     2         (msh(iM)%eType.EQ.eType_NRB)) THEN
+               msh(iM)%nFs = 1
+               wrn = "Taylor-Hood basis is not allowed for NURBS mesh"//
+     2            " or shells and fibers"
+            ELSE
+               msh(iM)%nFs = 2
+            END IF
+         END IF
+      END DO
+
 !--------------------------------------------------------------------
 !     Searching for BCs
       lEq%nBc = list%srch("Add BC")
@@ -941,14 +964,14 @@
                lEq%dmn(iDmn)%phys = phys_fluid
             CASE("struct")
                lEq%dmn(iDmn)%phys = phys_struct
-            CASE("vms_struct")
-               lEq%dmn(iDmn)%phys = phys_vms_struct
+            CASE("ustruct")
+               lEq%dmn(iDmn)%phys = phys_ustruct
                IF (.NOT.sstEq) sstEq = .TRUE.
             CASE("lElas")
                lEq%dmn(iDmn)%phys = phys_lElas
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/vms_struct/lElas"
+     2            "Equation must be fluid/struct/ustruct/lElas"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys
@@ -1021,7 +1044,7 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_vms_struct) THEN
+     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
 
@@ -1737,8 +1760,8 @@ c     2         "can be applied for Neumann boundaries only"
          lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
          lPtr => list%get(ltmp, "Undeforming Neu face")
          IF (ltmp) THEN
-            IF (phys .NE. phys_vms_struct) err = "Undeforming Neu "//
-     2         "face is currently formulated for VMS_STRUCT only"
+            IF (phys .NE. phys_ustruct) err = "Undeforming Neu "//
+     2         "face is currently formulated for USTRUCT only"
 
             IF (BTEST(lBc%bType,bType_cpl) .OR.
      2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//

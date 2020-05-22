@@ -139,14 +139,14 @@
          i = 0
          DO a=1, tnNo
             IF (ISDOMAIN(1, a, phys_struct) .OR.
-     2          ISDOMAIN(1, a, phys_vms_struct) .OR.
+     2          ISDOMAIN(1, a, phys_ustruct) .OR.
      3          ISDOMAIN(1, a, phys_lElas)) i = i + 1
          END DO
          ALLOCATE(gNodes(i))
          i = 0
          DO a=1, tnNo
             IF (ISDOMAIN(1, a, phys_struct) .OR.
-     2          ISDOMAIN(1, a, phys_vms_struct) .OR.
+     2          ISDOMAIN(1, a, phys_ustruct) .OR.
      3          ISDOMAIN(1, a, phys_lElas)) THEN
                i = i + 1
                gNodes(i) = a

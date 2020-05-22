@@ -32,10 +32,117 @@
 !--------------------------------------------------------------------
 !
 !     This routines is for solving nonlinear structural mechanics
-!     problem using pure displacement-based formulation.
+!     problem (pure displacement-based formulation).
 !
 !--------------------------------------------------------------------
 
+      SUBROUTINE CONSTRUCT_dSOLID(lM, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
+      REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), ya_l(:), N(:),
+     3   Nx(:,:), lR(:,:), lK(:,:,:)
+
+      eNoN = lM%eNoN
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
+!     STRUCT: dof = nsd
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nstd,eNoN),
+     3   pSl(nstd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
+     4   lK(dof*dof,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_struct) CYCLE
+
+!        Update shape functions for NURBS
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Create local copies
+         fN   = 0._RKIND
+         pS0l = 0._RKIND
+         ya_l = 0._RKIND
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+            IF (ALLOCATED(lM%fN)) THEN
+               DO iFn=1, nFn
+                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+               END DO
+            END IF
+            IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
+         END DO
+
+!        Gauss integration
+         lR = 0._RKIND
+         lK = 0._RKIND
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+            END IF
+            IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            w = lM%w(g) * Jac
+            N = lM%N(:,g)
+
+            pSl = 0._RKIND
+            IF (nsd .EQ. 3) THEN
+               CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2            pS0l, pSl, ya_l, lR, lK)
+
+            ELSE IF (nsd .EQ. 2) THEN
+               CALL STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2            pS0l, pSl, ya_l, lR, lK)
+
+            END IF
+
+!           Prestress
+            IF (pstEq) THEN
+               DO a=1, eNoN
+                  Ac = ptr(a)
+                  pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
+                  pSa(Ac)   = pSa(Ac)   + w*N(a)
+               END DO
+            END IF
+         END DO ! g: loop
+
+!        Assembly
+#ifdef WITH_TRILINOS
+         IF (eq(cEq)%assmTLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, N, Nx,
+     2   lR, lK)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_dSOLID
+!####################################################################
       SUBROUTINE STRUCT3D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
      2   pS0l, pSl, ya_l, lR, lK)
       USE COMMOD

@@ -154,7 +154,7 @@
       OPEN(fid, FILE=TRIM(fName), ACCESS='DIRECT', RECL=recLn)
       IF (.NOT.ibFlag) THEN
          IF (dFlag) THEN
-!           VMS_STRUCT
+!           USTRUCT
             IF (sstEq) THEN
 !              Prestress
                IF (pstEq) THEN
@@ -239,7 +239,7 @@
          e = s + nsd - 1
          DO iDmn=1, eq(iEq)%nDmn
             IF ( (eq(iEq)%dmn(iDmn)%phys .NE. phys_struct) .AND.
-     2           (eq(iEq)%dmn(iDmn)%phys .NE. phys_vms_struct) .AND.
+     2           (eq(iEq)%dmn(iDmn)%phys .NE. phys_ustruct) .AND.
      3           (eq(iEq)%dmn(iDmn)%phys .NE. phys_lElas)  .AND.
      4           (eq(iEq)%dmn(iDmn)%phys .NE. phys_shell) .AND.
      5           (eq(iEq)%dmn(iDmn)%phys .NE. phys_CMM) ) CYCLE

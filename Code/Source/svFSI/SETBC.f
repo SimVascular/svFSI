@@ -131,7 +131,7 @@
             END IF
 
             IF ((eq(iEq)%phys .EQ. phys_FSI .AND. sstEq) .OR.
-     2           eq(iEq)%phys .EQ. phys_vms_struct) THEN
+     2           eq(iEq)%phys .EQ. phys_ustruct) THEN
                c1  = eq(iEq)%gam * dt
                c1i = 1._RKIND / c1
                c2  = (eq(iEq)%gam - 1._RKIND)*dt
@@ -472,7 +472,7 @@
                   lR(3,a) = lR(3,a) - w*N(a)*h(3)
                END DO
 
-               IF (cPhys .EQ. phys_vms_struct) THEN
+               IF (cPhys .EQ. phys_ustruct) THEN
                   wl = w*af
                   DO a=1, eNoN
                      DO b=1, eNoN
@@ -510,7 +510,7 @@
                   lR(2,a) = lR(2,a) - w*N(a)*h(2)
                END DO
 
-               IF (cPhys .EQ. phys_vms_struct) THEN
+               IF (cPhys .EQ. phys_ustruct) THEN
                   wl = w*af
                   DO a=1, eNoN
                      DO b=1, eNoN
@@ -545,8 +545,8 @@
             CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
          ELSE
 #endif
-            IF (cPhys .EQ. phys_vms_struct) THEN
-               CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+            IF (cPhys .EQ. phys_ustruct) THEN
+               CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
             ELSE
                CALL DOASSEM(eNoN, ptr, lK, lR)
             END IF

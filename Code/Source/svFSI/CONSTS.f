@@ -74,7 +74,7 @@
 !     modulus, Poisson's ratio, conductivity, internal force (X, Y, Z),
 !     permeability, stabilization coeff. for backflow divergence,
 !     external source, damping, shell thickness, stabilization coeffs.
-!     for VMS_STRUCT (mom., cont.)
+!     for USTRUCT (mom., cont.)
       INTEGER(KIND=IKIND), PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   solid_density = 2, solid_viscosity = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
@@ -93,16 +93,16 @@
      5   eType_QTR = 111, eType_QTE = 112
 !--------------------------------------------------------------------
 !     Types of equations that are included in this solver
-!     Fluid equation (Navier-Stokes), structure (non-linear), heat
-!     equation, linear elasticity, heat in a fluid
-!     (advection-diffusion), fluid-structure-interaction, mesh motion,
-!     Prestress, Shell mechanics, Coupled-Momentum-Method,
-!     Cardiac Electro-Physiology, VMS-stabilized-structure
+!     Fluid equation (Navier-Stokes), nonlinear structure (pure d), heat
+!     equation, linear elasticity, heat in fluid (advection-diffusion),
+!     fluid-structure-interaction, mesh motion, Shell mechanics,
+!     Coupled-Momentum-Method, Cardiac Electro-Physiology,
+!     Nonlinear structure (v-p)
       INTEGER(KIND=IKIND), PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_mesh = 207,
      4   phys_shell = 208, phys_CMM = 209, phys_CEP = 210,
-     5   phys_vms_struct = 211
+     5   phys_ustruct = 211
 !--------------------------------------------------------------------
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit

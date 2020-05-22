@@ -70,7 +70,7 @@
          MODULE PROCEDURE DESTROYFACE, DESTROYMSH, DESTROYBC, DESTROYBF,
      2      DESTROYDMN, DESTROYEQ, DESTROYBS, DESTROYMB, DESTROYDATA,
      3      DESTROYADJ, DESTROYSTACK, DESTROYQUEUE, DESTROYTRACE,
-     4      DESTROYIBCM
+     4      DESTROYIBCM, DESTROYFS
       END INTERFACE DESTROY
 
       INTERFACE GETNADJCNCY
@@ -1002,10 +1002,28 @@
       END SUBROUTINE GTBLK
 !####################################################################
 !     These set of routines destroy an object.
+      PURE SUBROUTINE DESTROYFS(fs)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(fsType), INTENT(OUT) :: fs
+
+      fs%eType = eType_NA
+
+      IF (ALLOCATED(fs%w))      DEALLOCATE(fs%w)
+      IF (ALLOCATED(fs%xi))     DEALLOCATE(fs%xi)
+      IF (ALLOCATED(fs%N))      DEALLOCATE(fs%N)
+      IF (ALLOCATED(fs%Nx))     DEALLOCATE(fs%Nx)
+      IF (ALLOCATED(fs%Nxx))    DEALLOCATE(fs%Nxx)
+
+      RETURN
+      END SUBROUTINE DESTROYFS
+!--------------------------------------------------------------------
       PURE SUBROUTINE DESTROYFACE(lFa)
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(OUT) :: lFa
+
+      INTEGER(KIND=IKIND) i
 
       IF (ALLOCATED(lFa%gE))     DEALLOCATE(lFa%gE)
       IF (ALLOCATED(lFa%gN))     DEALLOCATE(lFa%gN)
@@ -1023,6 +1041,13 @@
       CALL DESTROYADJ(lFa%nAdj)
       CALL DESTROYADJ(lFa%eAdj)
       CALL DESTROYTRACE(lFa%trc)
+
+      IF (ALLOCATED(lFa%fs)) THEN
+         DO i=1, lFa%nFs
+            CALL DESTROY(lFa%fs(i))
+         END DO
+         DEALLOCATE(lFa%fs)
+      END IF
 
       lFa%eType = eType_NA
       lFa%nEl   = 0
@@ -1064,6 +1089,13 @@
       IF (ALLOCATED(lM%fN))      DEALLOCATE(lM%fN)
       IF (ALLOCATED(lM%Nx))      DEALLOCATE(lM%Nx)
       IF (ALLOCATED(lM%Nxx))     DEALLOCATE(lM%Nxx)
+
+      IF (ALLOCATED(lM%fs)) THEN
+         DO i=1, lM%nFs
+            CALL DESTROY(lM%fs(i))
+         END DO
+         DEALLOCATE(lM%fs)
+      END IF
 
       IF (ALLOCATED(lM%bs)) THEN
          DO i=1, insd

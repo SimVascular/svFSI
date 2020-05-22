@@ -119,13 +119,16 @@ set(FSRCS TYPEMOD.f
          CEP.f
          CEPION.f
          CMM.f
-         CONSTRUCT.f
          CONTACT.f
          DEBUG.f
          DISTRIBUTE.f
+         EQASSEM.f
          FFT.f
          FLUID.f
-         HEAT.f
+         FS.f
+         FSI.f
+         HEATF.f
+         HEATS.f
          IB.f
          INITIALIZE.f
          LELAS.f
@@ -135,6 +138,7 @@ set(FSRCS TYPEMOD.f
          LS.f
          MAIN.f
          MATMODELS.f
+         MESH.f
          NN.f
          NURBS.f
          OUTPUT.f
@@ -147,7 +151,7 @@ set(FSRCS TYPEMOD.f
          SHELLS.f
          STRUCT.f
          TXT.f
-         VMS_STRUCT.f
+         USTRUCT.f
          VTKXML.f)
 
 set(F90SRCS vtkComMod.f90

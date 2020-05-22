@@ -36,6 +36,94 @@
 !
 !--------------------------------------------------------------------
 
+      SUBROUTINE CONSTRUCT_SHELL(lM, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, eNoN, cPhys
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   dl(:,:), bfl(:,:), lR(:,:), lK(:,:,:)
+
+      eNoN = lM%eNoN
+      IF (lM%eType .EQ. eType_TRI) eNoN = 2*eNoN
+
+!     SHELLS: dof = nsd
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), lR(dof,eNoN),
+     3   lK(dof*dof,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_shell) CYCLE
+
+!        Create local copies
+         xl  = 0._RKIND
+         al  = 0._RKIND
+         yl  = 0._RKIND
+         dl  = 0._RKIND
+         bfl = 0._RKIND
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            IF (a .LE. lM%eNoN) THEN
+               Ac = lM%IEN(a,e)
+               ptr(a) = Ac
+            ELSE
+               b  = a - lM%eNoN
+               Ac = lM%eIEN(b,e)
+               ptr(a) = Ac
+               IF (Ac .EQ. 0) CYCLE
+            END IF
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+         END DO
+
+         IF (lM%eType .EQ. eType_TRI) THEN
+!        Triangles - constant strain, no numerical integration
+            CALL SHELLTRI(lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
+
+         ELSE IF (lM%eType .EQ. eType_NRB) THEN
+!        NURBS
+            lR = 0._RKIND
+            lK = 0._RKIND
+
+!           Update shape functions
+            CALL NRBNNX(lM, e)
+
+!           Gauss integration
+            DO g=1, lM%nG
+               CALL SHELLNRB(lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
+            END DO
+
+!           Assembly
+#ifdef WITH_TRILINOS
+            IF (eq(cEq)%assmTLS) THEN
+               CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+            ELSE
+#endif
+               CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+            END IF
+#endif
+         END IF
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, lR, lK)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_SHELL
+!####################################################################
       SUBROUTINE SHELLTRI (lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
       USE COMMOD
       USE ALLFUN
@@ -812,7 +900,7 @@
 
       RETURN
       END SUBROUTINE SHELLBENDTRI
-!####################################################################
+!--------------------------------------------------------------------
 !     Set follower pressure load/net traction on shells
       SUBROUTINE SHELLFP (eNoN, w, N, Nx, dl, xl, tfl, lR, lK)
       USE COMMOD

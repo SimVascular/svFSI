@@ -158,10 +158,10 @@
 !     synchronize residue, R before treating immersed boundaries
             IF (.NOT.eq(cEq)%assmTLS) CALL COMMU(R)
 
-!     Update residue in displacement equation for VMS_STRUCT physics.
-!     Note that this step is done only first iteration. The residue will
-!     be 0 for subsequent iterations
-            IF (sstEq) CALL VMS_STRUCTR(Yg)
+!     Update residue in displacement equation for USTRUCT physics. Note
+!     that this step is done only first iteration. The residue will be 0
+!     for subsequent iterations
+            IF (sstEq) CALL USTRUCTR(Yg)
 
             CALL SETBCUNDEFNEU()
 

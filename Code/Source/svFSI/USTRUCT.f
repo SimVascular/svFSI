@@ -32,13 +32,103 @@
 !-----------------------------------------------------------------------
 !
 !     These routines are for solving the nonlinear structural dynamics
-!     problem using velocity and pressure as the unknown degrees of
-!     freedom and stabilized using variational multiscale methods.
+!     problem (velocity-pressure based formulation).
 !
 !--------------------------------------------------------------------
 
-      SUBROUTINE VMS_STRUCT3D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl,
-     2   fN, ya_l, lR, lK, lKd)
+      SUBROUTINE CONSTRUCT_uSOLID(lM, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
+      REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   dl(:,:), bfl(:,:), fN(:,:), ya_l(:), N(:), Nx(:,:), lR(:,:),
+     3   lK(:,:,:), lKd(:,:,:)
+
+      eNoN = lM%eNoN
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
+!     USTRUCT: dof = nsd+1
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), ya_l(eNoN), N(eNoN),
+     3   Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
+     4   lKd(dof*nsd,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_ustruct) CYCLE
+
+!        Update shape functions for NURBS
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Create local copies
+         fN   = 0._RKIND
+         ya_l = 0._RKIND
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+            IF (ALLOCATED(lM%fN)) THEN
+               DO iFn=1, nFn
+                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+               END DO
+            END IF
+            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
+         END DO
+
+!        Gauss integration
+         lR  = 0._RKIND
+         lK  = 0._RKIND
+         lKd = 0._RKIND
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+            END IF
+            IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            w = lM%w(g) * Jac
+            N = lM%N(:,g)
+
+            IF (nsd .EQ. 3) THEN
+               CALL USTRUCT3D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl, bfl,
+     2            fN, ya_l, lR, lK, lKd)
+
+            ELSE IF (nsd .EQ. 2) THEN
+               CALL USTRUCT2D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl, bfl,
+     2            fN, ya_l, lR, lK, lKd)
+
+            END IF
+         END DO ! g: loop
+
+!        Assembly
+#ifdef WITH_TRILINOS
+         IF (eq(cEq)%assmTLS) err = "Cannot assemble USTRUCT using "//
+     2      "Trilinos"
+#endif
+         CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, ya_l, N, Nx, lR, lK, lKd)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_uSOLID
+!####################################################################
+      SUBROUTINE USTRUCT3D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl, fN,
+     2   ya_l, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -442,10 +532,10 @@
       END DO
 
       RETURN
-      END SUBROUTINE VMS_STRUCT3D
+      END SUBROUTINE USTRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE VMS_STRUCT2D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl,
-     2   fN, ya_l, lR, lK, lKd)
+      SUBROUTINE USTRUCT2D(eNoN, nFn, w, Je, N, Nx, al, yl, dl, bfl, fN,
+     2   ya_l, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -708,9 +798,9 @@
       END DO
 
       RETURN
-      END SUBROUTINE VMS_STRUCT2D
+      END SUBROUTINE USTRUCT2D
 !####################################################################
-      SUBROUTINE BVMS_STRUCT(lFa, eNoN, e, ptr, xl, dl, hl, lR, lK, lKd)
+      SUBROUTINE BUSTRUCT(lFa, eNoN, e, ptr, xl, dl, hl, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -785,7 +875,7 @@
 
          l1 = ALL((/l1, l2, l3, l4/))
          IF (.NOT.l1) err =
-     2      "Error in computing face derivatives (B_VMS_STRUCTNEU)"
+     2      "Error in computing face derivatives (BUSTRUCTNEU)"
 
          IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
      2      CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
@@ -796,18 +886,18 @@
          w   = lFa%w(g)*Jac
 
          IF (nsd .EQ. 3) THEN
-            CALL BVMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+            CALL BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
          ELSE
-            CALL BVMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+            CALL BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
          END IF
       END DO
 
-      CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+      CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
 
       RETURN
-      END SUBROUTINE BVMS_STRUCT
+      END SUBROUTINE BUSTRUCT
 !--------------------------------------------------------------------
-      SUBROUTINE BVMS_STRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+      SUBROUTINE BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -888,9 +978,9 @@
       END DO
 
       RETURN
-      END SUBROUTINE BVMS_STRUCT3D
+      END SUBROUTINE BUSTRUCT3D
 !--------------------------------------------------------------------
-      SUBROUTINE BVMS_STRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
+      SUBROUTINE BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -947,9 +1037,9 @@
       END DO
 
       RETURN
-      END SUBROUTINE BVMS_STRUCT2D
+      END SUBROUTINE BUSTRUCT2D
 !####################################################################
-      SUBROUTINE VMS_STRUCT_DOASSEM(d, eqN, lKd, lK, lR)
+      SUBROUTINE USTRUCT_DOASSEM(d, eqN, lKd, lK, lR)
       USE TYPEMOD
       USE COMMOD, ONLY: dof, nsd, rowPtr, colPtr, idMap, Kd, Val, R
       IMPLICIT NONE
@@ -1085,9 +1175,9 @@
          RETURN
          END SUBROUTINE GETCOLPTR
 !--------------------------------------------------------------------
-      END SUBROUTINE VMS_STRUCT_DOASSEM
+      END SUBROUTINE USTRUCT_DOASSEM
 !####################################################################
-      SUBROUTINE VMS_STRUCTR(Yg)
+      SUBROUTINE USTRUCTR(Yg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -1098,7 +1188,7 @@
 
       REAL(KIND=RKIND), ALLOCATABLE :: KU(:,:)
 
-      IF (eq(cEq)%phys .NE. phys_vms_struct .AND.
+      IF (eq(cEq)%phys .NE. phys_ustruct .AND.
      2    eq(cEq)%phys .NE. phys_FSI) RETURN
 
       s   = eq(cEq)%s
@@ -1111,7 +1201,7 @@
       END IF
 
       DO a=1, tnNo
-         IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
+         IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
          DO i=1, nsd
             Rd(i,a) = amg*Ad(i,a) - Yg(s+i-1,a)
          END DO
@@ -1121,7 +1211,7 @@
          ALLOCATE(KU(4,tnNo))
          KU = 0._RKIND
          DO a=1, tnNo
-            IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
+            IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
 
             DO i=rowPtr(a), rowPtr(a+1)-1
                c = colPtr(i)
@@ -1149,7 +1239,7 @@
          ALLOCATE(KU(3,tnNo))
          KU = 0._RKIND
          DO a=1, tnNo
-            IF (.NOT.ISDOMAIN(cEq, a, phys_vms_struct)) CYCLE
+            IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
 
             DO i=rowPtr(a), rowPtr(a+1)-1
                c = colPtr(i)
@@ -1170,5 +1260,5 @@
       END IF
 
       RETURN
-      END SUBROUTINE VMS_STRUCTR
+      END SUBROUTINE USTRUCTR
 !####################################################################

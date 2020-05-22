@@ -42,7 +42,7 @@
       REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
       LOGICAL :: flag
-      INTEGER(KIND=IKIND) :: i, a, iEq, iDmn, iM, ierr, nnz, gnnz
+      INTEGER(KIND=IKIND) :: i, a, iEq, iDmn, iM, iFa, ierr, nnz, gnnz
       CHARACTER(LEN=stdL) :: fTmp, sTmp
       REAL(KIND=RKIND) :: am
       TYPE(FSILS_commuType) :: communicator
@@ -104,7 +104,7 @@
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'ST'
-         CASE (phys_vms_struct)
+         CASE (phys_ustruct)
             dFlag = .TRUE.
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'ST'
@@ -225,7 +225,7 @@
       IF (ibFlag) CALL IB_MEMALLOC()
 
 !     Additional physics dependent variables
-!     VMS_STRUCT phys
+!     USTRUCT phys
       IF (sstEq) THEN
          ALLOCATE(Ad(nsd,tnNo), Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
          Ad = 0._RKIND
@@ -233,7 +233,7 @@
          Kd = 0._RKIND
       END IF
 
-!     PRESTRESS phys
+!     PRESTRESS
       IF (pstEq) THEN
          IF (ALLOCATED(pS0)) err = "Prestress already allocated. "//
      2      "Correction needed"
@@ -375,6 +375,17 @@
 
 !     Preparing faces and BCs
       CALL BAFINI()
+
+!     Initialize function spaces
+      DO iM=1, nMsh
+         ALLOCATE(msh(iM)%fs(msh(iM)%nFs))
+         CALL INITFSMSH(msh(iM))
+         DO iFa=1, msh(iM)%nFa
+            msh(iM)%fa(iFa)%nFs = msh(iM)%nFs
+            ALLOCATE(msh(iM)%fa(iFa)%fs(msh(iM)%fa(iFa)%nFs))
+            CALL INITFSFACE(msh(iM)%fa(iFa))
+         END DO
+      END DO
 
 !     As all the arrays are allocated, call BIN to VTK for conversion
       IF (bin2VTK) CALL PPBIN2VTK()

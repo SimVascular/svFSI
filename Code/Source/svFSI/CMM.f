@@ -35,6 +35,207 @@
 !
 !--------------------------------------------------------------------
 
+      SUBROUTINE CONSTRUCT_CMM(lM, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys
+      REAL(KIND=RKIND) w, Jac, vwp(2), ksix(nsd,nsd)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   dl(:,:), bfl(:,:), pS0l(:,:), pSl(:), vwpl(:,:), N(:), Nx(:,:),
+     3   lR(:,:), lK(:,:,:)
+
+      eNoN = lM%eNoN
+      IF (lM%eType.NE.eType_TET .OR. nsd.NE.3) err =
+     2   " CMM equation is constructed for 3D tetrahedral meshes only"
+
+!     CMM: dof = nsd+1
+!     CMM init: dof = nsd
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
+     2   dl(nsd,eNoN), bfl(nsd,eNoN), pS0l(nstd,eNoN), pSl(nstd),
+     3   vwpl(2,eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
+     4   lK(dof*dof,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_cmm) CYCLE
+
+!        Create local copies
+         pS0l = 0._RKIND
+         vwpl = 0._RKIND
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+            IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+            IF (cmmVarWall) vwpl(:,a) = varWallProps(:,Ac)
+         END DO
+
+         IF (cmmInit) THEN
+            pSl(:) = 0._RKIND
+            vwp(:) = 0._RKIND
+            DO a=1, eNoN
+               pSl(:) = pSl(:) + pS0l(:,a)
+               vwp(:) = vwp(:) + vwpl(:,a)
+            END DO
+            pSl(:) = pSl(:)/REAL(eNoN, KIND=RKIND)
+            vwp(:) = vwp(:)/REAL(eNoN, KIND=RKIND)
+            CALL CMMi(lM, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)
+         ELSE
+!           Gauss integration
+            lR = 0._RKIND
+            lK = 0._RKIND
+            DO g=1, lM%nG
+               IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+                  CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+               END IF
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+               w = lM%w(g) * Jac
+               N = lM%N(:,g)
+
+               CALL CMM3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+            END DO ! g: loop
+
+!        Assembly
+#ifdef WITH_TRILINOS
+            IF (eq(cEq)%assmTLS) THEN
+               CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+            ELSE
+#endif
+               CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+            END IF
+#endif
+         END IF
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, pS0l, pSl, vwpl, N, Nx, lR,
+     2   lK)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_CMM
+!####################################################################
+!     CMM initialization (interior)
+      SUBROUTINE CMMi(lM, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
+     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
+
+      INTEGER(KIND=IKIND) a, g, Ac
+      REAL(KIND=RKIND) :: w, Jac, nV(3), pSl(6), gC(3,2)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+
+      ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+      lK  = 0._RKIND
+      lR  = 0._RKIND
+
+      Nx  = lM%Nx(:,:,1)
+      CALL GNNS(eNoN, Nx, xl, nV, gC, gC)
+      Jac = SQRT(NORM(nV))
+      nV  = nV / Jac
+
+!     Internal stresses (stiffness) contribution
+      pSl = 0._RKIND
+      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
+
+!     Inertia and body forces (mass) contribution
+      DO g=1, lM%nG
+         N(:) = lM%N(:,g)
+         w = lM%w(g)*Jac
+         CALL CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
+
+!        Prestress
+         IF (pstEq) THEN
+            DO a=1, eNoN
+               Ac = ptr(a)
+               pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
+               pSa(Ac)   = pSa(Ac)   + w*N(a)
+            END DO
+         END IF
+      END DO
+
+!     Now doing the assembly part
+#ifdef WITH_TRILINOS
+      IF (eq(cEq)%assmTLS) THEN
+         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+      ELSE
+#endif
+         CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+      END IF
+#endif
+
+      DEALLOCATE(N, Nx, lR, lK)
+
+      RETURN
+      END SUBROUTINE CMMi
+!--------------------------------------------------------------------
+!     CMM initialization (boundary elements)
+      SUBROUTINE CMMb(lFa, e, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(faceType), INTENT(IN) :: lFa
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, ptr(eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
+     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
+
+      INTEGER(KIND=IKIND) g
+      REAL(KIND=RKIND) :: w, Jac, nV(3), pSl(6)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+
+      ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+      lK  = 0._RKIND
+      lR  = 0._RKIND
+
+!     Internal stresses (stiffness) contribution
+      pSl = 0._RKIND
+      Nx  = lFa%Nx(:,:,1)
+      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
+
+!     Inertia and body forces (mass) contribution
+      DO g=1, lFa%nG
+         CALL GNNB(lFa, e, g, nV)
+         Jac = SQRT(NORM(nV))
+         nV  = nV / Jac
+         w   = lFa%w(g)*Jac
+         N   = lFa%N(:,g)
+         CALL CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
+      END DO
+
+!     Now doing the assembly part
+#ifdef WITH_TRILINOS
+      IF (eq(cEq)%assmTLS) THEN
+         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+      ELSE
+#endif
+         CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+      END IF
+#endif
+
+      DEALLOCATE(N, Nx, lR, lK)
+
+      RETURN
+      END SUBROUTINE CMMb
+!####################################################################
       SUBROUTINE CMM3D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
       USE COMMOD
       USE ALLFUN
@@ -280,114 +481,6 @@ c         u(3) = u(3) + N(a)*yl(3,a)*(1._RKIND-bdry(a))
 
       RETURN
       END SUBROUTINE CMM3D
-!####################################################################
-!     CMM initialization (interior)
-      SUBROUTINE CMMi(lM, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(mshType), INTENT(IN) :: lM
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, ptr(eNoN)
-      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
-     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
-
-      INTEGER(KIND=IKIND) a, g, Ac
-      REAL(KIND=RKIND) :: w, Jac, nV(3), pSl(6), gC(3,2)
-
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
-
-      ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
-      lK  = 0._RKIND
-      lR  = 0._RKIND
-
-      Nx  = lM%Nx(:,:,1)
-      CALL GNNS(eNoN, Nx, xl, nV, gC, gC)
-      Jac = SQRT(NORM(nV))
-      nV  = nV / Jac
-
-!     Internal stresses (stiffness) contribution
-      pSl = 0._RKIND
-      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
-
-!     Inertia and body forces (mass) contribution
-      DO g=1, lM%nG
-         N(:) = lM%N(:,g)
-         w = lM%w(g)*Jac
-         CALL CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
-
-!        Prestress
-         IF (pstEq) THEN
-            DO a=1, eNoN
-               Ac = ptr(a)
-               pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
-               pSa(Ac)   = pSa(Ac)   + w*N(a)
-            END DO
-         END IF
-      END DO
-
-!     Now doing the assembly part
-#ifdef WITH_TRILINOS
-      IF (eq(cEq)%assmTLS) THEN
-         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-      ELSE
-#endif
-         CALL DOASSEM(eNoN, ptr, lK, lR)
-#ifdef WITH_TRILINOS
-      END IF
-#endif
-
-      DEALLOCATE(N, Nx, lR, lK)
-
-      RETURN
-      END SUBROUTINE CMMi
-!--------------------------------------------------------------------
-!     CMM initialization (boundary elements)
-      SUBROUTINE CMMb(lFa, e, eNoN, al, dl, xl, bfl, pS0l, vwp, ptr)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(faceType), INTENT(IN) :: lFa
-      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, ptr(eNoN)
-      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), dl(tDof,eNoN),
-     2   xl(3,eNoN), bfl(3,eNoN), pS0l(6), vwp(2)
-
-      INTEGER(KIND=IKIND) g
-      REAL(KIND=RKIND) :: w, Jac, nV(3), pSl(6)
-
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:), lK(:,:,:)
-
-      ALLOCATE(N(eNoN), Nx(2,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
-      lK  = 0._RKIND
-      lR  = 0._RKIND
-
-!     Internal stresses (stiffness) contribution
-      pSl = 0._RKIND
-      Nx  = lFa%Nx(:,:,1)
-      CALL CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)
-
-!     Inertia and body forces (mass) contribution
-      DO g=1, lFa%nG
-         CALL GNNB(lFa, e, g, nV)
-         Jac = SQRT(NORM(nV))
-         nV  = nV / Jac
-         w   = lFa%w(g)*Jac
-         N   = lFa%N(:,g)
-         CALL CMM_MASS(eNoN, w, N, al, bfl, vwp, lR, lK)
-      END DO
-
-!     Now doing the assembly part
-#ifdef WITH_TRILINOS
-      IF (eq(cEq)%assmTLS) THEN
-         CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
-      ELSE
-#endif
-         CALL DOASSEM(eNoN, ptr, lK, lR)
-#ifdef WITH_TRILINOS
-      END IF
-#endif
-
-      DEALLOCATE(N, Nx, lR, lK)
-
-      RETURN
-      END SUBROUTINE CMMb
 !####################################################################
 !     Contribution from internal stresses (stiffness)
       SUBROUTINE CMM_STIFFNESS(eNoN, Nx, xl, dl, pS0l, vwp, pSl, lR, lK)

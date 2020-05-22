@@ -573,7 +573,7 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys .EQ. phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_vms_struct) THEN
+     2       lEq%dmn(iDmn)%phys .EQ. phys_ustruct) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
 
@@ -1096,6 +1096,7 @@
       CALL cm%bcast(lM%eType)
       CALL cm%bcast(lM%eNoN)
       CALL cm%bcast(lM%nFa)
+      CALL cm%bcast(lM%nFs)
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%gnEl)
       CALL cm%bcast(lM%gnNo)

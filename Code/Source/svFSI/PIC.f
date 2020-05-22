@@ -96,8 +96,8 @@ c         CALL IB_SETBCPEN()
      2            /(eq(iEq)%gam - 1._RKIND)
                Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef
             ELSE
-!              vms_struct, FSI
-               IF (eq(iEq)%phys .EQ. phys_vms_struct .OR.
+!              ustruct, FSI
+               IF (eq(iEq)%phys .EQ. phys_ustruct .OR.
      2             eq(iEq)%phys .EQ. phys_FSI) THEN
                   coef = (eq(iEq)%gam - 1._RKIND)/eq(iEq)%gam
                   Ad(:,:)   = Ad(:,:)*coef
@@ -155,7 +155,10 @@ c         CALL IB_SETBCPEN()
          END IF
       END DO
 
-      IF (pstEq) pSn(:,:) = 0._RKIND
+      IF (pstEq) THEN
+         pSn(:,:) = 0._RKIND
+         pSa(:)   = 0._RKIND
+      END IF
 
       RETURN
       END SUBROUTINE PICI
@@ -189,8 +192,8 @@ c         CALL IB_SETBCPEN()
             Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
          END DO
       ELSE IF (sstEq) THEN
-!        vms_struct, FSI (vms_struct)
-         IF (eq(cEq)%phys .EQ. phys_vms_struct .OR.
+!        ustruct, FSI (ustruct)
+         IF (eq(cEq)%phys .EQ. phys_ustruct .OR.
      2       eq(cEq)%phys .EQ. phys_FSI) THEN
             DO a=1, tnNo
                An(s:e,a)   = An(s:e,a)   - R(:,a)
@@ -219,7 +222,7 @@ c         CALL IB_SETBCPEN()
          e = eq(2)%e
          DO Ac=1, tnNo
             IF (ISDOMAIN(cEq, Ac, phys_struct) .OR.
-     2          ISDOMAIN(cEq, Ac, phys_vms_struct) .OR.
+     2          ISDOMAIN(cEq, Ac, phys_ustruct) .OR.
      3          ISDOMAIN(cEq, Ac, phys_lElas)) THEN
                An(s:e,Ac) = An(1:nsd,Ac)
                Yn(s:e,Ac) = Yn(1:nsd,Ac)
