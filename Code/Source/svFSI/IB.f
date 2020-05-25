@@ -3814,8 +3814,7 @@ c     2         "can be applied for Neumann boundaries only"
       LOGICAL l1, l2, l3, l4
       INTEGER(KIND=IKIND) a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoNb, eNoN
-      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), xiL(2), Nl(2),
-     2   Gmat(nsd,nsd)
+      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), Gmat(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
      2   Nx(:,:), xbl(:,:), xl(:,:), abl(:,:), ybl(:,:), ubl(:,:),
@@ -3904,23 +3903,6 @@ c     2         "can be applied for Neumann boundaries only"
             END DO
             xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
 
-!           Set bounds on the parameteric coordinates
-            xiL(1) = -1.0001_RKIND
-            xiL(2) =  1.0001_RKIND
-            IF (msh(jM)%eType .EQ. eType_TRI .OR.
-     2          msh(jM)%eType .EQ. eType_TET) THEN
-               xiL(1) = -1.E-4_RKIND
-            END IF
-
-!           Set bounds on shape functions
-            Nl(1) = -0.0001_RKIND
-            Nl(2) =  1.0001_RKIND
-            IF (msh(jM)%eType .EQ. eType_QUD .OR.
-     2          msh(jM)%eType .EQ. eType_BIQ) THEN
-               Nl(1) = -0.1251_RKIND
-               Nl(2) =  1.0001_RKIND
-            END IF
-
 !           Identify the parameteric coordinate of the IB integration
 !           point w.r.t. background fluid mesh element
             CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, l1)
@@ -3928,7 +3910,8 @@ c     2         "can be applied for Neumann boundaries only"
 !           Check if parameteric coordinate is within bounds
             b = 0
             DO a=1, nsd
-               IF (xi(a).GE.xil(1) .AND. xi(a).LE.xil(2)) b = b + 1
+               IF (xi(a).GE.msh(jM)%xib(1,a) .AND.
+     2             xi(a).LE.msh(jM)%xib(2,a)) b = b + 1
             END DO
             l2 = b .EQ. nsd
 
@@ -3940,7 +3923,8 @@ c     2         "can be applied for Neumann boundaries only"
             rt = 0._RKIND
             DO a=1, eNoN
                rt = rt + N(a)
-               IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) b = b + 1
+               IF (N(a).GT.msh(jM)%Nb(1,a) .AND.
+     2             N(a).LT.msh(jM)%Nb(2,a)) b = b + 1
             END DO
             l3 = b .EQ. eNoN
             l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
@@ -4853,7 +4837,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       INTEGER(KIND=IKIND) :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoN, eNoNb
       REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), ap(nsd), yp(nsd+1),
-     2   Ks(nsd,nsd), rt, xiL(2), Nl(2)
+     2   Ks(nsd,nsd), rt
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
      2   xl(:,:), xbl(:,:), al(:,:), yl(:,:), sA(:)
@@ -4920,28 +4904,13 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             END DO
             xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
 
-!           Set bounds on the parameteric coordinates
-            xiL(1) = -1.0001_RKIND
-            xiL(2) =  1.0001_RKIND
-            IF (msh(jM)%eType .EQ. eType_TRI .OR.
-     2          msh(jM)%eType .EQ. eType_TET) THEN
-               xiL(1) = -1.E-4_RKIND
-            END IF
-
-!           Set bounds on shape functions
-            Nl(1) = -0.0001_RKIND
-            Nl(2) =  1.0001_RKIND
-            IF (msh(jM)%eType .EQ. eType_BIQ) THEN
-               Nl(1) = -0.1251_RKIND
-               Nl(2) =  1.0001_RKIND
-            END IF
-
             CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, l1)
 
 !           Check if parameteric coordinate is within bounds
             b = 0
             DO a=1, nsd
-               IF (xi(a).GE.xil(1) .AND. xi(a).LE.xil(2)) b = b + 1
+               IF (xi(a).GE.msh(jM)%xib(1,a) .AND.
+     2             xi(a).LE.msh(jM)%xib(2,a)) b = b + 1
             END DO
             l2 = b .EQ. nsd
 
@@ -4953,7 +4922,8 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             rt = 0._RKIND
             DO a=1, eNoN
                rt = rt + N(a)
-               IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) b = b + 1
+               IF (N(a).GT.msh(jM)%Nb(1,a) .AND.
+     2             N(a).LT.msh(jM)%Nb(2,a)) b = b + 1
             END DO
             l3 = b .EQ. eNoN
             l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND

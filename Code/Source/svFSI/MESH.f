@@ -87,8 +87,9 @@
          END DO
 
 !        For MESH, the reference configuration is the one at the
-!        beginning of the time step
+!        beginning of the time step. Update displacements accordingly
          xl(:,:) = xl(:,:) + dol(:,:)
+         dl(is:ie,:) = dl(is:ie,:) - dol(:,:)
 
 !        Gauss integration
          lR = 0._RKIND
@@ -107,7 +108,7 @@
      2            lK)
 
             ELSE IF (nsd .EQ. 2) THEN
-               CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
+               CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
      2            lK)
 
             END IF

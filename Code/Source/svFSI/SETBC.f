@@ -673,7 +673,7 @@
       INTEGER(KIND=IKIND) :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl,
      2   nG, eNoN, eNoNb, cPhys
       REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ub(nsd), tauB(2), Ks(nsd,nsd), rt, xiL(2), Nl(2)
+     2   ub(nsd), tauB(2), Ks(nsd,nsd), rt
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
@@ -738,21 +738,6 @@
       END DO
       xi0 = xi0 / REAL(lM%nG, KIND=RKIND)
 
-!     Set bounds on the parameteric coordinates
-      xiL(1) = -1.0001_RKIND
-      xiL(2) =  1.0001_RKIND
-      IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
-         xiL(1) = -1.E-4_RKIND
-      END IF
-
-!     Set bounds on shape functions
-      Nl(1) = -0.0001_RKIND
-      Nl(2) =  1.0001_RKIND
-      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
-         Nl(1) = -0.1251_RKIND
-         Nl(2) =  1.0001_RKIND
-      END IF
-
       DO e=1, nEl
          Ec = lFa%gE(e)
          cDmn  = DOMAIN(lM, cEq, Ec)
@@ -798,7 +783,8 @@
 !           Check if parameteric coordinate is within bounds
             a = 0
             DO i=1, nsd
-               IF (xi(i).GE.xiL(1) .AND. xi(i).LE.xiL(2)) a = a + 1
+               IF (xi(i).GE.lM%xib(1,i) .AND. xi(i).LE.lM%xib(2,i))
+     2            a = a + 1
             END DO
             l2 = a .EQ. nsd
 
@@ -809,7 +795,8 @@
             rt = 0._RKIND
             DO a=1, eNoN
                rt = rt + N(a)
-               IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) i = i + 1
+               IF (N(a).GT.lM%Nb(1,a) .AND. N(a).LT.lM%Nb(2,a))
+     2            i = i + 1
             END DO
             l3 = i .EQ. eNoN
             l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND

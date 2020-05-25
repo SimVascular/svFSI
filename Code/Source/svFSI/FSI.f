@@ -125,8 +125,8 @@
      2               fN, pS0l, pSl, ya_l, lR, lK)
 
                CASE (phys_ustruct)
-                  CALL USTRUCT3D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,
-     2               bfl, fN, ya_l, lR, lK, lKd)
+c                  CALL USTRUCT3D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,
+c     2               bfl, fN, ya_l, lR, lK, lKd)
 
                END SELECT
 
@@ -144,8 +144,8 @@
      2               fN, pS0l, pSl, ya_l, lR, lK)
 
                CASE (phys_ustruct)
-                  CALL USTRUCT2D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,
-     2               bfl, fN, ya_l, lR, lK, lKd)
+c                  CALL USTRUCT2D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,
+c     2               bfl, fN, ya_l, lR, lK, lKd)
 
                END SELECT
             END IF

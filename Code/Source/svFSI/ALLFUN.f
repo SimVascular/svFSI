@@ -1081,10 +1081,11 @@
       IF (ALLOCATED(lM%iGC))     DEALLOCATE(lM%iGC)
       IF (ALLOCATED(lM%nW))      DEALLOCATE(lM%nW)
       IF (ALLOCATED(lM%w))       DEALLOCATE(lM%w)
-      IF (ALLOCATED(lM%xiL))     DEALLOCATE(lM%xiL)
+      IF (ALLOCATED(lM%xib))     DEALLOCATE(lM%xib)
       IF (ALLOCATED(lM%xi))      DEALLOCATE(lM%xi)
       IF (ALLOCATED(lM%x))       DEALLOCATE(lM%x)
       IF (ALLOCATED(lM%N))       DEALLOCATE(lM%N)
+      IF (ALLOCATED(lM%Nb))      DEALLOCATE(lM%Nb)
       IF (ALLOCATED(lM%nV))      DEALLOCATE(lM%nV)
       IF (ALLOCATED(lM%fN))      DEALLOCATE(lM%fN)
       IF (ALLOCATED(lM%Nx))      DEALLOCATE(lM%Nx)
@@ -2039,7 +2040,7 @@
 
       LOGICAL :: ldbg, l1, l2, l3, l4
       INTEGER(KIND=IKIND) :: a, e, i, Ac, eNoN
-      REAL(KIND=RKIND) :: rt, xi0(nsd), xib(2), Nb(2)
+      REAL(KIND=RKIND) :: rt, xi0(nsd)
 
       LOGICAL, ALLOCATABLE :: eChck(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), N(:), Nxi(:,:)
@@ -2058,21 +2059,6 @@
          xi0 = xi0 + lM%xi(:,i)
       END DO
       xi0 = xi0 / REAL(lM%nG, KIND=RKIND)
-
-!     Set bounds on the parameteric coordinates
-      xib(1) = -1.0001_RKIND
-      xib(2) =  1.0001_RKIND
-      IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
-         xib(1) = -1.E-4_RKIND
-      END IF
-
-!     Set bounds on shape functions
-      Nb(1) = -1.E-4_RKIND
-      Nb(2) =  1.0001_RKIND
-      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
-         Nb(1) = -0.1251_RKIND
-         Nb(2) =  1.0001_RKIND
-      END IF
 
       IF (ldbg) THEN
          WRITE(1000+cm%tF(),'(A)') "=================================="
@@ -2131,7 +2117,8 @@
 !        Check if parameteric coordinate is within bounds
          a = 0
          DO i=1, nsd
-            IF (xi(i).GE.xib(1) .AND. xi(i).LE.xib(2)) a = a + 1
+            IF (xi(i).GE.lM%xib(1,i) .AND. xi(i).LE.lM%xib(2,i))
+     2         a = a + 1
          END DO
          l2 = a .EQ. nsd
 
@@ -2152,7 +2139,7 @@
          rt = 0._RKIND
          DO a=1, eNoN
             rt = rt + N(a)
-            IF (N(a).GT.Nb(1) .AND. N(a).LT.Nb(2)) i = i + 1
+            IF (N(a).GT.lM%Nb(1,a) .AND. N(a).LT.lM%Nb(2,a)) i = i + 1
          END DO
          l3 = i .EQ. eNoN
          l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND

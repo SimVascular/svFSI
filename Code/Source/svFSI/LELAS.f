@@ -95,7 +95,7 @@
      2            lK)
 
             ELSE IF (nsd .EQ. 2) THEN
-               CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
+               CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
      2            lK)
 
             END IF

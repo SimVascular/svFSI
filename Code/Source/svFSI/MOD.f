@@ -524,14 +524,16 @@
          REAL(KIND=RKIND), ALLOCATABLE :: nW(:)
 !        Gauss weights
          REAL(KIND=RKIND), ALLOCATABLE :: w(:)
-!        Bounds on parameteric coordinates
-         REAL(KIND=RKIND), ALLOCATABLE :: xiL(:)
 !        Gauss integration points in parametric space
          REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Bounds on parameteric coordinates
+         REAL(KIND=RKIND), ALLOCATABLE :: xib(:,:)
 !        Position coordinates
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !        Parent shape function
          REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+!        Shape function bounds
+         REAL(KIND=RKIND), ALLOCATABLE :: Nb(:,:)
 !        Normal vector to each nodal point (for Shells)
          REAL(KIND=RKIND), ALLOCATABLE :: nV(:,:)
 !        Fiber orientations stored at the element level - used for

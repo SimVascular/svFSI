@@ -149,6 +149,9 @@
      2      lM%Nx(:,:,g))
       END DO
 
+      ALLOCATE(lM%xib(2,nsd), lM%Nb(2,lM%eNoN))
+      CALL GETNNBNDS(lM%eType, lM%eNoN, lM%xib, lM%Nb)
+
       RETURN
       END SUBROUTINE SELECTELE
 !--------------------------------------------------------------------
@@ -688,6 +691,85 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 
       RETURN
       END SUBROUTINE GETGNN
+!--------------------------------------------------------------------
+!     Returns shape functions bounds
+      PURE SUBROUTINE GETNNBNDS(eType, eNoN, xib, Nb)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eType, eNoN
+      REAL(KIND=RKIND), INTENT(OUT) :: xib(2,nsd), Nb(2,eNoN)
+
+      xib(1,:) = -1._RKIND
+      xib(2,:) =  1._RKIND
+
+      Nb(1,:)  = 0._RKIND
+      Nb(2,:)  = 1._RKIND
+
+!     3D elements
+      SELECT CASE(eType)
+      CASE(eType_TET)
+         xib(1,:) = 0._RKIND
+
+      CASE(eType_WDG)
+         xib(1,3) = -1._RKIND
+
+      CASE(eType_QTE)
+         xib(1,:) = 0._RKIND
+
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  = -0.125_RKIND
+         Nb(1,4)  = -0.125_RKIND
+
+         Nb(2,5)  = 4._RKIND
+         Nb(2,6)  = 4._RKIND
+         Nb(2,7)  = 4._RKIND
+         Nb(2,8)  = 4._RKIND
+         Nb(2,9)  = 4._RKIND
+         Nb(2,10) = 4._RKIND
+
+!     2D elements
+      CASE(eType_TRI)
+         xib(1,:) = 0._RKIND
+
+      CASE(eType_BIQ)
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  = -0.125_RKIND
+         Nb(1,4)  = -0.125_RKIND
+         Nb(1,5)  = -0.125_RKIND
+         Nb(1,6)  = -0.125_RKIND
+         Nb(1,7)  = -0.125_RKIND
+         Nb(1,8)  = -0.125_RKIND
+         Nb(1,9)  =  0._RKIND
+
+      CASE(eType_QTR)
+         xib(1,:) = 0._RKIND
+
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  = -0.125_RKIND
+
+         Nb(2,4)  = 4._RKIND
+         Nb(2,5)  = 4._RKIND
+         Nb(2,6)  = 4._RKIND
+
+      CASE(eType_QUD)
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  =  0._RKIND
+
+      END SELECT
+
+!     Add a small tolerance around the bounds
+      xib(1,:) = xib(1,:) - 1.0E-4_RKIND
+      xib(2,:) = xib(2,:) + 1.0E-4_RKIND
+
+      Nb(1,:)  = Nb(1,:)  - 1.0E-4_RKIND
+      Nb(2,:)  = Nb(2,:)  + 1.0E-4_RKIND
+
+      RETURN
+      END SUBROUTINE GETNNBNDS
 !####################################################################
       PURE SUBROUTINE GNN(eNoN, insd, Nxi, x, Nx, Jac, ks)
       USE COMMOD, ONLY: nsd

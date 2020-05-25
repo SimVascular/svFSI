@@ -415,7 +415,8 @@
          END IF
       END IF
 
-      propL = prop_NA
+      THflag = .FALSE.
+      propL  = prop_NA
       SELECT CASE (eqName)
 !     FLUID Navier-Stokes solver ------------------------------------
       CASE ('fluid')
