@@ -376,7 +376,7 @@
          lK = 0._RKIND
          lR = 0._RKIND
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, nV)
+            CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV))
             w   = lFa%w(g)*Jac
             N   = lFa%N(:,g)
@@ -453,7 +453,7 @@
          lR  = 0._RKIND
          lKd = 0._RKIND
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, nV)
+            CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
             w  = lFa%w(g) * SQRT(NORM(nV))
             N  = lFa%N(:,g)
 
@@ -764,7 +764,7 @@
          lK = 0._RKIND
          lR = 0._RKIND
          DO g=1, nG
-            CALL GNNB(lFa, e, g, nV)
+            CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV))
             nV  = nV/Jac
             w   = lFa%w(g) * Jac

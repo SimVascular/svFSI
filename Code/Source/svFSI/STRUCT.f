@@ -99,8 +99,8 @@
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
                CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             END IF
-            IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             w = lM%w(g) * Jac
             N = lM%N(:,g)
 

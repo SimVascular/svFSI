@@ -56,10 +56,12 @@
       CALL ALLOCFS(lM%fs(1), insd)
 
       IF (lM%eType .NE. eType_NRB) THEN
-         lM%fs(1)%w  = lM%w
-         lM%fs(1)%xi = lM%xi
-         lM%fs(1)%N  = lM%N
-         lM%fs(1)%Nx = lM%Nx
+         lM%fs(1)%w   = lM%w
+         lM%fs(1)%xi  = lM%xi
+         lM%fs(1)%xib = lM%xib
+         lM%fs(1)%N   = lM%N
+         lM%fs(1)%Nb  = lM%Nb
+         lM%fs(1)%Nx  = lM%Nx
       END IF
 
 !     Sets Taylor-Hood basis if invoked by user (fluid, ustruct, FSI)
@@ -77,6 +79,8 @@
             CALL GETGNN(insd, lM%fs(2)%eType, lM%fs(2)%eNoN,
      2         lM%fs(2)%xi(:,g), lM%fs(2)%N(:,g), lM%fs(2)%Nx(:,:,g))
          END DO
+         CALL GETNNBNDS(lM%fs(2)%eType, lM%fs(2)%eNoN, lM%fs(2)%xib,
+     2      lM%fs(2)%Nb)
       END IF
 
       RETURN
@@ -104,10 +108,12 @@
       CALL ALLOCFS(lFa%fs(1), insd)
 
       IF (lFa%eType .NE. eType_NRB) THEN
-         lFa%fs(1)%w  = lFa%w
-         lFa%fs(1)%xi = lFa%xi
-         lFa%fs(1)%N  = lFa%N
-         lFa%fs(1)%Nx = lFa%Nx
+         lFa%fs(1)%w   = lFa%w
+         lFa%fs(1)%xi  = lFa%xi
+         lFa%fs(1)%N   = lFa%N
+         lFa%fs(1)%Nx  = lFa%Nx
+         CALL GETNNBNDS(lFa%fs(1)%eType, lFa%fs(1)%eNoN, lFa%fs(1)%xib,
+     2      lFa%fs(1)%Nb)
       END IF
 
 !     Sets Taylor-Hood basis if invoked by user (fluid, ustruct, FSI)
@@ -125,6 +131,8 @@
             CALL GETGNN(insd, lFa%fs(2)%eType, lFa%fs(2)%eNoN,
      2         lFa%fs(2)%xi(:,g), lFa%fs(2)%N(:,g), lFa%fs(2)%Nx(:,:,g))
          END DO
+         CALL GETNNBNDS(lFa%fs(2)%eType, lFa%fs(2)%eNoN, lFa%fs(2)%xib,
+     2      lFa%fs(2)%Nb)
       END IF
 
       RETURN
@@ -143,8 +151,8 @@
       nG   = fs%nG
       eNoN = fs%eNoN
 
-      ALLOCATE(fs%w(nG), fs%xi(insd,nG), fs%N(eNoN,nG),
-     2   fs%Nx(insd,eNoN,nG))
+      ALLOCATE(fs%w(nG), fs%xi(insd,nG), fs%xib(2,nsd), fs%N(eNoN,nG),
+     2   fs%Nb(2,eNoN), fs%Nx(insd,eNoN,nG))
 
       IF (fs%eType .EQ. eType_NRB) THEN
          IF (insd .EQ. 1) THEN

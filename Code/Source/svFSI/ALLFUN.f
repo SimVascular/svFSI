@@ -88,16 +88,25 @@
       CONTAINS
 !####################################################################
 !     This routine integrate s over the surface faId.
-      FUNCTION IntegS(lFa, s)
+      FUNCTION IntegS(lFa, s, pflag)
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: s(:)
+      LOGICAL, INTENT(IN), OPTIONAL :: pflag
       REAL(KIND=RKIND) IntegS
 
-      LOGICAL isIB
-      INTEGER(KIND=IKIND) a, e, g, Ac, nNo
+      LOGICAL isIB, flag
+      INTEGER(KIND=IKIND) a, e, g, Ac, nNo, insd
       REAL(KIND=RKIND) sHat, Jac, n(nsd)
+      TYPE(fsType) :: fs
+
+      flag = .FALSE.
+      IF (PRESENT(pflag)) flag = .TRUE.
+
+      insd = nsd - 1
+      IF (msh(lFa%iM)%lShl) insd = insd - 1
+      IF (msh(lFa%iM)%lFib) insd = 0
 
       nNo = SIZE(s)
       IF (nNo .NE. tnNo) THEN
@@ -114,6 +123,35 @@
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
       END IF
 
+!     Update pressure function space for Taylor-Hood element
+      IF (flag) THEN
+         IF (lFa%nFs.NE.2) err = "Incompatible boundary "//
+     2      "integral function call and face element type"
+         fs%nG    = lFa%fs(2)%nG
+         fs%eType = lFa%fs(2)%eType
+         fs%lShpF = lFa%fs(2)%lShpF
+         fs%eNoN  = lFa%fs(2)%eNoN
+         ALLOCATE(fs%w(fs%nG), fs%N(fs%eNoN,fs%nG),
+     2      fs%Nx(insd,fs%eNoN,fs%nG))
+         IF (fs%eType .NE. eType_NRB) THEN
+            fs%w  = lFa%fs(2)%w
+            fs%N  = lFa%fs(2)%N
+            fs%Nx = lFa%fs(2)%Nx
+         END IF
+      ELSE
+         fs%nG    = lFa%fs(1)%nG
+         fs%eType = lFa%fs(1)%eType
+         fs%lShpF = lFa%fs(1)%lShpF
+         fs%eNoN  = lFa%fs(1)%eNoN
+         ALLOCATE(fs%w(fs%nG), fs%N(fs%eNoN,fs%nG),
+     2      fs%Nx(insd,fs%eNoN,fs%nG))
+         IF (fs%eType .NE. eType_NRB) THEN
+            fs%w  = lFa%fs(1)%w
+            fs%N  = lFa%fs(1)%N
+            fs%Nx = lFa%fs(1)%Nx
+         END IF
+      END IF
+
       IntegS = 0._RKIND
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
@@ -123,11 +161,14 @@
             ELSE
                CALL NRBNNXB(ib%msh(lFa%iM), lFa, e)
             END IF
+            fs%w  = lFa%w
+            fs%N  = lFa%N
+            fs%Nx = lFa%Nx
          END IF
 
-         DO g=1, lFa%nG
+         DO g=1, fs%nG
             IF (.NOT.isIB) THEN
-               CALL GNNB(lFa, e, g, n)
+               CALL GNNB(lFa, e, g, insd, fs%eNoN, fs%Nx(:,:,g), n)
             ELSE
                CALL GNNIB(lFa, e, g, n)
             END IF
@@ -135,12 +176,12 @@
 
 !     Calculating the function value
             sHat = 0._RKIND
-            DO a=1, lFa%eNoN
+            DO a=1, fs%eNoN
                Ac   = lFa%IEN(a,e)
-               sHat = sHat + s(Ac)*lFa%N(a,g)
+               sHat = sHat + s(Ac)*fs%N(a,g)
             END DO
 !     Now integrating
-            IntegS = IntegS + Jac*lFa%w(g)*sHat
+            IntegS = IntegS + Jac*fs%w(g)*sHat
          END DO
       END DO
 
@@ -192,7 +233,7 @@
 
          DO g=1, lFa%nG
             IF (.NOT.isIB) THEN
-               CALL GNNB(lFa, e, g, n)
+               CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
             ELSE
                CALL GNNIB(lFa, e, g, n)
             END IF
@@ -216,21 +257,26 @@
       RETURN
       END FUNCTION IntegV
 !--------------------------------------------------------------------
-!     This routine integrate s(l,u,:) over the surface faId.
-      FUNCTION IntegG(lFa, s, l, uo)
+!     This routine integrate s(l:u,:) over the surface faId.
+      FUNCTION IntegG(lFa, s, l, uo, THflag)
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: s(:,:)
       INTEGER(KIND=IKIND), INTENT(IN) :: l
       INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: uo
+      LOGICAL, INTENT(IN), OPTIONAL :: THflag
 
+      LOGICAL flag
       INTEGER(KIND=IKIND) a, u, nNo
       REAL(KIND=RKIND) IntegG
       REAL(KIND=RKIND), ALLOCATABLE :: sclr(:), vec(:,:)
 
       u = l
       IF (PRESENT(uo)) u = uo
+
+      flag = .FALSE.
+      IF (PRESENT(THflag)) flag = .TRUE.
 
       nNo = SIZE(s,2)
       IF (nNo .NE. tnNo) THEN
@@ -254,7 +300,7 @@
          DO a=1, nNo
             sclr(a) = s(l,a)
          END DO
-         IntegG = IntegS(lFa,sclr)
+         IntegG = IntegS(lFa,sclr,flag)
       ELSE
          err = "Unexpected dof in IntegG"
       END IF
@@ -263,18 +309,20 @@
       END FUNCTION IntegG
 !--------------------------------------------------------------------
 !     This routine integrate an equation over a particular domain
-      FUNCTION vInteg(dId, s, l, u)
+      FUNCTION vInteg(dId, s, l, u, pFlag)
       USE COMMOD
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: s(:,:)
       INTEGER(KIND=IKIND), INTENT(IN) :: dId
       INTEGER(KIND=IKIND), INTENT(IN) :: l
       INTEGER(KIND=IKIND), INTENT(IN) :: u
+      LOGICAL, INTENT(IN), OPTIONAL :: pFlag
       REAL(KIND=RKIND) vInteg
 
-      LOGICAL isIB
+      LOGICAL isIB, flag
       INTEGER(KIND=IKIND) a, e, g, Ac, iM, eNoN, insd, ibl, nNo
       REAL(KIND=RKIND) Jac, nV(nsd), sHat, tmp(nsd,nsd)
+      TYPE(fsType) :: fs
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sl(:), Nxi(:,:),
      2   Nx(:,:), tmps(:,:)
@@ -289,6 +337,13 @@
          END IF
       END IF
 
+      flag = .FALSE.
+      IF (PRESENT(pFlag)) THEN
+         flag = .TRUE.
+         IF (l .NE. u) err = "Incompatible spatial output setting "//
+     2      "and element type"
+      END IF
+
       isIB = .FALSE.
       IF (ibFlag) THEN
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
@@ -297,10 +352,37 @@
       vInteg = 0._RKIND
       IF (.NOT.isIB) THEN
          DO iM=1, nMsh
-            eNoN = msh(iM)%eNoN
             insd = nsd
             IF (msh(iM)%lShl) insd = nsd-1
             IF (msh(iM)%lFib) insd = 1
+
+!           Update pressure function space for Taylor-Hood type element
+            IF (flag .AND. (msh(iM)%nFs.EQ.2)) THEN
+               fs%nG    = msh(iM)%fs(2)%nG
+               fs%eType = msh(iM)%fs(2)%eType
+               fs%lShpF = msh(iM)%fs(2)%lShpF
+               fs%eNoN  = msh(iM)%fs(2)%eNoN
+               ALLOCATE(fs%w(fs%nG), fs%N(fs%eNoN,fs%nG),
+     2            fs%Nx(nsd,fs%eNoN,fs%nG))
+               IF (fs%eType .NE. eType_NRB) THEN
+                  fs%w  = msh(iM)%fs(2)%w
+                  fs%N  = msh(iM)%fs(2)%N
+                  fs%Nx = msh(iM)%fs(2)%Nx
+               END IF
+            ELSE
+               fs%nG    = msh(iM)%fs(1)%nG
+               fs%eType = msh(iM)%fs(1)%eType
+               fs%lShpF = msh(iM)%fs(1)%lShpF
+               fs%eNoN  = msh(iM)%fs(1)%eNoN
+               ALLOCATE(fs%w(fs%nG), fs%N(fs%eNoN,fs%nG),
+     2            fs%Nx(nsd,fs%eNoN,fs%nG))
+               IF (fs%eType .NE. eType_NRB) THEN
+                  fs%w  = msh(iM)%fs(1)%w
+                  fs%N  = msh(iM)%fs(1)%N
+                  fs%Nx = msh(iM)%fs(1)%Nx
+               END IF
+            END IF
+            eNoN = fs%eNoN
 
             ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
      2         sl(eNoN), tmps(nsd,insd))
@@ -310,7 +392,13 @@
                   IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
                END IF
 !           Updating the shape functions, if this is a NURB
-               IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), e)
+               IF (msh(iM)%eType .EQ. eType_NRB) THEN
+                  CALL NRBNNX(msh(iM), e)
+                  fs%w  = msh(iM)%w
+                  fs%N  = msh(iM)%N
+                  fs%Nx = msh(iM)%Nx
+               END IF
+
                ibl = 0
                DO a=1, eNoN
                   Ac      = msh(iM)%IEN(a,e)
@@ -325,9 +413,9 @@
                END DO
                IF (ibl .EQ. eNoN) CYCLE
 
-               DO g=1, msh(iM)%nG
-                  Nxi(:,:) = msh(iM)%Nx(:,:,g)
-                  IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF) THEN
+               DO g=1, fs%nG
+                  Nxi(:,:) = fs%Nx(:,:,g)
+                  IF (g.EQ.1 .OR. .NOT.fs%lShpF) THEN
                      IF (msh(iM)%lShl) THEN
                         CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
                         Jac = SQRT(NORM(nV))
@@ -340,13 +428,14 @@
                   sHat = 0._RKIND
                   DO a=1, eNoN
                      Ac = msh(iM)%IEN(a,e)
-                     sHat = sHat + sl(a)*msh(iM)%N(a,g)
+                     sHat = sHat + sl(a)*fs%N(a,g)
                   END DO
-                  vInteg = vInteg + msh(iM)%w(g)*Jac*sHat
+                  vInteg = vInteg + fs%w(g)*Jac*sHat
                END DO
             END DO
 
             DEALLOCATE(xl, Nxi, Nx, sl, tmps)
+            CALL DESTROY(fs)
          END DO
       ELSE
          DO iM=1, ib%nMsh
@@ -1011,7 +1100,9 @@
 
       IF (ALLOCATED(fs%w))      DEALLOCATE(fs%w)
       IF (ALLOCATED(fs%xi))     DEALLOCATE(fs%xi)
+      IF (ALLOCATED(fs%xib))    DEALLOCATE(fs%xib)
       IF (ALLOCATED(fs%N))      DEALLOCATE(fs%N)
+      IF (ALLOCATED(fs%Nb))     DEALLOCATE(fs%Nb)
       IF (ALLOCATED(fs%Nx))     DEALLOCATE(fs%Nx)
       IF (ALLOCATED(fs%Nxx))    DEALLOCATE(fs%Nxx)
 

@@ -318,22 +318,26 @@
       INTEGER(KIND=IKIND) a, Ac, e, Ec, i, j, iEq, iFa, eNoN, g
       REAL(KIND=RKIND) Tdn(nsd), ndTdn, taue(nsd), ux(nsd,nsd), mu, w,
      2   nV(nsd), Jac, ks(nsd,nsd), lRes(maxnsd), p, gam, mu_s
+      TYPE(fsType) :: fsP
 
       REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), gnV(:,:),
-     2   lnV(:,:), xl(:,:), ul(:,:), Nx(:,:), N(:), pl(:)
+     2   lnV(:,:), xl(:,:), ul(:,:), pl(:), N(:), Nx(:,:)
+
+      IF (outGrp.NE.outGrp_WSS .AND. outGrp.NE.outGrp_trac) err =
+     2   "Invalid output group. Correction is required in BPOST"
 
       iEq   = 1
       eNoN  = lM%eNoN
       FSIeq = .FALSE.
       IF (eq(iEq)%phys .EQ. phys_FSI) FSIeq = .TRUE.
 
-      ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), gnV(nsd,tnNo),
-     2   lnV(nsd,eNoN), xl(nsd,eNoN), ul(nsd,eNoN), Nx(nsd,eNoN),
-     3   N(eNoN), pl(eNoN))
+      ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), xl(nsd,eNoN), ul(nsd,eNoN),
+     2   gnV(nsd,tnNo), lnV(nsd,eNoN), N(eNoN), Nx(nsd,eNoN))
       sA   = 0._RKIND
       sF   = 0._RKIND
       gnV  = 0._RKIND
       lRes = 0._RKIND
+
 !     First creating the norm field
       DO iFa=1, lM%nFa
          DO a=1, lM%fa(iFa)%nNo
@@ -342,8 +346,28 @@
          END DO
       END DO
 
-      IF (outGrp.NE.outGrp_WSS .AND. outGrp.NE.outGrp_trac) err =
-     2   "Invalid output group. Correction is required in BPOST"
+!     Update pressure function spaces
+      IF (lM%nFs .EQ. 1) THEN
+         fsP%nG    = lM%fs(1)%nG
+         fsP%eType = lM%fs(1)%eType
+         fsP%eNoN  = lM%fs(1)%eNoN
+         CALL ALLOCFS(fsP, nsd)
+         fsP%w  = lM%fs(1)%w
+         fsP%xi = lM%fs(1)%xi
+         fsP%N  = lM%fs(1)%N
+         fsP%Nx = lM%fs(1)%Nx
+      ELSE
+         fsP%nG    = lM%fs(1)%nG
+         fsP%eType = lM%fs(2)%eType
+         fsP%eNoN  = lM%fs(2)%eNoN
+         CALL ALLOCFS(fsP, nsd)
+         fsP%xi = lM%fs(1)%xi
+         DO g=1, fsP%nG
+            CALL GETGNN(nsd, fsP%eType, fsP%eNoN, fsP%xi(:,g),
+     2         fsP%N(:,g), fsP%Nx(:,:,g))
+         END DO
+      END IF
+      ALLOCATE(pl(fsP%eNoN))
 
       DO iFa=1, lM%nFa
          DO e=1, lM%fa(iFa)%nEl
@@ -351,6 +375,7 @@
             cDmn = DOMAIN(lM, iEq, Ec)
             IF (cDmn .EQ. 0) CYCLE
             IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, Ec)
+
 !     Finding the norm for all the nodes of this element, including
 !     those that don't belong to this face, which will be inerpolated
 !     from the nodes of the face
@@ -366,8 +391,13 @@
                ELSE
                   ul(:,a) = lY(1:nsd,Ac)
                END IF
-               pl(a)    = lY(nsd+1,Ac)
             END DO
+
+            DO a=1, fsP%eNoN
+               Ac    = lM%IEN(a,Ec)
+               pl(a) = lY(nsd+1,Ac)
+            END DO
+
             nV = nV/lM%fa(iFa)%eNoN
             DO a=1, eNoN
                IF (ISZERO(NORM(lnV(:,a)))) lnV(:,a) = nV
@@ -382,15 +412,18 @@
 !     Calculating ux = grad(u) and nV at a Gauss point
                ux = 0._RKIND
                nV = 0._RKIND
-               p  = 0._RKIND
                DO a=1, eNoN
                   nV = nV + N(a)*lnV(:,a)
-                  p  = p  + N(a)*pl(a)
                   DO i=1, nsd
                      DO j=1, nsd
                         ux(i,j) = ux(i,j) + Nx(i,a)*ul(j,a)
                      END DO
                   END DO
+               END DO
+
+               p = 0._RKIND
+               DO a=1, fsP%eNoN
+                  p = p + fsP%N(a,g)*pl(a)
                END DO
 
 !              Shear rate, gam := (2*e_ij*e_ij)^0.5

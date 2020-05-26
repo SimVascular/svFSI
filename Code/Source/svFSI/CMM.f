@@ -101,8 +101,8 @@
             DO g=1, lM%nG
                IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
                   CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
                END IF
-               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
                w = lM%w(g) * Jac
                N = lM%N(:,g)
 
@@ -212,7 +212,7 @@
 
 !     Inertia and body forces (mass) contribution
       DO g=1, lFa%nG
-         CALL GNNB(lFa, e, g, nV)
+         CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
          Jac = SQRT(NORM(nV))
          nV  = nV / Jac
          w   = lFa%w(g)*Jac

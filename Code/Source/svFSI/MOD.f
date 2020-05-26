@@ -62,8 +62,12 @@
          REAL(KIND=RKIND), ALLOCATABLE :: w(:)
 !        Gauss integration points in parametric space
          REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Bounds on Gauss integration points in parametric space
+         REAL(KIND=RKIND), ALLOCATABLE :: xib(:,:)
 !        Parent shape function
          REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+!        Bounds on shape functions
+         REAL(KIND=RKIND), ALLOCATABLE :: Nb(:,:)
 !        Parent shape functions gradient
          REAL(KIND=RKIND), ALLOCATABLE :: Nx(:,:,:)
 !        Second derivatives of shape functions - used for shells & IGA

@@ -202,6 +202,7 @@ c         CALL IB_SETBCPEN()
                Ad(:,a)     = Ad(:,a)     - dUl(:)
                Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
             END DO
+            CALL USTRUCT_THPCE()
          ELSE IF (eq(cEq)%phys .EQ. phys_mesh) THEN
             DO a=1, tnNo
                An(s:e,a)   = An(s:e,a) - R(:,a)

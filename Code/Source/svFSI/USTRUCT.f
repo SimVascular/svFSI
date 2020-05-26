@@ -119,8 +119,8 @@
             IF (g.EQ.1 .OR. .NOT.fs(1)%lShpF) THEN
                CALL GNN(fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g), xwl, Nwx, Jac,
      2            ksix)
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             END IF
-            IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             w = fs(1)%w(g) * Jac
 
             IF (nsd .EQ. 3) THEN
@@ -147,8 +147,8 @@
             IF (g.EQ.1 .OR. .NOT.fs(2)%lShpF) THEN
                CALL GNN(fs(2)%eNoN, nsd, fs(2)%Nx(:,:,g), xql, Nqx, Jac,
      2            ksix)
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             END IF
-            IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             w = fs(2)%w(g) * Jac
 
             IF (nsd .EQ. 3) THEN
@@ -1298,7 +1298,7 @@
          IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
      2      CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
 
-         CALL GNNB(lFa, e, g, nV)
+         CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
          Jac = SQRT(NORM(nV))
          nV  = nV / Jac
          w   = lFa%w(g)*Jac
@@ -1601,9 +1601,11 @@
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) :: a, i, c, s
+      LOGICAL :: THflag
+      INTEGER(KIND=IKIND) :: a, i, c, s, e, Ac, iM
       REAL(KIND=RKIND) :: amg, ami
 
+      INTEGER, ALLOCATABLE :: eNds(:)
       REAL(KIND=RKIND), ALLOCATABLE :: KU(:,:)
 
       IF (eq(cEq)%phys .NE. phys_ustruct .AND.
@@ -1615,68 +1617,228 @@
 
       IF (eq(cEq)%itr .GT. 1) THEN
          Rd = 0._RKIND
-         RETURN
-      END IF
-
-      DO a=1, tnNo
-         IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
-         DO i=1, nsd
-            Rd(i,a) = amg*Ad(i,a) - Yg(s+i-1,a)
+      ELSE
+         DO a=1, tnNo
+            IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
+            DO i=1, nsd
+               Rd(i,a) = amg*Ad(i,a) - Yg(s+i-1,a)
+            END DO
          END DO
+
+         IF (nsd .EQ. 3) THEN
+            ALLOCATE(KU(4,tnNo))
+            KU = 0._RKIND
+            DO a=1, tnNo
+               IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
+               DO i=rowPtr(a), rowPtr(a+1)-1
+                  c = colPtr(i)
+                  KU(1,a) = KU(1,a) + Kd(1 ,i)*Rd(1,c) +
+     2               Kd(2 ,i)*Rd(2,c) + Kd(3 ,i)*Rd(3,c)
+                  KU(2,a) = KU(2,a) + Kd(4 ,i)*Rd(1,c) +
+     2               Kd(5 ,i)*Rd(2,c) + Kd(6 ,i)*Rd(3,c)
+                  KU(3,a) = KU(3,a) + Kd(7 ,i)*Rd(1,c) +
+     2               Kd(8 ,i)*Rd(2,c) + Kd(9 ,i)*Rd(3,c)
+                  KU(4,a) = KU(4,a) + Kd(10,i)*Rd(1,c) +
+     2               Kd(11,i)*Rd(2,c) + Kd(12,i)*Rd(3,c)
+               END DO
+            END DO
+
+            CALL COMMU(KU)
+
+            DO a=1, tnNo
+               R(1,a) = R(1,a) - ami*KU(1,a)
+               R(2,a) = R(2,a) - ami*KU(2,a)
+               R(3,a) = R(3,a) - ami*KU(3,a)
+               R(4,a) = R(4,a) - ami*KU(4,a)
+            END DO
+            DEALLOCATE(KU)
+         ELSE
+            ALLOCATE(KU(3,tnNo))
+            KU = 0._RKIND
+            DO a=1, tnNo
+               IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
+               DO i=rowPtr(a), rowPtr(a+1)-1
+                  c = colPtr(i)
+                  KU(1,a) = KU(1,a) + Kd(1,i)*Rd(1,c) + Kd(2,i)*Rd(2,c)
+                  KU(2,a) = KU(2,a) + Kd(3,i)*Rd(1,c) + Kd(4,i)*Rd(2,c)
+                  KU(3,a) = KU(3,a) + Kd(5,i)*Rd(1,c) + Kd(6,i)*Rd(2,c)
+               END DO
+            END DO
+
+            CALL COMMU(KU)
+
+            DO a=1, tnNo
+               R(1,a) = R(1,a) - ami*KU(1,a)
+               R(2,a) = R(2,a) - ami*KU(2,a)
+               R(3,a) = R(3,a) - ami*KU(3,a)
+            END DO
+            DEALLOCATE(KU)
+         END IF
+      END  IF
+
+      THflag = .FALSE.
+      DO iM=1, nMsh
+         IF (msh(iM)%nFs .EQ. 2) THEN
+            THflag = .TRUE.
+            EXIT
+         END IF
       END DO
 
-      IF (nsd .EQ. 3) THEN
-         ALLOCATE(KU(4,tnNo))
-         KU = 0._RKIND
-         DO a=1, tnNo
-            IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
-
-            DO i=rowPtr(a), rowPtr(a+1)-1
-               c = colPtr(i)
-               KU(1,a) = KU(1,a) + Kd(1 ,i)*Rd(1,c) + Kd(2 ,i)*Rd(2,c) +
-     2                             Kd(3 ,i)*Rd(3,c)
-               KU(2,a) = KU(2,a) + Kd(4 ,i)*Rd(1,c) + Kd(5 ,i)*Rd(2,c) +
-     2                             Kd(6 ,i)*Rd(3,c)
-               KU(3,a) = KU(3,a) + Kd(7 ,i)*Rd(1,c) + Kd(8 ,i)*Rd(2,c) +
-     2                             Kd(9 ,i)*Rd(3,c)
-               KU(4,a) = KU(4,a) + Kd(10,i)*Rd(1,c) + Kd(11,i)*Rd(2,c) +
-     2                             Kd(12,i)*Rd(3,c)
+      IF (THflag) THEN
+         ALLOCATE(eNds(tnNo))
+         eNds(:) = 0
+         DO iM=1, nMsh
+            IF (msh(iM)%nFs .EQ. 1) CYCLE
+            i = msh(iM)%fs(2)%eNoN
+            DO e=1, msh(iM)%nEl
+               DO a=i+1, msh(iM)%fs(1)%eNoN
+                  Ac = msh(iM)%IEN(a,e)
+                  eNds(Ac) = 1
+               END DO
             END DO
          END DO
 
-         CALL COMMU(KU)
-
          DO a=1, tnNo
-            R(1,a) = R(1,a) - ami*KU(1,a)
-            R(2,a) = R(2,a) - ami*KU(2,a)
-            R(3,a) = R(3,a) - ami*KU(3,a)
-            R(4,a) = R(4,a) - ami*KU(4,a)
+            IF (eNds(a) .EQ. 1) THEN
+               R(nsd+1,a) = 0._RKIND
+               s = (nsd+1)*(nsd+1)
+               DO i=rowPtr(a), rowPtr(a+1)-1
+                  c = colPtr(i)
+                  IF (c .EQ. a) THEN
+                     Val(s,i) = 1._RKIND
+                  ELSE
+                     Val(s,i) = 0._RKIND
+                  END IF
+               END DO
+            END IF
          END DO
-         DEALLOCATE(KU)
-      ELSE
-         ALLOCATE(KU(3,tnNo))
-         KU = 0._RKIND
-         DO a=1, tnNo
-            IF (.NOT.ISDOMAIN(cEq, a, phys_ustruct)) CYCLE
-
-            DO i=rowPtr(a), rowPtr(a+1)-1
-               c = colPtr(i)
-               KU(1,a) = KU(1,a) + Kd(1,i)*Rd(1,c) + Kd(2,i)*Rd(2,c)
-               KU(2,a) = KU(2,a) + Kd(3,i)*Rd(1,c) + Kd(4,i)*Rd(2,c)
-               KU(3,a) = KU(3,a) + Kd(5,i)*Rd(1,c) + Kd(6,i)*Rd(2,c)
-            END DO
-         END DO
-
-         CALL COMMU(KU)
-
-         DO a=1, tnNo
-            R(1,a) = R(1,a) - ami*KU(1,a)
-            R(2,a) = R(2,a) - ami*KU(2,a)
-            R(3,a) = R(3,a) - ami*KU(3,a)
-         END DO
-         DEALLOCATE(KU)
       END IF
 
       RETURN
       END SUBROUTINE USTRUCTR
+!####################################################################
+!     For Taylor-Hood type element discretization, update pressure
+!     at the edge nodes of an element
+      SUBROUTINE USTRUCT_THPCE()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      LOGICAL THflag, l1, l2, l3, l4
+      INTEGER(KIND=IKIND) a, b, e, g, i, s, iM, Ac, eType, eNoN, eNoNq
+      REAL(KIND=RKIND) Jac, eVol, p, rt, xp(nsd), xi0(nsd), xi(nsd),
+     2   ksix(nsd,nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), xql(:,:), pl(:), Nq(:),
+     2   Nqx(:,:), sA(:), sF(:)
+
+      THflag = .FALSE.
+      DO iM=1, nMsh
+         IF (msh(iM)%nFs .EQ. 2) THEN
+            THflag = .TRUE.
+            EXIT
+         END IF
+      END DO
+      IF (.NOT.THflag) RETURN
+
+      ALLOCATE(sA(tnNo), sF(tnNo))
+      sF(:) = 0._RKIND
+      sA(:) = 0._RKIND
+
+      s = eq(cEq)%s
+      DO iM=1, nMsh
+         IF (msh(iM)%nFs .EQ. 1) CYCLE
+
+         eType = msh(iM)%fs(2)%eType
+
+         eNoN  = msh(iM)%fs(1)%eNoN
+         eNoNq = msh(iM)%fs(2)%eNoN
+         ALLOCATE(xl(nsd,eNoN), xql(nsd,eNoNq), pl(eNoNq), Nq(eNoNq),
+     2      Nqx(nsd,eNoNq))
+
+         xi0 = 0._RKIND
+         DO g=1, msh(iM)%fs(2)%nG
+            xi0 = xi0 + msh(iM)%fs(2)%xi(:,g)
+         END DO
+         xi0 = xi0 / REAL(msh(iM)%fs(2)%nG, KIND=RKIND)
+
+         DO e=1, msh(iM)%nEl
+            cDmn = DOMAIN(msh(iM), cEq, e)
+            IF (eq(cEq)%dmn(cDmn)%phys .NE. phys_ustruct) CYCLE
+
+            DO a=1, eNoN
+               Ac = msh(iM)%IEN(a,e)
+               xl(:,a) = x(:,Ac)
+            END DO
+
+            DO a=1, eNoNq
+               Ac = msh(iM)%IEN(a,e)
+               pl(a)    = Yn(s+nsd,Ac)
+               xql(:,a) = xl(:,a)
+            END DO
+
+            eVol = 0._RKIND
+            DO g=1, msh(iM)%fs(2)%nG
+               IF (g.EQ.1 .OR. .NOT.msh(iM)%fs(2)%lShpF) THEN
+                  CALL GNN(eNoNq, nsd, msh(iM)%fs(2)%Nx(:,:,g), xql,
+     2               Nqx, Jac, ksix)
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+               END IF
+               eVol = eVol + msh(iM)%fs(2)%w(g)*Jac
+            END DO
+
+            DO a=eNoNq+1, eNoN
+               Ac = msh(iM)%IEN(a,e)
+               xp = xl(:,a)
+
+               xi = xi0
+               CALL GETXI(eType, eNoNq, xql, xp, xi, l1)
+
+               i = 0
+               DO b=1, nsd
+                  IF (xi(b).GE.msh(iM)%fs(2)%xib(1,b) .AND.
+     2                xi(b).LE.msh(iM)%fs(2)%xib(2,b)) i = i + 1
+               END DO
+               l2 = i .EQ. nsd
+
+               CALL GETGNN(nsd, eType, eNoNq, xi, Nq, Nqx)
+
+               i  = 0
+               rt = 0._RKIND
+               DO b=1, eNoNq
+                  rt = rt + Nq(b)
+                  IF (Nq(b).GT.msh(iM)%fs(2)%Nb(1,b) .AND.
+     2                Nq(b).LT.msh(iM)%fs(2)%Nb(2,b)) i = i + 1
+               END DO
+               l3 = i .EQ. eNoNq
+               l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
+
+               l1 = ALL((/l1, l2, l3, l4/))
+               IF (.NOT.l1) err =
+     2            "Error in computing face derivatives (USTRUCT_THPCE)"
+
+               p = 0._RKIND
+               DO b=1, eNoNq
+                  p = p + pl(b)*Nq(b)
+               END DO
+
+               sF(Ac) = sF(Ac) + p*eVol
+               sA(Ac) = sA(Ac) + eVol
+            END DO
+
+         END DO ! e-loop
+         DEALLOCATE(xl, xql, pl, Nq, Nqx)
+      END DO ! iM-loop
+
+      CALL COMMU(sA)
+      CALL COMMU(sF)
+
+      DO a=1, tnNo
+         IF (.NOT.ISZERO(sA(a))) Yn(s+nsd,a) = sF(a)/sA(a)
+      END DO
+
+      DEALLOCATE(sA, sF)
+
+      RETURN
+      END SUBROUTINE USTRUCT_THPCE
 !####################################################################

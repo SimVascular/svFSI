@@ -333,6 +333,17 @@
          END IF
       END DO
 
+!     Initialize function spaces
+      DO iM=1, nMsh
+         ALLOCATE(msh(iM)%fs(msh(iM)%nFs))
+         CALL INITFSMSH(msh(iM))
+         DO iFa=1, msh(iM)%nFa
+            msh(iM)%fa(iFa)%nFs = msh(iM)%nFs
+            ALLOCATE(msh(iM)%fa(iFa)%fs(msh(iM)%fa(iFa)%nFs))
+            CALL INITFSFACE(msh(iM)%fa(iFa))
+         END DO
+      END DO
+
 !     Initialize Immersed Boundary data structures
       ALLOCATE(iblank(tnNo), ighost(tnNo))
       iblank = 0
@@ -375,17 +386,6 @@
 
 !     Preparing faces and BCs
       CALL BAFINI()
-
-!     Initialize function spaces
-      DO iM=1, nMsh
-         ALLOCATE(msh(iM)%fs(msh(iM)%nFs))
-         CALL INITFSMSH(msh(iM))
-         DO iFa=1, msh(iM)%nFa
-            msh(iM)%fa(iFa)%nFs = msh(iM)%nFs
-            ALLOCATE(msh(iM)%fa(iFa)%fs(msh(iM)%fa(iFa)%nFs))
-            CALL INITFSFACE(msh(iM)%fa(iFa))
-         END DO
-      END DO
 
 !     As all the arrays are allocated, call BIN to VTK for conversion
       IF (bin2VTK) CALL PPBIN2VTK()

@@ -205,7 +205,7 @@
       DO e=1, lFa%nEl
          IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, n)
+            CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
             DO a=1, lFa%eNoN
                Ac       = lFa%IEN(a,e)
                sV(:,Ac) = sV(:,Ac) + n*lFa%N(a,g)*lFa%w(g)
@@ -426,7 +426,7 @@
             DO e=1, lFa%nEl
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e)
                DO g=1, lFa%nG
-                  CALL GNNB(lFa, e, g, n)
+                  CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),n)
                   DO a=1, lFa%eNoN
                      Ac = lFa%IEN(a,e)
                      sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n

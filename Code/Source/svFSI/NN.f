@@ -754,6 +754,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nb(2,5)  = 4._RKIND
          Nb(2,6)  = 4._RKIND
 
+!     1D elements
       CASE(eType_QUD)
          Nb(1,1)  = -0.125_RKIND
          Nb(1,2)  = -0.125_RKIND
@@ -1045,15 +1046,15 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !     This routine returns a vector at element "e" and Gauss point
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)).
-      SUBROUTINE GNNB(lFa, e, g, n)
+      SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: e, g
-      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd), Nx(insd,eNoNb)
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN, insd
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
       REAL(KIND=RKIND) v(nsd)
 
       LOGICAL, ALLOCATABLE :: setIt(:)
@@ -1063,7 +1064,6 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
-      insd = nsd - 1
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
 
@@ -1071,7 +1071,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !     that are at the face at the beginning of the list and the rest at
 !     the end
       setIt = .TRUE.
-      DO a=1, lFa%eNoN
+      DO a=1, eNoNb
          Ac = lFa%IEN(a,e)
          DO b=1, eNoN
             IF (setIt(b)) THEN
@@ -1085,7 +1085,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
             WRITE(*,'(A)') " ERROR: could not find matching face nodes"
             WRITE(*,'(A)',ADVANCE='NO') "    Face "//TRIM(lFa%name)//
      2         " e: "//STR(e)
-            DO b=1, lFa%eNoN
+            DO b=1, eNoNb
                WRITE(*,'(A)',ADVANCE='NO') " "//STR(lFa%IEN(b,e))
             END DO
             WRITE(*,'(A)')
@@ -1102,7 +1102,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          ptr(a)   = b
          setIt(b) = .FALSE.
       END DO
-      a = lFa%eNoN
+      a = eNoNb
       DO b=1, eNoN
          IF (setIt(b)) THEN
             a      = a + 1
@@ -1140,7 +1140,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !        Face element surface deflation
          ALLOCATE(xXi(nsd,1))
          xXi = 0._RKIND
-         DO a=1, lFa%eNoN
+         DO a=1, eNoNb
             b = ptr(a)
             xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
          END DO
@@ -1165,10 +1165,10 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
       ELSE
          ALLOCATE(xXi(nsd,insd))
          xXi = 0._RKIND
-         DO a=1, lFa%eNoN
+         DO a=1, eNoNb
             b = ptr(a)
             DO i=1, insd
-               xXi(:,i) = xXi(:,i) + lFa%Nx(i,a,g)*lX(:,b)
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,b)
             END DO
          END DO
          n = CROSS(xXi)

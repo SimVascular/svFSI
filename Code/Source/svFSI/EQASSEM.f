@@ -145,7 +145,7 @@
             IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
             DO g=1, lFa%nG
-               CALL GNNB(lFa, e, g, nV)
+               CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
                Jac = SQRT(NORM(nV))
                nV  = nV/Jac
                w   = lFa%w(g)*Jac
