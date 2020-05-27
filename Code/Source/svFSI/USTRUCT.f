@@ -106,7 +106,7 @@
          lKd = 0._RKIND
 
 !        Set function spaces for velocity/displacement and pressure.
-         CALL USTRUCT_SETFS(fs, lM, vmsStab, 1)
+         CALL GETTHOODFS(fs, lM, vmsStab, 1)
 
 !        Define element coordinates appropriate for function spaces
          ALLOCATE(xwl(nsd,fs(1)%eNoN), Nwx(nsd,fs(1)%eNoN))
@@ -135,7 +135,7 @@
          END DO ! g: loop
 
 !        Set function spaces for velocity/displacement and pressure.
-         CALL USTRUCT_SETFS(fs, lM, vmsStab, 2)
+         CALL GETTHOODFS(fs, lM, vmsStab, 2)
 
 !        Gauss integration 2
          DO g=1, fs(2)%nG
@@ -176,82 +176,6 @@
 
       RETURN
       END SUBROUTINE CONSTRUCT_uSOLID
-!--------------------------------------------------------------------
-      SUBROUTINE USTRUCT_SETFS(fs, lM, vmsFlag, iOpt)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(fsType), INTENT(OUT) :: fs(2)
-      TYPE(mshType), INTENT(IN) :: lM
-      LOGICAL, INTENT(IN) :: vmsFlag
-      INTEGER, INTENT(IN) :: iOpt
-
-      INTEGER i, g
-
-      CALL DESTROY(fs(1))
-      CALL DESTROY(fs(2))
-      IF (vmsFlag) THEN
-         DO i=1, 2
-            fs(i)%nG    = lM%fs(1)%nG
-            fs(i)%eType = lM%fs(1)%eType
-            fs(i)%lShpF = lM%fs(1)%lShpF
-            fs(i)%eNoN  = lM%fs(1)%eNoN
-            CALL ALLOCFS(fs(i), nsd)
-            fs(i)%w  = lM%fs(1)%w
-            fs(i)%xi = lM%fs(1)%xi
-            fs(i)%N  = lM%fs(1)%N
-            fs(i)%Nx = lM%fs(1)%Nx
-         END DO
-      ELSE
-         IF (iOpt .EQ. 1) THEN
-            fs(1)%nG    = lM%fs(1)%nG
-            fs(1)%eType = lM%fs(1)%eType
-            fs(1)%lShpF = lM%fs(1)%lShpF
-            fs(1)%eNoN  = lM%fs(1)%eNoN
-            CALL ALLOCFS(fs(1), nsd)
-            fs(1)%w  = lM%fs(1)%w
-            fs(1)%xi = lM%fs(1)%xi
-            fs(1)%N  = lM%fs(1)%N
-            fs(1)%Nx = lM%fs(1)%Nx
-
-            fs(2)%nG    = lM%fs(1)%nG
-            fs(2)%eType = lM%fs(2)%eType
-            fs(2)%lShpF = lM%fs(2)%lShpF
-            fs(2)%eNoN  = lM%fs(2)%eNoN
-            CALL ALLOCFS(fs(2), nsd)
-            fs(2)%w(:)    = lM%fs(1)%w(:)
-            fs(2)%xi(:,:) = lM%fs(1)%xi(:,:)
-            DO g=1, fs(2)%nG
-               CALL GETGNN(nsd, fs(2)%eType, fs(2)%eNoN, fs(2)%xi(:,g),
-     2            fs(2)%N(:,g), fs(2)%Nx(:,:,g))
-            END DO
-         ELSE IF (iOpt .EQ. 2) THEN
-            fs(2)%nG    = lM%fs(2)%nG
-            fs(2)%eType = lM%fs(2)%eType
-            fs(2)%lShpF = lM%fs(2)%lShpF
-            fs(2)%eNoN  = lM%fs(2)%eNoN
-            CALL ALLOCFS(fs(2), nsd)
-            fs(2)%w  = lM%fs(2)%w
-            fs(2)%xi = lM%fs(2)%xi
-            fs(2)%N  = lM%fs(2)%N
-            fs(2)%Nx = lM%fs(2)%Nx
-
-            fs(1)%nG    = lM%fs(2)%nG
-            fs(1)%eType = lM%fs(1)%eType
-            fs(1)%lShpF = lM%fs(1)%lShpF
-            fs(1)%eNoN  = lM%fs(1)%eNoN
-            CALL ALLOCFS(fs(1), nsd)
-            fs(1)%w(:)    = lM%fs(2)%w(:)
-            fs(1)%xi(:,:) = lM%fs(2)%xi(:,:)
-            DO g=1, fs(1)%nG
-               CALL GETGNN(nsd, fs(1)%eType, fs(1)%eNoN, fs(1)%xi(:,g),
-     2            fs(1)%N(:,g), fs(1)%Nx(:,:,g))
-            END DO
-         END IF
-      END IF
-
-      RETURN
-      END SUBROUTINE USTRUCT_SETFS
 !####################################################################
       SUBROUTINE USTRUCT3D_M(vmsFlag, eNoNw, eNoNq, nFn, w, Je, Nw, Nq,
      2   Nwx, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd)
@@ -874,7 +798,7 @@
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b
       REAL(KIND=RKIND) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p,
      2   pd, px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, tauM,
-     3   tauC, rC, rCl, rM(3), NwxFi(3,eNoNw), NqxFi(3,eNoNq),VxFi(3,3),
+     3   tauC, rC, rM(3), NwxFi(3,eNoNw), NqxFi(3,eNoNq),VxFi(3,3),
      4   PxFi(3), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(3,eNoNw), NxNx, T1,
      5   T2, T3, Ku
 
@@ -1087,7 +1011,7 @@
       INTEGER(KIND=IKIND) :: i, j, k, a, b
       REAL(KIND=RKIND) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p,
      2   pd, px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, tauM,
-     3   tauC, rC, rCl, rM(2), NwxFi(2,eNoNw), NqxFi(2,eNoNq),VxFi(2,2),
+     3   tauC, rC, rM(2), NwxFi(2,eNoNw), NqxFi(2,eNoNq),VxFi(2,2),
      4   PxFi(2), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(2,eNoNw), NxNx, T1,
      5   T2, T3, Ku
 
@@ -1601,11 +1525,9 @@
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo)
 
-      LOGICAL :: THflag
-      INTEGER(KIND=IKIND) :: a, i, c, s, e, Ac, iM
+      INTEGER(KIND=IKIND) :: a, i, c, s
       REAL(KIND=RKIND) :: amg, ami
 
-      INTEGER, ALLOCATABLE :: eNds(:)
       REAL(KIND=RKIND), ALLOCATABLE :: KU(:,:)
 
       IF (eq(cEq)%phys .NE. phys_ustruct .AND.
@@ -1676,169 +1598,8 @@
          END IF
       END  IF
 
-      THflag = .FALSE.
-      DO iM=1, nMsh
-         IF (msh(iM)%nFs .EQ. 2) THEN
-            THflag = .TRUE.
-            EXIT
-         END IF
-      END DO
-
-      IF (THflag) THEN
-         ALLOCATE(eNds(tnNo))
-         eNds(:) = 0
-         DO iM=1, nMsh
-            IF (msh(iM)%nFs .EQ. 1) CYCLE
-            i = msh(iM)%fs(2)%eNoN
-            DO e=1, msh(iM)%nEl
-               DO a=i+1, msh(iM)%fs(1)%eNoN
-                  Ac = msh(iM)%IEN(a,e)
-                  eNds(Ac) = 1
-               END DO
-            END DO
-         END DO
-
-         DO a=1, tnNo
-            IF (eNds(a) .EQ. 1) THEN
-               R(nsd+1,a) = 0._RKIND
-               s = (nsd+1)*(nsd+1)
-               DO i=rowPtr(a), rowPtr(a+1)-1
-                  c = colPtr(i)
-                  IF (c .EQ. a) THEN
-                     Val(s,i) = 1._RKIND
-                  ELSE
-                     Val(s,i) = 0._RKIND
-                  END IF
-               END DO
-            END IF
-         END DO
-      END IF
+      CALL THOOD_ValRC()
 
       RETURN
       END SUBROUTINE USTRUCTR
-!####################################################################
-!     For Taylor-Hood type element discretization, update pressure
-!     at the edge nodes of an element
-      SUBROUTINE USTRUCT_THPCE()
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      LOGICAL THflag, l1, l2, l3, l4
-      INTEGER(KIND=IKIND) a, b, e, g, i, s, iM, Ac, eType, eNoN, eNoNq
-      REAL(KIND=RKIND) Jac, eVol, p, rt, xp(nsd), xi0(nsd), xi(nsd),
-     2   ksix(nsd,nsd)
-
-      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), xql(:,:), pl(:), Nq(:),
-     2   Nqx(:,:), sA(:), sF(:)
-
-      THflag = .FALSE.
-      DO iM=1, nMsh
-         IF (msh(iM)%nFs .EQ. 2) THEN
-            THflag = .TRUE.
-            EXIT
-         END IF
-      END DO
-      IF (.NOT.THflag) RETURN
-
-      ALLOCATE(sA(tnNo), sF(tnNo))
-      sF(:) = 0._RKIND
-      sA(:) = 0._RKIND
-
-      s = eq(cEq)%s
-      DO iM=1, nMsh
-         IF (msh(iM)%nFs .EQ. 1) CYCLE
-
-         eType = msh(iM)%fs(2)%eType
-
-         eNoN  = msh(iM)%fs(1)%eNoN
-         eNoNq = msh(iM)%fs(2)%eNoN
-         ALLOCATE(xl(nsd,eNoN), xql(nsd,eNoNq), pl(eNoNq), Nq(eNoNq),
-     2      Nqx(nsd,eNoNq))
-
-         xi0 = 0._RKIND
-         DO g=1, msh(iM)%fs(2)%nG
-            xi0 = xi0 + msh(iM)%fs(2)%xi(:,g)
-         END DO
-         xi0 = xi0 / REAL(msh(iM)%fs(2)%nG, KIND=RKIND)
-
-         DO e=1, msh(iM)%nEl
-            cDmn = DOMAIN(msh(iM), cEq, e)
-            IF (eq(cEq)%dmn(cDmn)%phys .NE. phys_ustruct) CYCLE
-
-            DO a=1, eNoN
-               Ac = msh(iM)%IEN(a,e)
-               xl(:,a) = x(:,Ac)
-            END DO
-
-            DO a=1, eNoNq
-               Ac = msh(iM)%IEN(a,e)
-               pl(a)    = Yn(s+nsd,Ac)
-               xql(:,a) = xl(:,a)
-            END DO
-
-            eVol = 0._RKIND
-            DO g=1, msh(iM)%fs(2)%nG
-               IF (g.EQ.1 .OR. .NOT.msh(iM)%fs(2)%lShpF) THEN
-                  CALL GNN(eNoNq, nsd, msh(iM)%fs(2)%Nx(:,:,g), xql,
-     2               Nqx, Jac, ksix)
-                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
-               END IF
-               eVol = eVol + msh(iM)%fs(2)%w(g)*Jac
-            END DO
-
-            DO a=eNoNq+1, eNoN
-               Ac = msh(iM)%IEN(a,e)
-               xp = xl(:,a)
-
-               xi = xi0
-               CALL GETXI(eType, eNoNq, xql, xp, xi, l1)
-
-               i = 0
-               DO b=1, nsd
-                  IF (xi(b).GE.msh(iM)%fs(2)%xib(1,b) .AND.
-     2                xi(b).LE.msh(iM)%fs(2)%xib(2,b)) i = i + 1
-               END DO
-               l2 = i .EQ. nsd
-
-               CALL GETGNN(nsd, eType, eNoNq, xi, Nq, Nqx)
-
-               i  = 0
-               rt = 0._RKIND
-               DO b=1, eNoNq
-                  rt = rt + Nq(b)
-                  IF (Nq(b).GT.msh(iM)%fs(2)%Nb(1,b) .AND.
-     2                Nq(b).LT.msh(iM)%fs(2)%Nb(2,b)) i = i + 1
-               END DO
-               l3 = i .EQ. eNoNq
-               l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-               l1 = ALL((/l1, l2, l3, l4/))
-               IF (.NOT.l1) err =
-     2            "Error in computing face derivatives (USTRUCT_THPCE)"
-
-               p = 0._RKIND
-               DO b=1, eNoNq
-                  p = p + pl(b)*Nq(b)
-               END DO
-
-               sF(Ac) = sF(Ac) + p*eVol
-               sA(Ac) = sA(Ac) + eVol
-            END DO
-
-         END DO ! e-loop
-         DEALLOCATE(xl, xql, pl, Nq, Nqx)
-      END DO ! iM-loop
-
-      CALL COMMU(sA)
-      CALL COMMU(sF)
-
-      DO a=1, tnNo
-         IF (.NOT.ISZERO(sA(a))) Yn(s+nsd,a) = sF(a)/sA(a)
-      END DO
-
-      DEALLOCATE(sA, sF)
-
-      RETURN
-      END SUBROUTINE USTRUCT_THPCE
 !####################################################################

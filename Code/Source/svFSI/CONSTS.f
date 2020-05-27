@@ -97,12 +97,12 @@
 !     equation, linear elasticity, heat in fluid (advection-diffusion),
 !     fluid-structure-interaction, mesh motion, Shell mechanics,
 !     Coupled-Momentum-Method, Cardiac Electro-Physiology,
-!     Nonlinear structure (v-p)
+!     Nonlinear structure (v-p), Stokes equations
       INTEGER(KIND=IKIND), PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_mesh = 207,
      4   phys_shell = 208, phys_CMM = 209, phys_CEP = 210,
-     5   phys_ustruct = 211
+     5   phys_ustruct = 211, phys_stokes = 212
 !--------------------------------------------------------------------
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit

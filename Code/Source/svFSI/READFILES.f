@@ -822,6 +822,27 @@
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
+      CASE ('stokes')
+         lEq%phys = phys_stokes
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
+
+         propL(1,1) = ctau_M
+         propL(2,1) = f_x
+         propL(3,1) = f_y
+         IF (nsd .EQ. 3) propL(4,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/7,2,3,0/)
+         outPuts(1) = out_velocity
+         outPuts(2) = out_pressure
+         outPuts(3) = out_WSS
+         outPuts(4) = out_vorticity
+         outPuts(5) = out_traction
+         outPuts(6) = out_viscosity
+         outPuts(7) = out_divergence
+
+         CALL READLS(lSolver_CG, lEq, list)
+
       CASE DEFAULT
          err = "Equation type "//TRIM(eqName)//" is not defined"
       END SELECT
@@ -1049,8 +1070,9 @@
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
 
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
-     2       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
+     3       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
             CALL READVISCMODEL(lEq%dmn(iDmn), lPD)
          END IF
       END DO
@@ -2407,7 +2429,6 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("constant", "const", "newtonian")
          lDmn%visc%viscType = viscType_Const
          lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0._RKIND)
-         RETURN
 
       CASE ("carreau-yasuda", "cy")
          lDmn%visc%viscType = viscType_CY
@@ -2426,7 +2447,6 @@ c     2         "can be applied for Neumann boundaries only"
      2         "High shear-rate viscosity value should be higher than"//
      3         " low shear-rate value"
          END IF
-         RETURN
 
       CASE ("cassons", "cass")
          lDmn%visc%viscType = viscType_Cass
@@ -2437,11 +2457,15 @@ c     2         "can be applied for Neumann boundaries only"
          lDmn%visc%lam = 0.5_RKIND
          lPtr => lVis%get(rtmp,"Low shear-rate threshold")
          IF (ASSOCIATED(lPtr)) lDmn%visc%lam = rtmp
-         RETURN
 
       CASE DEFAULT
          err = "Undefined constitutive model for viscosity used"
       END SELECT
+
+      IF ((lDmn%phys .EQ. phys_stokes) .AND.
+     2    (lDmn%visc%viscType .NE. viscType_Const)) THEN
+         err = "Only constant viscosity is allowed for Stokes flow"
+      END IF
 
       RETURN
       END SUBROUTINE READVISCMODEL

@@ -163,6 +163,8 @@
 !     for subsequent iterations
             IF (sstEq) CALL USTRUCTR(Yg)
 
+            IF (eq(cEq)%phys .EQ. phys_stokes) CALL THOOD_ValRC()
+
             CALL SETBCUNDEFNEU()
 
 !     Add contribution from IB to residue

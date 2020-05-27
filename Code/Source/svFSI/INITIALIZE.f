@@ -130,6 +130,9 @@
          CASE (phys_CEP)
             eq(iEq)%dof = 1
             eq(iEq)%sym = 'EP'
+         CASE (phys_stokes)
+            eq(iEq)%dof = nsd + 1
+            eq(iEq)%sym = 'SS'
          CASE DEFAULT
             err = "Equation type "//eq(iEq)%sym//" is not defined"
          END SELECT

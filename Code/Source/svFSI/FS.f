@@ -166,7 +166,7 @@
 
       RETURN
       END SUBROUTINE ALLOCFS
-!--------------------------------------------------------------------
+!####################################################################
 !     Sets Tayloor-Hood basis for a parent element type
       SUBROUTINE SETTHOODFS(fs, eType)
       USE COMMOD
@@ -205,5 +205,136 @@
 
       RETURN
       END SUBROUTINE SETTHOODFS
+!--------------------------------------------------------------------
+      SUBROUTINE GETTHOODFS(fs, lM, lStab, iOpt)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(fsType), INTENT(OUT) :: fs(2)
+      TYPE(mshType), INTENT(IN) :: lM
+      LOGICAL, INTENT(IN) :: lStab
+      INTEGER, INTENT(IN) :: iOpt
+
+      INTEGER i, g
+
+      CALL DESTROY(fs(1))
+      CALL DESTROY(fs(2))
+      IF (lStab) THEN
+         DO i=1, 2
+            fs(i)%nG    = lM%fs(1)%nG
+            fs(i)%eType = lM%fs(1)%eType
+            fs(i)%lShpF = lM%fs(1)%lShpF
+            fs(i)%eNoN  = lM%fs(1)%eNoN
+            CALL ALLOCFS(fs(i), nsd)
+            fs(i)%w  = lM%fs(1)%w
+            fs(i)%xi = lM%fs(1)%xi
+            fs(i)%N  = lM%fs(1)%N
+            fs(i)%Nx = lM%fs(1)%Nx
+         END DO
+      ELSE
+         IF (iOpt .EQ. 1) THEN
+            fs(1)%nG    = lM%fs(1)%nG
+            fs(1)%eType = lM%fs(1)%eType
+            fs(1)%lShpF = lM%fs(1)%lShpF
+            fs(1)%eNoN  = lM%fs(1)%eNoN
+            CALL ALLOCFS(fs(1), nsd)
+            fs(1)%w  = lM%fs(1)%w
+            fs(1)%xi = lM%fs(1)%xi
+            fs(1)%N  = lM%fs(1)%N
+            fs(1)%Nx = lM%fs(1)%Nx
+
+            fs(2)%nG    = lM%fs(1)%nG
+            fs(2)%eType = lM%fs(2)%eType
+            fs(2)%lShpF = lM%fs(2)%lShpF
+            fs(2)%eNoN  = lM%fs(2)%eNoN
+            CALL ALLOCFS(fs(2), nsd)
+            fs(2)%w(:)    = lM%fs(1)%w(:)
+            fs(2)%xi(:,:) = lM%fs(1)%xi(:,:)
+            DO g=1, fs(2)%nG
+               CALL GETGNN(nsd, fs(2)%eType, fs(2)%eNoN, fs(2)%xi(:,g),
+     2            fs(2)%N(:,g), fs(2)%Nx(:,:,g))
+            END DO
+         ELSE IF (iOpt .EQ. 2) THEN
+            fs(2)%nG    = lM%fs(2)%nG
+            fs(2)%eType = lM%fs(2)%eType
+            fs(2)%lShpF = lM%fs(2)%lShpF
+            fs(2)%eNoN  = lM%fs(2)%eNoN
+            CALL ALLOCFS(fs(2), nsd)
+            fs(2)%w  = lM%fs(2)%w
+            fs(2)%xi = lM%fs(2)%xi
+            fs(2)%N  = lM%fs(2)%N
+            fs(2)%Nx = lM%fs(2)%Nx
+
+            fs(1)%nG    = lM%fs(2)%nG
+            fs(1)%eType = lM%fs(1)%eType
+            fs(1)%lShpF = lM%fs(1)%lShpF
+            fs(1)%eNoN  = lM%fs(1)%eNoN
+            CALL ALLOCFS(fs(1), nsd)
+            fs(1)%w(:)    = lM%fs(2)%w(:)
+            fs(1)%xi(:,:) = lM%fs(2)%xi(:,:)
+            DO g=1, fs(1)%nG
+               CALL GETGNN(nsd, fs(1)%eType, fs(1)%eNoN, fs(1)%xi(:,g),
+     2            fs(1)%N(:,g), fs(1)%Nx(:,:,g))
+            END DO
+         END IF
+      END IF
+
+      RETURN
+      END SUBROUTINE GETTHOODFS
+!####################################################################
+      SUBROUTINE THOOD_ValRC()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      LOGICAL :: THflag
+      INTEGER(KIND=IKIND) :: a, i, c, s, e, Ac, iM
+
+      INTEGER, ALLOCATABLE :: eNds(:)
+
+      IF ((eq(cEq)%phys .NE. phys_stokes) .AND.
+     2    (eq(cEq)%phys .NE. phys_ustruct)) RETURN
+
+      THflag = .FALSE.
+      DO iM=1, nMsh
+         IF (msh(iM)%nFs .EQ. 2) THEN
+            THflag = .TRUE.
+            EXIT
+         END IF
+      END DO
+
+      IF (THflag) THEN
+         ALLOCATE(eNds(tnNo))
+         eNds(:) = 0
+         DO iM=1, nMsh
+            IF (msh(iM)%nFs .EQ. 1) CYCLE
+            i = msh(iM)%fs(2)%eNoN
+            DO e=1, msh(iM)%nEl
+               DO a=i+1, msh(iM)%fs(1)%eNoN
+                  Ac = msh(iM)%IEN(a,e)
+                  eNds(Ac) = 1
+               END DO
+            END DO
+         END DO
+
+         DO a=1, tnNo
+            IF (eNds(a) .EQ. 1) THEN
+               R(nsd+1,a) = 0._RKIND
+               s = (nsd+1)*(nsd+1)
+               DO i=rowPtr(a), rowPtr(a+1)-1
+                  c = colPtr(i)
+                  IF (c .EQ. a) THEN
+                     Val(s,i) = 1._RKIND
+                  ELSE
+                     Val(s,i) = 0._RKIND
+                  END IF
+               END DO
+            END IF
+         END DO
+         DEALLOCATE(eNds)
+      END IF
+
+      RETURN
+      END SUBROUTINE THOOD_ValRC
 !####################################################################
 

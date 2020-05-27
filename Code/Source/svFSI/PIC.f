@@ -202,7 +202,6 @@ c         CALL IB_SETBCPEN()
                Ad(:,a)     = Ad(:,a)     - dUl(:)
                Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
             END DO
-            CALL USTRUCT_THPCE()
          ELSE IF (eq(cEq)%phys .EQ. phys_mesh) THEN
             DO a=1, tnNo
                An(s:e,a)   = An(s:e,a) - R(:,a)
@@ -216,6 +215,11 @@ c         CALL IB_SETBCPEN()
             Yn(s:e,a) = Yn(s:e,a) - R(:,a)*coef(1)
             Dn(s:e,a) = Dn(s:e,a) - R(:,a)*coef(3)
          END DO
+      END IF
+
+      IF ((eq(cEq)%phys .EQ. phys_ustruct) .OR.
+     2    (eq(cEq)%phys .EQ. phys_stokes)) THEN
+        CALL PICETH()
       END IF
 
       IF (eq(cEq)%phys .EQ. phys_FSI) THEN
@@ -294,5 +298,131 @@ c         CALL IB_SETBCPEN()
 
       RETURN
       END SUBROUTINE PICC
+!====================================================================
+!     Pressure correction at edge nodes for Taylor-Hood type element
+!     via interpolation
+      SUBROUTINE PICETH()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+
+      LOGICAL THflag, l1, l2, l3, l4
+      INTEGER(KIND=IKIND) a, b, e, g, i, s, iM, Ac, eType, eNoN, eNoNq
+      REAL(KIND=RKIND) Jac, eVol, p, rt, xp(nsd), xi0(nsd), xi(nsd),
+     2   ksix(nsd,nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), xql(:,:), pl(:), Nq(:),
+     2   Nqx(:,:), sA(:), sF(:)
+
+      THflag = .FALSE.
+      DO iM=1, nMsh
+         IF (msh(iM)%nFs .EQ. 2) THEN
+            THflag = .TRUE.
+            EXIT
+         END IF
+      END DO
+      IF (.NOT.THflag) RETURN
+
+      ALLOCATE(sA(tnNo), sF(tnNo))
+      sF(:) = 0._RKIND
+      sA(:) = 0._RKIND
+
+      s = eq(cEq)%s
+      DO iM=1, nMsh
+         IF (msh(iM)%nFs .EQ. 1) CYCLE
+
+         eType = msh(iM)%fs(2)%eType
+
+         eNoN  = msh(iM)%fs(1)%eNoN
+         eNoNq = msh(iM)%fs(2)%eNoN
+         ALLOCATE(xl(nsd,eNoN), xql(nsd,eNoNq), pl(eNoNq), Nq(eNoNq),
+     2      Nqx(nsd,eNoNq))
+
+         xi0 = 0._RKIND
+         DO g=1, msh(iM)%fs(2)%nG
+            xi0 = xi0 + msh(iM)%fs(2)%xi(:,g)
+         END DO
+         xi0 = xi0 / REAL(msh(iM)%fs(2)%nG, KIND=RKIND)
+
+         DO e=1, msh(iM)%nEl
+            cDmn = DOMAIN(msh(iM), cEq, e)
+            IF ((eq(cEq)%dmn(cDmn)%phys .NE. phys_ustruct) .AND.
+     2          (eq(cEq)%dmn(cDmn)%phys .NE. phys_stokes)) CYCLE
+
+            DO a=1, eNoN
+               Ac = msh(iM)%IEN(a,e)
+               xl(:,a) = x(:,Ac)
+            END DO
+
+            DO a=1, eNoNq
+               Ac = msh(iM)%IEN(a,e)
+               pl(a)    = Yn(s+nsd,Ac)
+               xql(:,a) = xl(:,a)
+            END DO
+
+            eVol = 0._RKIND
+            DO g=1, msh(iM)%fs(2)%nG
+               IF (g.EQ.1 .OR. .NOT.msh(iM)%fs(2)%lShpF) THEN
+                  CALL GNN(eNoNq, nsd, msh(iM)%fs(2)%Nx(:,:,g), xql,
+     2               Nqx, Jac, ksix)
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+               END IF
+               eVol = eVol + msh(iM)%fs(2)%w(g)*Jac
+            END DO
+
+            DO a=eNoNq+1, eNoN
+               Ac = msh(iM)%IEN(a,e)
+               xp = xl(:,a)
+
+               xi = xi0
+               CALL GETXI(eType, eNoNq, xql, xp, xi, l1)
+
+               i = 0
+               DO b=1, nsd
+                  IF (xi(b).GE.msh(iM)%fs(2)%xib(1,b) .AND.
+     2                xi(b).LE.msh(iM)%fs(2)%xib(2,b)) i = i + 1
+               END DO
+               l2 = i .EQ. nsd
+
+               CALL GETGNN(nsd, eType, eNoNq, xi, Nq, Nqx)
+
+               i  = 0
+               rt = 0._RKIND
+               DO b=1, eNoNq
+                  rt = rt + Nq(b)
+                  IF (Nq(b).GT.msh(iM)%fs(2)%Nb(1,b) .AND.
+     2                Nq(b).LT.msh(iM)%fs(2)%Nb(2,b)) i = i + 1
+               END DO
+               l3 = i .EQ. eNoNq
+               l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
+
+               l1 = ALL((/l1, l2, l3, l4/))
+               IF (.NOT.l1) err =
+     2            "Error in computing face derivatives (USTRUCT_THPCE)"
+
+               p = 0._RKIND
+               DO b=1, eNoNq
+                  p = p + pl(b)*Nq(b)
+               END DO
+
+               sF(Ac) = sF(Ac) + p*eVol
+               sA(Ac) = sA(Ac) + eVol
+            END DO
+
+         END DO ! e-loop
+         DEALLOCATE(xl, xql, pl, Nq, Nqx)
+      END DO ! iM-loop
+
+      CALL COMMU(sA)
+      CALL COMMU(sF)
+
+      DO a=1, tnNo
+         IF (.NOT.ISZERO(sA(a))) Yn(s+nsd,a) = sF(a)/sA(a)
+      END DO
+
+      DEALLOCATE(sA, sF)
+
+      RETURN
+      END SUBROUTINE PICETH
 !====================================================================
 

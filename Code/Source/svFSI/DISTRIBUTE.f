@@ -572,13 +572,14 @@
             END IF
          END IF
 
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_ustruct) THEN
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct)) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
 
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_CMM) THEN
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
+     3       (lEq%dmn(iDmn)%phys .EQ. phys_CMM .AND. .NOT.cmmInit))THEN
             CALL DIST_VISCMODEL(lEq%dmn(iDmn)%visc)
          END IF
       END DO
@@ -1449,7 +1450,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       TYPE(faceType), INTENT(INOUT) :: lFa, gFa
       INTEGER(KIND=IKIND), INTENT(IN) :: gmtl(gtnNo)
 
-      INTEGER(KIND=IKIND) eNoNb, e, a, Ac, Ec, i, j
+      INTEGER(KIND=IKIND) eNoNb, e, a, Ac, Ec, i, j, iM
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), ePtr(:)
 
@@ -1457,22 +1458,25 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     populating gFa to all procs
       IF (cm%mas()) THEN
          gFa%d    = lFa%d
-         gFa%nNo  = lFa%nNo
-         gFa%nEl  = lFa%nEl
          gFa%eNoN = lFa%eNoN
+         gFa%iM   = lFa%iM
+         gFa%nEl  = lFa%nEl
          gFa%gnEl = lFa%gnEl
+         gFa%nNo  = lFa%nNo
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(1+gFa%eNoN,gFa%gnEl))
       ELSE
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(0,0))
       END IF
       CALL cm%bcast(gFa%d)
-      CALL cm%bcast(gFa%nNo)
-      CALL cm%bcast(gFa%nEl)
       CALL cm%bcast(gFa%eNoN)
+      CALL cm%bcast(gFa%iM)
+      CALL cm%bcast(gFa%nEl)
       CALL cm%bcast(gFa%gnEl)
+      CALL cm%bcast(gFa%nNo)
       CALL SELECTELEB(lM, gFa)
 
       eNoNb = gFa%eNoN
+      iM = gFa%iM
       ALLOCATE(gFa%IEN(eNoNb,gFa%nEl), gFa%gE(gFa%nEl), gFa%gN(gFa%nNo),
      2   ePtr(gFa%nEl))
       IF (cm%mas()) THEN
@@ -1484,6 +1488,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       lFa%d    = gFa%d
       lFa%eNoN = eNoNb
       CALL SELECTELEB(lM, lFa)
+      lFa%iM   = iM
 
       i = gFa%nEl*(2+eNoNb) + gFa%nNo
       ALLOCATE(part(i))

@@ -102,7 +102,7 @@
       TYPE(fsType) :: fs
 
       flag = .FALSE.
-      IF (PRESENT(pflag)) flag = .TRUE.
+      IF (PRESENT(pflag)) flag = pFlag
 
       insd = nsd - 1
       IF (msh(lFa%iM)%lShl) insd = insd - 1
@@ -276,7 +276,7 @@
       IF (PRESENT(uo)) u = uo
 
       flag = .FALSE.
-      IF (PRESENT(THflag)) flag = .TRUE.
+      IF (PRESENT(THflag)) flag = THflag
 
       nNo = SIZE(s,2)
       IF (nNo .NE. tnNo) THEN
@@ -339,7 +339,7 @@
 
       flag = .FALSE.
       IF (PRESENT(pFlag)) THEN
-         flag = .TRUE.
+         flag = pFlag
          IF (l .NE. u) err = "Incompatible spatial output setting "//
      2      "and element type"
       END IF

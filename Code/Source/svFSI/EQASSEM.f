@@ -76,6 +76,9 @@
       CASE (phys_CEP)
          CALL CONSTRUCT_CEP(lM, Ag, Yg, Dg)
 
+      CASE (phys_stokes)
+         CALL CONSTRUCT_STOKES(lM, Yg)
+
       CASE DEFAULT
          err = " Undefined physics selection for assembly"
       END SELECT
@@ -181,6 +184,9 @@
                   CALL BCEP(eNoN, w, N, h, lR)
 
                CASE (phys_shell)
+                  CALL BLELAS(eNoN, w, N, h, nV, lR)
+
+               CASE (phys_stokes)
                   CALL BLELAS(eNoN, w, N, h, nV, lR)
 
                CASE DEFAULT

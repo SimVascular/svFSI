@@ -149,6 +149,7 @@ set(FSRCS TYPEMOD.f
          REMESH.f
          SETBC.f
          SHELLS.f
+         STOKES.f
          STRUCT.f
          TXT.f
          USTRUCT.f
