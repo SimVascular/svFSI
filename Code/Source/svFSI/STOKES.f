@@ -134,10 +134,10 @@
 
             IF (nsd .EQ. 3) THEN
                CALL STOKES3D_C(lStab, fs(1)%eNoN, fs(2)%eNoN, w, ksix,
-     2            fs(2)%N(:,g), Nwx, Nqx, yl, lR, lK)
+     2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, yl, bfl, lR, lK)
             ELSE IF (nsd .EQ. 2) THEN
                CALL STOKES2D_C(lStab, fs(1)%eNoN, fs(2)%eNoN, w, ksix,
-     2            fs(2)%N(:,g), Nwx, Nqx, yl, lR, lK)
+     2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, yl, bfl, lR, lK)
             END IF
          END DO ! g: loop
 
@@ -264,7 +264,11 @@
             lK(9,a,b)  = lK(9,a,b)  + wl*mu*(Nwx(1,a)*Nwx(3,b))
             lK(10,a,b) = lK(10,a,b) + wl*mu*(Nwx(2,a)*Nwx(3,b))
             lK(11,a,b) = lK(11,a,b) + wl*mu*(Nwx(3,a)*Nwx(3,b) + NxNx)
+         END DO
+      END DO
 
+      DO b=1, eNoNq
+         DO a=1, eNoNw
             lK(4,a,b)  = lK(4,a,b)  - wl*Nwx(1,a)*Nq(b)
             lK(8,a,b)  = lK(8,a,b)  - wl*Nwx(2,a)*Nq(b)
             lK(12,a,b) = lK(12,a,b) - wl*Nwx(3,a)*Nq(b)
@@ -350,7 +354,11 @@
 
             lK(4,a,b) = lK(4,a,b) + wl*mu*(Nwx(1,a)*Nwx(2,b))
             lK(5,a,b) = lK(5,a,b) + wl*mu*(Nwx(2,a)*Nwx(2,b) + NxNx)
+         END DO
+      END DO
 
+      DO b=1, eNoNq
+         DO a=1, eNoNw
             lK(3,a,b) = lK(3,a,b) - wl*Nwx(1,a)*Nq(b)
             lK(6,a,b) = lK(6,a,b) - wl*Nwx(2,a)*Nq(b)
          END DO
@@ -359,23 +367,28 @@
       RETURN
       END SUBROUTINE STOKES2D_M
 !####################################################################
-      SUBROUTINE STOKES3D_C(lStab, eNoNw, eNoNq, w, ksix, Nq, Nwx, Nqx,
-     2   yl, lR, lK)
+      SUBROUTINE STOKES3D_C(lStab, eNoNw, eNoNq, w, ksix, Nw, Nq, Nwx,
+     2   Nqx, yl, bfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       LOGICAL, INTENT(IN) :: lStab
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
-      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nq(eNoNq),
-     2   Nwx(3,eNoNw), Nqx(3,eNoNq), yl(tDof,eNoNw)
+      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
+     2   Nq(eNoNq), Nwx(3,eNoNw), Nqx(3,eNoNq), yl(tDof,eNoNw),
+     3   bfl(3,eNoNw)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lK(dof*dof,eNoNw,eNoNw)
 
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b
-      REAL(KIND=RKIND) :: mu, div, px(3), kS, ctM, tauM, rM, wl, NxNx
+      REAL(KIND=RKIND) :: mu, div, fb(3), px(3), kS, ctM, tauM, rM, wl,
+     2   NxNx
 
-      mu  = eq(cEq)%dmn(cDmn)%visc%mu_i
-      ctM = eq(cEq)%dmn(cDmn)%prop(ctau_M)
+      mu    = eq(cEq)%dmn(cDmn)%visc%mu_i
+      ctM   = eq(cEq)%dmn(cDmn)%prop(ctau_M)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
 
 !     {i,j,k} := velocity dofs; {l} := pressure dof
       i = eq(cEq)%s
@@ -386,7 +399,10 @@
 !     Divergence of velocity
       div = 0._RKIND
       DO a=1, eNoNw
-         div = div + Nwx(1,a)*yl(i,a) + Nwx(2,a)*yl(j,a) +
+         fb(1) = fb(1) + Nw(a)*bfl(1,a)
+         fb(2) = fb(2) + Nw(a)*bfl(2,a)
+         fb(3) = fb(3) + Nw(a)*bfl(3,a)
+         div   = div + Nwx(1,a)*yl(i,a) + Nwx(2,a)*yl(j,a) +
      2      Nwx(3,a)*yl(k,a)
       END DO
 
@@ -413,9 +429,10 @@
       END IF
 
 !     Local residue
+      px(:) = px(:) - fb(:)
       DO a=1, eNoNq
          rM = px(1)*Nqx(1,a) + px(2)*Nqx(2,a) + px(3)*Nqx(3,a)
-         lR(4,a) = lR(4,a) + w*(Nq(a)*div - tauM*rM)
+         lR(4,a) = lR(4,a) + w*(Nq(a)*div + tauM*rM)
       END DO
 
 !     Tangent (stiffness) matrices
@@ -433,7 +450,7 @@
             DO a=1, eNoNq
                NxNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
      2              + Nqx(3,a)*Nqx(3,b)
-               lK(16,a,b) = lK(16,a,b) - wl*tauM*NxNx
+               lK(16,a,b) = lK(16,a,b) + wl*tauM*NxNx
             END DO
          END DO
       END IF
@@ -441,23 +458,27 @@
       RETURN
       END SUBROUTINE STOKES3D_C
 !--------------------------------------------------------------------
-      SUBROUTINE STOKES2D_C(lStab, eNoNw, eNoNq, w, ksix, Nq, Nwx, Nqx,
-     2   yl, lR, lK)
+      SUBROUTINE STOKES2D_C(lStab, eNoNw, eNoNq, w, ksix, Nw, Nq, Nwx,
+     2   Nqx, yl, bfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       LOGICAL, INTENT(IN) :: lStab
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
-      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nq(eNoNq),
-     2   Nwx(2,eNoNw), Nqx(2,eNoNq), yl(tDof,eNoNw)
+      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
+     2   Nq(eNoNq), Nwx(2,eNoNw), Nqx(2,eNoNq), yl(tDof,eNoNw),
+     3   bfl(2,eNoNw)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lK(dof*dof,eNoNw,eNoNw)
 
-      INTEGER(KIND=IKIND) :: i, j, k, a, b
-      REAL(KIND=RKIND) :: mu, div, px(2), kS, ctM, tauM, rM, wl, NxNx
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b
+      REAL(KIND=RKIND) :: mu, div, fb(2), px(2), kS, ctM, tauM, rM, wl,
+     2   NxNx
 
-      mu  = eq(cEq)%dmn(cDmn)%visc%mu_i
-      ctM = eq(cEq)%dmn(cDmn)%prop(ctau_M)
+      mu    = eq(cEq)%dmn(cDmn)%visc%mu_i
+      ctM   = eq(cEq)%dmn(cDmn)%prop(ctau_M)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
 
 !     {i,j} := velocity dofs; {k} := pressure dof
       i = eq(cEq)%s
@@ -467,7 +488,9 @@
 !     Divergence of velocity
       div = 0._RKIND
       DO a=1, eNoNw
-         div = div + Nwx(1,a)*yl(i,a) + Nwx(2,a)*yl(j,a)
+         fb(1) = fb(1) + Nw(a)*bfl(1,a)
+         fb(2) = fb(2) + Nw(a)*bfl(2,a)
+         div   = div + Nwx(1,a)*yl(i,a) + Nwx(2,a)*yl(j,a)
       END DO
 
 !     Pressure gradient
@@ -489,9 +512,10 @@
       END IF
 
 !     Local residue
+      px(:) = px(:) - fb(:)
       DO a=1, eNoNq
          rM = px(1)*Nqx(1,a) + px(2)*Nqx(2,a)
-         lR(3,a) = lR(3,a) + w*(Nq(a)*div - tauM*rM)
+         lR(3,a) = lR(3,a) + w*(Nq(a)*div + tauM*rM)
       END DO
 
 !     Tangent (stiffness) matrices
@@ -507,7 +531,7 @@
          DO b=1, eNoNq
             DO a=1, eNoNq
                NxNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
-               lK(9,a,b) = lK(9,a,b) - wl*tauM*NxNx
+               lK(9,a,b) = lK(9,a,b) + wl*tauM*NxNx
             END DO
          END DO
       END IF
