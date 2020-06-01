@@ -517,23 +517,23 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(2,8) = -ux*lz/8._RKIND
          Nxi(3,8) = -ux*ly/8._RKIND
       CASE(eType_TET)
-         N(1) = 1._RKIND - xi(1) - xi(2) - xi(3)
-         N(2) = xi(1)
-         N(3) = xi(2)
-         N(4) = xi(3)
+         N(1) = xi(1)
+         N(2) = xi(2)
+         N(3) = xi(3)
+         N(4) = 1._RKIND - xi(1) - xi(2) - xi(3)
 
-         Nxi(1,1) = -1._RKIND
-         Nxi(2,1) = -1._RKIND
-         Nxi(3,1) = -1._RKIND
-         Nxi(1,2) =  1._RKIND
-         Nxi(2,2) =  0._RKIND
+         Nxi(1,1) =  1._RKIND
+         Nxi(2,1) =  0._RKIND
+         Nxi(3,1) =  0._RKIND
+         Nxi(1,2) =  0._RKIND
+         Nxi(2,2) =  1._RKIND
          Nxi(3,2) =  0._RKIND
          Nxi(1,3) =  0._RKIND
-         Nxi(2,3) =  1._RKIND
-         Nxi(3,3) =  0._RKIND
-         Nxi(1,4) =  0._RKIND
-         Nxi(2,4) =  0._RKIND
-         Nxi(3,4) =  1._RKIND
+         Nxi(2,3) =  0._RKIND
+         Nxi(3,3) =  1._RKIND
+         Nxi(1,4) = -1._RKIND
+         Nxi(2,4) = -1._RKIND
+         Nxi(3,4) = -1._RKIND
       CASE(eType_WDG)
          ux = xi(1)
          uy = xi(2)
@@ -567,61 +567,60 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(3,6) =  uz*0.5_RKIND
       CASE(eType_QTE)
          s     = 1._RKIND - xi(1) - xi(2) - xi(3)
-         N(1)  = s    *(2._RKIND*s     - 1._RKIND)
-         N(2)  = xi(1)*(2._RKIND*xi(1) - 1._RKIND)
-         N(3)  = xi(2)*(2._RKIND*xi(2) - 1._RKIND)
-         N(4)  = xi(3)*(2._RKIND*xi(3) - 1._RKIND)
-         N(5)  = 4._RKIND*xi(1)*s
-         N(6)  = 4._RKIND*xi(1)*xi(2)
-         N(7)  = 4._RKIND*xi(2)*s
-         N(8)  = 4._RKIND*xi(3)*s
-         N(9)  = 4._RKIND*xi(3)*xi(1)
-         N(10) = 4._RKIND*xi(3)*xi(2)
+         N(1)  = xi(1)*(2._RKIND*xi(1) - 1._RKIND)
+         N(2)  = xi(2)*(2._RKIND*xi(2) - 1._RKIND)
+         N(3)  = xi(3)*(2._RKIND*xi(3) - 1._RKIND)
+         N(4)  = s    *(2._RKIND*s     - 1._RKIND)
+         N(5)  = 4._RKIND*xi(1)*xi(2)
+         N(6)  = 4._RKIND*xi(2)*xi(3)
+         N(7)  = 4._RKIND*xi(1)*xi(3)
+         N(8)  = 4._RKIND*xi(1)*s
+         N(9)  = 4._RKIND*xi(2)*s
+         N(10) = 4._RKIND*xi(3)*s
 
-         Nxi(1,1)  =  1._RKIND - 4._RKIND*s
-         Nxi(2,1)  =  1._RKIND - 4._RKIND*s
-         Nxi(3,1)  =  1._RKIND - 4._RKIND*s
-         Nxi(1,2)  =  4._RKIND*xi(1) - 1._RKIND
-         Nxi(2,2)  =  0._RKIND
+         Nxi(1,1)  =  4._RKIND*xi(1) - 1._RKIND
+         Nxi(2,1)  =  0._RKIND
+         Nxi(3,1)  =  0._RKIND
+         Nxi(1,2)  =  0._RKIND
+         Nxi(2,2)  =  4._RKIND*xi(2) - 1._RKIND
          Nxi(3,2)  =  0._RKIND
          Nxi(1,3)  =  0._RKIND
-         Nxi(2,3)  =  4._RKIND*xi(2) - 1._RKIND
-         Nxi(3,3)  =  0._RKIND
-         Nxi(1,4)  =  0._RKIND
-         Nxi(2,4)  =  0._RKIND
-         Nxi(3,4)  =  4._RKIND*xi(3) - 1._RKIND
-
-         Nxi(1,5)  =  4._RKIND*( s - xi(1) )
-         Nxi(2,5)  = -4._RKIND*xi(1)
-         Nxi(3,5)  = -4._RKIND*xi(1)
-         Nxi(1,6)  =  4._RKIND*xi(2)
-         Nxi(2,6)  =  4._RKIND*xi(1)
-         Nxi(3,6)  =  0._RKIND
-         Nxi(1,7)  = -4._RKIND*xi(2)
-         Nxi(2,7)  =  4._RKIND*( s - xi(2) )
-         Nxi(3,7)  = -4._RKIND*xi(2)
-         Nxi(1,8)  = -4._RKIND*xi(3)
-         Nxi(2,8)  = -4._RKIND*xi(3)
-         Nxi(3,8)  =  4._RKIND*( s - xi(3) )
-         Nxi(1,9)  =  4._RKIND*xi(3)
-         Nxi(2,9)  =  0._RKIND
-         Nxi(3,9)  =  4._RKIND*xi(1)
-         Nxi(1,10) =  0._RKIND
-         Nxi(2,10) =  4._RKIND*xi(3)
-         Nxi(3,10) =  4._RKIND*xi(2)
+         Nxi(2,3)  =  0._RKIND
+         Nxi(3,3)  =  4._RKIND*xi(3) - 1._RKIND
+         Nxi(1,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(2,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(3,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(1,5)  =  4._RKIND*xi(2)
+         Nxi(2,5)  =  4._RKIND*xi(1)
+         Nxi(3,5)  =  0._RKIND
+         Nxi(1,6)  =  0._RKIND
+         Nxi(2,6)  =  4._RKIND*xi(3)
+         Nxi(3,6)  =  4._RKIND*xi(2)
+         Nxi(1,7)  =  4._RKIND*xi(3)
+         Nxi(2,7)  =  0._RKIND
+         Nxi(3,7)  =  4._RKIND*xi(1)
+         Nxi(1,8)  =  4._RKIND*( s - xi(1) )
+         Nxi(2,8)  = -4._RKIND*xi(1)
+         Nxi(3,8)  = -4._RKIND*xi(1)
+         Nxi(1,9)  = -4._RKIND*xi(2)
+         Nxi(2,9)  =  4._RKIND*( s - xi(2) )
+         Nxi(3,9)  = -4._RKIND*xi(2)
+         Nxi(1,10) = -4._RKIND*xi(3)
+         Nxi(2,10) = -4._RKIND*xi(3)
+         Nxi(3,10) =  4._RKIND*( s - xi(3) )
 
 !     2D elements
       CASE(eType_TRI)
-         N(1) = 1._RKIND - xi(1) - xi(2)
-         N(2) = xi(1)
-         N(3) = xi(2)
+         N(1) = xi(1)
+         N(2) = xi(2)
+         N(3) = 1._RKIND - xi(1) - xi(2)
 
-         Nxi(1,1) = -1._RKIND
-         Nxi(2,1) = -1._RKIND
-         Nxi(1,2) =  1._RKIND
-         Nxi(2,2) =  0._RKIND
-         Nxi(1,3) =  0._RKIND
-         Nxi(2,3) =  1._RKIND
+         Nxi(1,1) =  1._RKIND
+         Nxi(2,1) =  0._RKIND
+         Nxi(1,2) =  0._RKIND
+         Nxi(2,2) =  1._RKIND
+         Nxi(1,3) = -1._RKIND
+         Nxi(2,3) = -1._RKIND
       CASE(eType_BIL)
          ux = 1._RKIND + xi(1)
          uy = 1._RKIND + xi(2)
@@ -679,26 +678,25 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(2,9) =  (ly - uy)*lx*ux
       CASE(eType_QTR)
          s    = 1._RKIND - xi(1) - xi(2)
-         N(1) = s    *( 2._RKIND*s     - 1._RKIND )
-         N(2) = xi(1)*( 2._RKIND*xi(1) - 1._RKIND )
-         N(3) = xi(2)*( 2._RKIND*xi(2) - 1._RKIND )
-         N(4) = 4._RKIND*xi(1)*s
-         N(5) = 4._RKIND*xi(1)*xi(2)
-         N(6) = 4._RKIND*xi(2)*s
+         N(1) = xi(1)*( 2._RKIND*xi(1) - 1._RKIND )
+         N(2) = xi(2)*( 2._RKIND*xi(2) - 1._RKIND )
+         N(3) = s    *( 2._RKIND*s     - 1._RKIND )
+         N(4) = 4._RKIND*xi(1)*xi(2)
+         N(5) = 4._RKIND*xi(2)*s
+         N(6) = 4._RKIND*xi(1)*s
 
-         Nxi(1,1) =  1._RKIND - 4._RKIND*s
-         Nxi(2,1) =  1._RKIND - 4._RKIND*s
-         Nxi(1,2) =  4._RKIND*xi(1) - 1._RKIND
-         Nxi(2,2) =  0._RKIND
-         Nxi(1,3) =  0._RKIND
-         Nxi(2,3) =  4._RKIND*xi(2) - 1._RKIND
-
-         Nxi(1,4) =  4._RKIND*( s - xi(1) )
-         Nxi(2,4) = -4._RKIND*xi(1)
-         Nxi(1,5) =  4._RKIND*xi(2)
-         Nxi(2,5) =  4._RKIND*xi(1)
-         Nxi(1,6) = -4._RKIND*xi(2)
-         Nxi(2,6) =  4._RKIND*( s - xi(2) )
+         Nxi(1,1) =  4._RKIND*xi(1) - 1._RKIND
+         Nxi(2,1) =  0._RKIND
+         Nxi(1,2) =  0._RKIND
+         Nxi(2,2) =  4._RKIND*xi(2) - 1._RKIND
+         Nxi(1,3) =  1._RKIND - 4._RKIND*s
+         Nxi(2,3) =  1._RKIND - 4._RKIND*s
+         Nxi(1,4) =  4._RKIND*xi(2)
+         Nxi(2,4) =  4._RKIND*xi(1)
+         Nxi(1,5) = -4._RKIND*xi(2)
+         Nxi(2,5) =  4._RKIND*( s - xi(2) )
+         Nxi(1,6) =  4._RKIND*( s - xi(1) )
+         Nxi(2,6) = -4._RKIND*xi(1)
 
 !     1D elements
       CASE(eType_LIN)
