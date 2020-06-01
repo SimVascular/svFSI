@@ -77,7 +77,7 @@
          CALL CONSTRUCT_CEP(lM, Ag, Yg, Dg)
 
       CASE (phys_stokes)
-         CALL CONSTRUCT_STOKES(lM, Yg)
+         CALL CONSTRUCT_STOKES(lM, Ag, Yg)
 
       CASE DEFAULT
          err = " Undefined physics selection for assembly"
