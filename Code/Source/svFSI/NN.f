@@ -255,10 +255,10 @@
          w = 1._RKIND/24._RKIND
          s = (5._RKIND + 3._RKIND*SQRT(5._RKIND))/20._RKIND
          t = (5._RKIND -          SQRT(5._RKIND))/20._RKIND
-         xi(1,1) = t; xi(2,1) = t; xi(3,1) = t
-         xi(1,2) = s; xi(2,2) = t; xi(3,2) = t
-         xi(1,3) = t; xi(2,3) = s; xi(3,3) = t
-         xi(1,4) = t; xi(2,4) = t; xi(3,4) = s
+         xi(1,1) = s; xi(2,1) = t; xi(3,1) = t
+         xi(1,2) = t; xi(2,2) = s; xi(3,2) = t
+         xi(1,3) = t; xi(2,3) = t; xi(3,3) = s
+         xi(1,4) = t; xi(2,4) = t; xi(3,4) = t
       CASE(eType_WDG)
          w  =  1._RKIND/6._RKIND
          s  =  2._RKIND/3._RKIND
@@ -282,26 +282,26 @@
 
          s = 0.333333333333333_RKIND
          t = 0._RKIND
-         xi(1,2) = s; xi(2,2) = s; xi(3,2) = s
-         xi(1,3) = t; xi(2,3) = s; xi(3,3) = s
-         xi(1,4) = s; xi(2,4) = t; xi(3,4) = s
-         xi(1,5) = s; xi(2,5) = s; xi(3,5) = t
+         xi(1,2) = t; xi(2,2) = s; xi(3,2) = s
+         xi(1,3) = s; xi(2,3) = t; xi(3,3) = s
+         xi(1,4) = s; xi(2,4) = s; xi(3,4) = t
+         xi(1,5) = s; xi(2,5) = s; xi(3,5) = s
 
          s = 0.090909090909091_RKIND
          t = 0.727272727272727_RKIND
-         xi(1,6) = s; xi(2,6) = s; xi(3,6) = s
-         xi(1,7) = t; xi(2,7) = s; xi(3,7) = s
-         xi(1,8) = s; xi(2,8) = t; xi(3,8) = s
-         xi(1,9) = s; xi(2,9) = s; xi(3,9) = t
+         xi(1,6) = t; xi(2,6) = s; xi(3,6) = s
+         xi(1,7) = s; xi(2,7) = t; xi(3,7) = s
+         xi(1,8) = s; xi(2,8) = s; xi(3,8) = t
+         xi(1,9) = s; xi(2,9) = s; xi(3,9) = s
 
          s = 0.066550153573664D0
          t = 0.433449846426336D0
-         xi(1,10) = t; xi(2,10) = s; xi(3,10) = s
+         xi(1,10) = s; xi(2,10) = s; xi(3,10) = t
          xi(1,11) = s; xi(2,11) = t; xi(3,11) = s
-         xi(1,12) = s; xi(2,12) = s; xi(3,12) = t
-         xi(1,13) = s; xi(2,13) = t; xi(3,13) = t
+         xi(1,12) = s; xi(2,12) = t; xi(3,12) = t
+         xi(1,13) = t; xi(2,13) = t; xi(3,13) = s
          xi(1,14) = t; xi(2,14) = s; xi(3,14) = t
-         xi(1,15) = t; xi(2,15) = t; xi(3,15) = s
+         xi(1,15) = t; xi(2,15) = s; xi(3,15) = s
 
 !     2D elements
       CASE(eType_TRI)
@@ -349,15 +349,15 @@
 
          s = 0.797426985353087_RKIND
          t = 0.101286507323456_RKIND
-         xi(1,2) = t; xi(2,2) = t
-         xi(1,3) = s; xi(2,3) = t
-         xi(1,4) = t; xi(2,4) = s
+         xi(1,2) = s; xi(2,2) = t
+         xi(1,3) = t; xi(2,3) = s
+         xi(1,4) = t; xi(2,4) = t
 
          s = 0.059715871789770_RKIND
          t = 0.470142064105115_RKIND
-         xi(1,5) = t; xi(2,5) = t
-         xi(1,6) = s; xi(2,6) = t
-         xi(1,7) = t; xi(2,7) = s
+         xi(1,5) = s; xi(2,5) = t
+         xi(1,6) = t; xi(2,6) = s
+         xi(1,7) = t; xi(2,7) = t
 
 !     1D elements
       CASE(eType_LIN)

@@ -2302,6 +2302,8 @@ c     2         "can be applied for Neumann boundaries only"
       IF (.NOT.incompFlag) THEN
          kap = E/(1._RKIND-2._RKIND*nu)/3._RKIND
          lam = E*nu/(1._RKIND+nu)/(1._RKIND-2._RKIND*nu)
+      ELSE
+         kap = 0._RKIND
       END IF
 
       lSt => lPD%get(ctmp, "Constitutive model")
@@ -2381,7 +2383,7 @@ c     2         "can be applied for Neumann boundaries only"
          err = "Undefined constitutive model used"
       END SELECT
 
-      IF (incompFlag) RETURN
+      IF (incompFlag .AND. lDmn%phys.EQ.phys_ustruct) RETURN
 
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")
@@ -2405,6 +2407,8 @@ c     2         "can be applied for Neumann boundaries only"
       lDmn%stM%Kpen = kap
       lPtr => lPD%get(rtmp, "Penalty parameter")
       IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
+      IF (ISZERO(lDmn%stM%Kpen)) err = "Penalty parameter set to 0 "//
+     2   "for incompressible displacement-based solid mechanics"
 
       RETURN
       END SUBROUTINE READMATMODEL

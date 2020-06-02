@@ -413,7 +413,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
      2   lD(tDof,tnNo)
 
-      LOGICAL :: l1, l2, l3
+      LOGICAL :: l1, l2, l3, lJac
       INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
      2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, itmp, ne,
      3   iFn, nFn
@@ -422,9 +422,10 @@
       TYPE(vtkXMLType) :: vtu
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: outS(:), tmpI(:,:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:), tmpVe(:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
 
+      lJac = .FALSE.
       l1 = .FALSE.
       itmp = SUM(iblank(:))
       itmp = cm%reduce(itmp)
@@ -562,7 +563,10 @@
                      END DO
                   END IF
                   IF (.NOT.cmmInit) THEN
-                     CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                     ALLOCATE(tmpVe(msh(iM)%nEl))
+                     tmpVe = 0._RKIND
+                     CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
+                     DEALLOCATE(tmpVe)
                   END IF
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
@@ -615,23 +619,30 @@
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_J)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-                  ALLOCATE(tmpV(1,msh(iM)%nNo))
-                  tmpV = 0._RKIND
-                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl),
+     2               d(iM)%xe(1,msh(iM)%nEl))
+                  lJac  = .TRUE.
+                  tmpV  = 0._RKIND
+                  tmpVe = 0._RKIND
+                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is,a) = tmpV(1,a)
                   END DO
-                  DEALLOCATE(tmpV)
+                  DO a=1, msh(iM)%nEl
+                     d(iM)%xe(1,a) = tmpVe(a)
+                  END DO
+                  DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_F)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-                  ALLOCATE(tmpV(nsd*nsd,msh(iM)%nNo))
-                  tmpV = 0._RKIND
-                  CALL TPOST(msh(iM), l, tmpV, lD, iEq, oGrp)
+                  ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
+                  tmpV  = 0._RKIND
+                  tmpVe = 0._RKIND
+                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO
-                  DEALLOCATE(tmpV)
+                  DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_divV)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -754,12 +765,26 @@
       END DO
 
 !     Write element-based variables
-      ne = 1
+      ne = 0
       IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
          ALLOCATE(tmpI(1,nEl))
+!     Write the domain ID
+         ne = 1
+         IF (ALLOCATED(dmnID)) THEN
+            Ec = 0
+            DO iM=1, nMsh
+               DO e=1, d(iM)%nEl
+                  Ec = Ec + 1
+                  tmpI(1,Ec) = INT(d(iM)%xe(e,ne), KIND=IKIND)
+               END DO
+            END DO
+            CALL putVTK_elemData(vtu, 'Domain_ID', tmpI, iStat)
+            IF (iStat .LT. 0) err = "VTU file write error (dom id)"
+         END IF
+
          IF (.NOT.savedOnce) THEN
             savedOnce = .TRUE.
-            ne = ne + 2
+            ne = ne + 1
 
 !        Write partition data
             IF (.NOT.cm%seq()) THEN
@@ -767,27 +792,12 @@
                DO iM=1, nMsh
                   DO e=1, d(iM)%nEl
                      Ec = Ec + 1
-                     tmpI(1,Ec) = d(iM)%xe(e,2)
+                     tmpI(1,Ec) = INT(d(iM)%xe(e,ne), KIND=IKIND)
                   END DO
                END DO
                CALL putVTK_elemData(vtu, 'Proc_ID', tmpI, iStat)
                IF (iStat .LT. 0) err = "VTU file write error (proc id)"
             END IF
-         ELSE
-            ne = ne + 1
-         END IF
-
-!     Write the domain ID
-         IF (ALLOCATED(dmnID)) THEN
-            Ec = 0
-            DO iM=1, nMsh
-               DO e=1, d(iM)%nEl
-                  Ec = Ec + 1
-                  tmpI(1,Ec) = d(iM)%xe(e,1)
-               END DO
-            END DO
-            CALL putVTK_elemData(vtu, 'Domain_ID', tmpI, iStat)
-            IF (iStat .LT. 0) err = "VTU file write error (dom id)"
          END IF
 
 !     Write the mesh ID
@@ -805,15 +815,38 @@
          DEALLOCATE(tmpI)
       END IF
 
-!     Write element ghost cells if necessary
-      IF (l1 .OR. l2) THEN
-         ALLOCATE(tmpI(1,nEl))
+!     Write element Jacobian if necessary
+      IF (lJac) THEN
+         ne = ne + 1
+         ALLOCATE(tmpVe(nEl))
+         tmpVe = 0._RKIND
          Ec = 0
          DO iM=1, nMsh
-            DO e=1, d(iM)%nEl
-               Ec = Ec + 1
-               tmpI(1,Ec) = d(iM)%xe(e,ne)
-            END DO
+            IF (ALLOCATED(d(iM)%xe)) THEN
+               DO e=1, d(iM)%nEl
+                  Ec = Ec + 1
+                  tmpVe(Ec) = d(iM)%xe(e,ne)
+               END DO
+            END IF
+         END DO
+         CALL putVTK_elemData(vtu, 'E_Jacobian', tmpVe, iStat)
+         IF (iStat .LT. 0) err = "VTU file write error (E_Jacobian)"
+         DEALLOCATE(tmpVe)
+      END IF
+
+!     Write element ghost cells if necessary
+      IF (l1 .OR. l2) THEN
+         ne = ne + 1
+         ALLOCATE(tmpI(1,nEl))
+         tmpI = 0
+         Ec = 0
+         DO iM=1, nMsh
+            IF (ALLOCATED(d(iM)%xe)) THEN
+               DO e=1, d(iM)%nEl
+                  Ec = Ec + 1
+                  tmpI(1,Ec) = INT(d(iM)%xe(e,ne), KIND=IKIND)
+               END DO
+            END IF
          END DO
          CALL putVTK_elemData(vtu, 'EGHOST', tmpI, iStat)
          IF (iStat .LT. 0) err = "VTU file write error (EGHOST)"
@@ -843,7 +876,8 @@
 
       INTEGER(KIND=IKIND) :: e, i, ierr, Ec, m
 
-      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), tmpI(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: eJac(:)
 
       d%eNoN    = lM%eNoN
       d%vtkType = lM%vtkType
@@ -867,37 +901,51 @@
          END DO
       END IF
 
-      m = 1
+      m = 0
       IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
-         IF (.NOT.savedOnce) THEN
-            m = m + 2
-         ELSE
+         IF (savedOnce) THEN
             m = m + 1
+         ELSE
+            m = m + 2
          END IF
-         ALLOCATE(d%xe(d%nEl,m))
+      END IF
+      IF (ALLOCATED(d%xe)) THEN
+         m = m + 1
+         ALLOCATE(eJac(lM%nEl))
+         eJac(:) = d%xe(1,:)
+         DEALLOCATE(d%xe)
+      END IF
+      IF (ALLOCATED(lM%iGC)) m = m + 1
+      IF (m .NE. 0) ALLOCATE(d%xe(d%nEl,m))
+
+      m = 0
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
+         m = 1
          IF (ALLOCATED(dmnId)) THEN
-            ALLOCATE(sCount(cm%np()))
+            ALLOCATE(sCount(cm%np()), tmpI(d%nEl))
             DO i=1, cm%np()
                sCount(i) = lM%eDist(i) - lM%eDist(i-1)
             END DO
-            CALL MPI_GATHERV(lM%eId, lM%nEl, mpint, d%xe(:,1), sCount,
+            CALL MPI_GATHERV(lM%eId, lM%nEl, mpint, tmpI, sCount,
      2         lM%eDist, mpint, master, cm%com(), ierr)
 
             IF (cm%mas()) THEN
                DEALLOCATE(sCount)
                ALLOCATE(sCount(lM%gnEl))
-               sCount = d%xe(:,1)
+               sCount = tmpI(:)
                DO e=1, lM%gnEl
                   Ec = lM%otnIEN(e)
-                  d%xe(e,1) = sCount(Ec)
+                  d%xe(e,m) = REAL(sCount(Ec), KIND=RKIND)
                END DO
             END IF
-            DEALLOCATE(sCount)
+            DEALLOCATE(sCount, tmpI)
          ELSE
-            d%xe(:,1) = 1
+            d%xe(:,m) = 1._RKIND
          END IF
 
          IF (.NOT.savedOnce) THEN
+            m = m + 1
+            ALLOCATE(tmpI(d%nEl))
             IF (cm%mas()) THEN
                IF (.NOT.cm%seq()) THEN
                   i = 0
@@ -908,39 +956,61 @@
                            IF (e .LE. lM%eDist(i)) EXIT
                         END DO
                      END IF
-                     d%xe(e,2) = i
+                     tmpI(e) = i
                   END DO
                   ALLOCATE(sCount(lM%gnEl))
-                  sCount = d%xe(:,2)
+                  sCount = tmpI(:)
                   DO e=1, lM%gnEl
                      Ec = lM%otnIEN(e)
-                     d%xe(e,2) = sCount(Ec)
+                     d%xe(e,m) = REAL(sCount(Ec), KIND=RKIND)
                   END DO
                   DEALLOCATE(sCount)
                END IF
             END IF
+            DEALLOCATE(tmpI)
          END IF
       END IF
 
-      IF (ALLOCATED(lM%iGC)) THEN
-         IF (.NOT.ALLOCATED(d%xe)) ALLOCATE(d%xe(d%nEl,m))
+      IF (ALLOCATED(eJac)) THEN
+         m = m + 1
          ALLOCATE(sCount(cm%np()))
          DO i=1, cm%np()
             sCount(i) = lM%eDist(i) - lM%eDist(i-1)
          END DO
-         CALL MPI_GATHERV(lM%iGC, lM%nEl, mpint, d%xe(:,m), sCount,
+         CALL MPI_GATHERV(eJac, lM%nEl, mpreal, d%xe(:,m), sCount,
+     2      lM%eDist, mpreal, master, cm%com(), ierr)
+
+         DEALLOCATE(sCount, eJac)
+         IF (cm%mas()) THEN
+            ALLOCATE(eJac(lM%gnEl))
+            eJac = d%xe(:,m)
+            DO e=1, lM%gnEl
+               Ec = lM%otnIEN(e)
+               d%xe(e,m) = eJac(Ec)
+            END DO
+            DEALLOCATE(eJac)
+         END IF
+      END IF
+
+      IF (ALLOCATED(lM%iGC)) THEN
+         m = m + 1
+         ALLOCATE(sCount(cm%np()), tmpI(d%nEl))
+         DO i=1, cm%np()
+            sCount(i) = lM%eDist(i) - lM%eDist(i-1)
+         END DO
+         CALL MPI_GATHERV(lM%iGC, lM%nEl, mpint, tmpI, sCount,
      2      lM%eDist, mpint, master, cm%com(), ierr)
 
          IF (cm%mas()) THEN
             DEALLOCATE(sCount)
             ALLOCATE(sCount(lM%gnEl))
-            sCount = d%xe(:,m)
+            sCount = tmpI(:)
             DO e=1, lM%gnEl
                Ec = lM%otnien(e)
-               d%xe(e,m) = sCount(Ec)
+               d%xe(e,m) = REAL(sCount(Ec), KIND=RKIND)
             END DO
          END IF
-         DEALLOCATE(sCount)
+         DEALLOCATE(sCount, tmpI)
       END IF
 
       RETURN

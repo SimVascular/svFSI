@@ -654,7 +654,7 @@
 !        Connectivity array
          INTEGER(KIND=IKIND), ALLOCATABLE :: IEN(:,:)
 !        Element based variables to be written
-         INTEGER(KIND=IKIND), ALLOCATABLE :: xe(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: xe(:,:)
 !        All the variables after transformation to global format
          REAL(KIND=RKIND), ALLOCATABLE :: gx(:,:)
 !        All the variables to be written (including position)

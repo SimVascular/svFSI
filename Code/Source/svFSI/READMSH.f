@@ -862,7 +862,7 @@ c               END IF
       LOGICAL, INTENT(IN) :: flag
 
       LOGICAL qFlag
-      INTEGER(KIND=IKIND) Ac, b, i, sn(4), e, a, a1, b1, teNoN, eType
+      INTEGER(KIND=IKIND) Ac, b, i, sn(4), e, a, teNoN, eType
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNodes(:)
       REAL(KIND=RKIND), ALLOCATABLE :: v(:,:), xl(:,:)

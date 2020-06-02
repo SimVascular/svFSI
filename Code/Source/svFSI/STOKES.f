@@ -488,7 +488,7 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lK(dof*dof,eNoNw,eNoNw)
 
-      INTEGER(KIND=IKIND) :: i, j, k, l, a, b
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
       REAL(KIND=RKIND) :: mu, wm, wf, div, vd(2), fb(2), px(2), kS, ctM,
      2   tauM, rMv(2), rM, NxNx
 
