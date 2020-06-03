@@ -527,7 +527,11 @@
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = af*Jac*tauC*rho*NxFi(3,a)*NxFi(3,b) + T1
             lK(11,a,b) = lK(11,a,b) + w*T2 + afm*Ku
+         END DO
+      END DO
 
+      DO b=1, eNoNq
+         DO a=1, eNoNw
 !           dM_1/dP
             T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1._RKIND)
             T2 = T1*NxFi(1,a)*Nq(b) + af*drho*vd(1)*Nw(a)*Nq(b)
@@ -767,7 +771,11 @@
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(2,b) + T1
             lK(5,a,b) = lK(5,a,b) + w*T2 + afm*Ku
+         END DO
+      END DO
 
+      DO b=1, eNoNq
+         DO a=1, eNoNw
 !           dM_1/dP
             T1 = am*tauC*beta + af*(tauC*dbeta*pd - 1._RKIND)
             T2 = T1*NxFi(1,a)*Nq(b) + af*drho*vd(1)*Nw(a)*Nq(b)
