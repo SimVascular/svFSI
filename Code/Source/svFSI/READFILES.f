@@ -2398,7 +2398,7 @@ c     2         "can be applied for Neumann boundaries only"
          lDmn%stM%volType = stVol_M94
 
       CASE DEFAULT
-         err = "Undefined dilational penalty model"
+         lDmn%stM%volType = stVol_ST91
       END SELECT
 
 !     Default penalty parameter is equal to bulk modulus
