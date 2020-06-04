@@ -42,7 +42,7 @@
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) iEq, s, e
-      REAL(KIND=RKIND) coef, ctime
+      REAL(KIND=RKIND) coef
 
 !     Prestress initialization
       IF (pstEq) THEN
@@ -56,24 +56,16 @@
       IF (ibFlag) THEN
          ib%callD(1) = CPUT()
 
-!        Set IB forces to zero, except for feedback force
-         ib%R = 0._RKIND
-
-!        Compute FSI forcing (ib%R) for immersed bodies (IFEM)
-         CALL IB_CALCFFSI(Do)
-
-!        Treat IB dirichlet boundaries using penalty forces
-c         CALL IB_SETBCPEN()
+!        Set IB Dirichlet BCs
+         CALL IB_SETBCDIR(ib%Yn, ib%Un)
 
 !        Update IB location and tracers
-         ib%Ao = ib%An
-         ib%Yo = ib%Yn
-         ib%Uo = ib%Un
-         ib%callD(2) = CPUT()
          CALL IB_UPDATE(Do)
-         ctime = CPUT()
-         ib%callD(2) = ctime - ib%callD(2)
-         ib%callD(1) = ctime - ib%callD(1)
+         ib%callD(2) = CPUT() - ib%callD(1)
+
+!        Compute FSI forcing (ib%R) for immersed bodies (IFEM)
+         CALL IB_CALCFFSI(Ao, Yo, Do)
+         ib%callD(1) = CPUT() - ib%callD(1)
       END IF
 
       DO iEq=1, nEq

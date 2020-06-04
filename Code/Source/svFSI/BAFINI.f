@@ -112,28 +112,6 @@
          END DO
       END DO
 
-      IF (ibLSptr .NE. 0) THEN
-         SELECT CASE (ib%mthd)
-         CASE (ibMthd_SSM)
-            i = SUM(iblank(:))
-            ALLOCATE(gNodes(i))
-            i = 0
-            DO a=1, tnNo
-               IF (iblank(a) .EQ. 1) THEN
-                  i = i + 1
-                  gNodes(i) = a
-               END IF
-            END DO
-
-         CASE DEFAULT
-            err = " Invalid IB method (BAFINI)"
-         END SELECT
-
-         lsPtr = ibLSptr
-         CALL FSILS_BC_CREATE(lhs, lsPtr, i, nsd, BC_TYPE_Dir, gNodes)
-         DEALLOCATE(gNodes)
-      END IF
-
       IF (mvMsh) THEN
          i = 0
          DO a=1, tnNo

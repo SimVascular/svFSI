@@ -181,8 +181,6 @@
       TYPE bcType
 !        Strong/Weak application of Dirichlet BC
          LOGICAL :: weakDir
-!        Whether feedback force is along normal direction only
-         LOGICAL :: fbN = .FALSE.
 !        Pre/Res/Flat/Para... boundary types
          INTEGER(KIND=IKIND) :: bType = 0
 !        Pointer to coupledBC%face
@@ -203,10 +201,8 @@
          REAL(KIND=RKIND) :: k = 0._RKIND
 !        Robin: damping
          REAL(KIND=RKIND) :: c = 0._RKIND
-!        Penalty parameters for weakly applied Dir BC / immersed bodies
+!        Penalty parameters for weakly applied Dir BC
          REAL(KIND=RKIND) :: tauB(2) = 0._RKIND
-!        IB: Feedback force constant
-         REAL(KIND=RKIND) :: tauF = 0._RKIND
 !        Direction vector for imposing the BC
          INTEGER(KIND=IKIND), ALLOCATABLE :: eDrn(:)
 !        Defined steady vector (traction)
@@ -623,12 +619,8 @@
          TYPE(lsType) ls
 !        FSILS type of linear solver
          TYPE(FSILS_lsType) FSILS
-!        IB: FSILS type of linear solver
-         TYPE(FSILS_lsType) lsIB
 !        BCs associated with this equation
          TYPE(bcType), ALLOCATABLE :: bc(:)
-!        Body force associated with this equation
-         TYPE(bfType), ALLOCATABLE :: bf(:)
 !        IB: BCs associated with this equation on immersed surfaces
          TYPE(bcType), ALLOCATABLE :: bcIB(:)
 !        domains that this equation must be solved
@@ -639,6 +631,8 @@
          TYPE(outputType), ALLOCATABLE :: output(:)
 !        IB: Outputs
          TYPE(outputType), ALLOCATABLE :: outIB(:)
+!        Body force associated with this equation
+         TYPE(bfType), ALLOCATABLE :: bf(:)
       END TYPE eqType
 
 !     This type will be used to write data in the VTK files.
@@ -706,6 +700,8 @@
          LOGICAL :: savedOnce = .FALSE.
 !        IB formulation
          INTEGER(KIND=IKIND) :: mthd = ibMthd_NA
+!        IB coupling
+         INTEGER(KIND=IKIND) :: cpld = ibCpld_NA
 !        Current IB domain ID
          INTEGER(KIND=IKIND) :: cDmn
 !        Current equation
@@ -714,10 +710,6 @@
          INTEGER(KIND=IKIND) :: tnNo
 !        Number of IB meshes
          INTEGER(KIND=IKIND) :: nMsh
-!        Number of fiber directions
-         INTEGER(KIND=IKIND) :: nFn
-!        Number of IB faces in LHS passed to FSILS
-         INTEGER(KIND=IKIND) :: nFacesLS
 !        IB call duration
          REAL(KIND=RKIND) :: callD(3)
 !        IB Domain ID
@@ -728,30 +720,16 @@
          INTEGER(KIND=IKIND), ALLOCATABLE :: colPtr(:)
 !        IB position coordinates
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
-!        Fiber direction (for electrophysiology / structure mechanics)
-         REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:)
-!        Acceleration (new)
-         REAL(KIND=RKIND), ALLOCATABLE :: An(:,:)
-!        Acceleration (old)
-         REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)
 !        Velocity (new)
          REAL(KIND=RKIND), ALLOCATABLE :: Yn(:,:)
-!        Velocity (old)
-         REAL(KIND=RKIND), ALLOCATABLE :: Yo(:,:)
 !        Displacement (new)
          REAL(KIND=RKIND), ALLOCATABLE :: Un(:,:)
-!        Displacement (old)
-         REAL(KIND=RKIND), ALLOCATABLE :: Uo(:,:)
 !        FSI force (IFEM method)
          REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
-!        Feedback force
-         REAL(KIND=RKIND), ALLOCATABLE :: Rfb(:,:)
 
 !        DERIVED TYPE VARIABLES
 !        IB meshes
          TYPE(mshType), ALLOCATABLE :: msh(:)
-!        FSILS data structure to produce LHS sparse matrix
-         TYPE(FSILS_lhsType) lhs
 !        IB communicator
          TYPE(ibCommType) :: cm
       END TYPE ibType
@@ -851,8 +829,6 @@
       INTEGER(KIND=IKIND) rsTS
 !     Number of stress values to be stored
       INTEGER(KIND=IKIND) nstd
-!     FSILS pointer for immersed boundaries
-      INTEGER(KIND=IKIND) ibLSptr
 
 !     REAL VARIABLES
 !     Time step size

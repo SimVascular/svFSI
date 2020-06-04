@@ -971,7 +971,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !     Correct the position vector
       DO a=1, eNoN
          Ac = ib%msh(iM)%IEN(a,Ec)
-         lX(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+         lX(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
       END DO
 
 !     Calculating surface deflation

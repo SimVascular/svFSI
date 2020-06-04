@@ -184,13 +184,6 @@
          END DO ! iBc
       END DO ! iEq
 
-      IF (ibFlag) THEN
-         IF (ib%mthd .EQ. ibMthd_SSM) THEN
-            CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
-            CALL IB_SSMPRJCTU(lY, lD, ib%Yo)
-         END IF
-      END IF
-
       RETURN
       END SUBROUTINE SETBCDIR
 !--------------------------------------------------------------------

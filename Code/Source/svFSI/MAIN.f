@@ -180,7 +180,6 @@
                   incL(i) = 1
                END IF
             END DO
-            IF (ibLSptr .NE. 0) incL(ibLSptr) = 1
 
             dbg = "Solving equation <"//eq(cEq)%sym//">"
             CALL LSSOLVE(eq(cEq), incL, res)
@@ -198,11 +197,8 @@
 !     End of inner loop
 
 !     Immersed body treatment: project flow variables from fluid mesh
-!     to IB solid mesh and enforce Dirichlet BCs
-         IF (ibFlag) THEN
-            CALL IB_PROJFVAR(An, Yn, Do, ib%An, ib%Yn, ib%Un)
-            CALL IB_SETBCDIR(ib%An, ib%Yn, ib%Un)
-         END IF
+!     to IB solid mesh
+         IF (ibFlag) CALL IB_PROJFVAR(Yn, Do)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
@@ -233,7 +229,7 @@
             IF (l3 .AND. l4) THEN
                CALL OUTRESULT(timeP, 3, iEqOld)
                CALL WRITEVTUS(An, Yn, Dn)
-               IF (ibFlag) CALL IB_WRITEVTUS(ib%An, ib%Yn, ib%Un)
+               IF (ibFlag) CALL IB_WRITEVTUS(ib%Yn, ib%Un)
             ELSE
                CALL OUTRESULT(timeP, 2, iEqOld)
             END IF

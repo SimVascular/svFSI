@@ -422,8 +422,8 @@
                      ELSE
                         CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
                      END IF
+                     IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
                   END IF
-                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
                   sHat = 0._RKIND
                   DO a=1, eNoN
@@ -441,8 +441,6 @@
          DO iM=1, ib%nMsh
             eNoN = ib%msh(iM)%eNoN
             insd = nsd
-            IF (ib%msh(iM)%lShl) insd = nsd-1
-            IF (ib%msh(iM)%lFib) insd = 1
 
             ALLOCATE(xl(nsd,eNoN), Nxi(insd,eNoN), Nx(insd,eNoN),
      2         sl(eNoN), tmps(nsd,insd))
@@ -457,7 +455,7 @@
      2            CALL NRBNNX(ib%msh(iM), e)
                DO a=1, eNoN
                   Ac      = ib%msh(iM)%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                  xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
                   IF (l .EQ. u) THEN
                      sl(a) = s(l,Ac)
                    ELSE
@@ -468,14 +466,9 @@
                DO g=1, ib%msh(iM)%nG
                   Nxi(:,:) = ib%msh(iM)%Nx(:,:,g)
                   IF (g.EQ.1 .OR. .NOT.ib%msh(iM)%lShpF) THEN
-                     IF (ib%msh(iM)%lShl) THEN
-                        CALL GNNS(eNoN, Nxi, xl, nV, tmps, tmps)
-                        Jac = SQRT(NORM(nV))
-                     ELSE
-                        CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
-                     END IF
+                     CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
+                     IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
                   END IF
-                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
                   sHat = 0._RKIND
                   DO a=1, eNoN
@@ -1240,7 +1233,6 @@
       END IF
 
       lBc%weakDir  = .FALSE.
-      lBc%fbN      = .FALSE.
       lBc%bType    = 0
       lBc%cplBCptr = 0
       lBc%g        = 0._RKIND
@@ -1248,7 +1240,6 @@
       lBc%k        = 0._RKIND
       lBc%k        = 0._RKIND
       lBc%tauB     = 0._RKIND
-      lBc%tauF     = 0._RKIND
 
       RETURN
       END SUBROUTINE DESTROYBC
@@ -2176,7 +2167,6 @@
 
          DO a=1, eNoN
             Ac = lM%IEN(a,Ec)
-            xi(:) = xi(:) + lM%xi(:,a)
             xl(:,a) = xg(:,Ac) + Dg(:,Ac)
          END DO
 
@@ -2251,7 +2241,7 @@
 
       REAL(KIND=RKIND), INTENT(INOUT) :: U(:)
 
-      INTEGER(KIND=IKIND) i, a, e, Ac, iM, iFa, nl, ng, ierr, tag
+      INTEGER(KIND=IKIND) i, a, e, Ac, iM, nl, ng, ierr, tag
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
@@ -2267,25 +2257,13 @@
       ALLOCATE(incNd(ib%tnNo))
       incNd = 0
       DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-            DO i=1, ib%msh(iM)%trc%n
-               e = ib%msh(iM)%trc%gE(1,i)
-               DO a=1, ib%msh(iM)%eNoN
-                  Ac = ib%msh(iM)%IEN(a,e)
-                  incNd(Ac) = 1
-               END DO
+         DO i=1, ib%msh(iM)%trc%n
+            e = ib%msh(iM)%trc%gE(1,i)
+            DO a=1, ib%msh(iM)%eNoN
+               Ac = ib%msh(iM)%IEN(a,e)
+               incNd(Ac) = 1
             END DO
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
-                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
-                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
-                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                     incNd(Ac) = 1
-                  END DO
-               END DO
-            END DO
-         END IF
+         END DO
       END DO
 
       nl = SUM(incNd)
@@ -2347,7 +2325,7 @@
 
       REAL(KIND=RKIND), INTENT(INOUT) :: U(:,:)
 
-      INTEGER(KIND=IKIND) m, i, a, e, s, Ac, iM, iFa, nl, ng, ierr, tag
+      INTEGER(KIND=IKIND) m, i, a, e, s, Ac, iM, nl, ng, ierr, tag
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
@@ -2364,25 +2342,13 @@
       ALLOCATE(incNd(ib%tnNo))
       incNd = 0
       DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-            DO i=1, ib%msh(iM)%trc%n
-               e = ib%msh(iM)%trc%gE(1,i)
-               DO a=1, ib%msh(iM)%eNoN
-                  Ac = ib%msh(iM)%IEN(a,e)
-                  incNd(Ac) = 1
-               END DO
+         DO i=1, ib%msh(iM)%trc%n
+            e = ib%msh(iM)%trc%gE(1,i)
+            DO a=1, ib%msh(iM)%eNoN
+               Ac = ib%msh(iM)%IEN(a,e)
+               incNd(Ac) = 1
             END DO
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
-                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
-                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
-                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                     incNd(Ac) = 1
-                  END DO
-               END DO
-            END DO
-         END IF
+         END DO
       END DO
 
       nl = SUM(incNd)

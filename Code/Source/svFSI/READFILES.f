@@ -1093,7 +1093,7 @@
       TYPE(listType), INTENT(INOUT) :: list
 
       INTEGER(KIND=IKIND) lSolverType, FSILSType
-      CHARACTER(LEN=stdL) ctmp
+      CHARACTER(LEN=stdL) ctmp, stmp
       TYPE(listType), POINTER :: lPtr, lPL
 
 !     Default LS
@@ -1106,19 +1106,36 @@
          CASE('ns', 'bpn', 'bipn')
             lSolverType = lSolver_NS
             FSILSType   = LS_TYPE_NS
+            stmp = CLR("BIPN")
          CASE('gmres')
             lSolverType = lSolver_GMRES
             FSILSType   = LS_TYPE_GMRES
+            stmp = CLR("GMRES")
          CASE('cg')
             lSolverType = lSolver_CG
             FSILSType   = LS_TYPE_CG
+            stmp = CLR("CG")
          CASE('bicg', 'bicgs')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
+            stmp = CLR("BICGSTab")
          CASE DEFAULT
             err = TRIM(list%ping("LS type",lPL))//" Undefined type"
          END SELECT
-      END IF
+      ELSE
+         IF (lSolverType .EQ. lSolver_NS) THEN
+            stmp = CLR("BIPN")
+         ELSE IF (lSolverType .EQ. lSolver_GMRES) THEN
+            stmp = CLR("GMRES")
+         ELSE IF (lSolverType .EQ. lSolver_CG) THEN
+            stmp = CLR("CG")
+         ELSE IF (lSolverType .EQ. lSolver_BICGS) THEN
+            stmp = CLR("BiCGStab")
+         ELSE
+            err = " Undefined linear solver"
+         END IF
+       END IF
+      std = " Using linear solver: "//TRIM(stmp)
 
       lEq%ls%LS_Type = lSolverType
       CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
@@ -1142,44 +1159,52 @@
             CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
                lEq%useTLS = .FALSE.
+               stmp = CLR("FSILS")
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-Diagonal")
             CASE('trilinos-blockjacobi', 'blockjacobi')
                lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-BlockJacobi")
             CASE('trilinos-ilu')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILU
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ILU")
             CASE('trilinos-ilut')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ILUT")
             CASE('trilinos-ic')
                lEq%ls%PREC_Type = PREC_TRILINOS_IC
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-IC")
             CASE('trilinos-ict')
                lEq%ls%PREC_Type = PREC_TRILINOS_ICT
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ICT")
             CASE ('trilinos-ml')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ML")
 #endif
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
      2          //" Undefined type"
             END SELECT
-            std = " Using preconditioner: "//TRIM(ctmp)
          ELSE
             SELECT CASE (lEq%ls%PREC_Type)
             CASE (PREC_FSILS)
-               std = " Using preconditioner: fsils"
+               stmp = CLR("FSILS")
             CASE (PREC_TRILINOS_DIAGONAL)
-               std = " Using preconditioner: trilinos-diagonal"
+               stmp = CLR("Trilinos-Diagonal")
             CASE DEFAULT
                err = " Undefined preconditioner"
             END SELECT
          END IF
+         std = " Using preconditioner: "//TRIM(stmp)
 
          IF (lEq%useTLS) THEN
             lPtr => lPL%get(lEq%assmTLS, "Use Trilinos for assembly")
@@ -1594,7 +1619,7 @@
          lPtr => list%get(ftmp,"BCT file path")
          IF (ASSOCIATED(lPtr)) THEN
             ALLOCATE(lBc%gm)
-            CALL READBCT(lBc%gm, msh(iM)%fa(iFa), ftmp%fname)
+            CALL READBCT(lBc%gm, msh(iM), msh(iM)%fa(iFa), ftmp%fname)
          ELSE
             lPtr =>list%get(fTmp,
      2         "Temporal and spatial values file path")
@@ -2471,18 +2496,19 @@ c     2         "can be applied for Neumann boundaries only"
       END SUBROUTINE READVISCMODEL
 !####################################################################
 !     This subroutine reads general velocity data from bct.vtp
-      SUBROUTINE READBCT(lMB, lFa, fName)
+      SUBROUTINE READBCT(lMB, lM, lFa, fName)
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
       TYPE(MBType), INTENT(INOUT) :: lMB
+      TYPE(mshType), INTENT(IN) :: lM
       TYPE(faceType), INTENT(IN) :: lFa
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       CHARACTER(LEN=*), PARAMETER :: shdr = "velocity_"
 
-      INTEGER(KIND=IKIND) :: i, j, a, Ac, n, nNo, ntime, iM, istat
+      INTEGER(KIND=IKIND) :: i, j, a, Ac, n, ntime, istat
       REAL(KIND=RKIND) :: t
       CHARACTER(LEN=stdL) :: stmp
       TYPE(vtkXMLType) :: vtp
@@ -2496,8 +2522,8 @@ c     2         "can be applied for Neumann boundaries only"
       CALL loadVTK(vtp, fName, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (init)"
 
-      CALL getVTK_numPoints(vtp, nNo, iStat)
-      IF (nNo .NE. lFa%nNo) err = "Mismatch in num points for face <"//
+      CALL getVTK_numPoints(vtp, i, iStat)
+      IF (i .NE. lFa%nNo) err = "Mismatch in num points for face <"//
      2   TRIM(lFa%name)//">"
 
 !     Get all the point data starting with "velocity_"
@@ -2523,8 +2549,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Initialize lMB data structure
       lMB%dof = nsd
       lMB%nTP = ntime
-      iM = lFa%iM
-      ALLOCATE(lMB%t(ntime), lMB%d(nsd,nNo,ntime), ptr(msh(iM)%gnNo))
+      ALLOCATE(lMB%t(ntime), lMB%d(nsd,lFa%nNo,ntime), ptr(lM%gnNo))
       lMB%t = 0._RKIND
       lMB%d = 0._RKIND
       ptr   = 0
@@ -2553,21 +2578,21 @@ c     2         "can be applied for Neumann boundaries only"
 !     Prepare pointer array
       DO a=1, lFa%nNo
          Ac = lFa%gN(a)
-         Ac = msh(iM)%lN(Ac)
+         Ac = lM%lN(Ac)
          IF (Ac .EQ. 0) err = "Incorrect global node number detected "//
-     2      "for BC. Mesh: "//TRIM(msh(iM)%name)//", Face: "//
+     2      "for BC. Mesh: "//TRIM(lM%name)//", Face: "//
      3      TRIM(lFa%name)//", Node: "//STR(a)//" gN: "//STR(lFa%gN(a))
          ptr(Ac) = a
       END DO
 
 !     Get GlobalNodeID from vtp file and make sure it is consistent
 !     with mesh structure
-      ALLOCATE(gN(nNo))
+      ALLOCATE(gN(lFa%nNo))
       gN = 0
       CALL getVTK_pointData(vtp, "GlobalNodeID", gN, istat)
-      DO a=1, nNo
+      DO a=1, lFa%nNo
          Ac = gN(a)
-         IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
+         IF (Ac.GT.lM%gnNo .OR. Ac.LE.0) THEN
             err = "Entry "//a//" is out of bound in <bct.vtp>"
          END IF
          Ac = ptr(Ac)
@@ -2577,7 +2602,7 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
 !     Load spatial data for each time point from vtp file
-      ALLOCATE(tmpR(nsd,nNo))
+      ALLOCATE(tmpR(nsd,lFa%nNo))
       ntime = 0
       DO i=1, n
          j = LEN(TRIM(namesL(i)))
@@ -2585,7 +2610,7 @@ c     2         "can be applied for Neumann boundaries only"
          ntime = ntime + 1
          tmpR  = 0._RKIND
          CALL getVTK_pointData(vtp, namesL(i), tmpR, istat)
-         DO a=1, nNo
+         DO a=1, lFa%nNo
             Ac = gN(a)
             Ac = ptr(Ac)
             lMB%d(:,Ac,ntime) = tmpR(:,a)

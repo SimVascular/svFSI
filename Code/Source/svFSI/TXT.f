@@ -166,10 +166,6 @@
             SELECT CASE (oGrp)
             CASE (outGrp_NA)
                err = "NA outGrp in TXT"
-            CASE (outGrp_A)
-               DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%An(s:e,a)/REAL(cm%np(), KIND=RKIND)
-               END DO
             CASE (outGrp_Y)
                DO a=1, ib%tnNo
                   tmpV(1:l,a) = ib%Yn(s:e,a)/REAL(cm%np(), KIND=RKIND)

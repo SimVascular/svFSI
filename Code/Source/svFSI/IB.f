@@ -29,7 +29,7 @@
 ! NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 ! SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 !
-!-----------------------------------------------------------------------
+!--------------------------------------------------------------------
 !
 !     Here, all functions for treating immersed boundaries are defined.
 !
@@ -46,7 +46,7 @@
       LOGICAL :: flag
       INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e
       REAL(KIND=RKIND) :: scaleF, fibN(nsd), rtmp
-      CHARACTER(LEN=stdL) :: ctmp
+      CHARACTER(LEN=stdL) :: ctmp, fExt
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(fileType) :: fTmp
 
@@ -60,6 +60,7 @@
       DO iM=1, ib%nMsh
          lPM => list%get(ib%msh(iM)%name, "Add IB", iM)
          lPtr => lPM%get(ib%msh(iM)%lShl, "Set mesh as shell")
+         IF (ib%msh(iM)%lShl) err = "Immersed shells are not allowed"
 
          std  = " Reading IB mesh <"//CLR(TRIM(ib%msh(iM)%name))//">"
          CALL READSV(lPM, ib%msh(iM))
@@ -112,22 +113,11 @@
          ib%tnNo           = a
          DEALLOCATE(ib%msh(iM)%x)
 
-         ib%msh(iM)%dx = 0.1_RKIND
-         lPtr => lPM%get(rtmp,"Mesh edge size")
-         IF (ASSOCIATED(lPtr)) ib%msh(iM)%dx = rtmp
+         lPtr => lPM%get(ib%msh(iM)%dx,"Mesh global edge size",1)
       END DO
       ALLOCATE(ib%x(nsd,ib%tnNo))
       ib%x = gX
       DEALLOCATE(gX)
-
-!     Checks for shell elements
-      DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl) THEN
-            IF (ib%msh(iM)%eType .NE. eType_TRI) THEN
-               err = "Immersed shell elements can only be triangles"
-            END IF
-         END IF
-      END DO
 
 !     Setting msh%gN, msh%lN parameter
       b = 0
@@ -159,7 +149,7 @@
          DEALLOCATE(ib%msh(iM)%gIEN)
       END DO
 
-!     Re-arranging fa structure
+!     Re-arranging fa structure - %gN, %lN, %IEN
       b = 0
       DO iM=1, ib%nMsh
          DO iFa=1, ib%msh(iM)%nFa
@@ -186,11 +176,20 @@
       DO iM=1, nMsh
          lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
 
-         lPtr => lPM%get(fTmp,"Domain (IB) file path")
-         IF (ASSOCIATED(lPtr)) CALL SETDMNIDFF(ib%msh(iM), fTmp%open())
-
          lPtr => lPM%get(i,"Domain (IB)",ll=0,ul=BIT_SIZE(ib%dmnId)-1)
          IF (ASSOCIATED(lPtr)) CALL SETDMNID(ib%msh(iM), i)
+
+         lPtr => lPM%get(fTmp,"Domain (IB) file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            i= LEN(TRIM(fTmp%fname))
+            fExt = fTmp%fname(i-2:i)
+            IF (TRIM(fExt).EQ."vtp" .OR. TRIM(fExt).EQ."vtu") THEN
+               CALL SETDMNIDVTK(ib%msh(iM), fTmp%fname, "DOMAIN_ID")
+            ELSE
+               CALL SETDMNIDFF(ib%msh(iM), fTmp%open())
+            END IF
+         END IF
+
          IF (.NOT.ALLOCATED(ib%msh(iM)%eId)) err =
      2      " Immersed bodies require domain ID parameter to be set"
       END DO
@@ -206,60 +205,49 @@
       END DO
 
 !     Read fiber orientation
-      ib%nFn = 0
-      flag   = .FALSE.
+      flag = .FALSE.
       DO iM=1, ib%nMsh
          lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
          j = lPM%srch("Fiber direction file path")
          IF (j .EQ. 0) j = lPM%srch("Fiber direction")
-         IF (ib%nFn .LT. j) ib%nFn = j
+         IF (j .NE. 0) THEN
+            flag = .TRUE.
+            EXIT
+         END IF
       END DO
-      IF (ib%nFn .GT. 0) flag = .TRUE.
 
       IF (flag) THEN
          DO iM=1, ib%nMsh
             lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
 
-            j = lPM%srch("Fiber direction file path")
-            IF (j .NE. 0) THEN
-               ALLOCATE(ib%msh(iM)%x(ib%nFn*nsd,ib%msh(iM)%gnNo))
-               ib%msh(iM)%x = 0._RKIND
-               DO i=1, j
+            ib%msh(iM)%nFn = lPM%srch("Fiber direction file path")
+            j = ib%msh(iM)%nFn
+            IF (ib%msh(iM)%nFn .NE. 0) THEN
+               ALLOCATE(ib%msh(iM)%fN(j*nsd,ib%msh(iM)%nEl))
+               ib%msh(iM)%fN = 0._RKIND
+               DO i=1, ib%msh(iM)%nFn
                   lPtr => lPM%get(cTmp, "Fiber direction file path", i)
-                  CALL READVTUPDATA(ib%msh(iM), cTmp, "FIB_DIR", nsd, i)
+                  CALL READFIBNFF(ib%msh(iM), cTmp, "FIB_DIR", i)
                END DO
             ELSE
-               j = lPM%srch("Fiber direction")
-               IF (j .NE. 0) THEN
-                  ALLOCATE(ib%msh(iM)%x(ib%nFn*nsd,msh(iM)%gnNo))
-                  ib%msh(iM)%x = 0._RKIND
-                  DO i=1, j
+               ib%msh(iM)%nFn = lPM%srch("Fiber direction")
+               j = ib%msh(iM)%nFn
+               IF (ib%msh(iM)%nFn .NE. 0) THEN
+                  ALLOCATE(ib%msh(iM)%fN(j*nsd,ib%msh(iM)%nEl))
+                  ib%msh(iM)%fN = 0._RKIND
+                  DO i=1, ib%msh(iM)%nFn
                      lPtr => lPM%get(fibN, "Fiber direction", i)
-                     DO a=1, ib%msh(iM)%gnNo
-                        ib%msh(iM)%x((i-1)*nsd+1:i*nsd,a) = fibN(1:nsd)
+                     rtmp = SQRT(NORM(fibN))
+                     IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
+                     DO e=1, ib%msh(iM)%nEl
+                        ib%msh(iM)%fN((i-1)*nsd+1:i*nsd,e) = fibN(1:nsd)
                      END DO
                   END DO
                END IF
             END IF
          END DO
-
-         ALLOCATE(ib%fN(ib%nFn*nsd,ib%tnNo))
-         ib%fN = 0._RKIND
-         DO iM=1, ib%nMsh
-            IF (.NOT.ALLOCATED(ib%msh(iM)%x)) CYCLE
-            DO a=1, ib%msh(iM)%gnNo
-               Ac = ib%msh(iM)%gN(a)
-               DO i=1, ib%nFn
-                  fibN(:) = ib%msh(iM)%x((i-1)*nsd+1:i*nsd,a)
-                  rtmp = SQRT(NORM(fibN))
-                  IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
-                  ib%fN((i-1)*nsd+1:i*nsd,Ac) = fibN
-               END DO
-            END DO
-            DEALLOCATE(ib%msh(iM)%x)
-         END DO
       ELSE
-         ib%nFn = 1
+         ib%msh(:)%nFn = 0
       END IF
 
       IF (ib%nMsh .GT. 1) THEN
@@ -279,25 +267,48 @@
       IMPLICIT NONE
       TYPE(listType), INTENT(INOUT) :: list
 
-      CHARACTER(LEN=stdL) :: ctmp
+      CHARACTER(LEN=stdL) :: ctmp, stmp
       TYPE(listType), POINTER :: lIBs, lPtr
 
-      lIBs => list%get(ctmp, "IB settings")
-      IF (.NOT.ASSOCIATED(lIBs)) err = "IB settings not provided"
-
-      lPtr => lIBs%get(ctmp, "Method")
-      IF (ASSOCIATED(lPtr)) THEN
+      lIBs => list%get(ctmp, "IB method")
+      IF (ASSOCIATED(lIBs)) THEN
+         CALL TO_LOWER(ctmp)
          SELECT CASE (ctmp)
-         CASE ("SSM")
-            ib%mthd = ibMthd_SSM
-         CASE ("IFEM")
+         CASE ("ifem")
             ib%mthd = ibMthd_IFEM
+            stmp = " IB method "//CLR("IFEM")
+
+         CASE ("feib", "feibs", "feibstab")
+            ib%mthd = ibMthd_IFEM
+            stmp = " IB method "//CLR("FEIBStab")
+
          CASE DEFAULT
             err = " Invalid IB method"
+
          END SELECT
+
+         lPtr => lIBs%get(ctmp, "Coupling")
+         CALL TO_LOWER(ctmp)
+         SELECT CASE (ctmp)
+         CASE ("explicit","e")
+            ib%cpld = ibCpld_E
+            stmp = TRIM(stmp)//" with "//CLR("Explicit")//" coupling"
+
+         CASE ("implicit", "i")
+            ib%cpld = ibCpld_I
+            stmp = TRIM(stmp)//" with "//CLR("Implicit")//" coupling"
+
+         CASE DEFAULT
+            err = " Invalid IB coupling"
+
+         END SELECT
+         std = TRIM(stmp)
       ELSE
-         std = " Choosing default IB method "//CLR("IFEM")
+         std = " Choosing default IB method "//CLR("IFEM")//" with "//
+     2      CLR("Explicit")//" coupling"
+
          ib%mthd = ibMthd_IFEM
+         ib%cpld = ibCpld_E
       END IF
 
       RETURN
@@ -315,7 +326,6 @@
 
       INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 5
 
-      LOGICAL flag
       INTEGER(KIND=IKIND) i, iBc, propL(maxNProp), iDmn, iProp, prop,
      2   nDOP(4), outputs(maxOutput)
       REAL(KIND=RKIND) rtmp
@@ -326,15 +336,8 @@
       IF (.NOT.ALLOCATED(ib%dmnId)) err = " No IB domain is read yet"
 
       lEq%nDmnIB = list%srch("Domain (IB)")
-      flag = .FALSE.
       IF (lEq%nDmnIB .EQ. 0) THEN
-         IF (ib%mthd .EQ. ibMthd_IFEM) err =
-     2      "No IB domain provided for IFEM method"
-         flag = .TRUE.
-         lEq%nDmnIB = 1
-         ALLOCATE(lEq%dmnIB(lEq%nDmnIB))
-         lEq%dmnIB(1)%Id = -1
-         lEq%dmnIB(1)%phys = phys_NA
+         err = "IB domain properties not specified"
       ELSE
          ALLOCATE(lEq%dmnIB(lEq%nDmnIB))
       END IF
@@ -342,7 +345,6 @@
 !--------------------------------------------------------------------
 !     Searching through each IB domain properties
       DO iDmn=1, lEq%nDmnIB
-         IF (flag) EXIT
          lPD => list%get(lEq%dmnIB(iDmn)%Id,"Domain (IB)",iDmn,
      2      ll=0,ul=(BIT_SIZE(ib%dmnId)-1))
          DO i=1, iDmn-1
@@ -352,28 +354,11 @@
             END IF
          END DO
 
-!        IB Equation being solved: shell/struct/lElas
+!        IB Equation being solved: struct
+!        Other potential equations include vms_struct/lElas/shell
          lPtr => lPD%get(ctmp, "Equation", 1)
          propL = prop_NA
          SELECT CASE(TRIM(ctmp))
-         CASE("shell")
-            lEq%dmnIB(iDmn)%phys = phys_shell
-            IF (nsd .NE. 3) err = "Shell mechanics can be solved only"//
-     2         " in 3-dimensions"
-            propL(1) = solid_density
-            propL(2) = damping
-            propL(3) = elasticity_modulus
-            propL(4) = poisson_ratio
-            propL(5) = shell_thickness
-            propL(6) = f_x
-            propL(7) = f_y
-            propL(8) = f_z
-
-            nDOP = (/3,1,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_velocity
-            outPuts(3) = out_integ
-
          CASE("struct")
             lEq%dmnIB(iDmn)%phys = phys_struct
             propL(1) = solid_density
@@ -386,16 +371,15 @@
             propL(8) = f_y
             IF (nsd .EQ. 3) propL(9) = f_z
 
-            nDOP = (/5,1,0,0/)
+            nDOP = (/4,1,0,0/)
             outPuts(1) = out_displacement
-            outPuts(2) = out_velocity
-            outPuts(3) = out_pressure
-            outPuts(4) = out_acceleration
-            outPuts(5) = out_integ
+            outPuts(2) = out_integ
+            outPuts(3) = out_velocity
+            outPuts(4) = out_pressure
 
          CASE DEFAULT
             err = TRIM(lPD%ping("Equation (IB)",lPtr))//
-     2         "IB must be solved using shell/struct equation"
+     2         "IB must be solved using struct equation only"
          END SELECT
 
 !        Domain properties
@@ -420,20 +404,13 @@
                lPtr => lPD%get(rtmp,"Force_Y")
             CASE (f_z)
                lPtr => lPD%get(rtmp,"Force_Z")
-            CASE (source_term)
-               lPtr => lPD%get(rtmp,"Source term")
-            CASE (damping)
-               lPtr => lPD%get(rtmp,"Mass damping")
-            CASE (shell_thickness)
-               lPtr => lPD%get(rtmp,"Shell thickness",1,lb=0._RKIND)
             CASE (ctau_M)
+               IF (ib%mthd .EQ. ibMthd_FEIBStab) rtmp = 1.E-3_RKIND
                lPtr => lPD%get(rtmp,
      2            "Momentum stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 1.E-3_RKIND
             CASE (ctau_C)
                lPtr => lPD%get(rtmp,
      2            "Continuity stabilization coefficient")
-               IF (.NOT.ASSOCIATED(lPtr)) rtmp = 0._RKIND
             CASE DEFAULT
                err = "Undefined properties (IB)"
             END SELECT
@@ -445,16 +422,8 @@
          END IF
       END DO
 
-      IF (.NOT.flag) THEN
-!        Read IB outputs
-         CALL IB_READOUTPUTS(lEq, nDOP, outPuts, list)
-
-!        IB linear solver properties:
-!        Default: CG, relTol=1E-2; absTol=1E-10; maxItr=1000)
-         CALL FSILS_LS_CREATE(lEq%lsIB, LS_TYPE_CG)
-!         SUBROUTINE FSILS_LS_CREATE(ls, LS_type, relTol, absTol, &
-!     &      maxItr, dimKry, relTolIn, absTolIn, maxItrIn)
-      END IF
+!     Read IB outputs
+      CALL IB_READOUTPUTS(lEq, nDOP, outPuts, list)
 
 !--------------------------------------------------------------------
 !     Searching for BCs on immersed bodies
@@ -486,7 +455,7 @@
       TYPE(listType), INTENT(INOUT) :: list
 
       INTEGER(KIND=IKIND) nOut, iOut, i, j
-      CHARACTER(LEN=stdL) ctmp
+      CHARACTER(LEN=stdL) ctmp, stmp
       TYPE(listType), POINTER :: lPtr, lPO
 
       lEq%nOutIB = nDOP(1)
@@ -494,21 +463,6 @@
 
       DO iOut=1, nDOP(1)
          SELECT CASE (outputs(iOut))
-         CASE (out_velocity)
-            lEq%outIB(iOut)%grp  = outGrp_Y
-            lEq%outIB(iOut)%o    = 0
-            lEq%outIB(iOut)%l    = nsd
-            lEq%outIB(iOut)%name = "Velocity"
-         CASE (out_pressure)
-            lEq%outIB(iOut)%grp  = outGrp_Y
-            lEq%outIB(iOut)%o    = nsd
-            lEq%outIB(iOut)%l    = 1
-            lEq%outIB(iOut)%name = "Pressure"
-         CASE (out_acceleration)
-            lEq%outIB(iOut)%grp  = outGrp_A
-            lEq%outIB(iOut)%o    = 0
-            lEq%outIB(iOut)%l    = nsd
-            lEq%outIB(iOut)%name = "Acceleration"
          CASE (out_displacement)
             lEq%outIB(iOut)%grp  = outGrp_D
             lEq%outIB(iOut)%o    = 0
@@ -523,6 +477,16 @@
             ELSE
                lEq%outIB(iOut)%name = "Volume"
             END IF
+         CASE (out_velocity)
+            lEq%outIB(iOut)%grp  = outGrp_Y
+            lEq%outIB(iOut)%o    = 0
+            lEq%outIB(iOut)%l    = nsd
+            lEq%outIB(iOut)%name = "Velocity"
+         CASE (out_pressure)
+            lEq%outIB(iOut)%grp  = outGrp_Y
+            lEq%outIB(iOut)%o    = nsd
+            lEq%outIB(iOut)%l    = 1
+            lEq%outIB(iOut)%name = "Pressure"
          CASE DEFAULT
             err = "IB output undefined"
          END SELECT
@@ -541,10 +505,12 @@
          SELECT CASE(TRIM(ctmp))
          CASE("Spatial")
             j = 1
-         CASE("B_INT")
+         CASE("B_INT", "Boundary_integral")
             j = 2
-         CASE("V_INT")
+         CASE("V_INT", "Volume_integral")
             j = 3
+         CASE("Alias")
+            CYCLE
          CASE DEFAULT
             j = -1
             err = TRIM(list%ping("Output (IB)",lPO))//
@@ -552,12 +518,22 @@
          END SELECT
          DO i=1, lEq%nOutIB
             lPtr => lPO%get(lEq%outIB(i)%wtn(j),lEq%outIB(i)%name)
-            IF (TRIM(lEq%outIB(i)%name) .EQ. "Vortex") THEN
-               IF (nsd .ne. maxNSD) THEN
-                  lEq%outIB(i)%wtn(j) = .FALSE.
-               END IF
-            END IF
          END DO
+      END DO
+
+!     Read any alias names for outputs
+      DO iOut=1, nOut
+         lPO => list%get(ctmp,"Output (IB)",iOut)
+         SELECT CASE (TRIM(ctmp))
+         CASE ("Alias")
+            DO i=1, lEq%nOutIB
+               lPtr => lPO%get(stmp, TRIM(lEq%output(i)%name))
+               IF (ASSOCIATED(lPtr)) lEq%outIB(i)%name = TRIM(stmp)
+            END DO
+            EXIT
+         CASE DEFAULT
+            CYCLE
+         END SELECT
       END DO
 
       RETURN
@@ -610,11 +586,7 @@
 
       iM  = lBc%iM
       iFa = lBc%iFa
-      IF (iFa .NE. 0) THEN
-         nNo = ib%msh(iM)%fa(iFa)%nNo
-      ELSE
-         nNo = ib%msh(iM)%nNo
-      END IF
+      nNo = ib%msh(iM)%fa(iFa)%nNo
 
 !     Reading the type: Dir/Neu
       lPtr => list%get(ctmp,"Type")
@@ -629,57 +601,11 @@
 
 !     Weak Dirichlet BC for fluid/FSI equations
       lBc%weakDir = .FALSE.
-      IF (BTEST(lBc%bType,bType_Dir)) THEN
-!        Read penalty values
-         lPtr => list%get(rtmp, "Penalty parameter")
-         IF (ASSOCIATED(lPtr)) lBc%tauB(:) = rtmp
-         lPtr => list%get(rtmp, "Penalty parameter (tangential)")
-         IF (ASSOCIATED(lPtr)) lBc%tauB(1) = rtmp
-         lPtr => list%get(rtmp, "Penalty parameter (normal)")
-         IF (ASSOCIATED(lPtr)) lBc%tauB(2) = rtmp
-
-!        Read feedback parameter
-         lPtr => list%get(rtmp, "Feedback force constant")
-         IF (ASSOCIATED(lPtr)) lBc%tauF = rtmp
-         lPtr => list%get(lBc%fbN, "Feedback along normal direction")
-
-         IF (ib%msh(iM)%lShl .AND. iFa.EQ.0) THEN
-            IF (.NOT.lBc%fbN) err = "Feedback forcing should be "//
-     2         "applied along normal direction for immersed shells"
-         END IF
-      END IF
-
-!     Read BCs for shells with triangular elements. Not necessary for
-!     NURBS elements
-      lPtr => list%get(ctmp,"Shell BC type")
-      IF (ASSOCIATED(lPtr)) THEN
-         SELECT CASE (ctmp)
-         CASE ("Fixed", "fixed", "Clamped", "clamped")
-            lBc%bType = IBSET(lBc%bType,bType_fix)
-            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Fixed BC "//
-     2         "can be applied for Dirichlet boundaries only"
-         CASE ("Hinged", "hinged")
-            lBc%bType = IBSET(lBc%bType,bType_hing)
-            IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Hinged BC "//
-     2         "can be applied for Dirichlet boundaries only"
-         CASE ("Free", "free")
-            lBc%bType = IBSET(lBc%bType,bType_free)
-            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Free BC "//
-     2         "can be applied for Neumann boundaries only"
-!       Symm BC needs to be verified
-c         CASE ("Symm", "symm", "Symmetric", "symmetric")
-c            lBc%bType = IBSET(lBc%bType,bType_symm)
-c            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Symm BC "//
-c     2         "can be applied for Neumann boundaries only"
-         CASE DEFAULT
-            err = TRIM(list%ping("Shell BC type",lPtr))//
-     2         " Unexpected Shell BC type"
-         END SELECT
-      END IF
 
       ALLOCATE(lBc%eDrn(nsd))
       lBc%eDrn = 0
       lPtr => list%get(lBc%eDrn,"Effective direction")
+
       ctmp = "Steady"
       lPtr => list%get(ctmp,"Time dependence")
       SELECT CASE (ctmp)
@@ -691,6 +617,9 @@ c     2         "can be applied for Neumann boundaries only"
          ALLOCATE(lBc%gt)
          lPtr => list%get(fTmp,"Temporal values file path")
          IF (ASSOCIATED(lPtr)) THEN
+            ltmp = .FALSE.
+            lPtr => list%get(ltmp,"Ramp function")
+            lBc%gt%lrmp = ltmp
             fid = fTmp%open()
             READ(fid,*) i, j
             IF (i .LT. 2) THEN
@@ -698,12 +627,16 @@ c     2         "can be applied for Neumann boundaries only"
                err = "Wrong format in: "//fTmp%fname
             END IF
             lBc%gt%n = j
+            IF (lBc%gt%lrmp) lBc%gt%n = 1
             ALLOCATE(lBc%gt%r(j))
             ALLOCATE(lBc%gt%i(j))
             CALL FFT(fid, i, lBc%gt)
             CLOSE(fid)
          ELSE
             lPtr => list%get(fTmp,"Fourier coefficients file path",1)
+            IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
+     2         "unsteady type BC"
+            lBc%gt%lrmp = .FALSE.
             fid = fTmp%open()
             READ (fid,*) lBc%gt%ti
             READ (fid,*) lBc%gt%T
@@ -722,32 +655,37 @@ c     2         "can be applied for Neumann boundaries only"
          err = " Cannot apply Coupled BCs for immersed bodies"
       CASE ('Resistance')
          err = " Cannot apply Resistance BCs for immersed bodies"
+      CASE ('RCR', 'Windkessel')
+         err = " Cannot apply RCR BCs for immersed bodies"
       CASE ('General')
          lBc%bType = IBSET(lBc%bType,bType_gen)
-         lPtr =>list%get(fTmp,"Temporal and spatial values file path",1)
-         fid = fTmp%open()
-         READ (fid,*) i, j, a
-         IF (a .NE. nNo) THEN
-            IF (iFa .NE. 0) THEN
+         lPtr => list%get(ftmp,"BCT file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            ALLOCATE(lBc%gm)
+            CALL READBCT(lBc%gm, ib%msh(iM), ib%msh(iM)%fa(iFa),
+     2         ftmp%fname)
+         ELSE
+            lPtr =>list%get(fTmp,
+     2         "Temporal and spatial values file path",1)
+            IF (.NOT.ASSOCIATED(lPtr)) err = "Input file for General"//
+     2         " BC (bct_ib.vtp) is not provided"
+            fid = fTmp%open()
+            READ (fid,*) i, j, a
+            IF (a .NE. nNo) THEN
                err = "Number of nodes does not match between "//
      2            TRIM(ib%msh(iM)%fa(iFa)%name)//" and "//fTmp%fname
-            ELSE
-               err = "Number of nodes does not match between "//
-     2            TRIM(ib%msh(iM)%name)//" and "//fTmp%fname
             END IF
-         END IF
-         IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
-     2      " is violated in "//fTmp%fname
+            IF (i.LT.1 .OR. i.GT.nsd) err = "0 < dof <= "//nsd//
+     2         " is violated in "//fTmp%fname
 
-         ALLOCATE(lBc%gm)
-         ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(ib%msh(iM)%nNo))
+            ALLOCATE(lBc%gm)
+            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j), ptr(ib%msh(iM)%nNo))
 !     I am seting all the nodes to zero just in case a node is not set
-         lBc%gm%d   = 0._RKIND
-         lBc%gm%dof = i
-         lBc%gm%nTP = j
-         ptr        = 0
+            lBc%gm%d   = 0._RKIND
+            lBc%gm%dof = i
+            lBc%gm%nTP = j
+            ptr        = 0
 !     Preparing the pointer array
-         IF (iFa .NE. 0) THEN
             DO a=1, nNo
                Ac = ib%msh(iM)%fa(iFa)%gN(a)
                Ac = ib%msh(iM)%lN(Ac)
@@ -758,42 +696,37 @@ c     2         "can be applied for Neumann boundaries only"
      5            STR(ib%msh(iM)%fa(iFa)%gN(a))
                ptr(Ac) = a
             END DO
-         ELSE
-            DO a=1, nNo
-               ptr(a) = a
-            END DO
-         END IF
-
-         DO i=1, j
-            READ (fid,*) rtmp
-            lBc%gm%t(i) = rtmp
-            IF (i .EQ. 1) THEN
-               IF (.NOT.ISZERO(rtmp)) err = "First time step"//
-     2            " should be zero in <"//TRIM(ftmp%fname)//">"
-            ELSE
-               rtmp = rtmp - lBc%gm%t(i-1)
-               IF (ISZERO(rtmp) .OR. rtmp.LT.0._RKIND) err = "Non-in"//
-     2            "creasing time trend is found in <"//
-     3            TRIM(ftmp%fname)//">"
-            END IF
-         END DO
-
-         lBc%gm%period = lBc%gm%t(j)
-         DO b=1, nNo
-            READ (fid,*) Ac
-            IF (Ac.GT.ib%msh(iM)%nNo .OR. Ac.LE.0) THEN
-               err = "Entry "//b//" is out of bound in "//ftmp%fname
-            END IF
-            a = ptr(Ac)
-            IF (a .EQ. 0) THEN
-               err = "Entry "//b//" not found in "//ftmp%fname
-            END IF
             DO i=1, j
-               READ (fid,*) lBc%gm%d(:,a,i)
+               READ (fid,*) rtmp
+               lBc%gm%t(i) = rtmp
+               IF (i .EQ. 1) THEN
+                  IF (.NOT.ISZERO(rtmp)) err = "First time step"//
+     2               " should be zero in <"//TRIM(ftmp%fname)//">"
+               ELSE
+                  rtmp = rtmp - lBc%gm%t(i-1)
+                  IF (ISZERO(rtmp) .OR. rtmp.LT.0._RKIND) err =
+     2               "Non-increasing time trend is found in <"//
+     3               TRIM(ftmp%fname)//">"
+               END IF
             END DO
-         END DO
-         CLOSE(fid)
-         DEALLOCATE(ptr)
+
+            lBc%gm%period = lBc%gm%t(j)
+            DO b=1, nNo
+               READ (fid,*) Ac
+               IF (Ac.GT.ib%msh(iM)%nNo .OR. Ac.LE.0) THEN
+                  err = "Entry "//b//" is out of bound in "//ftmp%fname
+               END IF
+               a = ptr(Ac)
+               IF (a .EQ. 0) THEN
+                  err = "Entry "//b//" not found in "//ftmp%fname
+               END IF
+               DO i=1, j
+                  READ (fid,*) lBc%gm%d(:,a,i)
+               END DO
+            END DO
+            CLOSE(fid)
+            DEALLOCATE(ptr)
+         END IF
       CASE DEFAULT
          err = TRIM(list%ping("Time dependence",lPtr))//
      2      " Unexpected type"
@@ -819,8 +752,6 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ('Flat')
          lBc%bType = IBSET(lBc%bType,bType_flat)
       CASE ('Parabolic')
-         IF (iFa .EQ. 0) err = "Parabolic profile not yet set up for "//
-     2      "immersed shells"
          lBc%bType = IBSET(lBc%bType,bType_para)
       CASE ('User_defined')
          lBc%bType = IBSET(lBc%bType,bType_ud)
@@ -830,24 +761,17 @@ c     2         "can be applied for Neumann boundaries only"
 !     I am seting all the nodes to zero just in case a node is not set
          ptr = 0
 !     Preparing the pointer array
-         IF (iFa .NE. 0) THEN
-            DO a=1, nNo
-               lBc%gx(a) = 0._RKIND
-               Ac = ib%msh(iM)%fa(iFa)%gN(a)
-               Ac = ib%msh(iM)%lN(Ac)
-               IF (Ac .EQ. 0) err = "Incorrect global node number "//
-     2            "detected for BC. Mesh: "//TRIM(ib%msh(iM)%name)//
-     3            ", Face: "//TRIM(ib%msh(iM)%fa(iFa)%name)//
-     4            ", Node: "//STR(a)//" gN: "//
-     5            STR(ib%msh(iM)%fa(iFa)%gN(a))
-               ptr(Ac) = a
-            END DO
-         ELSE
-            DO a=1, nNo
-               lBc%gx(a) = 0._RKIND
-               ptr(a) = a
-            END DO
-         END IF
+         DO a=1, nNo
+            lBc%gx(a) = 0._RKIND
+            Ac = ib%msh(iM)%fa(iFa)%gN(a)
+            Ac = ib%msh(iM)%lN(Ac)
+            IF (Ac .EQ. 0) err = "Incorrect global node number "//
+     2         "detected for BC. Mesh: "//TRIM(ib%msh(iM)%name)//
+     3         ", Face: "//TRIM(ib%msh(iM)%fa(iFa)%name)//
+     4         ", Node: "//STR(a)//" gN: "//
+     5         STR(ib%msh(iM)%fa(iFa)%gN(a))
+            ptr(Ac) = a
+         END DO
 
          DO b=1, nNo
             READ (fid,*) Ac, rtmp
@@ -875,12 +799,7 @@ c     2         "can be applied for Neumann boundaries only"
       IMPLICIT NONE
 
       ALLOCATE(ib%R(nsd+1,tnNo))
-      ALLOCATE(ib%Rfb(nsd,ib%tnNo))
-      ALLOCATE(ib%Ao(nsd,ib%tnNo))
-      ALLOCATE(ib%An(nsd,ib%tnNo))
-      ALLOCATE(ib%Yo(nsd+1,ib%tnNo))
       ALLOCATE(ib%Yn(nsd+1,ib%tnNo))
-      ALLOCATE(ib%Uo(nsd,ib%tnNo))
       ALLOCATE(ib%Un(nsd,ib%tnNo))
 
       RETURN
@@ -910,6 +829,8 @@ c     2         "can be applied for Neumann boundaries only"
             EXIT
          END IF
       END DO
+      IF (ib%cEq .EQ. 0) err = "Fluid equation not detected "//
+     2   "to treat immersed bodies"
 
       lD = 0._RKIND
       IF (mvMsh) THEN
@@ -943,22 +864,8 @@ c     2         "can be applied for Neumann boundaries only"
          DO iBc=1, eq(iEq)%nBcIB
             iFa = eq(iEq)%bcIB(iBc)%iFa
             iM  = eq(iEq)%bcIB(iBc)%iM
-            IF (iFa .NE. 0) THEN
-               CALL IB_BCINI(eq(iEq)%bcIB(iBc), ib%msh(iM)%fa(iFa))
-               IF (ib%msh(iM)%lShl) THEN
-                  CALL SHLBCINI(eq(iEq)%bcIB(iBc), ib%msh(iM)%fa(iFa),
-     2               ib%msh(iM))
-               END IF
-            ELSE
-               CALL IB_SBCINI(eq(iEq)%bcIB(iBc), ib%msh(iM))
-            END IF
+            CALL IB_BCINI(eq(iEq)%bcIB(iBc), ib%msh(iM)%fa(iFa))
          END DO
-      END DO
-
-!     Initialize shell structures (extended IEN and shell normal). This
-!     call has to be made before calling LHSA.
-      DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl) CALL IB_SHLINI(ib%msh(iM))
       END DO
 
 !     Create sparse matrix data structures
@@ -966,8 +873,7 @@ c     2         "can be applied for Neumann boundaries only"
       std = "    Non-zeros in LHS matrix (IB): "//nnz
 
 !     Set IB Dirichlet BCs
-      CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
-      CALL IB_SETBCDIR(ib%An, ib%Yn, ib%Un)
+      CALL IB_SETBCDIR(ib%Yn, ib%Un)
 
 !     To compute IB traces, calculate node/element adjacency for
 !     background lumen mesh
@@ -979,13 +885,7 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Calculate node/element adjacency for immersed bodies
       DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-            CALL GETEADJCNCY(ib%msh(iM))
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               CALL GETEADJCNCY(ib%msh(iM)%fa(iFa))
-            END DO
-         END IF
+         CALL GETEADJCNCY(ib%msh(iM))
       END DO
 
 !     Set iblank field for immersed boundaries
@@ -1182,168 +1082,6 @@ c     2         "can be applied for Neumann boundaries only"
 
       RETURN
       END SUBROUTINE IB_BCINI
-!--------------------------------------------------------------------
-!     Set BC spatial profile on the shell
-      SUBROUTINE IB_SBCINI(lBc, lM)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(bcType), INTENT(INOUT) :: lBc
-      TYPE(mshType), INTENT(IN) :: lM
-
-      INTEGER(KIND=IKIND) a, Ac, iFa
-
-      REAL(KIND=RKIND), ALLOCATABLE :: s(:)
-
-      IF (BTEST(lBc%bType,bType_gen)) THEN
-         IF (BTEST(lBc%bType,bType_Neu) .AND. lBc%gm%dof.NE.1) THEN
-            err = " Only DOF=1 is accepted for Neu general BCs"
-         END IF
-         RETURN
-      END IF
-
-      IF (.NOT.ALLOCATED(lBc%gx)) ALLOCATE(lBc%gx(lM%nNo))
-
-      ALLOCATE(s(ib%tnNo))
-      s = 0._RKIND
-      IF (BTEST(lBc%bType,bType_flat)) THEN
-!     Just a constant value for Flat profile
-         DO a=1, lM%nNo
-            Ac    = lM%gN(a)
-            s(Ac) = 1._RKIND
-         END DO
-      ELSE IF (BTEST(lBc%bType,bType_para)) THEN
-         err = "Parabolic BC not set up yet for immersed shells"
-
-      ELSE IF (BTEST(lBc%bType,bType_ud)) THEN
-         DO a=1, lM%nNo
-            Ac    = lM%gN(a)
-            s(Ac) = lBc%gx(a)
-         END DO
-      END IF
-
-!     Zero perimeter - all faces of the shell are zeroed
-      IF (BTEST(lBc%bType,bType_zp)) THEN
-         DO iFa=1, lM%nFa
-            DO a=1, lM%fa(iFa)%nNo
-               Ac    = lM%fa(iFa)%gN(a)
-               s(Ac) = 0._RKIND
-            END DO
-         END DO
-      END IF
-
-      DO a=1, lM%nNo
-         Ac        = lM%gN(a)
-         lBc%gx(a) = s(Ac)
-      END DO
-
-      RETURN
-      END SUBROUTINE IB_SBCINI
-!--------------------------------------------------------------------
-!     Initializing shells
-      SUBROUTINE IB_SHLINI(lM)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(mshType), INTENT(INOUT) :: lM
-
-      INTEGER(KIND=IKIND) :: a, b, e, f, g, Ac, Bc, nNo, nEl, eNoN,
-     2   ep(2,3)
-      LOGICAL :: flag
-      REAL(KIND=RKIND) :: Jac, area, nV(nsd), tmpR(nsd,nsd-1)
-
-      INTEGER(KIND=IKIND), ALLOCATABLE :: incN(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sV(:,:)
-
-      IF (lM%eType .EQ. eType_NRB) THEN
-         ALLOCATE(lM%eIEN(0,0), lM%sbc(lM%eNoN,lM%nEl))
-         lM%sbc = 0
-         RETURN
-      END IF
-
-      ep   = RESHAPE((/2,3,3,1,1,2/), SHAPE(ep))
-      nNo  = lM%nNo
-      nEl  = lM%nEl
-      eNoN = lM%eNoN
-      ALLOCATE(incN(eNoN), lM%eIEN(eNoN,nEl), lM%sbc(eNoN,nEl))
-
-      lM%eIEN = 0
-      lM%sbc  = 0
-      DO e=1, nEl
-         DO a=1, eNoN
-            Ac = lM%IEN(ep(1,a),e)
-            Bc = lM%IEN(ep(2,a),e)
-            DO f=1, nEl
-               IF (e .EQ. f) CYCLE
-               incN = 0
-               DO b=1, eNoN
-                  IF (lM%IEN(b,f).EQ.Ac .OR. lM%IEN(b,f).EQ.Bc)
-     2               incN(b) = incN(b) + 1
-               END DO
-               IF (SUM(incN) .EQ. 2) THEN
-                  DO b=1, eNoN
-                     IF (incN(b) .EQ. 0) THEN
-                        lM%eIEN(a,e) = lM%IEN(b,f)
-                        EXIT
-                     END IF
-                  END DO
-                  EXIT
-               END IF
-            END DO
-
-            IF (lM%eIEN(a,e) .EQ. 0) THEN
-               lM%sbc(a,e) = IBSET(lM%sbc(a,e), bType_free)
-            END IF
-         END DO
-      END DO
-      DEALLOCATE(incN)
-
-!     Compute shell director (normal)
-      ALLOCATE(xl(nsd,eNoN), sV(nsd,ib%tnNo), lM%nV(nsd,nNo))
-      sV   = 0._RKIND
-      area = 0._RKIND
-      DO e=1, nEl
-         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
-         DO a=1, eNoN
-            Ac = lM%IEN(a,e)
-            xl(:,a) = ib%x(:,Ac)
-         END DO
-
-         DO g=1, lM%nG
-            CALL GNNS(eNoN, lM%Nx(:,:,g), xl, nV, tmpR, tmpR)
-            Jac = SQRT(NORM(nV))
-            DO a=1, eNoN
-               Ac = lM%IEN(a,e)
-               sV(:,Ac) = sV(:,Ac) + lM%w(g)*lM%N(a,g)*nV
-               area     = area     + lM%w(g)*lM%N(a,g)*Jac
-            END DO
-         END DO
-      END DO
-
-      std = "    Area of the shell surface <"//TRIM(lM%name)//"> is "//
-     2   STR(area)
-
-      flag = .TRUE.
-      DO a=1, nNo
-         Ac  = lM%gN(a)
-         Jac = SQRT(NORM(sV(:,Ac)))
-         IF (ISZERO(Jac)) THEN
-            IF (flag) THEN
-               wrn = "Skipping normal calculation of node "//a//
-     2            " in mesh <"//TRIM(lM%name)//">"
-               flag = .FALSE.
-            END IF
-            lM%nV(:,a) = 0._RKIND
-            lM%nV(1,a) = 1._RKIND
-            CYCLE
-         END IF
-         lM%nV(:,a) = sV(:,Ac)/Jac
-      END DO
-
-      DEALLOCATE(xl, sV)
-
-      RETURN
-      END SUBROUTINE IB_SHLINI
 !####################################################################
 !     Form the LHS sparse data structures for immersed bodies
       SUBROUTINE IB_LHSA(nnz)
@@ -1363,52 +1101,11 @@ c     2         "can be applied for Neumann boundaries only"
       ALLOCATE (uInd(mnnzeic,ib%tnNo))
       uInd = 0
       DO iM=1, ib%nMsh
-!        Treat shell with triangular elements separately
-         IF (ib%msh(iM)%lShl .AND. ib%msh(iM)%eType.EQ.eType_TRI) CYCLE
          DO e=1, ib%msh(iM)%nEl
             DO a=1, ib%msh(iM)%eNoN
                rowN = ib%msh(iM)%IEN(a,e)
                DO b=1, ib%msh(iM)%eNoN
                   colN = ib%msh(iM)%IEN(b,e)
-                  DO i=1, mnnzeic
-                     IF (uInd(i,rowN) .EQ. 0) THEN
-                        uInd(i,rowN) = colN
-                        EXIT
-                     END IF
-                     IF (colN .GT. uInd(i,rowN)) CYCLE
-                     IF (colN .EQ. uInd(i,rowN)) EXIT
-                     IF (uInd(mnnzeic,rowN) .NE. 0) GOTO 003
-                     DO j=mnnzeic, i+1, -1
-                        uInd(j,rowN) = uInd(j-1,rowN)
-                     END DO
-                     uInd(i,rowN) = colN
-                     EXIT
-                  END DO
-                  IF (i .GT. mnnzeic) GOTO 003
-               END DO
-            END DO
-         END DO
-      END DO
-
-!     Treat shells with triangular elements here
-      DO iM=1, ib%nMsh
-         IF (.NOT.ib%msh(iM)%lShl) CYCLE
-         IF (ib%msh(iM)%eType .EQ. eType_NRB) CYCLE
-         DO e=1, ib%msh(iM)%nEl
-            DO a=1, 2*ib%msh(iM)%eNoN
-               IF (a .LE. ib%msh(iM)%eNoN) THEN
-                  rowN = ib%msh(iM)%IEN(a,e)
-               ELSE
-                  rowN = ib%msh(iM)%eIEN(a-ib%msh(iM)%eNoN,e)
-               END IF
-               IF (rowN .EQ. 0) CYCLE
-               DO b=1, 2*ib%msh(iM)%eNoN
-                  IF (b .LE. ib%msh(iM)%eNoN) THEN
-                     colN = ib%msh(iM)%IEN(b,e)
-                  ELSE
-                     colN = ib%msh(iM)%eIEN(b-ib%msh(iM)%eNoN,e)
-                  END IF
-                  IF (colN .EQ. 0) CYCLE
                   DO i=1, mnnzeic
                      IF (uInd(i,rowN) .EQ. 0) THEN
                         uInd(i,rowN) = colN
@@ -1472,7 +1169,7 @@ c     2         "can be applied for Neumann boundaries only"
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
-      LOGICAL :: flag, incL
+      LOGICAL :: incL
       INTEGER(KIND=IKIND) :: a, Ac, i, iM, itmp
       REAL(KIND=RKIND) :: minb(nsd), maxb(nsd), xp(nsd), dx
 
@@ -1480,16 +1177,6 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Initialize iblank field
       iblank(:) = 0
-
-!     Return if all the immersed meshes are shells
-      flag = .FALSE.
-      DO iM=1, ib%nMsh
-         IF (.NOT.ib%msh(iM)%lShl) THEN
-            flag = .TRUE.
-            EXIT
-         END IF
-      END DO
-      IF (.NOT.flag) RETURN
 
 !     Fit a bounding box around IB and probe only those nodes lying
 !     inside the box
@@ -1501,8 +1188,8 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       DO i=1, nsd
-         minb(i) = MINVAL(ib%x(i,:) + ib%Uo(i,:)) - dx
-         maxb(i) = MAXVAL(ib%x(i,:) + ib%Uo(i,:)) + dx
+         minb(i) = MINVAL(ib%x(i,:) + ib%Un(i,:)) - dx
+         maxb(i) = MAXVAL(ib%x(i,:) + ib%Un(i,:)) + dx
       END DO
 
       ALLOCATE(chck(tnNo))
@@ -1624,7 +1311,7 @@ c     2         "can be applied for Neumann boundaries only"
                xb = 0._RKIND
                DO a=1, ib%msh(iM)%fa(iFa)%eNoN
                   Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                  xb = xb + ib%x(:,Ac) + ib%Uo(:,Ac)
+                  xb = xb + ib%x(:,Ac) + ib%Un(:,Ac)
                END DO
                xb = xb / REAL(ib%msh(iM)%fa(iFa)%eNoN, KIND=RKIND)
                dS = SQRT( SUM( (xp(:)-xb(:))**2._RKIND ) )
@@ -1647,7 +1334,7 @@ c     2         "can be applied for Neumann boundaries only"
       xb = 0._RKIND
       DO a=1, ib%msh(jM)%fa(jFa)%eNoN
          Ac = ib%msh(jM)%fa(jFa)%IEN(a,Ec)
-         xb = xb + ib%x(:,Ac) + ib%Uo(:,Ac)
+         xb = xb + ib%x(:,Ac) + ib%Un(:,Ac)
       END DO
       xb   = xb / REAL(ib%msh(jM)%fa(jFa)%eNoN, KIND=RKIND)
       dotP = NORM(xp-xb, nV)
@@ -1662,7 +1349,7 @@ c     2         "can be applied for Neumann boundaries only"
 !        if the probe is along the tangent, perform sign check with one
 !        of the vertices of the closest node instead of the centroid
          Ac   = ib%msh(jM)%fa(jFa)%IEN(1,Ec)
-         xb   = ib%x(:,Ac) + ib%Uo(:,Ac)
+         xb   = ib%x(:,Ac) + ib%Un(:,Ac)
          dotP = NORM(xp-xb,nV)
          IF (ABS(dotP) .LT. 1.E-9_RKIND) THEN
             flag = .TRUE.
@@ -1683,29 +1370,16 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(mshType), INTENT(INOUT) :: lM
       REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
-      INTEGER(KIND=IKIND) iFa
-
       INTEGER(KIND=IKIND), ALLOCATABLE :: incEl(:), ePtr(:,:,:)
 
 !     For shells and IFEM method, all the mesh elements are included for
 !     trace search. For solids, only boundary/face nodes are included
 !     for trace search.
-      IF (lM%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-         ALLOCATE(incEl(lM%nEl), ePtr(2,lM%nG,lM%nEl))
-         incEl = 1
-         ePtr  = 0
-         CALL IB_FINDMSHTRACES(lM, lD, incEl, ePtr)
-         DEALLOCATE(incEl, ePtr)
-      ELSE
-         DO iFa=1, lM%nFa
-            ALLOCATE(incEl(lM%fa(iFa)%nEl),
-     2         ePtr(2,lM%fa(iFa)%nG,lM%fa(iFa)%nEl))
-            incEl = 1
-            ePtr  = 0
-            CALL IB_FINDFACETRACES(lM%fa(iFa), lD, incEl, ePtr)
-            DEALLOCATE(incEl, ePtr)
-         END DO
-      END IF
+      ALLOCATE(incEl(lM%nEl), ePtr(2,lM%nG,lM%nEl))
+      incEl = 1
+      ePtr  = 0
+      CALL IB_FINDMSHTRACES(lM, lD, incEl, ePtr)
+      DEALLOCATE(incEl, ePtr)
 
       RETURN
       END SUBROUTINE IB_INITTRACES
@@ -1716,7 +1390,7 @@ c     2         "can be applied for Neumann boundaries only"
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) :: a, iM, iFa
+      INTEGER(KIND=IKIND) :: a, iM
       REAL(KIND=RKIND), ALLOCATABLE :: lD(:,:)
 
       ALLOCATE(lD(nsd,tnNo))
@@ -1735,13 +1409,7 @@ c     2         "can be applied for Neumann boundaries only"
          msh(iM)%iGC(:) = 0
       END DO
       DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-            CALL IB_UPDATETRACESMSH(ib%msh(iM), lD)
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               CALL IB_UPDATETRACESFACE(ib%msh(iM)%fa(iFa), lD)
-            END DO
-         END IF
+         CALL IB_UPDATETRACESMSH(ib%msh(iM), lD)
       END DO
 
 !     Reset IB communicator
@@ -1803,7 +1471,7 @@ c     2         "can be applied for Neumann boundaries only"
          DO e=1, lM%nEl
             DO a=1, lM%eNoN
                Ac = lM%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
 
             DO g=1, lM%nG
@@ -1915,7 +1583,7 @@ c     2         "can be applied for Neumann boundaries only"
          DO e=1, lFa%nEl
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
 
             DO g=1, lFa%nG
@@ -2003,7 +1671,7 @@ c     2         "can be applied for Neumann boundaries only"
       xpL = 0._RKIND
       DO a=1, lM%nNo
          Ac = lM%gN(a)
-         xpL(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+         xpL(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
       END DO
 
 !     Create a bounding box around the intersection of immersed body
@@ -2118,7 +1786,7 @@ c     2         "can be applied for Neumann boundaries only"
             IF (incEl(e) .EQ. 0) CYCLE
             DO a=1, lM%eNoN
                Ac = lM%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
             DO g=1, lM%nG
                xp = 0._RKIND
@@ -2158,7 +1826,7 @@ c     2         "can be applied for Neumann boundaries only"
             DO g=1, lM%nG
                DO a=1, lM%eNoN
                   Ac = lM%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                  xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
                END DO
 
                xp = 0._RKIND
@@ -2216,7 +1884,7 @@ c     2         "can be applied for Neumann boundaries only"
                DO g=1, lM%nG
                   DO a=1, lM%eNoN
                      Ac = lM%IEN(a,e)
-                     xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                     xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
                   END DO
 
                   xp = 0._RKIND
@@ -2376,7 +2044,7 @@ c     2         "can be applied for Neumann boundaries only"
             e = incEl(i)
             DO a=1, lM%eNoN
                Ac = lM%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
             DO g=1, lM%nG
                xp = 0._RKIND
@@ -2454,7 +2122,7 @@ c     2         "can be applied for Neumann boundaries only"
       xpL = 0._RKIND
       DO a=1, lFa%nNo
          Ac = lFa%gN(a)
-         xpL(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+         xpL(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
       END DO
 
 !     Create a bounding box around the intersection of immersed body
@@ -2581,7 +2249,7 @@ c     2         "can be applied for Neumann boundaries only"
             IF (incEl(e) .EQ. 0) CYCLE
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
             DO g=1, lFa%nG
                xp = 0._RKIND
@@ -2621,7 +2289,7 @@ c     2         "can be applied for Neumann boundaries only"
             DO g=1, lFa%nG
                DO a=1, lFa%eNoN
                   Ac = lFa%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                  xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
                END DO
 
                xp = 0._RKIND
@@ -2679,7 +2347,7 @@ c     2         "can be applied for Neumann boundaries only"
                DO g=1, lFa%nG
                   DO a=1, lFa%eNoN
                      Ac = lFa%IEN(a,e)
-                     xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+                     xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
                   END DO
 
                   xp = 0._RKIND
@@ -2839,7 +2507,7 @@ c     2         "can be applied for Neumann boundaries only"
             e = incEl(i)
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
             DO g=1, lFa%nG
                xp = 0._RKIND
@@ -2926,13 +2594,13 @@ c     2         "can be applied for Neumann boundaries only"
       DO a=1, lM%nNo
          IF (part(a) .NE. 0) CYCLE
          Ac   = lM%gN(a)
-         xp   = ib%x(:,Ac) + ib%Uo(:,Ac)
+         xp   = ib%x(:,Ac) + ib%Un(:,Ac)
          minS = HUGE(minS)
          DO b=1, gM%nNo
             Bc = gM%gN(b)
             IF (gN(Bc) .EQ. 0) CYCLE
             xb = x(:,Bc) + lD(:,Bc)
-            dS = SQRT( SUM( (xp(:)-xb(:))**2 ))
+            dS = SQRT( SUM( (xp(:)-xb(:))**2._RKIND ))
             IF (minS .GT. dS) minS = dS
          END DO
          IF (minS .LT. tol) THEN
@@ -3009,13 +2677,13 @@ c     2         "can be applied for Neumann boundaries only"
       DO a=1, lFa%nNo
          IF (part(a) .NE. 0) CYCLE
          Ac   = lFa%gN(a)
-         xp   = ib%x(:,Ac) + ib%Uo(:,Ac)
+         xp   = ib%x(:,Ac) + ib%Un(:,Ac)
          minS = HUGE(minS)
          DO b=1, gM%nNo
             Bc = gM%gN(b)
             IF (gN(Bc) .EQ. 0) CYCLE
             xb = x(:,Bc) + lD(:,Bc)
-            dS = SQRT( SUM( (xp(:)-xb(:))**2 ))
+            dS = SQRT( SUM( (xp(:)-xb(:))**2._RKIND ))
             IF (minS .GT. dS) minS = dS
          END DO
          IF (minS .LT. tol) THEN
@@ -3135,7 +2803,7 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER(KIND=IKIND) i, a, e, n, Ac, iM, iFa, ierr, tag
+      INTEGER(KIND=IKIND) i, a, e, n, Ac, iM, ierr, tag
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), ptr(:), rA(:,:),
      2   rReq(:)
@@ -3150,25 +2818,13 @@ c     2         "can be applied for Neumann boundaries only"
       ALLOCATE(incNd(ib%tnNo))
       incNd = 0
       DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-            DO i=1, ib%msh(iM)%trc%n
-               e = ib%msh(iM)%trc%gE(1,i)
-               DO a=1, ib%msh(iM)%eNoN
-                  Ac = ib%msh(iM)%IEN(a,e)
-                  incNd(Ac) = 1
-               END DO
+         DO i=1, ib%msh(iM)%trc%n
+            e = ib%msh(iM)%trc%gE(1,i)
+            DO a=1, ib%msh(iM)%eNoN
+               Ac = ib%msh(iM)%IEN(a,e)
+               incNd(Ac) = 1
             END DO
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
-                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
-                  DO a=1, ib%msh(iM)%fa(iFa)%eNoN
-                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                     incNd(Ac) = 1
-                  END DO
-               END DO
-            END DO
-         END IF
+         END DO
       END DO
 
 !     All the included IB nodes are now mapped to a local vector
@@ -3257,7 +2913,7 @@ c     2         "can be applied for Neumann boundaries only"
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER(KIND=IKIND) :: a, b, e, Ac, iM, jM
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, iM
 
       REAL(KIND=RKIND), ALLOCATABLE :: rG(:)
 
@@ -3282,19 +2938,19 @@ c     2         "can be applied for Neumann boundaries only"
          END DO
       END DO
 
-!     For Shells, use IB traces to identify ghost cells
-      DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl) THEN
-            DO b=1, ib%msh(iM)%trc%n
-               e  = ib%msh(iM)%trc%ptr(1,b)
-               jM = ib%msh(iM)%trc%ptr(2,b)
-               DO a=1, msh(jM)%eNoN
-                  Ac = msh(jM)%IEN(a,e)
-                  rG(Ac) = 1._RKIND
-               END DO
-            END DO
-         END IF
-      END DO
+c!     For Shells, use IB traces to identify ghost cells
+c      DO iM=1, ib%nMsh
+c         IF (ib%msh(iM)%lShl) THEN
+c            DO b=1, ib%msh(iM)%trc%n
+c               e  = ib%msh(iM)%trc%ptr(1,b)
+c               jM = ib%msh(iM)%trc%ptr(2,b)
+c               DO a=1, msh(jM)%eNoN
+c                  Ac = msh(jM)%IEN(a,e)
+c                  rG(Ac) = 1._RKIND
+c               END DO
+c            END DO
+c         END IF
+c      END DO
       CALL COMMU(rG)
 
       ighost = 0
@@ -3306,13 +2962,12 @@ c     2         "can be applied for Neumann boundaries only"
       END SUBROUTINE IB_SETIGHOST
 !####################################################################
 !     Write IB solution to a vtu file
-      SUBROUTINE IB_WRITEVTUS(lA, lY, lU)
+      SUBROUTINE IB_WRITEVTUS(lY, lU)
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
-      REAL(KIND=RKIND), INTENT(IN) :: lA(nsd,ib%tnNo),
-     2   lY(nsd+1,ib%tnNo), lU(nsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lY(nsd+1,ib%tnNo), lU(nsd,ib%tnNo)
 
       TYPE(dataType) :: d(ib%nMsh)
       TYPE(vtkXMLType) :: vtu
@@ -3324,8 +2979,6 @@ c     2         "can be applied for Neumann boundaries only"
       INTEGER(KIND=IKIND), ALLOCATABLE :: outS(:), tmpI(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
       CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
-
-      IF (ib%mthd .NE. ibMthd_IFEM) RETURN
 
       IF (cm%slv()) THEN
          ib%savedOnce = .TRUE.
@@ -3389,11 +3042,6 @@ c     2         "can be applied for Neumann boundaries only"
                SELECT CASE (oGrp)
                   CASE (outGrp_NA)
                   err = "Undefined output grp in VTK"
-               CASE (outGrp_A)
-                  DO a=1, ib%msh(iM)%nNo
-                     Ac = ib%msh(iM)%gN(a)
-                     d(iM)%x(is:ie,a) = lA(s:e,Ac)
-                  END DO
                CASE (outGrp_Y)
                   DO a=1, ib%msh(iM)%nNo
                      Ac = ib%msh(iM)%gN(a)
@@ -3660,11 +3308,11 @@ c     2         "can be applied for Neumann boundaries only"
       END SUBROUTINE IB_WTXT
 !####################################################################
 !     Apply Dirichlet boundary conditions on the immersed faces
-      SUBROUTINE IB_SETBCDIR(Ab, Yb, Ub)
+      SUBROUTINE IB_SETBCDIR(Yb, Ub)
       USE COMMOD
       IMPLICIT NONE
-      REAL(KIND=RKIND), INTENT(INOUT) :: Ab(nsd,ib%tnNo),
-     2   Yb(nsd+1,ib%tnNo), Ub(nsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: Yb(nsd+1,ib%tnNo),
+     2   Ub(nsd,ib%tnNo)
 
       LOGICAL :: eDir(maxnsd)
       INTEGER(KIND=IKIND) :: iFa, iM, iEq, iBc, a, Ac, nNo, lDof, i
@@ -3691,25 +3339,13 @@ c     2         "can be applied for Neumann boundaries only"
          iM  = eq(iEq)%bcIB(iBc)%iM
 
 !     Prepare a pointer list and normals for a face or a shell
-         IF (iFa .EQ. 0) THEN
-            IF (.NOT.ib%msh(iM)%lShl) err = "Trying to apply Dir "//
-     2         "BC on a non-shell mesh surface"
-            nNo = ib%msh(iM)%nNo
-            ALLOCATE(ptr(nNo), nV(nsd,nNo))
-            ptr = 0
-            DO a=1, nNo
-               ptr(a)  = ib%msh(iM)%gN(a)
-               nV(:,a) = ib%msh(iM)%nV(:,a)
-            END DO
-         ELSE
-            nNo = ib%msh(iM)%fa(iFa)%nNo
-            ALLOCATE(ptr(nNo), nV(nsd,nNo))
-            ptr = 0
-            DO a=1, nNo
-               ptr(a)  = ib%msh(iM)%fa(iFa)%gN(a)
-               nV(:,a) = ib%msh(iM)%fa(iFa)%nV(:,a)
-            END DO
-         END IF
+         nNo = ib%msh(iM)%fa(iFa)%nNo
+         ALLOCATE(ptr(nNo), nV(nsd,nNo))
+         ptr = 0
+         DO a=1, nNo
+            ptr(a)  = ib%msh(iM)%fa(iFa)%gN(a)
+            nV(:,a) = ib%msh(iM)%fa(iFa)%nV(:,a)
+         END DO
 
          ALLOCATE(tmpA(lDof,nNo), tmpY(lDof,nNo))
          CALL IB_SETBCDIRL(eq(iEq)%bcIB(iBc), nNo, lDof, nV, tmpA, tmpY)
@@ -3724,7 +3360,6 @@ c     2         "can be applied for Neumann boundaries only"
                         lDof = lDof + 1
                         Yb(i,Ac) = tmpA(lDof,a)
                         Ub(i,Ac) = tmpY(lDof,a)
-                        Ab(i,Ac) = (Yb(i,Ac)-ib%Yo(i,Ac))/dt
                      END IF
                   END DO
                ELSE
@@ -3732,9 +3367,8 @@ c     2         "can be applied for Neumann boundaries only"
                      lDof = 0
                      IF (eDir(i)) THEN
                         lDof = lDof + 1
-                        Ab(i,Ac) = tmpA(lDof,a)
                         Yb(i,Ac) = tmpY(lDof,a)
-                        Ub(i,Ac) = ib%Uo(i,Ac) + Yb(i,Ac)*dt
+                        Ub(i,Ac) = Ub(i,Ac) + Yb(i,Ac)*dt
                      END IF
                   END DO
                END IF
@@ -3745,11 +3379,9 @@ c     2         "can be applied for Neumann boundaries only"
                IF (BTEST(eq(iEq)%bcIB(iBc)%bType,bType_impD)) THEN
                   Yb(1:nsd,Ac) = tmpA(:,a)
                   Ub(1:nsd,Ac) = tmpY(:,a)
-                  Ab(1:nsd,Ac) = (Yb(1:nsd,Ac)-ib%Yo(1:nsd,Ac))/dt
                ELSE
-                  Ab(1:nsd,Ac) = tmpA(:,a)
                   Yb(1:nsd,Ac) = tmpY(:,a)
-                  Ub(1:nsd,Ac) = ib%Uo(1:nsd,Ac) + Yb(1:nsd,Ac)*dt
+                  Ub(1:nsd,Ac) = Ub(1:nsd,Ac) + Yb(1:nsd,Ac)*dt
                END IF
             END DO
          END IF
@@ -3805,22 +3437,20 @@ c     2         "can be applied for Neumann boundaries only"
 !####################################################################
 !     Compute FSI force on the immersed bodies using Immersed Finite
 !     Element Method (IFEM)
-      SUBROUTINE IB_CALCFFSI(Dg)
+      SUBROUTINE IB_CALCFFSI(Ag, Yg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
 
-      LOGICAL l1, l2, l3, l4
-      INTEGER(KIND=IKIND) a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
-     2   eNoNb, eNoN
-      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), Gmat(nsd,nsd)
+      INTEGER(KIND=IKIND) a, b, e, g, i, j, is, ie, Ac, Bc, Ec, iM, jM,
+     2   eNoNb, eNoN, nFn
+      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), Gmat(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
-     2   Nx(:,:), xbl(:,:), xl(:,:), abl(:,:), ybl(:,:), ubl(:,:),
-     3   fNl(:,:), lR(:,:)
-
-      IF (ib%cEq.EQ.0 .OR. ib%mthd.NE.ibMthd_IFEM) RETURN
+     2   Nx(:,:), xbl(:,:), xl(:,:), al(:,:), yl(:,:), ul(:,:), fN(:,:),
+     3   lR(:,:)
 
 !     TODO: This is temporary. Later we get domain based on each IB node
 !     and communicate across IB process boundaries
@@ -3828,6 +3458,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       is = eq(ib%cEq)%s
       ie = eq(ib%cEq)%e
+      IF (ie .EQ. nsd+1) ie = ie - 1
 
 !     We compute the fluid-structure interaction force on the IB domain
 !     and assemble the residue on the background mesh. The test or the
@@ -3835,11 +3466,12 @@ c     2         "can be applied for Neumann boundaries only"
 !     based on the background fluid mesh, while the integration is
 !     performed on the IB mesh in its reference configuration.
 !     Loop over all IB mesh
+      ib%R = 0._RKIND
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
+         nFn   = MAX(ib%msh(iM)%nFn, 1)
          ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), xbl(nsd,eNoNb),
-     2      abl(nsd,eNoNb), ybl(nsd+1,eNoNb), ubl(nsd,eNoNb),
-     3      fNl(ib%nFn*nsd,eNoNb))
+     2      ul(nsd,eNoNb), fN(nsd,nFn))
 !        Loop over each trace of IB integration points
          DO i=1, ib%msh(iM)%trc%n
             e  = ib%msh(iM)%trc%gE(1,i)
@@ -3856,14 +3488,16 @@ c     2         "can be applied for Neumann boundaries only"
      2         CALL NRBNNX(ib%msh(iM), e)
 
 !           Transfer to element-level local arrays
-            fNl = 0._RKIND
+            fN = 0._RKIND
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc)
-               abl(:,b) = ib%An(:,Bc)
-               ybl(:,b) = ib%Yn(:,Bc)
-               ubl(:,b) = ib%Un(:,Bc)
-               IF (ALLOCATED(ib%fN)) fNl(:,b) = ib%fN(:,Bc)
+               ul(:,b)  = ib%Un(:,Bc)
+               IF (ALLOCATED(ib%msh(iM)%fN)) THEN
+                  DO j=1, nFn
+                     fN(:,j) = ib%msh(iM)%fN((j-1)*nsd+1:j*nsd,e)
+                  END DO
+               END IF
             END DO
 
 !           Compute shapefunction gradients and element Jacobian. The
@@ -3876,76 +3510,38 @@ c     2         "can be applied for Neumann boundaries only"
 !           Scaled Gauss weight
             w = ib%msh(iM)%w(g) * Jac
 
-!           To compute test/weighting function and its gradient, get the
-!           trace of the IB integration point and the shapefunctions
-!           with respect to the background mesh
-
-!           Get IB integration point
-            xp = 0._RKIND
-            DO b=1, eNoNb
-               Bc = ib%msh(iM)%IEN(b,e)
-               xp(:) = xp(:) + Nb(b)*(xbl(:,b) + ib%Uo(:,Bc))
-            END DO
-
+!           Transfer to local arrays: background mesh variables
             eNoN = msh(jM)%eNoN
             ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
-     2         lR(nsd+1,eNoN))
+     2         al(nsd,eNoN), yl(nsd+1,eNoN), lR(nsd+1,eNoN))
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
+               al(:,a) = Ag(is:ie,Ac)
+               yl(:,a) = Yg(is:ie+1,Ac)
                xl(:,a) = x(:,Ac)
                IF (mvMsh) xl(:,a) = xl(:,a) + Dg(ie+2:ie+nsd+1,Ac)
             END DO
 
-!           Initialize the parameteric coordinate
-            xi = 0._RKIND
-            DO a=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,a)
+!           To compute test/weighting function and its gradient, get the
+!           trace of the IB integration point and the shapefunctions
+!           with respect to the background mesh
+!           Get IB integration point
+            xp = 0._RKIND
+            DO b=1, eNoNb
+               Bc = ib%msh(iM)%IEN(b,e)
+               xp(:) = xp(:) + Nb(b)*(xbl(:,b) + ib%Un(:,Bc))
             END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
 
-!           Identify the parameteric coordinate of the IB integration
-!           point w.r.t. background fluid mesh element
-            CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, l1)
-
-!           Check if parameteric coordinate is within bounds
-            b = 0
-            DO a=1, nsd
-               IF (xi(a).GE.msh(jM)%xib(1,a) .AND.
-     2             xi(a).LE.msh(jM)%xib(2,a)) b = b + 1
-            END DO
-            l2 = b .EQ. nsd
-
-!           Get the shapefunction and its parameteric derivatives
-            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nxi)
-
-!           Check if shape functions are within bounds and sum to unity
-            b  = 0
-            rt = 0._RKIND
-            DO a=1, eNoN
-               rt = rt + N(a)
-               IF (N(a).GT.msh(jM)%Nb(1,a) .AND.
-     2             N(a).LT.msh(jM)%Nb(2,a)) b = b + 1
-            END DO
-            l3 = b .EQ. eNoN
-            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-            l1 = ALL((/l1, l2, l3, l4/))
-            IF (.NOT.l1) err = " IB tracer pointing to wrong fluid "//
-     2         "element"
+!           Find shape functions and derivatives on the background mesh
+!           at the integration point
+            CALL IB_GETNNx(msh(jM), xl, xp, N, Nxi)
 
 !           Get the shapefunction derivatives in physical space
             CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Gmat)
 
 !           Compute the local residue due to IB-FSI forcing
-            lR = 0._RKIND
-            IF (nsd .EQ. 3) THEN
-               CALL IB_FFSI3D(eNoNb, eNoN, w, Jac, Nb, Nbx, N, Nx, Gmat,
-     2            abl, ybl, ubl, fNl, lR)
-
-            ELSE IF (nsd .EQ. 2) THEN
-               CALL IB_FFSI2D(eNoNb, eNoN, w, Jac, Nb, Nbx, N, Nx, Gmat,
-     2            abl, ybl, ubl, fNl, lR)
-            END IF
+            CALL IB_CALCFFSIL(eNoNb, eNoN, nFn, w, Jac, Nb, Nbx, N, Nx,
+     2         Gmat, al, yl, ul, fN, lR)
 
 !           Assemble to global residue
             DO a=1, eNoN
@@ -3953,9 +3549,9 @@ c     2         "can be applied for Neumann boundaries only"
                ib%R(:,Ac) = ib%R(:,Ac) + lR(:,a)
             END DO
 
-            DEALLOCATE(N, Nxi, Nx, xl, lR)
+            DEALLOCATE(N, Nxi, Nx, xl, xl, yl, lR)
          END DO
-         DEALLOCATE(Nb, Nbx, xbl, abl, ybl, ubl, fNl)
+         DEALLOCATE(Nb, Nbx, xbl, ul, fN)
       END DO
 
       CALL COMMU(ib%R)
@@ -3964,34 +3560,61 @@ c     2         "can be applied for Neumann boundaries only"
       END SUBROUTINE IB_CALCFFSI
 !--------------------------------------------------------------------
 !     Compute the 3D FSI force due to IB in reference configuration
-      SUBROUTINE IB_FFSI3D(eNoNb, eNoN, w, Je, Nb, Nbx, N, Nx, Gm, al,
-     2   yl, ul, fNl, lR)
+      SUBROUTINE IB_CALCFFSIL(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
+     2   Gm, al, yl, ul, fN, lR)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(nsd,eNoNb),
+     2   N(eNoN), Nx(nsd,eNoN), Gm(nsd,nsd), al(nsd,eNoN),
+     3   yl(nsd+1,eNoN), ul(nsd,eNoNb), fN(nsd,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(nsd+1,eNoN)
+
+      lR = 0._RKIND
+      IF (ib%mthd .EQ. ibMthd_IFEM) THEN
+         IF (nsd .EQ. 3) THEN
+            CALL IB_IFEM3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2         ul, fN, lR)
+         ELSE
+            CALL IB_IFEM2D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2         ul, fN, lR)
+         END IF
+      ELSE IF (ib%mthd .EQ. ibMthd_FEIBStab) THEN
+         IF (nsd .EQ. 3) THEN
+            CALL IB_FEIBStab3D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
+     2         Gm, al, yl, ul, fN, lR)
+         ELSE
+            CALL IB_FEIBStab2D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
+     2         Gm, al, yl, ul, fN, lR)
+         END IF
+      END IF
+
+      RETURN
+      END SUBROUTINE IB_CALCFFSIL
+!--------------------------------------------------------------------
+!     Compute the 3D FSI force due to IB in reference configuration
+      SUBROUTINE IB_IFEM3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2   ul, fN, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN
-      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(3,eNoNb),
-     2   N(eNoN), Nx(3,eNoN), Gm(3,3), al(3,eNoNb), yl(4,eNoNb),
-     3   ul(3,eNoNb), fNl(3*ib%nFn,eNoNb)
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb),
+     2   N(eNoN), Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ul(3,eNoNb),
+     3   fN(3,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
 
-      REAL(KIND=RKIND), PARAMETER :: ct_f(2) = (/1._RKIND, 3._RKIND/),
-     2   ct_p = 1._RKIND
-
-      LOGICAL :: incompFlag
-      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn, iFn
-      REAL(KIND=RKIND) :: fb(3), vd(3), v(3), p, px(3), vx(3,3), divV,
-     2   vVx(3), rt, rV(3), rM(3,3)
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
+      REAL(KIND=RKIND) :: ya, rt, fb(3), vd(3), v(3), vx(3,3), vVx(3),
+     2   rV(3), rM(3,3)
 
 !     Solid domain parameters
-      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(3,3),
-     2   Fi(3,3), S(3,3), PFt(3,3), CC(3,3,3,3), fl(3,ib%nFn), tauM_s,
-     3   tauC_s, vp_s(3)
+      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, F(3,3), Fi(3,3),
+     2   S(3,3), PFt(3,3), CC(3,3,3,3)
       TYPE(stModelType) :: stModel
 
 !     Fluid domain parameters
-      REAL(KIND=RKIND) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f,
-     2   tauB, gam, vp_f(3), va_f(3), es(3,3), mu_x
+      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(3,3), mu_x
 
 !     Define IB struct parameters
       iEq     = ib%cEq
@@ -4002,9 +3625,6 @@ c     2         "can be applied for Neumann boundaries only"
       nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
       mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
 
-      incompFlag = .FALSE.
-      IF (ISZERO(nu_s - 0.5_RKIND)) incompFlag = .TRUE.
-
 !     Define fluid parameters
       rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
 
@@ -4013,56 +3633,44 @@ c     2         "can be applied for Neumann boundaries only"
       fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
       fb(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
 
-!     Inertia, body force and deformation tensor (F)
+!     Active strain/stress parameter
+      ya = 0._RKIND
+
+!     Inertia and body force
       vd     = -fb
       v      = 0._RKIND
-      p      = 0._RKIND
-      px     = 0._RKIND
       vx     = 0._RKIND
-      fl     = 0._RKIND
+      DO a=1, eNoN
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + al(1,a)*N(a)
+         vd(2) = vd(2) + al(2,a)*N(a)
+         vd(3) = vd(3) + al(3,a)*N(a)
+
+!        Velocity, v
+         v(1) = v(1) + yl(1,a)*N(a)
+         v(2) = v(2) + yl(2,a)*N(a)
+         v(3) = v(3) + yl(3,a)*N(a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
+         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
+         vx(1,3) = vx(1,3) + yl(1,a)*Nx(3,a)
+
+         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
+         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
+         vx(2,3) = vx(2,3) + yl(2,a)*Nx(3,a)
+
+         vx(3,1) = vx(3,1) + yl(3,a)*Nx(1,a)
+         vx(3,2) = vx(3,2) + yl(3,a)*Nx(2,a)
+         vx(3,3) = vx(3,3) + yl(3,a)*Nx(3,a)
+      END DO
+
+!     Deformation gradient tensor
       F      = 0._RKIND
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
       F(3,3) = 1._RKIND
       DO b=1, eNoNb
-!        Acceleration (dv_i/dt)
-         vd(1) = vd(1) + al(1,b)*Nb(b)
-         vd(2) = vd(2) + al(2,b)*Nb(b)
-         vd(3) = vd(3) + al(3,b)*Nb(b)
-
-!        Velocity, v
-         v(1) = v(1) + yl(1,b)*Nb(b)
-         v(2) = v(2) + yl(2,b)*Nb(b)
-         v(3) = v(3) + yl(3,b)*Nb(b)
-
-!        Pressure, p
-         p = p + yl(4,b)*Nb(b)
-
-!        Grad p in reference coordinates
-         px(1) = px(1) + yl(4,b)*Nbx(1,b)
-         px(2) = px(2) + yl(4,b)*Nbx(2,b)
-         px(3) = px(3) + yl(4,b)*Nbx(3,b)
-
-!        Grad v (v_i,I) w.r.t. reference coordinates
-         vx(1,1) = vx(1,1) + yl(1,b)*Nbx(1,b)
-         vx(1,2) = vx(1,2) + yl(1,b)*Nbx(2,b)
-         vx(1,3) = vx(1,3) + yl(1,b)*Nbx(3,b)
-
-         vx(2,1) = vx(2,1) + yl(2,b)*Nbx(1,b)
-         vx(2,2) = vx(2,2) + yl(2,b)*Nbx(2,b)
-         vx(2,3) = vx(2,3) + yl(2,b)*Nbx(3,b)
-
-         vx(3,1) = vx(3,1) + yl(3,b)*Nbx(1,b)
-         vx(3,2) = vx(3,2) + yl(3,b)*Nbx(2,b)
-         vx(3,3) = vx(3,3) + yl(3,b)*Nbx(3,b)
-
-         DO iFn=1, ib%nFn
-            a = 3*(iFn-1)
-            fl(1,iFn) = fl(1,iFn) + fNl(a+1,b)*Nb(b)
-            fl(2,iFn) = fl(2,iFn) + fNl(a+2,b)*Nb(b)
-            fl(3,iFn) = fl(3,iFn) + fNl(a+3,b)*Nb(b)
-         END DO
-
 !        Deformation tensor, F_{iI}. Here the shape function derivatives
 !        are w.r.t. the reference coordinates
          F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
@@ -4080,26 +3688,403 @@ c     2         "can be applied for Neumann boundaries only"
       Jac = MAT_DET(F, nsd)
       Fi  = MAT_INV(F, nsd)
 
-!     Update the derivatives in the physical coordinates
-!     grad v (v_i,j) in spatial coordintes
-      rM(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1) + vx(1,3)*Fi(3,1)
-      rM(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2) + vx(1,3)*Fi(3,2)
-      rM(1,3) = vx(1,1)*Fi(1,3) + vx(1,2)*Fi(2,3) + vx(1,3)*Fi(3,3)
+!     V. grad V
+      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
+      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
+      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
 
-      rM(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1) + vx(2,3)*Fi(3,1)
-      rM(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2) + vx(2,3)*Fi(3,2)
-      rM(2,3) = vx(2,1)*Fi(1,3) + vx(2,2)*Fi(2,3) + vx(2,3)*Fi(3,3)
+!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
+      es(1,1) = vx(1,1) + vx(1,1)
+      es(2,2) = vx(2,2) + vx(2,2)
+      es(3,3) = vx(3,3) + vx(3,3)
 
-      rM(3,1) = vx(3,1)*Fi(1,1) + vx(3,2)*Fi(2,1) + vx(3,3)*Fi(3,1)
-      rM(3,2) = vx(3,1)*Fi(1,2) + vx(3,2)*Fi(2,2) + vx(3,3)*Fi(3,2)
-      rM(3,3) = vx(3,1)*Fi(1,3) + vx(3,2)*Fi(2,3) + vx(3,3)*Fi(3,3)
-      vx(:,:) = rM(:,:)
+      es(1,2) = vx(1,2) + vx(2,1)
+      es(1,3) = vx(1,3) + vx(3,1)
+      es(2,3) = vx(2,3) + vx(3,2)
 
-!     grad p (p,i) in spatial coordinates
-      rV(1) = px(1)*Fi(1,1) + px(2)*Fi(2,1) + px(3)*Fi(3,1)
-      rV(2) = px(1)*Fi(1,2) + px(2)*Fi(2,2) + px(3)*Fi(3,2)
-      rV(3) = px(1)*Fi(1,3) + px(2)*Fi(2,3) + px(3)*Fi(3,3)
-      px(:) = rV(:)
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5_RKIND*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rt, mu_x)
+
+!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
+!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
+!     For compressible solids, Svol = J*p*Cinv where p is computed
+!     based on the dilational penalty model
+      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
+
+!     1st Piola-Kirchhoff stress, P = F * S
+      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
+      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
+      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
+
+      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
+      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
+      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
+
+      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
+      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
+      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
+
+!     P * F_transpose
+      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
+      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
+      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
+
+      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
+      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
+      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
+
+      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
+      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
+      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
+
+!     Stress contribution
+      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1)
+      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2)
+      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3)
+
+      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1)
+      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2)
+      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3)
+
+      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1)
+      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2)
+      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3)
+
+!     Inertia contribution
+      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1))
+      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2))
+      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3))
+
+!     Residue
+      DO a=1, eNoN
+         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
+     2      + Nx(3,a)*rM(1,3))
+         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
+     2      + Nx(3,a)*rM(2,3))
+         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
+     2      + Nx(3,a)*rM(3,3))
+      END DO
+
+      RETURN
+      END SUBROUTINE IB_IFEM3D
+!--------------------------------------------------------------------
+!     Compute the 2D FSI force due to IB in reference configuration
+      SUBROUTINE IB_IFEM2D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2   ul, fN, lR)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb),
+     2   N(eNoN), Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ul(3,eNoNb),
+     3   fN(3,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
+
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
+      REAL(KIND=RKIND) :: ya, rt, fb(3), vd(3), v(3), vx(3,3), vVx(3),
+     2   rV(3), rM(3,3)
+
+!     Solid domain parameters
+      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, F(3,3), Fi(3,3),
+     2   S(3,3), PFt(3,3), CC(3,3,3,3)
+      TYPE(stModelType) :: stModel
+
+!     Fluid domain parameters
+      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(3,3), mu_x
+
+!     Define IB struct parameters
+      iEq     = ib%cEq
+      iDmn    = ib%cDmn
+      stModel = eq(iEq)%dmnIB(iDmn)%stM
+      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
+      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
+      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+
+!     Define fluid parameters
+      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
+
+!     Body force
+      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+      fb(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
+
+!     Active strain/stress parameter
+      ya = 0._RKIND
+
+!     Inertia and body force
+      vd     = -fb
+      v      = 0._RKIND
+      vx     = 0._RKIND
+      DO a=1, eNoN
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + al(1,a)*N(a)
+         vd(2) = vd(2) + al(2,a)*N(a)
+         vd(3) = vd(3) + al(3,a)*N(a)
+
+!        Velocity, v
+         v(1) = v(1) + yl(1,a)*N(a)
+         v(2) = v(2) + yl(2,a)*N(a)
+         v(3) = v(3) + yl(3,a)*N(a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
+         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
+         vx(1,3) = vx(1,3) + yl(1,a)*Nx(3,a)
+
+         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
+         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
+         vx(2,3) = vx(2,3) + yl(2,a)*Nx(3,a)
+
+         vx(3,1) = vx(3,1) + yl(3,a)*Nx(1,a)
+         vx(3,2) = vx(3,2) + yl(3,a)*Nx(2,a)
+         vx(3,3) = vx(3,3) + yl(3,a)*Nx(3,a)
+      END DO
+
+!     Deformation gradient tensor
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      DO b=1, eNoNb
+!        Deformation tensor, F_{iI}. Here the shape function derivatives
+!        are w.r.t. the reference coordinates
+         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
+         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
+         F(1,3) = F(1,3) + ul(1,b)*Nbx(3,b)
+
+         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
+         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
+         F(2,3) = F(2,3) + ul(2,b)*Nbx(3,b)
+
+         F(3,1) = F(3,1) + ul(3,b)*Nbx(1,b)
+         F(3,2) = F(3,2) + ul(3,b)*Nbx(2,b)
+         F(3,3) = F(3,3) + ul(3,b)*Nbx(3,b)
+      END DO
+      Jac = MAT_DET(F, nsd)
+      Fi  = MAT_INV(F, nsd)
+
+!     V. grad V
+      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
+      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
+      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
+
+!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
+      es(1,1) = vx(1,1) + vx(1,1)
+      es(2,2) = vx(2,2) + vx(2,2)
+      es(3,3) = vx(3,3) + vx(3,3)
+
+      es(1,2) = vx(1,2) + vx(2,1)
+      es(1,3) = vx(1,3) + vx(3,1)
+      es(2,3) = vx(2,3) + vx(3,2)
+
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5_RKIND*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rt, mu_x)
+
+!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
+!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
+!     For compressible solids, Svol = J*p*Cinv where p is computed
+!     based on the dilational penalty model
+      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
+
+!     1st Piola-Kirchhoff stress, P = F * S
+      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
+      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
+      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
+
+      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
+      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
+      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
+
+      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
+      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
+      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
+
+!     P * F_transpose
+      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
+      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
+      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
+
+      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
+      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
+      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
+
+      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
+      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
+      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
+
+!     Stress contribution
+      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1)
+      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2)
+      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3)
+
+      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1)
+      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2)
+      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3)
+
+      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1)
+      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2)
+      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3)
+
+!     Inertia contribution
+      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1))
+      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2))
+      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3))
+
+!     Residue
+      DO a=1, eNoN
+         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
+     2      + Nx(3,a)*rM(1,3))
+         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
+     2      + Nx(3,a)*rM(2,3))
+         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
+     2      + Nx(3,a)*rM(3,3))
+      END DO
+
+      RETURN
+      END SUBROUTINE IB_IFEM2D
+!--------------------------------------------------------------------
+      SUBROUTINE IB_FEIBStab3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2   ul, fN, lR)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(2,eNoNb),
+     2   N(eNoN), Nx(2,eNoN), al(2,eNoN), yl(3,eNoN), ul(2,eNoNb),
+     3   fN(2,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
+
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
+      REAL(KIND=RKIND) :: ya, rt, fb(2), vd(2), v(2), vx(2,2), vVx(2),
+     2   rV(2), rM(2,2)
+
+!     Solid domain parameters
+      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, nu_s, mu_s, F(2,2), Fi(2,2),
+     2   S(2,2), PFt(2,2), CC(2,2,2,2)
+      TYPE(stModelType) :: stModel
+
+!     Fluid domain parameters
+      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(2,2), mu_x
+
+!     Define IB struct parameters
+      iEq     = ib%cEq
+      iDmn    = ib%cDmn
+      stModel = eq(iEq)%dmnIB(iDmn)%stM
+      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
+      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
+      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+
+!     Define fluid parameters
+      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
+
+!     Body force
+      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+
+!     Active strain/stress parameter
+      ya = 0._RKIND
+
+!     Inertia and body force
+      vd     = -fb
+      v      = 0._RKIND
+      vx     = 0._RKIND
+      DO a=1, eNoN
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + al(1,a)*N(a)
+         vd(2) = vd(2) + al(2,a)*N(a)
+
+!        Velocity, v
+         v(1) = v(1) + yl(1,a)*N(a)
+         v(2) = v(2) + yl(2,a)*N(a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
+         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
+         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
+         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
+      END DO
+
+!     Deformation gradient tensor
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      DO b=1, eNoNb
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + al(1,a)*N(a)
+         vd(2) = vd(2) + al(2,a)*N(a)
+         vd(3) = vd(3) + al(3,a)*N(a)
+
+!        Velocity, v
+         v(1) = v(1) + yl(1,a)*N(a)
+         v(2) = v(2) + yl(2,a)*N(a)
+         v(3) = v(3) + yl(3,a)*N(a)
+
+!        Pressure, p
+         p = p + yl(4,a)*N(a)
+
+!        Grad p in reference coordinates
+         px(1) = px(1) + yl(4,a)*Nx(1,a)
+         px(2) = px(2) + yl(4,a)*Nx(2,a)
+         px(3) = px(3) + yl(4,a)*Nx(3,a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
+         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
+         vx(1,3) = vx(1,3) + yl(1,a)*Nx(3,a)
+
+         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
+         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
+         vx(2,3) = vx(2,3) + yl(2,a)*Nx(3,a)
+
+         vx(3,1) = vx(3,1) + yl(3,a)*Nx(1,a)
+         vx(3,2) = vx(3,2) + yl(3,a)*Nx(2,a)
+         vx(3,3) = vx(3,3) + yl(3,a)*Nx(3,a)
+      END DO
+
+!     Deformation gradient tensor
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      DO b=1, eNoNb
+!        Deformation tensor, F_{iI}. Here the shape function derivatives
+!        are w.r.t. the reference coordinates
+         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
+         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
+         F(1,3) = F(1,3) + ul(1,b)*Nbx(3,b)
+
+         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
+         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
+         F(2,3) = F(2,3) + ul(2,b)*Nbx(3,b)
+
+         F(3,1) = F(3,1) + ul(3,b)*Nbx(1,b)
+         F(3,2) = F(3,2) + ul(3,b)*Nbx(2,b)
+         F(3,3) = F(3,3) + ul(3,b)*Nbx(3,b)
+      END DO
+      Jac = MAT_DET(F, nsd)
+      Fi  = MAT_INV(F, nsd)
 
 !     Divergence of velocity
       divV = vx(1,1) + vx(2,2) + vx(3,3)
@@ -4118,7 +4103,7 @@ c     2         "can be applied for Neumann boundaries only"
       es(1,3) = vx(1,3) + vx(3,1)
       es(2,3) = vx(2,3) + vx(3,2)
 
-      es(2,1) = es(1,2)
+       es(2,1) = es(1,2)
       es(3,1) = es(1,3)
       es(3,2) = es(2,3)
 
@@ -4153,7 +4138,7 @@ c     2         "can be applied for Neumann boundaries only"
       va_f(3) = v(3) + vp_f(3)
 
       rt = Gm(1,1) + Gm(2,2) + Gm(3,3)
-      rt = 16._RKIND*rt*tauM_f
+      rt = rt*tauM_f
       tauC_f = 1._RKIND/(rt)
 
       tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
@@ -4177,7 +4162,7 @@ c     2         "can be applied for Neumann boundaries only"
 !     Note that S = Siso + Svol. For incompressible solids, Svol = 0
 !     For compressible solids, Svol = J*p*Cinv and the fluid pressure
 !     contribution in the solid domain should be removed.
-      CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
+      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
 
 !     F * S * F_t
       rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
@@ -4273,32 +4258,31 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       RETURN
-      END SUBROUTINE IB_FFSI3D
+      END SUBROUTINE IB_FEIBStab3D
 !--------------------------------------------------------------------
 !     Compute the 2D FSI force due to IB in reference configuration
-      SUBROUTINE IB_FFSI2D(eNoNb, eNoN, w, Je, Nb, Nbx, N, Nx, Gm, al,
-     2   yl, ul, fNl, lR)
+      SUBROUTINE IB_FEIBStab2D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
+     2   Gm, al, yl, ul, fN, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(2,eNoNb),
-     2   N(eNoN), Nx(2,eNoN), Gm(2,2), al(2,eNoNb), yl(3,eNoNb),
-     3   ul(2,eNoNb), fNl(2*ib%nFn,eNoNb)
+     2   N(eNoN), Nx(2,eNoN), Gm(2,2), al(2,eNoN), yl(3,eNoN),
+     3   ul(2,eNoNb), fN(2,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
 
-      REAL(KIND=RKIND), PARAMETER :: ct_f(2) = (/1._RKIND, 3._RKIND/),
+      REAL(KIND=RKIND), PARAMETER :: ct_f(2) = (/1._RKIND,36._RKIND/),
      2   ct_p = 1._RKIND
 
       LOGICAL :: incompFlag
-      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn, iFn
-      REAL(KIND=RKIND) :: fb(2), vd(2), v(2), p, px(2), vx(2,2), divV,
-     2   vVx(2), rt, rV(2), rM(2,2)
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
+      REAL(KIND=RKIND) :: ya, fb(2), vd(2), v(2), p, px(2), vx(2,2),
+     2   divV, vVx(2), rt, rV(2), rM(2,2)
 
 !     Solid domain parameters
       REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(2,2),
-     2   Fi(2,2), S(2,2), PFt(2,2), CC(2,2,2,2), fl(2,ib%nFn), tauM_s,
-     3   tauC_s, vp_s(2)
+     2   Fi(2,2), S(2,2), PFt(2,2), CC(2,2,2,2), tauM_s, tauC_s, vp_s(2)
       TYPE(stModelType) :: stModel
 
 !     Fluid domain parameters
@@ -4324,66 +4308,53 @@ c     2         "can be applied for Neumann boundaries only"
       fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
       fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
 
+!     Active strain/stress parameter
+      ya = 0._RKIND
+
 !     Inertia, body force and deformation tensor (F)
       vd     = -fb
       v      = 0._RKIND
       p      = 0._RKIND
       px     = 0._RKIND
       vx     = 0._RKIND
-      fl     = 0._RKIND
+      DO a=1, eNoN
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + al(1,a)*N(a)
+         vd(2) = vd(2) + al(2,a)*N(a)
+
+!        Velocity, v
+         v(1) = v(1) + yl(1,a)*N(a)
+         v(2) = v(2) + yl(2,a)*N(a)
+
+!        Pressure, p
+         p = p + yl(3,a)*N(a)
+
+!        Grad p in reference coordinates
+         px(1) = px(1) + yl(3,a)*Nx(1,a)
+         px(2) = px(2) + yl(3,a)*Nx(2,a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
+         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
+         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
+         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
+      END DO
+
+!     Deformation gradient tensor
       F      = 0._RKIND
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
       DO b=1, eNoNb
-!        Acceleration (dv_i/dt)
-         vd(1) = vd(1) + al(1,b)*Nb(b)
-         vd(2) = vd(2) + al(2,b)*Nb(b)
-
-!        Velocity, v
-         v(1) = v(1) + yl(1,b)*Nb(b)
-         v(2) = v(2) + yl(2,b)*Nb(b)
-
-!        Pressure, p
-         p = p + yl(3,b)*Nb(b)
-
-!        Grad p in reference coordinates
-         px(1) = px(1) + yl(3,b)*Nbx(1,b)
-         px(2) = px(2) + yl(3,b)*Nbx(2,b)
-
-!        Grad v (v_i,I) w.r.t. reference coordinates
-         vx(1,1) = vx(1,1) + yl(1,b)*Nbx(1,b)
-         vx(1,2) = vx(1,2) + yl(1,b)*Nbx(2,b)
-         vx(2,1) = vx(2,1) + yl(2,b)*Nbx(1,b)
-         vx(2,2) = vx(2,2) + yl(2,b)*Nbx(2,b)
-
-         DO iFn=1, ib%nFn
-            a = 2*(iFn-1)
-            fl(1,iFn) = fl(1,iFn) + fNl(a+1,b)*Nb(b)
-            fl(2,iFn) = fl(2,iFn) + fNl(a+2,b)*Nb(b)
-         END DO
-
 !        Deformation tensor, F_{iI}. Here the shape function derivatives
 !        are w.r.t. the reference coordinates
          F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
          F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
+
          F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
          F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
       END DO
       Jac = MAT_DET(F, nsd)
       Fi  = MAT_INV(F, nsd)
-
-!     Update the derivatives in the physical coordinates
-!     grad v (v_i,j) in spatial coordintes
-      rM(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1)
-      rM(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2)
-      rM(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1)
-      rM(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2)
-      vx(:,:) = rM(:,:)
-
-!     grad p (p,i) in spatial coordinates
-      rV(1) = px(1)*Fi(1,1) + px(2)*Fi(2,1)
-      rV(2) = px(1)*Fi(1,2) + px(2)*Fi(2,2)
-      px(:) = rV(:)
 
 !     Divergence of velocity
       divV = vx(1,1) + vx(2,2)
@@ -4395,13 +4366,11 @@ c     2         "can be applied for Neumann boundaries only"
 !     Strain rate tensor 2*e_ij := (v_ij + v_ji)
       es(1,1) = vx(1,1) + vx(1,1)
       es(2,2) = vx(2,2) + vx(2,2)
-
       es(1,2) = vx(1,2) + vx(2,1)
       es(2,1) = es(1,2)
 
 !     Shear-rate := (2*e_ij*e_ij)^.5
-      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
-     2    + es(2,2)*es(2,2)
+      gam = es(1,1)*es(1,1) + es(2,2)*es(2,2) + 2._RKIND*es(1,2)*es(1,2)
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
@@ -4425,7 +4394,7 @@ c     2         "can be applied for Neumann boundaries only"
       va_f(2) = v(2) + vp_f(2)
 
       rt = Gm(1,1) + Gm(2,2)
-      rt = 16._RKIND*rt*tauM_f
+      rt = rt*tauM_f
       tauC_f = 1._RKIND/(rt)
 
       tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
@@ -4444,20 +4413,22 @@ c     2         "can be applied for Neumann boundaries only"
 !     Note that S = Siso + Svol. For incompressible solids, Svol = 0
 !     For compressible solids, Svol = J*p*Cinv and the fluid pressure
 !     contribution in the solid domain should be removed.
-      CALL GETPK2CC(stModel, F, ib%nFn, fl, S, CC)
+      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
 
-!     F * S * F_t
+!     1st Piola-Kirchhoff stress, P = F * S
       rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)
       rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)
       rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)
       rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)
+
+!     P * F_transpose
       PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2)
       PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2)
       PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2)
       PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2)
 
-      rV(1) = tauB * (vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
-      rV(2) = tauB * (vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
+      rV(1) = tauB*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
+      rV(2) = tauB*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
 
       rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1) +
      2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
@@ -4484,8 +4455,7 @@ c     2         "can be applied for Neumann boundaries only"
 
       IF (incompFlag) THEN
          DO a=1, eNoN
-            lR(3,a) = lR(3,a) + w*Jac*
-     2         (Nx(1,a)*vp_s(1) + Nx(2,a)*vp_s(2))
+            lR(3,a) = lR(3,a) + w*Jac*(Nx(1,a)*vp_s(1) +Nx(2,a)*vp_s(2))
          END DO
          RETURN
       END IF
@@ -4504,310 +4474,7 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       RETURN
-      END SUBROUTINE IB_FFSI2D
-!####################################################################
-!     Computes the penalty forcing for IBs with Dirichlet BCs.
-!     Feedback force contribution is optionally computed.
-      SUBROUTINE IB_SETBCPEN()
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-
-      INTEGER(KIND=IKIND) iEq, iBc, iM, iFa, a, i
-
-      REAL(KIND=RKIND), ALLOCATABLE :: sF(:,:)
-
-!     Return if fluid phys is not solved
-      IF (ib%cEq .EQ. 0) RETURN
-
-!     Enforce Dirichlet BCs on IB. sF is used as a dummy array to set
-!     Dir BC as we are only interested in the velocity field (Yo)
-      ALLOCATE(sF(nsd,ib%tnNo))
-      CALL IB_SETBCDIR(ib%Ao, ib%Yo, sF)
-!     Reset sF to 0
-      sF = 0._RKIND
-
-!     Compute penalty forces due to mismatch in velocity at IB
-      iEq = ib%cEq
-      DO iBc=1, eq(iEq)%nBcIB
-         IF (.NOT.BTEST(eq(iEq)%bcIB(iBc)%bType, bType_Dir)) CYCLE
-         iM  = eq(iEq)%bcIB(iBc)%iM
-         iFa = eq(iEq)%bcIB(iBc)%iFa
-         IF (iFa .NE. 0) THEN
-            CALL IB_SETBCPENL(eq(iEq)%bcIB(iBc), ib%msh(iM)%fa(iFa), sF)
-         ELSE
-            CALL IB_SETBCPENSL(eq(iEq)%bcIB(iBc), ib%msh(iM), sF)
-         END IF
-      END DO
-
-      DO a=1, ib%tnNo
-         DO i=1, nsd
-            ib%Rfb(i,a) = ib%Rfb(i,a) + sF(i,a)
-c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
-         END DO
-      END DO
-
-      DEALLOCATE(sF)
-
-      RETURN
-      END SUBROUTINE IB_SETBCPEN
-!--------------------------------------------------------------------
-      SUBROUTINE IB_SETBCPENL(lBc, lFa, sF)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(bcType), INTENT(IN) :: lBc
-      TYPE(faceType), INTENT(IN) :: lFa
-      REAL(KIND=RKIND), INTENT(INOUT) :: sF(nsd,ib%tnNo)
-
-      INTEGER(KIND=IKIND) :: a, e, g, Ac, eNoN
-      REAL(KIND=RKIND) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd),
-     2   fb(nsd)
-
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:), ul(:,:), ubl(:,:)
-
-!     Get penalty constants
-      tauF = lBc%tauF
-
-      eNoN = lFa%eNoN
-      ALLOCATE(N(eNoN), ul(nsd,eNoN), ubl(nsd,eNoN))
-
-!     Loop over all the face elements and assemble to the residue
-      DO e=1, lFa%nEl
-         DO a=1, eNoN
-            Ac = lFa%IEN(a,e)
-!        Get the projected local fluid velocity
-            ul(:,a)  = ib%Yn(1:nsd,Ac)
-!        Get the velocity imposed due to Dir BC
-            ubl(:,a) = ib%Yo(1:nsd,Ac)
-         END DO
-
-         DO g=1, lFa%nG
-            CALL GNNIB(lFa, e, g, nV)
-            Jac = SQRT(NORM(nV))
-
-!           Normal pointing outwards from solid to fluid
-            nV = nV / Jac
-            w  = lFa%w(g)*Jac
-            N  = lFa%N(:,g)
-
-            u  = 0._RKIND
-            ub = 0._RKIND
-            DO a=1, eNoN
-               u  = u  + N(a)*ul(:,a)
-               ub = ub + N(a)*ubl(:,a)
-            END DO
-
-!           Compute the feedback forcing with penalty forces along
-!           normal direction
-            IF (lBc%fbN) THEN
-               fb(:) = tauF * NORM(u-ub, nV) * nV(:)
-            ELSE
-               fb(:) = tauF * (u(:)-ub(:))
-            END IF
-
-!           Transfer back to global vector
-            DO a=1, eNoN
-               Ac = lFa%IEN(a,e)
-               sF(:,Ac) = sF(:,Ac) + w*N(a)*fb(:)
-            END DO
-         END DO
-      END DO
-
-      DEALLOCATE(N, ul, ubl)
-
-      RETURN
-      END SUBROUTINE IB_SETBCPENL
-!--------------------------------------------------------------------
-      SUBROUTINE IB_SETBCPENSL(lBc, lM, sF)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(bcType), INTENT(IN) :: lBc
-      TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=RKIND), INTENT(INOUT) :: sF(nsd,tnNo)
-
-      INTEGER(KIND=IKIND) :: a, e, g, Ac, eNoN
-      REAL(KIND=RKIND) :: tauF, w, Jac, nV(nsd), u(nsd), ub(nsd),
-     2   fb(nsd), gC(nsd,nsd-1)
-
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:), xl(:,:), ul(:,:), ubl(:,:)
-
-!     Get penalty constants
-      tauF  = lBc%tauF
-
-      eNoN = lM%eNoN
-      ALLOCATE(N(eNoN), xl(nsd,eNoN), ul(nsd,eNoN), ubl(nsd,eNoN))
-
-!     Loop over all the elements and assemble to the residue
-      DO e=1, lM%nEl
-         DO a=1, eNoN
-            Ac = lM%IEN(a,e)
-            xl(:,a)  = ib%x(:,Ac) + ib%Uo(:,Ac)
-!        Get the projected local fluid velocity
-            ul(:,a)  = ib%Yn(1:nsd,Ac)
-!        Get the velocity imposed due to Dir BC
-            ubl(:,a) = ib%Yo(1:nsd,Ac)
-         END DO
-
-         DO g=1, lM%nG
-            CALL GNNS(eNoN, lM%Nx(:,:,g), xl, nV, gC, gC)
-            Jac = SQRT(NORM(nV))
-!           Normal direction outwards from solid to fluid
-            nV  = nV/Jac
-            w   = lM%w(g) * Jac
-            N   = lM%N(:,g)
-
-            u  = 0._RKIND
-            ub = 0._RKIND
-            DO a=1, eNoN
-               u(:)  = u(:)  + N(a)*ul(:,a)
-               ub(:) = ub(:) + N(a)*ubl(:,a)
-            END DO
-
-!           Compute the feedback forcing with penalty forces along
-!           normal direction
-            IF (lBc%fbN) THEN
-               fb(:) = tauF * NORM(u-ub, nV) * nV(:)
-            ELSE
-               fb(:) = tauF * (u(:)-ub(:))
-            END IF
-
-!           Transfer back to global vector
-            DO a=1, eNoN
-               Ac = lM%IEN(a,e)
-               sF(:,Ac) = sF(:,Ac) + w*N(a)*fb(:)
-            END DO
-         END DO
-      END DO
-
-      DEALLOCATE(N, xl, ul, ubl)
-
-      RETURN
-      END SUBROUTINE IB_SETBCPENSL
-!####################################################################
-!     Project velocity from IB to ghost/finite cells using distance-
-!     weighted interpolation. This type of projection is used for SSM
-!     method only.
-      SUBROUTINE IB_SSMPRJCTU(Yg, Dg, Yb)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      REAL(KIND=RKIND), INTENT(INOUT) :: Yg(tDof,tnNo)
-      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo), Yb(nsd+1,ib%tnNo)
-
-      INTEGER(KIND=IKIND) a, b, i, g, e, s, Ac, Bc, Ec, iM, jM, iFa,
-     2   iEq, eNoN
-      REAL(KIND=RKIND) :: w, xe(nsd), xp(nsd), yp(nsd)
-
-      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sV(:,:), xl(:,:), yl(:,:),
-     2   N(:)
-
-      iEq = ib%cEq
-      IF (iEq .EQ. 0) RETURN
-
-!     SSM (stair-step method): interpolate velocities on background mesh
-!     node based on the traces of IB. We apply an inverse-distance
-!     weighted interpolation operator on the ghost nodes.
-      ib%callD(1) = CPUT()
-      ALLOCATE(sA(tnNo), sV(nsd,tnNo))
-      sV = 0._RKIND
-      sA = 0._RKIND
-      DO iM=1, ib%nMsh
-         IF (ib%msh(iM)%lShl) THEN
-            eNoN = ib%msh(iM)%eNoN
-            ALLOCATE(xl(nsd,eNoN), yl(nsd,eNoN), N(eNoN))
-            DO i=1, ib%msh(iM)%trc%n
-               e = ib%msh(iM)%trc%gE(1,i)
-               g = ib%msh(iM)%trc%gE(2,i)
-               DO a=1, eNoN
-                  Ac = ib%msh(iM)%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-                  yl(:,a) = Yb(1:nsd,Ac)
-                  N(a)    = ib%msh(iM)%N(a,g)
-               END DO
-
-               xp = 0._RKIND
-               yp = 0._RKIND
-               DO a=1, eNoN
-                  xp = xp + N(a)*xl(:,a)
-                  yp = yp + N(a)*yl(:,a)
-               END DO
-
-               Ec = ib%msh(iM)%trc%ptr(1,i)
-               jM = ib%msh(iM)%trc%ptr(2,i)
-               DO b=1, msh(jM)%eNoN
-                  Bc = msh(jM)%IEN(b,Ec)
-                  IF (ighost(Bc) .EQ. 1) THEN
-                     xe = x(:,Bc)
-                     IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
-                     w = SQRT(SUM( (xe - xp)**2._RKIND ))
-                     IF (ISZERO(w)) w = eps
-                     w = 1._RKIND/w
-                     sA(Bc) = sA(Bc) + w
-                     sV(:,Bc) = sV(:,Bc) + w*yp(:)
-                  END IF
-               END DO
-            END DO
-            DEALLOCATE(xl, yl, N)
-         ELSE
-            DO iFa=1, ib%msh(iM)%nFa
-               eNoN = ib%msh(iM)%fa(iFa)%eNoN
-               ALLOCATE(xl(nsd,eNoN), yl(nsd,eNoN), N(eNoN))
-               DO i=1, ib%msh(iM)%fa(iFa)%trc%n
-                  e = ib%msh(iM)%fa(iFa)%trc%gE(1,i)
-                  g = ib%msh(iM)%fa(iFa)%trc%gE(2,i)
-                  DO a=1, eNoN
-                     Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                     xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
-                     yl(:,a) = Yb(1:nsd,Ac)
-                     N(a)    = ib%msh(iM)%fa(iFa)%N(a,g)
-                  END DO
-
-                  xp = 0._RKIND
-                  yp = 0._RKIND
-                  DO a=1, eNoN
-                     xp = xp + N(a)*xl(:,a)
-                     yp = yp + N(a)*yl(:,a)
-                  END DO
-
-                  Ec = ib%msh(iM)%fa(iFa)%trc%ptr(1,i)
-                  jM = ib%msh(iM)%fa(iFa)%trc%ptr(2,i)
-                  DO b=1, msh(jM)%eNoN
-                     Bc = msh(jM)%IEN(b,Ec)
-                     IF (ighost(Bc) .EQ. 1) THEN
-                        xe = x(:,Bc)
-                        IF (mvMsh) xe = xe + Dg(nsd+2:2*nsd+1,Bc)
-                        w = SQRT(SUM( (xe - xp)**2._RKIND ))
-                        IF (ISZERO(w)) w = eps
-                        w = 1._RKIND/w
-                        sA(Bc) = sA(Bc) + w
-                        sV(:,Bc) = sV(:,Bc) + w*yp(:)
-                     END IF
-                  END DO
-               END DO
-               DEALLOCATE(xl, yl, N)
-            END DO
-         END IF
-      END DO
-
-      CALL COMMU(sA)
-      CALL COMMU(sV)
-
-      s = eq(iEq)%s
-      e = eq(iEq)%e
-      IF (e .EQ. nsd+1) e = e - 1
-      DO a=1, tnNo
-         IF (.NOT.ISZERO(sA(a)) .AND. ighost(a).EQ.1) THEN
-            Yg(s:e,a) = sV(:,a)/sA(a)
-         END IF
-      END DO
-      DEALLOCATE(sA, sV)
-
-      ib%callD(1) = CPUT() - ib%callD(1)
-
-      RETURN
-      END SUBROUTINE IB_SSMPRJCTU
+      END SUBROUTINE IB_FEIBStab2D
 !####################################################################
 !     Add contribution from IB to the residue (RHS)
       SUBROUTINE IB_CONSTRUCT()
@@ -4824,38 +4491,34 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       END SUBROUTINE IB_CONSTRUCT
 !####################################################################
 !     Poject fluid velocity, pressure and acceleration onto IB
-      SUBROUTINE IB_PROJFVAR(Ag, Yg, Dg, Ab, Yb, Ub)
+      SUBROUTINE IB_PROJFVAR(Yg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
-     2   Dg(tDof,tnNo)
-      REAL(KIND=RKIND), INTENT(OUT) :: Ab(nsd,ib%tnNo),
-     2   Yb(nsd+1,ib%tnNo), Ub(nsd,ib%tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      LOGICAL :: l1, l2, l3, l4
       INTEGER(KIND=IKIND) :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoN, eNoNb
-      REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), ap(nsd), yp(nsd+1),
-     2   Ks(nsd,nsd), rt
+      REAL(KIND=RKIND) :: w, Jac, xp(nsd), yp(nsd+1), Ks(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
-     2   xl(:,:), xbl(:,:), al(:,:), yl(:,:), sA(:)
-
-      Ab = 0._RKIND
-      Yb = 0._RKIND
-      Ub = 0._RKIND
-      IF (ib%cEq.EQ.0 .OR. ib%mthd.NE.ibMthd_IFEM) RETURN
+     2   xl(:,:), xbl(:,:), yl(:,:), sA(:), Uo(:,:)
 
       is = eq(ib%cEq)%s
       ie = eq(ib%cEq)%e
       IF (ie .EQ. nsd+1) ie = ie - 1
 
+!     Copy ib%Un
+      ALLOCATE(sA(ib%tnNo), Uo(nsd,ib%tnNo))
+      sA = 0._RKIND
+      Uo = ib%Un
+
+!     Initialize to 0
+      ib%Yn = 0._RKIND
+      ib%Un = 0._RKIND
+
 !     Use L2 projection with mass lumping to project flow variables from
 !     background fluid mesh to IB
-      ALLOCATE(sA(ib%tnNo))
-      sA = 0._RKIND
-!     Loop over each IB mesh
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
          ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), xbl(nsd,eNoNb))
@@ -4871,11 +4534,22 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
             Nb = ib%msh(iM)%N(:,g)
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
-               xbl(:,b) = ib%x(:,Bc) + ib%Uo(:,Bc)
+               xbl(:,b) = ib%x(:,Bc) + Uo(:,Bc)
             END DO
             CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,Ks)
             IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e
             w = ib%msh(iM)%w(g) * Jac
+
+!           Transfer to local arrays: background mesh variables
+            eNoN = msh(jM)%eNoN
+            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),yl(nsd+1,eNoN))
+            yl = 0._RKIND
+            DO a=1, eNoN
+               Ac = msh(jM)%IEN(a,Ec)
+               yl(:,a) = Yg(is:ie+1,Ac)
+               xl(:,a) = x(:,Ac)
+               IF (mvMsh) xl(:,a) = xl(:,a) + Dg(ie+2:ie+nsd+1,Ac)
+            END DO
 
 !           Coordinates of the integration point
             xp = 0._RKIND
@@ -4883,98 +4557,96 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
                xp = xp + Nb(b)*xbl(:,b)
             END DO
 
-!           Transfer to local arrays: background mesh variables
-            eNoN = msh(jM)%eNoN
-            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN), al(nsd,eNoN),
-     2         yl(nsd+1,eNoN))
-            al = 0._RKIND
-            yl = 0._RKIND
-            DO a=1, eNoN
-               Ac = msh(jM)%IEN(a,Ec)
-               al(:,a) = Ag(is:ie,Ac)
-               yl(:,a) = Yg(is:ie+1,Ac)
-               xl(:,a) = x(:,Ac)
-               IF (mvMsh) xl(:,a) = xl(:,a) + Dg(ie+2:ie+nsd+1,Ac)
-            END DO
-
-!           Initialize parameteric coordinate for Newton's iterations
-            xi = 0._RKIND
-            DO a=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,a)
-            END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
-
-            CALL GETXI(msh(jM)%eType, eNoN, xl, xp, xi, l1)
-
-!           Check if parameteric coordinate is within bounds
-            b = 0
-            DO a=1, nsd
-               IF (xi(a).GE.msh(jM)%xib(1,a) .AND.
-     2             xi(a).LE.msh(jM)%xib(2,a)) b = b + 1
-            END DO
-            l2 = b .EQ. nsd
-
-!           Get the shapefunction and its parameteric derivatives
-            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
-
-!           Check if shape functions are within bounds and sum to unity
-            b  = 0
-            rt = 0._RKIND
-            DO a=1, eNoN
-               rt = rt + N(a)
-               IF (N(a).GT.msh(jM)%Nb(1,a) .AND.
-     2             N(a).LT.msh(jM)%Nb(2,a)) b = b + 1
-            END DO
-            l3 = b .EQ. eNoN
-            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-            l1 = ALL((/l1, l2, l3, l4/))
-            IF (.NOT.l1) err = " IB tracer pointing to wrong fluid "//
-     2         "element (PROJFVAR)"
+!           Find shape functions and derivatives on the background mesh
+!           at the integration point
+            CALL IB_GETNNx(msh(jM), xl, xp, N, Nx)
 
 !           Use the computed shape functions to interpolate flow var at
 !           the IB integration point
-            ap = 0._RKIND
             yp = 0._RKIND
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
-               ap = ap + N(a)*al(:,a)
                yp = yp + N(a)*yl(:,a)
             END DO
 
-!        Project flow variables to IB nodes
+!           Project flow variables to IB nodes
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
-               Ab(:,Bc) = Ab(:,Bc) + w*Nb(b)*ap(:)
-               Yb(:,Bc) = Yb(:,Bc) + w*Nb(b)*yp(:)
+               ib%Yn(:,Bc) = ib%Yn(:,Bc) + w*Nb(b)*yp(:)
                sA(Bc)   = sA(Bc)   + w*Nb(b)
             END DO
-            DEALLOCATE(N, Nx, xl, al, yl)
+            DEALLOCATE(N, Nx, xl, yl)
          END DO
          DEALLOCATE(Nb, Nbx, xbl)
       END DO
 
 !     Synchronize Ab, Yb across all the processes
       ib%callD(3) = CPUT()
-      CALL IB_SYNC(Ab)
-      CALL IB_SYNC(Yb)
+      CALL IB_SYNC(ib%Yn)
       CALL IB_SYNC(sA)
       ib%callD(3) = CPUT() - ib%callD(3)
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(sA(a))) THEN
-            Ab(:,a) = Ab(:,a) / sA(a)
-            Yb(:,a) = Yb(:,a) / sA(a)
+            ib%Yn(:,a) = ib%Yn(:,a) / sA(a)
          END IF
          DO i=1, nsd
-            Ub(i,a) = ib%Uo(i,a) + Yb(i,a)*dt
+            ib%Un(i,a) = Uo(i,a) + ib%Yn(i,a)*dt
          END DO
       END DO
 
-      DEALLOCATE(sA)
+      DEALLOCATE(sA, Uo)
 
       RETURN
       END SUBROUTINE IB_PROJFVAR
+!####################################################################
+      SUBROUTINE IB_GETNNx(lM, xl, xp, N, Nx)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: xl(nsd,lM%eNoN), xp(nsd)
+      REAL(KIND=RKIND), INTENT(OUT) :: N(lM%eNoN), Nx(nsd,lM%eNoN)
+
+      LOGICAL l1, l2, l3, l4
+      INTEGER(KIND=IKIND) a, b
+      REAL(KIND=RKIND) :: rt, xi(nsd)
+
+!     Initialize parameteric coordinate for Newton's iterations
+      xi = 0._RKIND
+      DO a=1, lM%nG
+         xi = xi + lM%xi(:,a)
+      END DO
+      xi = xi / REAL(lM%nG, KIND=RKIND)
+
+      CALL GETXI(lM%eType, lM%eNoN, xl, xp, xi, l1)
+
+!     Check if parameteric coordinate is within bounds
+      b = 0
+      DO a=1, nsd
+         IF (xi(a).GE.lM%xib(1,a) .AND. xi(a).LE.lM%xib(2,a)) b = b + 1
+      END DO
+      l2 = b .EQ. nsd
+
+!     Get the shapefunction and its parameteric derivatives
+      CALL GETGNN(nsd, lM%eType, lM%eNoN, xi, N, Nx)
+
+!     Check if shape functions are within bounds and sum to unity
+      b  = 0
+      rt = 0._RKIND
+      DO a=1, lM%eNoN
+         rt = rt + N(a)
+         IF (N(a).GT.lM%Nb(1,a) .AND. N(a).LT.lM%Nb(2,a)) b = b + 1
+      END DO
+      l3 = b .EQ. lM%eNoN
+      l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
+
+      l1 = ALL((/l1, l2, l3, l4/))
+      IF (.NOT.l1) THEN
+         err = " IB tracer pointing to wrong fluid element (PROBEXI)"
+      END IF
+
+      RETURN
+      END SUBROUTINE IB_GETNNx
 !####################################################################
 !     Write IB call duration
       SUBROUTINE IB_OUTR()
@@ -4987,14 +4659,12 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
       std = REPEAT("-",55)
       WRITE(sOut,'(F6.2)') ib%callD(1)
       WRITE(sOut,'(A)') " IB call duration: "//TRIM(sOut)//' sec'
-      IF (ib%mthd .NE. ibMthd_SSM) THEN
-         rtmp = 100._RKIND*ib%callD(3)/ib%callD(1)
-         WRITE(sOut,'(A)') TRIM(sOut)//" (comm."//
-     2      STR(NINT(rtmp, KIND=IKIND),3)//"%)"
-         rtmp = 100._RKIND*ib%callD(2)/ib%callD(1)
-         WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
-     2      STR(NINT(rtmp, KIND=IKIND),3)//"%)"
-      END IF
+      rtmp = 100._RKIND*ib%callD(3)/ib%callD(1)
+      WRITE(sOut,'(A)') TRIM(sOut)//" (comm."//
+     2   STR(NINT(rtmp, KIND=IKIND),3)//"%)"
+      rtmp = 100._RKIND*ib%callD(2)/ib%callD(1)
+      WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
+     2   STR(NINT(rtmp, KIND=IKIND),3)//"%)"
       std = sOut
       std = REPEAT("-",55)
 
@@ -5150,7 +4820,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
          DO e=1, lM%nEl
             DO a=1, lM%eNoN
                Ac = lM%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
             DO g=1, lM%nG
                Ec = ePtr(1,g,e)
@@ -5245,7 +4915,7 @@ c            ib%R(i,a)   = ib%R(i,a)   + ib%Rfb(i,a)
          DO e=1, lFa%nEl
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
             END DO
             DO g=1, lFa%nG
                Ec = ePtr(1,g,e)

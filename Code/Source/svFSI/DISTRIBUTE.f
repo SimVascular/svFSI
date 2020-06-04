@@ -372,11 +372,11 @@
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) iM, iFa
-      LOGICAL flag
 
       IF (cm%slv()) ALLOCATE(ib)
 
       CALL cm%bcast(ib%mthd)
+      CALL cm%bcast(ib%cpld)
 
       CALL cm%bcast(ib%nMsh)
       CALL cm%bcast(ib%tnNo)
@@ -392,14 +392,6 @@
             CALL DISTIBFa(ib%msh(iM), ib%msh(iM)%fa(iFa))
          END DO
       END DO
-
-      CALL cm%bcast(ib%nFn)
-      flag = ALLOCATED(ib%fN)
-      CALL cm%bcast(flag)
-      IF (flag) THEN
-         IF (cm%slv()) ALLOCATE(ib%fN(ib%nFn*nsd,ib%tnNo))
-         CALL cm%bcast(ib%fN)
-      END IF
 
       RETURN
       END SUBROUTINE DISTIB
@@ -421,6 +413,7 @@
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%name)
       CALL cm%bcast(lM%dx)
+      CALL cm%bcast(lM%nFn)
 
       IF (cm%slv()) THEN
          lM%nNo = lM%gnNo
@@ -430,12 +423,14 @@
          ALLOCATE(lM%IEN(lM%eNoN, lM%nEl))
          ALLOCATE(lM%eId(lM%nEl))
          ALLOCATE(lM%fa(lM%nFa))
+         ALLOCATE(lM%fN(lM%nFn*nsd,lM%nEl))
          CALL SELECTELE(lM)
       END IF
       CALL cm%bcast(lM%gN)
       CALL cm%bcast(lM%lN)
       CALL cm%bcast(lM%IEN)
       CALL cm%bcast(lM%eId)
+      IF (lM%nFn .NE. 0) CALL cm%bcast(lM%fN)
 
       IF (lM%eType .EQ. eType_NRB) THEN
          CALL cm%bcast(lM%nSl)
@@ -829,15 +824,13 @@
       CALL cm%bcast(lBc%r)
       CALL cm%bcast(lBc%g)
       CALL cm%bcast(lBc%weakDir)
-      CALL cm%bcast(lBc%tauB)
-      CALL cm%bcast(lBc%tauF)
-      CALL cm%bcast(lBc%fbN)
 
 !     Communicating time-dependant BC data
       flag = ALLOCATED(lBc%gt)
       CALL cm%bcast(flag)
       IF (flag) THEN
          IF (cm%slv()) ALLOCATE(lBc%gt)
+         CALL cm%bcast(lBc%gt%lrmp)
          CALL cm%bcast(lBc%gt%qi)
          CALL cm%bcast(lBc%gt%qs)
          CALL cm%bcast(lBc%gt%ti)

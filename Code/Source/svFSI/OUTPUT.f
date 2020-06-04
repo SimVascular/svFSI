@@ -200,16 +200,14 @@
          IF (dFlag) THEN
             IF (pstEq) THEN
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2            eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%An, ib%Yn,
-     3            ib%Un, ib%Rfb
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%Yn, ib%Un
             ELSE
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2            eq%iNorm, cplBC%xn, Yn, An, Dn, ib%An, ib%Yn, ib%Un,
-     3            ib%Rfb
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, ib%Yn, ib%Un
             END IF
          ELSE
             WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2         eq%iNorm, cplBC%xn, Yn, An, ib%An, ib%Yn, ib%Un, ib%Rfb
+     2         eq%iNorm, cplBC%xn, Yn, An, ib%Yn, ib%Un
          END IF
       END IF
       CLOSE(fid)

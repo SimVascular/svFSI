@@ -204,8 +204,13 @@
       INTEGER(KIND=IKIND), PARAMETER :: cntctM_NA = 800,
      2   cntctM_penalty = 801
 !--------------------------------------------------------------------
-!     Immersed Boundary (IB) treatment
-      INTEGER(KIND=IKIND), PARAMETER :: ibMthd_NA = 850,
-     2   ibMthd_SSM = 851, ibMthd_IFEM = 852
+!     IB treatment: traditional immersed finite element (IFEM),
+!     consistent/stabilized IFEM
+       INTEGER(KIND=IKIND), PARAMETER :: ibMthd_NA = 850,
+     2   ibMthd_IFEM = 851, ibMthd_FEIBStab = 852
+
+!     IB coupling: explicit/implicit
+      INTEGER(KIND=IKIND), PARAMETER :: ibCpld_NA = 899, ibCpld_E = 898,
+     2   ibCpld_I = 897
 !--------------------------------------------------------------------
 !#######################################################################
