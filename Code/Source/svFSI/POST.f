@@ -47,7 +47,7 @@
 
       INTEGER(KIND=IKIND) a, Ac, iM
 
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:), tmpVe(:)
 
       DO iM=1, nMsh
          IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -60,15 +60,16 @@
             END DO
          ELSE IF (outGrp .EQ. outGrp_J) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-            ALLOCATE(tmpV(1,msh(iM)%nNo))
-            tmpV = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, lD, iEq, outGrp)
+            ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
+            tmpV  = 0._RKIND
+            tmpVe = 0._RKIND
+            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, iEq, outGrp)
             res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
                res(1,Ac) = tmpV(1,a)
             END DO
-            DEALLOCATE(tmpV)
+            DEALLOCATE(tmpV, tmpVe)
             ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
          ELSE IF (outGrp .EQ. outGrp_divV) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -487,25 +488,25 @@
       END SUBROUTINE BPOST
 !####################################################################
 !     Routine for post processing stress tensor
-      SUBROUTINE TPOST(lM, m, res, lD, iEq, outGrp)
+      SUBROUTINE TPOST(lM, m, res, resE, lD, iEq, outGrp)
       USE COMMOD
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER(KIND=IKIND), INTENT(IN) :: m, iEq, outGrp
-      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
       REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
 
       INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd,
      2   nFn
-      REAL(KIND=RKIND) w, Jac, detF, ya, Ja, elM, nu, lambda, mu,
+      REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
      2   ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
      3   sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       TYPE(stModelType) :: stModel
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
-     2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:)
+     2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -516,13 +517,15 @@
       IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN), sE(lM%nEl))
 
       sA   = 0._RKIND
       sF   = 0._RKIND
+      sE   = 0._RKIND
       insd = nsd
       ya   = 0._RKIND
       IF (lM%lFib) insd = 1
+
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
@@ -535,6 +538,8 @@
             nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
             lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
             mu     = 0.5_RKIND*elM/(1._RKIND + nu)
+         ELSE
+            stModel = eq(iEq)%dmn(cDmn)%stM
          END IF
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
@@ -552,13 +557,14 @@
             dl(:,a) = lD(:,Ac)
          END DO
 
-         stModel = eq(iEq)%dmn(cDmn)%stM
+         Je = 0._RKIND
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
                CALL GNN(eNoN, insd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
             END IF
-            w = lM%w(g)*Jac
-            N = lM%N(:,g)
+            w  = lM%w(g)*Jac
+            N  = lM%N(:,g)
+            Je = Je + w
 
             ed = 0._RKIND
             F  = MAT_ID(nsd)
@@ -606,6 +612,7 @@
                   sA(Ac)   = sA(Ac)   + w*N(a)
                   sF(1,Ac) = sF(1,Ac) + w*N(a)*detF
                END DO
+               sE(e) = sE(e) + w*detF
 
             ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
@@ -681,6 +688,7 @@
                END DO
             END IF
          END DO
+         IF (.NOT.ISZERO(Je)) sE(e) = sE(e)/Je
       END DO
 
       CALL COMMU(sF)
@@ -693,7 +701,9 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, fN, pSl, N, Nx)
+      resE(:) = sE(:)
+
+      DEALLOCATE (sA, sF, sE, xl, dl, fN, pSl, N, Nx)
 
       RETURN
       END SUBROUTINE TPOST

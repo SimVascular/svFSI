@@ -3062,9 +3062,9 @@ c      END DO
          ALLOCATE(d(iM)%xe(d(iM)%nEl,1))
          IF (.NOT.savedOnce) THEN
             IF (ALLOCATED(ib%dmnID)) THEN
-               d(iM)%xe(:,1) = ib%msh(iM)%eId(:)
+               d(iM)%xe(:,1) = REAL(ib%msh(iM)%eId(:), KIND=RKIND)
             ELSE
-               d(iM)%xe(:,1) = 1
+               d(iM)%xe(:,1) = 1._RKIND
             END IF
          END  IF
          nNo = nNo +  d(iM)%nNo
@@ -3142,7 +3142,7 @@ c      END DO
             DO iM=1, ib%nMsh
                DO e=1, d(iM)%nEl
                   Ec = Ec + 1
-                  tmpI(1,Ec) = d(iM)%xe(e,1)
+                  tmpI(1,Ec) = INT(d(iM)%xe(e,1), KIND=IKIND)
                END DO
             END DO
             CALL putVTK_elemData(vtu, 'Domain_ID', tmpI, iStat)

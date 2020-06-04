@@ -670,16 +670,16 @@
       REAL(KIND=RKIND), INTENT(IN) :: p, Ja
       REAL(KIND=RKIND), INTENT(OUT) :: ro, bt, dro, dbt
 
-      REAL(KIND=RKIND) :: Kp, nu, r1, r2
+      REAL(KIND=RKIND) :: Kp, r1, r2
 
       ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)/Ja
-      nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       bt  = 0._RKIND
       dbt = 0._RKIND
       dro = 0._RKIND
-      IF (ISZERO(nu-0.5_RKIND)) RETURN
 
-      Kp = stM%Kpen
+      Kp  = stM%Kpen
+      IF (ISZERO(Kp)) RETURN
+
       SELECT CASE (stM%volType)
       CASE (stVol_Quad)
          r1  = 1._RKIND/(Kp - p)

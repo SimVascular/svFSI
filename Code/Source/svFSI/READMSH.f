@@ -861,7 +861,8 @@ c               END IF
       TYPE(mshType), INTENT(INOUT) :: lM
       LOGICAL, INTENT(IN) :: flag
 
-      INTEGER(KIND=IKIND) Ac, b, i, sn(4), e, a, teNoN
+      LOGICAL qFlag
+      INTEGER(KIND=IKIND) Ac, b, i, sn(4), e, a, teNoN, eType
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNodes(:)
       REAL(KIND=RKIND), ALLOCATABLE :: v(:,:), xl(:,:)
@@ -896,10 +897,12 @@ c               END IF
          RETURN
       END IF
 
+      eType = lM%eType
       DO e=1, lM%gnEl
 !     By default no change
          a = 1; b = 1
-         IF (lM%eType.EQ.eType_BIL .OR. lM%eType.EQ.eType_BIQ) THEN
+         qFlag = .FALSE.
+         IF (eType.EQ.eType_BIL .OR. eType.EQ.eType_BIQ) THEN
             xl     = lM%x(:,lM%gIEN(1:4,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
@@ -933,7 +936,7 @@ c               END IF
 !     Two or more edges are on a straight line
                err = "Element "//e//" is distorted"
             END IF
-         ELSE IF (lM%eType .EQ. eType_WDG) THEN
+         ELSE IF (eType .EQ. eType_WDG) THEN
             xl     = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
@@ -952,7 +955,7 @@ c               END IF
 !     Two or more edges are on a straight line
                err = "Element "//e//" is distorted"
             END IF
-         ELSE IF (lM%eType .EQ. eType_TET) THEN
+         ELSE IF (eType.EQ.eType_TET .OR. eType.EQ.eType_QTE) THEN
             xl     = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
@@ -963,12 +966,13 @@ c               END IF
             IF (i .EQ. 1) THEN
 !     Two nodes must be switched
                a = 1; b = 2
+               qFlag = .TRUE.
                IF (e .EQ. 1) std = " Reordering element connectivity"
             ELSE IF (i .EQ. 0) THEN
 !     Two or more edges are on a straight line
                err = "Element "//e//" is distorted"
             END IF
-         ELSE IF (lM%eType .EQ. eType_TRI) THEN
+         ELSE IF (eType.EQ.eType_TRI .OR. eType.EQ.eType_QTR) THEN
             IF (nsd .NE. 2) CYCLE
             xl(:,1:3) = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
@@ -978,15 +982,28 @@ c               END IF
             IF (i .EQ. -1) THEN
 !     Two nodes must be switched
                a = 1; b = 2
+               qFlag = .TRUE.
             ELSE IF (i .EQ. 0) THEN
 !     Two or more edges are on a straight line
                err = "Element "//e//" is distorted"
             END IF
          END IF
 
-         Ac = lM%gIEN(a,e)
-         lM%gIEN(a,e) = lM%gIEN(b,e)
-         lM%gIEN(b,e) = Ac
+         CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
+         IF (qFlag) THEN
+            IF (eType .EQ. eType_QTR) THEN
+!              Swap nodes 5 and 6
+               a = 5; b = 6
+               CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
+            ELSE IF (eType .EQ. eType_QTE) THEN
+!              Swap nodes 6 and 7
+               a = 6; b = 7
+               CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
+!              Swap nodes 8 and 9
+               a = 8; b = 9
+               CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
+            END IF
+         END IF
       END DO
 
       RETURN

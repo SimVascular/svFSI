@@ -211,7 +211,7 @@
 
       IF ((eq(cEq)%phys .EQ. phys_ustruct) .OR.
      2    (eq(cEq)%phys .EQ. phys_stokes)) THEN
-        CALL PICETH()
+         CALL PICETH()
       END IF
 
       IF (eq(cEq)%phys .EQ. phys_FSI) THEN
