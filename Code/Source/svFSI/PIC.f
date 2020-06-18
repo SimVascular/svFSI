@@ -306,9 +306,9 @@ c         CALL IB_SETBCPEN()
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL THflag, l1, l2, l3, l4
-      INTEGER(KIND=IKIND) a, b, e, g, i, s, iM, Ac, eType, eNoN, eNoNq
-      REAL(KIND=RKIND) Jac, eVol, p, rt, xp(nsd), xi0(nsd), xi(nsd),
+      LOGICAL THflag
+      INTEGER(KIND=IKIND) a, b, e, g, s, iM, Ac, eType, eNoN, eNoNq
+      REAL(KIND=RKIND) Jac, eVol, p, xp(nsd), xi0(nsd), xi(nsd),
      2   ksix(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), xql(:,:), pl(:), Nq(:),
@@ -375,30 +375,8 @@ c         CALL IB_SETBCPEN()
                xp = xl(:,a)
 
                xi = xi0
-               CALL GETXI(eType, eNoNq, xql, xp, xi, l1)
-
-               i = 0
-               DO b=1, nsd
-                  IF (xi(b).GE.msh(iM)%fs(2)%xib(1,b) .AND.
-     2                xi(b).LE.msh(iM)%fs(2)%xib(2,b)) i = i + 1
-               END DO
-               l2 = i .EQ. nsd
-
-               CALL GETGNN(nsd, eType, eNoNq, xi, Nq, Nqx)
-
-               i  = 0
-               rt = 0._RKIND
-               DO b=1, eNoNq
-                  rt = rt + Nq(b)
-                  IF (Nq(b).GT.msh(iM)%fs(2)%Nb(1,b) .AND.
-     2                Nq(b).LT.msh(iM)%fs(2)%Nb(2,b)) i = i + 1
-               END DO
-               l3 = i .EQ. eNoNq
-               l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-               l1 = ALL((/l1, l2, l3, l4/))
-               IF (.NOT.l1) err =
-     2            "Error in computing face derivatives (USTRUCT_THPCE)"
+               CALL GETNNX(eType, eNoNq, xql, msh(iM)%fs(2)%xib,
+     2            msh(iM)%fs(2)%Nb, xp, xi, Nq, Nqx)
 
                p = 0._RKIND
                DO b=1, eNoNq

@@ -49,7 +49,7 @@
       DO iM=1, nMsh
          DO iFa=1, msh(iM)%nFa
             IF (msh(iM)%lFib) CYCLE
-            CALL FACEINI(msh(iM)%fa(iFa))
+            CALL FACEINI(msh(iM), msh(iM)%fa(iFa))
          END DO
          IF (msh(iM)%lShl) CALL SHLINI(msh(iM))
       END DO
@@ -175,47 +175,143 @@
       END SUBROUTINE BAFINI
 !####################################################################
 !     Initializing faces
-      SUBROUTINE FACEINI(lFa)
+      SUBROUTINE FACEINI(lM, lFa)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
       LOGICAL flag
-      INTEGER(KIND=IKIND) e, a, Ac, iM, g
-      REAL(KIND=RKIND) tmp, area, n(nsd)
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, Bc, Ec
+      REAL(KIND=RKIND) area, tmp, xi0(nsd), xi(nsd), xp(nsd), nV(nsd)
+      TYPE(fsType) :: fs, fsb
 
-      REAL(KIND=RKIND), ALLOCATABLE :: s(:), sV(:,:)
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:), sVl(:,:), xbl(:,:),
+     2   xl(:,:), N(:), Nxi(:,:)
 
-!     Calculating the center of the face, diameter and its area
-      iM = lFa%iM
-      ALLOCATE(s(tnNo), sV(nsd,tnNo))
-      IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
-      ALLOCATE(lFa%nV(nsd,lFa%nNo))
-      s        = 1._RKIND
-      sV       = 0._RKIND
-      area     = Integ(lFa,s)
-      lFa%area = area
-      std = " Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
-!     Making sure area is not zero, since it will cause issues later on
+!     Calculating face area
+      ALLOCATE(N(tnNo))
+      N    = 1._RKIND
+      area = Integ(lFa, N)
+      std  = " Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
       IF (ISZERO(area)) THEN
          IF (cm%mas()) wrn = "<"//TRIM(lFa%name)//"> area is zero"
       END IF
-      DO e=1, lFa%nEl
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
-         DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
-            DO a=1, lFa%eNoN
-               Ac       = lFa%IEN(a,e)
-               sV(:,Ac) = sV(:,Ac) + n*lFa%N(a,g)*lFa%w(g)
+      lFa%area = area
+      DEALLOCATE(N)
+
+!     Compute face normals at nodes
+      IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
+      ALLOCATE(lFa%nV(nsd,lFa%nNo), sV(nsd,tnNo))
+      sV = 0._RKIND
+      IF (lM%lShpF .OR. lM%eType.EQ.eType_NRB) THEN
+!        For linear elements or NURBS, we simply project element normals
+!        to nodes
+         DO e=1, lFa%nEl
+            IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(lM, lFa, e)
+            DO g=1, lFa%nG
+               CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), nV)
+               DO a=1, lFa%eNoN
+                  Ac       = lFa%IEN(a,e)
+                  sV(:,Ac) = sV(:,Ac) + nV*lFa%N(a,g)*lFa%w(g)
+               END DO
             END DO
          END DO
-      END DO
 
-      flag = .TRUE.
+      ELSE
+!        For higher order elements, use reduced order basis on mesh
+!        to project element normals. Lumping method is used to project
+!        to face corners. Normals at edge nodes are computed by simple
+!        interpolation from reduced basis. Standard lumping using higher
+!        order basis could lead to spurious errors
+         CALL SETTHOODFS(fs, lM%eType)
+         CALL SETTHOODFS(fsb, lFa%eType)
+         CALL ALLOCFS(fs, nsd)
+         CALL GETGIP(nsd, fs%eType, fs%nG, fs%w, fs%xi)
+         DO g=1, fs%nG
+            CALL GETGNN(nsd, fs%eType, fs%eNoN, fs%xi(:,g), fs%N(:,g),
+     2         fs%Nx(:,:,g))
+         END DO
+         CALL GETNNBNDS(fs%eType, fs%eNoN, fs%xib, fs%Nb)
+
+         xi0 = 0._RKIND
+         DO g=1, fs%nG
+            xi0 = xi0 + fs%xi(:,g)
+         END DO
+         xi0 = xi0 / REAL(fs%nG, KIND=RKIND)
+
+         ALLOCATE(sVl(nsd,lFa%eNoN), xbl(nsd,lFa%eNoN), xl(nsd,fs%eNoN),
+     2      N(fs%eNoN), Nxi(nsd,fs%eNoN), ptr(fs%eNoN))
+         DO e=1, lFa%nEl
+            DO a=1, lFa%eNoN
+               Ac = lFa%IEN(a,e)
+               xbl(:,a) = x(:,Ac)
+               IF (mvMsh) xbl(:,a) = xbl(:,a) + Do(nsd+2:2*nsd+1,Ac)
+            END DO
+
+            Ec  = lFa%gE(e)
+            ptr = 0
+            DO a=1, fs%eNoN
+               Ac = lM%IEN(a,Ec)
+               xl(:,a) = x(:,Ac)
+               IF (mvMsh) xl(:,a) = xl(:,a) + Do(nsd+2:2*nsd+1,Ac)
+               DO b=1, fsb%eNoN
+                  Bc = lFa%IEN(b,e)
+                  IF (Ac .EQ. Bc) THEN
+                     ptr(a) = b
+                     EXIT
+                  END IF
+               END DO
+            END DO
+
+            sVl(:,:) = 0._RKIND
+            DO g=1, lFa%nG
+               xp = 0._RKIND
+               DO a=1, lFa%eNoN
+                  xp = xp + lFa%N(a,g)*xbl(:,a)
+               END DO
+
+               xi = xi0
+               CALL GETNNX(fs%eType, fs%eNoN, xl, fs%xib, fs%Nb, xp,
+     2            xi, N, Nxi)
+
+               CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), nV)
+
+               DO a=1, fs%eNoN
+                  b = ptr(a)
+                  IF (b .EQ. 0) CYCLE
+                  Ac = lM%IEN(a,Ec)
+                  sVl(:,b) = sVl(:,b) + lFa%w(g)*N(a)*nV(:)
+                  sV(:,Ac) = sV(:,Ac) + sVl(:,b)
+               END DO
+            END DO
+
+            DO b=fsb%eNoN+1, lFa%eNoN
+               xp = xbl(:,b)
+               xi = xi0
+               CALL GETNNX(fs%eType, fs%eNoN, xl, fs%xib, fs%Nb, xp,
+     2            xi, N, Nxi)
+
+               DO a=1, fs%eNoN
+                  IF (ptr(a) .EQ. 0) CYCLE
+                  sVl(:,b) = sVl(:,b) + N(a)*sVl(:,ptr(a))
+               END DO
+
+               Ac = lFa%IEN(b,e)
+               sV(:,Ac) = sV(:,Ac) + sVl(:,b)
+            END DO
+         END DO
+         DEALLOCATE(sVl, xbl, xl, N, Nxi, ptr)
+         CALL DESTROY(fs)
+         CALL DESTROY(fsb)
+      END IF
+
       CALL COMMU(sV)
+      flag = .TRUE.
       DO a=1, lFa%nNo
-         Ac  = lFa%gN(a)
+         Ac = lFa%gN(a)
          tmp = SQRT(NORM(sV(:,Ac)))
          IF (ISZERO(tmp)) THEN
             IF (flag) THEN
@@ -229,6 +325,7 @@
          END IF
          lFa%nV(:,a) = sV(:,Ac)/tmp
       END DO
+      DEALLOCATE(sV)
 
       RETURN
       END SUBROUTINE FACEINI

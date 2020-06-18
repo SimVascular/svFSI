@@ -1177,10 +1177,9 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN),
      2   lKd(dof*nsd,eNoN,eNoN)
 
-      LOGICAL :: l1, l2, l3, l4
-      INTEGER(KIND=IKIND) :: a, b, g, Ac, iM, eNoNb
+      INTEGER(KIND=IKIND) :: a, g, Ac, iM, eNoNb
       REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ksix(nsd,nsd), rt, N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN)
+     2   ksix(nsd,nsd), N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN)
 
       iM    = lFa%iM
       eNoNb = lFa%eNoN
@@ -1200,35 +1199,11 @@
          END DO
 
          xi = xi0
-         CALL GETXI(msh(iM)%eType, eNoN, xl, xp, xi, l1)
-
-!        Check if parameteric coordinate is within bounds
-         a = 0
-         DO b=1, nsd
-            IF (xi(b).GE.msh(iM)%xib(1,b) .AND.
-     2          xi(b).LE.msh(iM)%xib(2,b)) a = a + 1
-         END DO
-         l2 = a .EQ. nsd
-
-         CALL GETGNN(nsd, msh(iM)%eType, eNoN, xi, N, Nxi)
-
-!        Check if shape functions are within bounds and sum to unity
-         b  = 0
-         rt = 0._RKIND
-         DO a=1, eNoN
-            rt = rt + N(a)
-            IF (N(a).GT.msh(iM)%Nb(1,a) .AND.
-     2          N(a).LT.msh(iM)%Nb(2,a)) b = b + 1
-         END DO
-         l3 = b .EQ. eNoN
-         l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-         l1 = ALL((/l1, l2, l3, l4/))
-         IF (.NOT.l1) err =
-     2      "Error in computing face derivatives (BUSTRUCTNEU)"
+         CALL GETNNX(msh(iM)%eType, eNoN, xl, msh(iM)%xib, msh(iM)%Nb,
+     2      xp, xi, N, Nxi)
 
          IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
-     2      CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, ksix)
+     2      CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, ksix)
 
          CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
          Jac = SQRT(NORM(nV))
