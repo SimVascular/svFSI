@@ -1776,6 +1776,15 @@ c     2         "can be applied for Neumann boundaries only"
          END SELECT
       END IF
 
+!     For Neumann BC, is load vector changing with deformation
+!     (follower pressure)
+      lBc%flwP = .FALSE.
+      IF (BTEST(lBc%bType,bType_Neu)) THEN
+         IF (phys.EQ.phys_struct .OR. phys.EQ.phys_ustruct) THEN
+            lPtr => list%get(lBc%flwP, "Follower pressure load")
+         END IF
+      END  IF
+
 !     If a Neumann BC face is undeforming
       lBc%masN = 0
       IF (BTEST(lBc%bType,bType_Neu)) THEN

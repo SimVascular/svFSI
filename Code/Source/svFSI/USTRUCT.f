@@ -1166,62 +1166,6 @@
       RETURN
       END SUBROUTINE USTRUCT2D_C
 !####################################################################
-      SUBROUTINE BUSTRUCT(lFa, eNoN, e, ptr, xl, dl, hl, lR, lK, lKd)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(faceType), INTENT(IN) :: lFa
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, e, ptr(eNoN)
-      REAL(KIND=RKIND), INTENT(IN) :: xl(nsd,eNoN), dl(tDof,eNoN),
-     2   hl(eNoN)
-      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN), lK(dof*dof,eNoN),
-     2   lKd(dof*nsd,eNoN,eNoN)
-
-      INTEGER(KIND=IKIND) :: a, g, Ac, iM, eNoNb
-      REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ksix(nsd,nsd), N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN)
-
-      iM    = lFa%iM
-      eNoNb = lFa%eNoN
-
-!     Initialize parameteric coordinate for Newton's iterations
-      xi0 = 0._RKIND
-      DO g=1, msh(iM)%nG
-         xi0 = xi0 + msh(iM)%xi(:,g)
-      END DO
-      xi0 = xi0 / REAL(msh(iM)%nG, KIND=RKIND)
-
-      DO g=1, lFa%nG
-         xp = 0._RKIND
-         DO a=1, eNoNb
-            Ac = lFa%IEN(a,e)
-            xp = xp + x(:,Ac)*lFa%N(a,g)
-         END DO
-
-         xi = xi0
-         CALL GETNNX(msh(iM)%eType, eNoN, xl, msh(iM)%xib, msh(iM)%Nb,
-     2      xp, xi, N, Nxi)
-
-         IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
-     2      CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, ksix)
-
-         CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
-         Jac = SQRT(NORM(nV))
-         nV  = nV / Jac
-         w   = lFa%w(g)*Jac
-
-         IF (nsd .EQ. 3) THEN
-            CALL BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
-         ELSE
-            CALL BUSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
-         END IF
-      END DO
-
-      CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
-
-      RETURN
-      END SUBROUTINE BUSTRUCT
-!--------------------------------------------------------------------
       SUBROUTINE BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN

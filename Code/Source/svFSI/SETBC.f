@@ -309,7 +309,11 @@
       END IF
 
 !     Add Neumann BCs contribution to the LHS/RHS
-      CALL BCONSTRUCT(lFa, hg, Yg, Dg)
+      IF (lBc%flwP) THEN
+         CALL BNEUFOLWP(lFa, hg, Dg)
+      ELSE
+         CALL BASSEMNEUBC(lFa, hg, Yg)
+      END IF
 
 !     Now treat Robin BC (stiffness and damping) here
       IF (BTEST(lBc%bType,bType_Robin))

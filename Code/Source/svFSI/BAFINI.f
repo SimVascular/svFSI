@@ -206,7 +206,14 @@
       IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
       ALLOCATE(lFa%nV(nsd,lFa%nNo), sV(nsd,tnNo))
       sV = 0._RKIND
-      IF (lM%lShpF .OR. lM%eType.EQ.eType_NRB) THEN
+
+      flag = .FALSE.
+      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_QTR .OR.
+     2    lM%eType.EQ.eType_BIQ .OR. lM%eType.EQ.eType_QTE) THEN
+         flag =.TRUE.
+      END IF
+
+      IF (.NOT.flag) THEN
 !        For linear elements or NURBS, we simply project element normals
 !        to nodes
          DO e=1, lFa%nEl

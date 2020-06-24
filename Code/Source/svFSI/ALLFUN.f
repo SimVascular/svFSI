@@ -1241,6 +1241,7 @@
 
       lBc%weakDir  = .FALSE.
       lBc%fbN      = .FALSE.
+      lBc%flwP     = .FALSE.
       lBc%bType    = 0
       lBc%cplBCptr = 0
       lBc%g        = 0._RKIND

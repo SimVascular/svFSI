@@ -504,3 +504,131 @@
       RETURN
       END SUBROUTINE STRUCT2D
 !####################################################################
+      SUBROUTINE BSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), hl(eNoN),
+     2   dl(tDof,eNoN), nV(3)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
+      REAL(KIND=RKIND) :: af, h, Jac, wl, Ku, F(3,3), Fi(3,3), nFi(3),
+     2   NxFi(3,eNoN)
+
+      af     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      i      = eq(cEq)%s
+      j      = i + 1
+      k      = j + 1
+
+      h      = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      DO a=1, eNoN
+         h       = h      + N(a)*hl(a)
+         F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
+         F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
+         F(1,3)  = F(1,3) + Nx(3,a)*dl(i,a)
+         F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
+         F(2,2)  = F(2,2) + Nx(2,a)*dl(j,a)
+         F(2,3)  = F(2,3) + Nx(3,a)*dl(j,a)
+         F(3,1)  = F(3,1) + Nx(1,a)*dl(k,a)
+         F(3,2)  = F(3,2) + Nx(2,a)*dl(k,a)
+         F(3,3)  = F(3,3) + Nx(3,a)*dl(k,a)
+      END DO
+      Jac = MAT_DET(F, 3)
+      Fi  = MAT_INV(F, 3)
+
+      nFi(1) = nV(1)*Fi(1,1) + nV(2)*Fi(2,1) + nV(3)*Fi(3,1)
+      nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2) + nV(3)*Fi(3,2)
+      nFi(3) = nV(1)*Fi(1,3) + nV(2)*Fi(2,3) + nV(3)*Fi(3,3)
+
+      DO a=1, eNoN
+         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1) + Nx(3,a)*Fi(3,1)
+         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2) + Nx(3,a)*Fi(3,2)
+         NxFi(3,a) = Nx(1,a)*Fi(1,3) + Nx(2,a)*Fi(2,3) + Nx(3,a)*Fi(3,3)
+      END DO
+
+      wl = w*Jac*h
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
+         lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
+         lR(3,a) = lR(3,a) - wl*N(a)*nFi(3)
+
+         DO b=1, eNoN
+            Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
+            lK(2,a,b)     = lK(2,a,b)     + Ku
+            lK(dof+1,a,b) = lK(dof+1,a,b) - Ku
+
+            Ku = wl*af*N(a)*(nFi(3)*NxFi(1,b) - nFi(1)*NxFi(3,b))
+            lK(3,a,b)       = lK(3,a,b)       + Ku
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) - Ku
+
+            Ku = wl*af*N(a)*(nFi(3)*NxFi(2,b) - nFi(2)*NxFi(3,b))
+            lK(dof+3,a,b)   = lK(dof+3,a,b)   + Ku
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) - Ku
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE BSTRUCT3D
+!--------------------------------------------------------------------
+      SUBROUTINE BSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), hl(eNoN),
+     2   dl(tDof,eNoN), nV(2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) :: i, j, a, b
+      REAL(KIND=RKIND) :: af, h, Jac, wl, Ku, F(2,2), Fi(2,2), nFi(2),
+     2   NxFi(2,eNoN)
+
+      af     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      i      = eq(cEq)%s
+      j      = i + 1
+
+      h      = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      DO a=1, eNoN
+         h       = h      + N(a)*hl(a)
+         F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
+         F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
+         F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
+         F(2,2)  = F(2,2) + Nx(2,a)*dl(j,a)
+      END DO
+      Jac = MAT_DET(F, 2)
+      Fi  = MAT_INV(F, 2)
+
+      nFi(1) = nV(1)*Fi(1,1) + nV(2)*Fi(2,1)
+      nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2)
+
+      DO a=1, eNoN
+         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1)
+         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2)
+      END DO
+
+      wl = w*Jac*h
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
+         lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
+
+         DO b=1, eNoN
+            Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
+            lK(2,a,b)     = lK(2,a,b)     + Ku
+            lK(dof+1,a,b) = lK(dof+1,a,b) - Ku
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE BSTRUCT2D
+!####################################################################

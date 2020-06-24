@@ -183,6 +183,9 @@
          LOGICAL :: weakDir
 !        Whether feedback force is along normal direction only
          LOGICAL :: fbN = .FALSE.
+!        Whether load vector changes with deformation
+!        (Neu - struct/ustruct only)
+         LOGICAL :: flwP = .FALSE.
 !        Pre/Res/Flat/Para... boundary types
          INTEGER(KIND=IKIND) :: bType = 0
 !        Pointer to coupledBC%face
