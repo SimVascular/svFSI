@@ -193,7 +193,8 @@
      2   PREC_FSILS = 701, PREC_TRILINOS_DIAGONAL = 702,
      3   PREC_TRILINOS_BLOCK_JACOBI = 703, PREC_TRILINOS_ILU = 704,
      4   PREC_TRILINOS_ILUT = 705, PREC_TRILINOS_IC = 706,
-     5   PREC_TRILINOS_ICT = 707, PREC_TRILINOS_ML = 708
+     5   PREC_TRILINOS_ICT = 707, PREC_TRILINOS_ML = 708,
+     6   PREC_RCS = 709
 !--------------------------------------------------------------------
 !     Solver definitions
       INTEGER(KIND=IKIND), PARAMETER :: lSolver_NA = 799,

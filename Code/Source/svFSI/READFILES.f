@@ -1142,6 +1142,9 @@
             CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
                lEq%useTLS = .FALSE.
+            CASE('rcs', 'row-column-scaling')
+               lEq%ls%PREC_Type = PREC_RCS
+               lEq%useTLS = .FALSE.
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
