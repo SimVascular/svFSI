@@ -133,7 +133,7 @@
             PRINT *, 'FSILS: LS_type not defined'
             STOP "FSILS: FATAL ERROR"
       END SELECT
-      R = R*Wc
+      R = Wc*R
 
       DO a=1, nNo
          Ri(:,a) = R(:,lhs%map(a))

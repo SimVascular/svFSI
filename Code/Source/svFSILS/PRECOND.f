@@ -230,7 +230,7 @@
             d = diagPtr(Ac)
             DO i=1, dof
                Val(i*dof-dof+i,d) = Wr(i,Ac)*(Val(i*dof-dof+i,d)
-     2                            -1._LSRP) + 1._LSRP
+     2                            - 1._LSRP) + 1._LSRP
             END DO
          END DO
       END SELECT

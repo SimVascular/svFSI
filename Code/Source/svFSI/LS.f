@@ -75,8 +75,14 @@
 
 #ifdef WITH_TRILINOS
       INTEGER(KIND=IKIND) a
+      REAL(KIND=RKIND), ALLOCATABLE :: Wr(:,:), Wc(:,:)
 
-      IF (lEq%useTLS) CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
+      IF (lEq%useTLS) THEN
+         ALLOCATE(Wr(dof,lhs%nNo), Wc(dof,lhs%nNo))
+         CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
+         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
+     2      Val, R, Wr, Wc)
+      END IF
 
       IF (lEq%assmTLS) THEN
          lEq%FSILS%RI%suc = .FALSE.
@@ -104,6 +110,8 @@
          DO a=1, tnNo
             R(:,a) = tls%R(:,lhs%map(a))
          END DO
+         R = Wc*R
+         DEALLOCATE(Wr,Wc)
       END IF
 #endif
 
@@ -139,18 +147,18 @@
       END IF
 
       tls%W = 1._RKIND
-      DO faIn=1, lhs%nFaces
-         IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
-         faDof = MIN(lhs%face(faIn)%dof,dof)
-         IF (lhs%face(faIn)%bGrp .EQ. BC_TYPE_Dir) THEN
-            DO a=1, lhs%face(faIn)%nNo
-               Ac = lhs%face(faIn)%glob(a)
-               DO i=1, faDof
-                  tls%W(i,Ac) = tls%W(i,Ac) * lhs%face(faIn)%val(i,a)
-               END DO
-            END DO
-         END IF
-      END DO
+      ! DO faIn=1, lhs%nFaces
+      !    IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
+      !    faDof = MIN(lhs%face(faIn)%dof,dof)
+      !    IF (lhs%face(faIn)%bGrp .EQ. BC_TYPE_Dir) THEN
+      !       DO a=1, lhs%face(faIn)%nNo
+      !          Ac = lhs%face(faIn)%glob(a)
+      !          DO i=1, faDof
+      !             tls%W(i,Ac) = tls%W(i,Ac) * lhs%face(faIn)%val(i,a)
+      !          END DO
+      !       END DO
+      !    END IF
+      ! END DO
 
       ALLOCATE(v(dof,tnNo))
       v = 0._RKIND
