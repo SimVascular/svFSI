@@ -500,6 +500,8 @@
          INTEGER(KIND=IKIND) vtkType
 !        Number of fiber directions
          INTEGER(KIND=IKIND) nFn
+!        Mesh scale factor
+         REAL(KIND=RKIND) scF
 !        IB: Mesh size parameter
          REAL(KIND=RKIND) dx
 !        Element distribution between processors

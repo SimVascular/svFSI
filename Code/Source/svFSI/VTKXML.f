@@ -494,7 +494,7 @@
          outNames(cOut) = ""
          DO a=1, msh(iM)%nNo
             Ac = msh(iM)%gN(a)
-            d(iM)%x(1:nsd,a) = x(:,Ac)
+            d(iM)%x(1:nsd,a) = x(:,Ac)/msh(iM)%scF
          END DO
 
          IF (l3) THEN
@@ -540,7 +540,7 @@
                CASE (outGrp_D)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
-                     d(iM)%x(is:ie,a) = lD(s:e,Ac)
+                     d(iM)%x(is:ie,a) = lD(s:e,Ac)/msh(iM)%scF
                   END DO
                CASE (outGrp_WSS)
                   CALL BPOST(msh(iM), tmpV, lY, lD, oGrp)

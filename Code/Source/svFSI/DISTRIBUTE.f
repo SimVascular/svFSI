@@ -420,6 +420,7 @@
       CALL cm%bcast(lM%nFa)
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%name)
+      CALL cm%bcast(lM%scF)
       CALL cm%bcast(lM%dx)
 
       IF (cm%slv()) THEN
@@ -1104,6 +1105,7 @@
       CALL cm%bcast(lM%gnNo)
       CALL cm%bcast(lM%name)
       CALL cm%bcast(lM%nFn)
+      CALL cm%bcast(lM%scF)
       nFn = lM%nFn
 
       insd = nsd

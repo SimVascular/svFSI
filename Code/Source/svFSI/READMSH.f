@@ -48,7 +48,7 @@
 
       LOGICAL :: flag
       INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
-      REAL(KIND=RKIND) :: maxX(nsd), minX(nsd), scaleF, fibN(nsd), rtmp
+      REAL(KIND=RKIND) :: maxX(nsd), minX(nsd), fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp, fExt
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(stackType) :: avNds
@@ -108,8 +108,8 @@
             END DO
 
 !     To scale the mesh, while attaching x to gX
-            scaleF = 1._RKIND
-            lPtr => lPM%get(scaleF,"Mesh scale factor",lb=0._RKIND)
+            msh(iM)%scF = 1._RKIND
+            lPtr => lPM%get(msh(iM)%scF,"Mesh scale factor",lb=0._RKIND)
             a = gtnNo + msh(iM)%gnNo
             IF (iM .GT. 1) THEN
                ALLOCATE(tmpX(nsd,gtnNo))
@@ -122,7 +122,7 @@
                DEALLOCATE(gX)
                ALLOCATE(gX(nsd,a))
             END IF
-            gX(:,gtnNo+1:a) = msh(iM)%x * scaleF
+            gX(:,gtnNo+1:a) = msh(iM)%x * msh(iM)%scF
             gtnNo           = a
             DEALLOCATE(msh(iM)%x)
          END DO
