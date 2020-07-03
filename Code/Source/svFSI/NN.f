@@ -380,6 +380,47 @@
 
       END SUBROUTINE GETGIP
 !####################################################################
+      SUBROUTINE GETNNX(eType, eNoN, xl, xib, Nb, xp, xi, N, Nx)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eType, eNoN
+      REAL(KIND=RKIND), INTENT(IN)  :: xl(nsd,eNoN), xib(2,nsd),
+     2   Nb(2,eNoN), xp(nsd)
+      REAL(KIND=RKIND), INTENT(OUT) :: N(eNoN), Nx(nsd,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: xi(nsd)
+
+      LOGICAL :: l1, l2, l3, l4
+      INTEGER :: i, j
+      REAL(KIND=RKIND) :: rt
+
+      CALL GETXI(eType, eNoN, xl, xp, xi, l1)
+
+!     Check if parameteric coordinate is within bounds
+      j = 0
+      DO i=1, nsd
+         IF (xi(i).GE.xib(1,i) .AND. xi(i).LE.xib(2,i)) j = j + 1
+      END DO
+      l2 = j .EQ. nsd
+
+      CALL GETGNN(nsd, eType, eNoN, xi, N, Nx)
+
+!     Check if shape functions are within bounds and sum to unity
+      j  = 0
+      rt = 0._RKIND
+      DO i=1, eNoN
+         rt = rt + N(i)
+         IF (N(i).GT.Nb(1,i) .AND. N(i).LT.Nb(2,i)) j = j + 1
+      END DO
+      l3 = j .EQ. eNoN
+      l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
+
+      l1 = ALL((/l1, l2, l3, l4/))
+      IF (.NOT.l1) err = "Error in computing shape functions"
+
+      RETURN
+      END SUBROUTINE GETNNX
+!--------------------------------------------------------------------
 !     Inverse maps {xp} to {$\xi$} in an element with coordinates {xl}
 !     using Newton's method
       SUBROUTINE GETXI(eType, eNoN, xl, xp, xi, flag)
@@ -1081,7 +1122,8 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
-      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd), Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
       TYPE(faceType), INTENT(IN) :: lFa
 
       INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN

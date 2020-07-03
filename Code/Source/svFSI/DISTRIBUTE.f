@@ -412,6 +412,7 @@
       CALL cm%bcast(lM%nFa)
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%name)
+      CALL cm%bcast(lM%scF)
       CALL cm%bcast(lM%dx)
       CALL cm%bcast(lM%nFn)
 
@@ -656,6 +657,7 @@
       CALL cm%bcast(lBc%h)
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
+      CALL cm%bcast(lBc%flwP)
       IF (BTEST(lBc%bType,bType_RCR)) THEN
          CALL cm%bcast(lBc%RCR%Rp)
          CALL cm%bcast(lBc%RCR%C)
@@ -1096,6 +1098,7 @@
       CALL cm%bcast(lM%gnNo)
       CALL cm%bcast(lM%name)
       CALL cm%bcast(lM%nFn)
+      CALL cm%bcast(lM%scF)
       nFn = lM%nFn
 
       insd = nsd

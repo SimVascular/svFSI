@@ -302,7 +302,11 @@
       END IF
 
 !     Add Neumann BCs contribution to the LHS/RHS
-      CALL BCONSTRUCT(lFa, hg, Yg, Dg)
+      IF (lBc%flwP) THEN
+         CALL BNEUFOLWP(lFa, hg, Dg)
+      ELSE
+         CALL BASSEMNEUBC(lFa, hg, Yg)
+      END IF
 
 !     Now treat Robin BC (stiffness and damping) here
       IF (BTEST(lBc%bType,bType_Robin))
@@ -662,11 +666,11 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      LOGICAL :: eDir(maxnsd), l1, l2, l3, l4
+      LOGICAL :: eDir(maxnsd)
       INTEGER(KIND=IKIND) :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl,
      2   nG, eNoN, eNoNb, cPhys
       REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ub(nsd), tauB(2), Ks(nsd,nsd), rt
+     2   ub(nsd), tauB(2), Ks(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
@@ -771,31 +775,8 @@
             END DO
 
             xi = xi0
-            CALL GETXI(lM%eType, eNoN, xl, xp, xi, l1)
-
-!           Check if parameteric coordinate is within bounds
-            a = 0
-            DO i=1, nsd
-               IF (xi(i).GE.lM%xib(1,i) .AND. xi(i).LE.lM%xib(2,i))
-     2            a = a + 1
-            END DO
-            l2 = a .EQ. nsd
-
-            CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
-
-!           Check if shape functions are within bounds and sum to unity
-            i  = 0
-            rt = 0._RKIND
-            DO a=1, eNoN
-               rt = rt + N(a)
-               IF (N(a).GT.lM%Nb(1,a) .AND. N(a).LT.lM%Nb(2,a))
-     2            i = i + 1
-            END DO
-            l3 = i .EQ. eNoN
-            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-            l1 = ALL((/l1, l2, l3, l4/))
-            IF (.NOT.l1) err = " Error in computing face shape function"
+            CALL GETNNX(lM%eType, eNoN, xl, lM%xib, lM%Nb, xp, xi, N,
+     2         Nxi)
 
             IF (g.EQ.1 .OR. .NOT.lM%lShpF)
      2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)

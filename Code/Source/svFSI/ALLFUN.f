@@ -422,8 +422,8 @@
                      ELSE
                         CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
                      END IF
-                     IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
                   END IF
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
                   sHat = 0._RKIND
                   DO a=1, eNoN
@@ -467,8 +467,8 @@
                   Nxi(:,:) = ib%msh(iM)%Nx(:,:,g)
                   IF (g.EQ.1 .OR. .NOT.ib%msh(iM)%lShpF) THEN
                      CALL GNN(eNoN, insd, Nxi, xl, Nx, Jac, tmp)
-                     IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
                   END IF
+                  IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
                   sHat = 0._RKIND
                   DO a=1, eNoN
@@ -1233,6 +1233,7 @@
       END IF
 
       lBc%weakDir  = .FALSE.
+      lBc%flwP     = .FALSE.
       lBc%bType    = 0
       lBc%cplBCptr = 0
       lBc%g        = 0._RKIND
@@ -2167,6 +2168,7 @@
 
          DO a=1, eNoN
             Ac = lM%IEN(a,Ec)
+            xi(:) = xi(:) + lM%xi(:,a)
             xl(:,a) = xg(:,Ac) + Dg(:,Ac)
          END DO
 

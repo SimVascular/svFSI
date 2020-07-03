@@ -181,6 +181,9 @@
       TYPE bcType
 !        Strong/Weak application of Dirichlet BC
          LOGICAL :: weakDir
+!        Whether load vector changes with deformation
+!        (Neu - struct/ustruct only)
+         LOGICAL :: flwP = .FALSE.
 !        Pre/Res/Flat/Para... boundary types
          INTEGER(KIND=IKIND) :: bType = 0
 !        Pointer to coupledBC%face
@@ -493,6 +496,8 @@
          INTEGER(KIND=IKIND) vtkType
 !        Number of fiber directions
          INTEGER(KIND=IKIND) nFn
+!        Mesh scale factor
+         REAL(KIND=RKIND) scF
 !        IB: Mesh size parameter
          REAL(KIND=RKIND) dx
 !        Element distribution between processors
