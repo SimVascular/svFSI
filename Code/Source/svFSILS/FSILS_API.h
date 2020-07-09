@@ -122,11 +122,12 @@
             INTEGER(KIND=LSIP), INTENT(IN) :: faIn
          END SUBROUTINE FSILS_BC_FREE
 
-         SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, isS, incL, res)
+         SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, prec, isS,      &
+     &         incL, res)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
             TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-            INTEGER(KIND=LSIP), INTENT(IN) :: dof
+            INTEGER(KIND=LSIP), INTENT(IN) :: dof, prec
             REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
             REAL(KIND=LSRP), INTENT(IN) :: Val(dof*dof,lhs%nnz)
             LOGICAL, INTENT(IN), OPTIONAL :: isS(lhs%nNo)

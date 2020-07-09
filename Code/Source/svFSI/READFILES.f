@@ -1118,7 +1118,6 @@
          CASE('bicg', 'bicgs')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
-            stmp = CLR("BICGSTab")
          CASE DEFAULT
             err = TRIM(list%ping("LS type",lPL))//" Undefined type"
          END SELECT
@@ -1160,6 +1159,10 @@
                lEq%ls%PREC_Type = PREC_FSILS
                lEq%useTLS = .FALSE.
                stmp = CLR("FSILS")
+            CASE('rcs', 'row-column-scaling')
+               lEq%ls%PREC_Type = PREC_RCS
+               lEq%useTLS = .FALSE.
+               stmp = CLR("RCS")
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
@@ -1619,7 +1622,7 @@
          lPtr => list%get(ftmp,"BCT file path")
          IF (ASSOCIATED(lPtr)) THEN
             ALLOCATE(lBc%gm)
-            CALL READBCT(lBc%gm, msh(iM), msh(iM)%fa(iFa), ftmp%fname)
+            CALL READBCT(lBc%gm, msh(iM)%fa(iFa), ftmp%fname)
          ELSE
             lPtr =>list%get(fTmp,
      2         "Temporal and spatial values file path")
@@ -2509,19 +2512,18 @@ c     2         "can be applied for Neumann boundaries only"
       END SUBROUTINE READVISCMODEL
 !####################################################################
 !     This subroutine reads general velocity data from bct.vtp
-      SUBROUTINE READBCT(lMB, lM, lFa, fName)
+      SUBROUTINE READBCT(lMB, lFa, fName)
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
       TYPE(MBType), INTENT(INOUT) :: lMB
-      TYPE(mshType), INTENT(IN) :: lM
       TYPE(faceType), INTENT(IN) :: lFa
       CHARACTER(LEN=stdL), INTENT(IN) :: fName
 
       CHARACTER(LEN=*), PARAMETER :: shdr = "velocity_"
 
-      INTEGER(KIND=IKIND) :: i, j, a, Ac, n, ntime, istat
+      INTEGER(KIND=IKIND) :: i, j, a, Ac, n, nNo, ntime, iM, istat
       REAL(KIND=RKIND) :: t
       CHARACTER(LEN=stdL) :: stmp
       TYPE(vtkXMLType) :: vtp
@@ -2535,8 +2537,8 @@ c     2         "can be applied for Neumann boundaries only"
       CALL loadVTK(vtp, fName, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (init)"
 
-      CALL getVTK_numPoints(vtp, i, iStat)
-      IF (i .NE. lFa%nNo) err = "Mismatch in num points for face <"//
+      CALL getVTK_numPoints(vtp, nNo, iStat)
+      IF (nNo .NE. lFa%nNo) err = "Mismatch in num points for face <"//
      2   TRIM(lFa%name)//">"
 
 !     Get all the point data starting with "velocity_"
@@ -2562,7 +2564,8 @@ c     2         "can be applied for Neumann boundaries only"
 !     Initialize lMB data structure
       lMB%dof = nsd
       lMB%nTP = ntime
-      ALLOCATE(lMB%t(ntime), lMB%d(nsd,lFa%nNo,ntime), ptr(lM%gnNo))
+      iM = lFa%iM
+      ALLOCATE(lMB%t(ntime), lMB%d(nsd,nNo,ntime), ptr(msh(iM)%gnNo))
       lMB%t = 0._RKIND
       lMB%d = 0._RKIND
       ptr   = 0
@@ -2591,21 +2594,21 @@ c     2         "can be applied for Neumann boundaries only"
 !     Prepare pointer array
       DO a=1, lFa%nNo
          Ac = lFa%gN(a)
-         Ac = lM%lN(Ac)
+         Ac = msh(iM)%lN(Ac)
          IF (Ac .EQ. 0) err = "Incorrect global node number detected "//
-     2      "for BC. Mesh: "//TRIM(lM%name)//", Face: "//
+     2      "for BC. Mesh: "//TRIM(msh(iM)%name)//", Face: "//
      3      TRIM(lFa%name)//", Node: "//STR(a)//" gN: "//STR(lFa%gN(a))
          ptr(Ac) = a
       END DO
 
 !     Get GlobalNodeID from vtp file and make sure it is consistent
 !     with mesh structure
-      ALLOCATE(gN(lFa%nNo))
+      ALLOCATE(gN(nNo))
       gN = 0
       CALL getVTK_pointData(vtp, "GlobalNodeID", gN, istat)
-      DO a=1, lFa%nNo
+      DO a=1, nNo
          Ac = gN(a)
-         IF (Ac.GT.lM%gnNo .OR. Ac.LE.0) THEN
+         IF (Ac.GT.msh(iM)%gnNo .OR. Ac.LE.0) THEN
             err = "Entry "//a//" is out of bound in <bct.vtp>"
          END IF
          Ac = ptr(Ac)
@@ -2615,7 +2618,7 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
 !     Load spatial data for each time point from vtp file
-      ALLOCATE(tmpR(nsd,lFa%nNo))
+      ALLOCATE(tmpR(nsd,nNo))
       ntime = 0
       DO i=1, n
          j = LEN(TRIM(namesL(i)))
@@ -2623,7 +2626,7 @@ c     2         "can be applied for Neumann boundaries only"
          ntime = ntime + 1
          tmpR  = 0._RKIND
          CALL getVTK_pointData(vtp, namesL(i), tmpR, istat)
-         DO a=1, lFa%nNo
+         DO a=1, nNo
             Ac = gN(a)
             Ac = ptr(Ac)
             lMB%d(:,Ac,ntime) = tmpR(:,a)
