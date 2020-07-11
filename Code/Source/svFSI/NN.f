@@ -131,7 +131,7 @@
          CASE(3)
             lM%eType   = eType_QUD
             lM%nG      = 3
-            lM%vtkType = 3
+            lM%vtkType = 21
             lM%nEf     = 2
             lM%lShpF   = .FALSE.
          CASE DEFAULT

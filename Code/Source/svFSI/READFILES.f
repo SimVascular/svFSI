@@ -1118,6 +1118,7 @@
          CASE('bicg', 'bicgs')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
+            stmp = CLR("BiCGStab")
          CASE DEFAULT
             err = TRIM(list%ping("LS type",lPL))//" Undefined type"
          END SELECT

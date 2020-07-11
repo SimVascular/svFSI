@@ -1192,17 +1192,15 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, Ac, iM, eNoN
+      INTEGER(KIND=IKIND) a, e, Ac, iM
       REAL(KIND=RKIND) :: pSl(6), vwp(2)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: al(:,:), dl(:,:), xl(:,:),
      2   bfl(:,:)
 
-      iM   = lFa%iM
-      eNoN = lFa%eNoN
-      ALLOCATE(al(tDof,eNoN), dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN),
-     2   ptr(eNoN))
+      iM = lFa%iM
+      ALLOCATE(al(tDof,3), dl(tDof,3), xl(3,3), bfl(3,3), ptr(3))
 
 !     Constructing the CMM contributions to the LHS/RHS and
 !     assembling them
@@ -1212,7 +1210,7 @@
 
          pSl = 0._RKIND
          vwp = 0._RKIND
-         DO a=1, eNoN
+         DO a=1, 3
             Ac = lFa%IEN(a,e)
             ptr(a)   = Ac
             xl(:,a)  = x(:,Ac)
@@ -1226,11 +1224,11 @@
                vwp(:) = vwp(:) + varWallProps(:,Ac)
             END IF
          END DO
-         pSl(:) = pSl(:) / REAL(eNoN, KIND=RKIND)
-         vwp(:) = vwp(:) / REAL(eNoN, KIND=RKIND)
+         pSl(:) = pSl(:) / 3._RKIND
+         vwp(:) = vwp(:) / 3._RKIND
 
 !     Add CMM BCs contributions to the LHS/RHS
-         CALL CMMb(lFa, e, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)
+         CALL CMMb(lFa, e, al, dl, xl, bfl, pSl, vwp, ptr)
       END DO
 
       DEALLOCATE(al, dl, xl, bfl, ptr)
