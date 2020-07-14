@@ -351,7 +351,7 @@
       FUNCTION GFLL(list, lVal, cmnd, ind)
       IMPLICIT NONE
       CLASS(listType), INTENT(INOUT) :: list
-      LOGICAL, INTENT(OUT) :: lVal
+      LOGICAL, INTENT(INOUT) :: lVal
       CHARACTER(LEN=*), INTENT(IN) :: cmnd
       INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: ind
       TYPE(listType), POINTER :: GFLL

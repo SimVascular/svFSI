@@ -489,7 +489,7 @@
       REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
       INTEGER(KIND=IKIND), PARAMETER :: fid = 1
-      INTEGER(KIND=IKIND) tStamp(SIZE(stamp)), a, i
+      INTEGER(KIND=IKIND) tStamp(SIZE(stamp)), i
 
       i = 0
       IF (.NOT.bin2VTK) THEN

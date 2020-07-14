@@ -48,15 +48,13 @@
 !     the solution is returned
 !--------------------------------------------------------------------
 
-      SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, prec, isS,
-     &     incL, res)
+      SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, prec, incL, res)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
       INTEGER(KIND=LSIP), INTENT(IN) :: dof, prec
       REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
       REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
-      LOGICAL, INTENT(IN), OPTIONAL :: isS(lhs%nNo)
       INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
       REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
 
@@ -98,10 +96,10 @@
       END DO
 
       IF (prec .EQ. PRECOND_FSILS) THEN
-         CALL PRECONDDIAG(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
+         CALL PRECONDDIAG(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
      &      Val, R, Wc)
       ELSE IF (prec .EQ. PRECOND_RCS) THEN
-         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
+         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
      &      Val, R, Wr, Wc)
       ELSE
          PRINT *, "This linear solver and preconditioner combination"//

@@ -669,15 +669,15 @@
                propL(8,1) = elasticity_modulus
             END IF
 
-            nDOP = (/11,2,4,0/)
+            nDOP = (/11,4,3,0/)
             outPuts(1)  = out_velocity
             outPuts(2)  = out_pressure
-            outPuts(3)  = out_energyFlux
-            outPuts(4)  = out_acceleration
-            outPuts(5)  = out_WSS
-            outPuts(6)  = out_vorticity
-            outPuts(7)  = out_vortex
-            outPuts(8)  = out_displacement
+            outPuts(3)  = out_WSS
+            outPuts(4)  = out_displacement
+            outPuts(5)  = out_energyFlux
+            outPuts(6)  = out_acceleration
+            outPuts(7)  = out_vorticity
+            outPuts(8)  = out_vortex
             outPuts(9)  = out_strainInv
             outPuts(10) = out_viscosity
             outPuts(11) = out_divergence
@@ -1481,15 +1481,13 @@
          IF (ASSOCIATED(lPtr)) THEN
             iM  = lBc%iM
             iFa = lBc%iFa
-            i = nsd
-            j = 2
-            a = msh(iM)%fa(iFa)%nNo
             ALLOCATE(lBc%gm)
-            lBc%gm%nTP = j
-            lBc%gm%dof = i
-            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
+            lBc%gm%nTP = 2
+            lBc%gm%dof = nsd
+            ALLOCATE(lBc%gm%t(2), lBc%gm%d(nsd,msh(iM)%fa(iFa)%nNo,2))
             lBc%gm%t(1) = 0._RKIND
-            lBc%gm%t(2) = HUGE(rtmp)
+            lBc%gm%t(2) = 1.E+10_RKIND
+            lBc%gm%period = lBc%gm%t(2)
 
             CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
             lBc%bType = IBSET(lBc%bType,bType_gen)
@@ -1616,6 +1614,24 @@
      2      "RCR cannot be used in conjunction with cplBC."
          cplBC%nFa = cplBC%nFa + 1
          lBc%cplBcPtr = cplBC%nFa
+      CASE ('Spatial')
+         lBc%bType = IBSET(lBc%bType,bType_gen)
+         IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Spatial BC"//
+     2      " is only defined for Neu BC"
+
+         lPtr => list%get(fTmp, "Spatial values file path")
+         iM  = lBc%iM
+         iFa = lBc%iFa
+         ALLOCATE(lBc%gm)
+         lBc%gm%nTP = 2
+         lBc%gm%dof = 1
+         ALLOCATE(lBc%gm%t(2), lBc%gm%d(1,msh(iM)%fa(iFa)%nNo,2))
+         lBc%gm%t(1) = 0._RKIND
+         lBc%gm%t(2) = 1.E+10_RKIND
+         lBc%gm%period = lBc%gm%t(2)
+
+         CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
+
       CASE ('General')
          iM  = lBc%iM
          iFa = lBc%iFa
@@ -2640,8 +2656,8 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE READBCT
 !####################################################################
-!     This subroutine reads traction data from a vtp file and stores
-!     in moving BC data structure
+!     This subroutine reads pressure/traction data from a vtp file and
+!     stores in moving BC data structure
       SUBROUTINE READTRACBCFF(lMB, lFa, fName)
       USE COMMOD
       USE LISTMOD
@@ -2652,12 +2668,12 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(faceType), INTENT(INOUT) :: lFa
       CHARACTER(LEN=stdL) :: fName
 
-      INTEGER(KIND=IKIND) :: iStat, a, Ac
+      INTEGER(KIND=IKIND) :: iStat, a, i, Ac
       TYPE(vtkXMLType) :: vtp
       TYPE(faceType) :: gFa
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX1(:), tmpX2(:,:)
 
 !     Read Traction data from VTP file
       iStat = 0
@@ -2668,18 +2684,20 @@ c     2         "can be applied for Neumann boundaries only"
       CALL getVTK_numPoints(vtp, gFa%nNo, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (num points)"
 
-      ALLOCATE(gFa%x(nsd,gFa%nNo), tmpX(maxNSD,gFa%nNo))
-      CALL getVTK_pointCoords(vtp, tmpX, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (coords)"
-      gFa%x(:,:) = tmpX(1:nsd,:)
+      ALLOCATE(tmpX1(gFa%nNo), tmpX2(maxNSD,gFa%nNo))
 
-!     Use gFa%N as temporary array to load traction data
-      ALLOCATE(gFa%N(nsd,gFa%nNo))
-      CALL getVTK_pointData(vtp, "Traction", tmpX, iStat)
-      gFa%N(:,:) = tmpX(1:nsd,:)
+      CALL getVTK_pointCoords(vtp, tmpX2, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (coords)"
+      ALLOCATE(gFa%x(nsd,gFa%nNo))
+      gFa%x(:,:) = tmpX2(1:nsd,:)
+
+      IF (lMB%dof .EQ. 1) THEN
+         CALL getVTK_pointData(vtp, "Pressure", tmpX1, iStat)
+      ELSE
+         CALL getVTK_pointData(vtp, "Traction", tmpX2, iStat)
+      END IF
       IF (iStat .LT. 0) err = "VTP file read error (point data)"
 
-      DEALLOCATE(tmpX)
       CALL flushVTK(vtp)
 
 !     Project traction from gFa to lFa. First prepare lFa%x, lFa%IEN
@@ -2693,15 +2711,25 @@ c     2         "can be applied for Neumann boundaries only"
       ptr = 0
       CALL FACEMATCH(lFa, gFa, ptr)
 
-!     Copy traction data to MB data structure
-      DO a=1, lFa%nNo
-         Ac = ptr(a)
-         lMB%d(:,a,1) = gFa%N(:,Ac)
-         lMB%d(:,a,2) = gFa%N(:,Ac)
-      END DO
+!     Copy pressure/traction data to MB data structure
+      IF (lMB%dof .EQ. 1) THEN
+         DO a=1, lFa%nNo
+            Ac = ptr(a)
+            lMB%d(1,a,1) = -tmpX1(Ac)
+            lMB%d(1,a,2) = -tmpX1(Ac)
+         END DO
+      ELSE
+         DO a=1, lFa%nNo
+            Ac = ptr(a)
+            DO i=1, lMB%dof
+               lMB%d(i,a,1) = tmpX2(i,Ac)
+               lMB%d(i,a,2) = tmpX2(i,Ac)
+            END DO
+         END DO
+      END IF
 
       CALL DESTROY(gFa)
-      DEALLOCATE(lFa%x, ptr)
+      DEALLOCATE(lFa%x, ptr, tmpX1, tmpX2)
 
       RETURN
       END SUBROUTINE READTRACBCFF

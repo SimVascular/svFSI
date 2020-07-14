@@ -559,13 +559,13 @@ c               END IF
 !--------------------------------------------------------------------
 !     This is match isoparameteric faces to each other. Project nodes
 !     from two adjacent meshes to each other based on a L2 norm.
-      SUBROUTINE MATCHFACES(lFa, pFa, lPrj, tol)
+      SUBROUTINE MATCHFACES(lFa, pFa, lPrj, ptol)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(faceType), INTENT(INOUT) :: lFa, pFa
       TYPE(stackType), INTENT(OUT) :: lPrj
-      REAL(KIND=RKIND), INTENT(IN) :: tol
+      REAL(KIND=RKIND), INTENT(IN) :: ptol
 
       TYPE blkType
          INTEGER(KIND=IKIND) :: n = 0
@@ -575,7 +575,7 @@ c               END IF
       LOGICAL nFlt(nsd)
       INTEGER(KIND=IKIND) nBkd, i, a, b, Ac, Bc, iBk, nBk, iM, jM, iSh,
      2   jSh, cnt
-      REAL(KIND=RKIND) ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
+      REAL(KIND=RKIND) tol, ds, minS, xMin(nsd), xMax(nsd), dx(nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: nodeBlk(:)
       TYPE(blkType), ALLOCATABLE :: blk(:)
@@ -590,6 +590,12 @@ c               END IF
       DO i=1, jM-1
          jSh = jSh + msh(i)%gnNo
       END DO
+
+      IF (ISZERO(ptol)) THEN
+         tol = 1.e3_RKIND * eps
+      ELSE
+         tol = ptol
+      END IF
 
 !     We want to have approximately 1000 nodes in each block. So we
 !     calculate nBkd, which is the number of separate blockes in each
@@ -658,12 +664,10 @@ c               END IF
             END IF
          END DO
          Bc = i
-         IF (ISZERO(tol)) THEN
-            IF (minS .LT. 1000._RKIND*eps) THEN
-               CALL PUSHSTACK(lPrj, (/Ac,Bc/))
-               cnt = cnt + 1
-            END IF
-         ELSE IF (tol < 0._RKIND) THEN
+         IF (tol < 0._RKIND) THEN
+            CALL PUSHSTACK(lPrj, (/Ac,Bc/))
+            cnt = cnt + 1
+         ELSE IF (minS .LT. tol) THEN
             CALL PUSHSTACK(lPrj, (/Ac,Bc/))
             cnt = cnt + 1
          END IF
