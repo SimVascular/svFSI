@@ -340,14 +340,21 @@
             IF (ALLOCATED(msh(iM)%iGC))    DEALLOCATE(msh(iM)%iGC)
             IF (ALLOCATED(msh(iM)%nW))     DEALLOCATE(msh(iM)%nW)
             IF (ALLOCATED(msh(iM)%w))      DEALLOCATE(msh(iM)%w)
-            IF (ALLOCATED(msh(iM)%xiL))    DEALLOCATE(msh(iM)%xiL)
             IF (ALLOCATED(msh(iM)%xi))     DEALLOCATE(msh(iM)%xi)
+            IF (ALLOCATED(msh(iM)%xib))    DEALLOCATE(msh(iM)%xib)
             IF (ALLOCATED(msh(iM)%x))      DEALLOCATE(msh(iM)%x)
             IF (ALLOCATED(msh(iM)%N))      DEALLOCATE(msh(iM)%N)
+            IF (ALLOCATED(msh(iM)%Nb))     DEALLOCATE(msh(iM)%Nb)
             IF (ALLOCATED(msh(iM)%nV))     DEALLOCATE(msh(iM)%nV)
             IF (ALLOCATED(msh(iM)%fN))     DEALLOCATE(msh(iM)%fN)
             IF (ALLOCATED(msh(iM)%Nx))     DEALLOCATE(msh(iM)%Nx)
             IF (ALLOCATED(msh(iM)%Nxx))    DEALLOCATE(msh(iM)%Nxx)
+            CALL DESTROY(msh(iM)%nAdj)
+            CALL DESTROY(msh(iM)%eAdj)
+            DO i=1, msh(iM)%nFs
+               CALL DESTROY(msh(iM)%fs(i))
+            END DO
+            IF (ALLOCATED(msh(iM)%fs))     DEALLOCATE(msh(iM)%fs)
          ELSE
             CALL DESTROY(msh(iM))
          END IF

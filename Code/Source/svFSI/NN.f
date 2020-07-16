@@ -80,6 +80,12 @@
             lM%vtkType = 10
             lM%nEf     = 4
             lM%lShpF   = .TRUE.
+         CASE(10)
+            lM%eType   = eType_QTE
+            lM%nG      = 15
+            lM%vtkType = 24
+            lM%nEf     = 4
+            lM%lShpF   = .FALSE.
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
          END SELECT
@@ -97,6 +103,12 @@
             lM%nG      = 4
             lM%vtkType = 9
             lM%nEf     = 4
+            lM%lShpF   = .FALSE.
+         CASE(6)
+            lM%eType   = eType_QTR
+            lM%nG      = 7
+            lM%vtkType = 22
+            lM%nEf     = 3
             lM%lShpF   = .FALSE.
          CASE(9)
             lM%eType   = eType_BIQ
@@ -119,7 +131,7 @@
          CASE(3)
             lM%eType   = eType_QUD
             lM%nG      = 3
-            lM%vtkType = 3
+            lM%vtkType = 21
             lM%nEf     = 2
             lM%lShpF   = .FALSE.
          CASE DEFAULT
@@ -136,6 +148,9 @@
          CALL GETGNN(insd, lM%eType, lM%eNoN, lM%xi(:,g), lM%N(:,g),
      2      lM%Nx(:,:,g))
       END DO
+
+      ALLOCATE(lM%xib(2,nsd), lM%Nb(2,lM%eNoN))
+      CALL GETNNBNDS(lM%eType, lM%eNoN, lM%xib, lM%Nb)
 
       RETURN
       END SUBROUTINE SELECTELE
@@ -176,6 +191,9 @@
          CASE(3)
             lFa%eType = eType_TRI
             lFa%nG    = 3
+         CASE(6)
+            lFa%eType = eType_QTR
+            lFa%nG    = 7
          CASE DEFAULT
             err = "Unable to identify combination of nsd and eNoN"
          END SELECT
@@ -253,6 +271,37 @@
          xi(1,4) = s; xi(2,4) = t; xi(3,4) = uz
          xi(1,5) = t; xi(2,5) = s; xi(3,5) = uz
          xi(1,6) = t; xi(2,6) = t; xi(3,6) = uz
+      CASE(eType_QTE)
+         w(1)     = 0.030283678097089_RKIND
+         w(2:5)   = 0.006026785714286_RKIND
+         w(6:9)   = 0.011645249086029_RKIND
+         w(10:15) = 0.010949141561386_RKIND
+
+         s = 0.25_RKIND
+         xi(1,1) = s; xi(2,1) = s; xi(3,1) = s
+
+         s = 0.333333333333333_RKIND
+         t = 0._RKIND
+         xi(1,2) = t; xi(2,2) = s; xi(3,2) = s
+         xi(1,3) = s; xi(2,3) = t; xi(3,3) = s
+         xi(1,4) = s; xi(2,4) = s; xi(3,4) = t
+         xi(1,5) = s; xi(2,5) = s; xi(3,5) = s
+
+         s = 0.090909090909091_RKIND
+         t = 0.727272727272727_RKIND
+         xi(1,6) = t; xi(2,6) = s; xi(3,6) = s
+         xi(1,7) = s; xi(2,7) = t; xi(3,7) = s
+         xi(1,8) = s; xi(2,8) = s; xi(3,8) = t
+         xi(1,9) = s; xi(2,9) = s; xi(3,9) = s
+
+         s = 0.066550153573664_RKIND
+         t = 0.433449846426336_RKIND
+         xi(1,10) = s; xi(2,10) = s; xi(3,10) = t
+         xi(1,11) = s; xi(2,11) = t; xi(3,11) = s
+         xi(1,12) = s; xi(2,12) = t; xi(3,12) = t
+         xi(1,13) = t; xi(2,13) = t; xi(3,13) = s
+         xi(1,14) = t; xi(2,14) = s; xi(3,14) = t
+         xi(1,15) = t; xi(2,15) = s; xi(3,15) = s
 
 !     2D elements
       CASE(eType_TRI)
@@ -290,6 +339,25 @@
          xi(1,7) = 0._RKIND; xi(2,7) =   s
          xi(1,8) =  -s;      xi(2,8) = 0._RKIND
          xi(1,9) = 0._RKIND; xi(2,9) = 0._RKIND
+      CASE(eType_QTR)
+         w(1)   = 0.225000000000000_RKIND * 5E-1_RKIND
+         w(2:4) = 0.125939180544827_RKIND * 5E-1_RKIND
+         w(5:7) = 0.132394152788506_RKIND * 5E-1_RKIND
+
+         s = 0.333333333333333_RKIND
+         xi(1,1) = s; xi(2,1) = s
+
+         s = 0.797426985353087_RKIND
+         t = 0.101286507323456_RKIND
+         xi(1,2) = s; xi(2,2) = t
+         xi(1,3) = t; xi(2,3) = s
+         xi(1,4) = t; xi(2,4) = t
+
+         s = 0.059715871789770_RKIND
+         t = 0.470142064105115_RKIND
+         xi(1,5) = s; xi(2,5) = t
+         xi(1,6) = t; xi(2,6) = s
+         xi(1,7) = t; xi(2,7) = t
 
 !     1D elements
       CASE(eType_LIN)
@@ -312,6 +380,47 @@
 
       END SUBROUTINE GETGIP
 !####################################################################
+      SUBROUTINE GETNNX(eType, eNoN, xl, xib, Nb, xp, xi, N, Nx)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eType, eNoN
+      REAL(KIND=RKIND), INTENT(IN)  :: xl(nsd,eNoN), xib(2,nsd),
+     2   Nb(2,eNoN), xp(nsd)
+      REAL(KIND=RKIND), INTENT(OUT) :: N(eNoN), Nx(nsd,eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: xi(nsd)
+
+      LOGICAL :: l1, l2, l3, l4
+      INTEGER :: i, j
+      REAL(KIND=RKIND) :: rt
+
+      CALL GETXI(eType, eNoN, xl, xp, xi, l1)
+
+!     Check if parameteric coordinate is within bounds
+      j = 0
+      DO i=1, nsd
+         IF (xi(i).GE.xib(1,i) .AND. xi(i).LE.xib(2,i)) j = j + 1
+      END DO
+      l2 = j .EQ. nsd
+
+      CALL GETGNN(nsd, eType, eNoN, xi, N, Nx)
+
+!     Check if shape functions are within bounds and sum to unity
+      j  = 0
+      rt = 0._RKIND
+      DO i=1, eNoN
+         rt = rt + N(i)
+         IF (N(i).GT.Nb(1,i) .AND. N(i).LT.Nb(2,i)) j = j + 1
+      END DO
+      l3 = j .EQ. eNoN
+      l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
+
+      l1 = ALL((/l1, l2, l3, l4/))
+      IF (.NOT.l1) err = "Error in computing shape functions"
+
+      RETURN
+      END SUBROUTINE GETNNX
+!--------------------------------------------------------------------
 !     Inverse maps {xp} to {$\xi$} in an element with coordinates {xl}
 !     using Newton's method
       SUBROUTINE GETXI(eType, eNoN, xl, xp, xi, flag)
@@ -497,19 +606,62 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(1,6) = -s
          Nxi(2,6) = -s
          Nxi(3,6) =  uz*0.5_RKIND
+      CASE(eType_QTE)
+         s     = 1._RKIND - xi(1) - xi(2) - xi(3)
+         N(1)  = xi(1)*(2._RKIND*xi(1) - 1._RKIND)
+         N(2)  = xi(2)*(2._RKIND*xi(2) - 1._RKIND)
+         N(3)  = xi(3)*(2._RKIND*xi(3) - 1._RKIND)
+         N(4)  = s    *(2._RKIND*s     - 1._RKIND)
+         N(5)  = 4._RKIND*xi(1)*xi(2)
+         N(6)  = 4._RKIND*xi(2)*xi(3)
+         N(7)  = 4._RKIND*xi(1)*xi(3)
+         N(8)  = 4._RKIND*xi(1)*s
+         N(9)  = 4._RKIND*xi(2)*s
+         N(10) = 4._RKIND*xi(3)*s
+
+         Nxi(1,1)  =  4._RKIND*xi(1) - 1._RKIND
+         Nxi(2,1)  =  0._RKIND
+         Nxi(3,1)  =  0._RKIND
+         Nxi(1,2)  =  0._RKIND
+         Nxi(2,2)  =  4._RKIND*xi(2) - 1._RKIND
+         Nxi(3,2)  =  0._RKIND
+         Nxi(1,3)  =  0._RKIND
+         Nxi(2,3)  =  0._RKIND
+         Nxi(3,3)  =  4._RKIND*xi(3) - 1._RKIND
+         Nxi(1,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(2,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(3,4)  =  1._RKIND - 4._RKIND*s
+         Nxi(1,5)  =  4._RKIND*xi(2)
+         Nxi(2,5)  =  4._RKIND*xi(1)
+         Nxi(3,5)  =  0._RKIND
+         Nxi(1,6)  =  0._RKIND
+         Nxi(2,6)  =  4._RKIND*xi(3)
+         Nxi(3,6)  =  4._RKIND*xi(2)
+         Nxi(1,7)  =  4._RKIND*xi(3)
+         Nxi(2,7)  =  0._RKIND
+         Nxi(3,7)  =  4._RKIND*xi(1)
+         Nxi(1,8)  =  4._RKIND*( s - xi(1) )
+         Nxi(2,8)  = -4._RKIND*xi(1)
+         Nxi(3,8)  = -4._RKIND*xi(1)
+         Nxi(1,9)  = -4._RKIND*xi(2)
+         Nxi(2,9)  =  4._RKIND*( s - xi(2) )
+         Nxi(3,9)  = -4._RKIND*xi(2)
+         Nxi(1,10) = -4._RKIND*xi(3)
+         Nxi(2,10) = -4._RKIND*xi(3)
+         Nxi(3,10) =  4._RKIND*( s - xi(3) )
 
 !     2D elements
       CASE(eType_TRI)
-         N(1) = 1._RKIND - xi(1) - xi(2)
-         N(2) = xi(1)
-         N(3) = xi(2)
+         N(1) = xi(1)
+         N(2) = xi(2)
+         N(3) = 1._RKIND - xi(1) - xi(2)
 
-         Nxi(1,1) = -1._RKIND
-         Nxi(2,1) = -1._RKIND
-         Nxi(1,2) =  1._RKIND
-         Nxi(2,2) =  0._RKIND
-         Nxi(1,3) =  0._RKIND
-         Nxi(2,3) =  1._RKIND
+         Nxi(1,1) =  1._RKIND
+         Nxi(2,1) =  0._RKIND
+         Nxi(1,2) =  0._RKIND
+         Nxi(2,2) =  1._RKIND
+         Nxi(1,3) = -1._RKIND
+         Nxi(2,3) = -1._RKIND
       CASE(eType_BIL)
          ux = 1._RKIND + xi(1)
          uy = 1._RKIND + xi(2)
@@ -565,6 +717,27 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(2,8) = -(ly - uy)*mx*lx*0.5_RKIND
          Nxi(1,9) =  (lx - ux)*ly*uy
          Nxi(2,9) =  (ly - uy)*lx*ux
+      CASE(eType_QTR)
+         s    = 1._RKIND - xi(1) - xi(2)
+         N(1) = xi(1)*( 2._RKIND*xi(1) - 1._RKIND )
+         N(2) = xi(2)*( 2._RKIND*xi(2) - 1._RKIND )
+         N(3) = s    *( 2._RKIND*s     - 1._RKIND )
+         N(4) = 4._RKIND*xi(1)*xi(2)
+         N(5) = 4._RKIND*xi(2)*s
+         N(6) = 4._RKIND*xi(1)*s
+
+         Nxi(1,1) =  4._RKIND*xi(1) - 1._RKIND
+         Nxi(2,1) =  0._RKIND
+         Nxi(1,2) =  0._RKIND
+         Nxi(2,2) =  4._RKIND*xi(2) - 1._RKIND
+         Nxi(1,3) =  1._RKIND - 4._RKIND*s
+         Nxi(2,3) =  1._RKIND - 4._RKIND*s
+         Nxi(1,4) =  4._RKIND*xi(2)
+         Nxi(2,4) =  4._RKIND*xi(1)
+         Nxi(1,5) = -4._RKIND*xi(2)
+         Nxi(2,5) =  4._RKIND*( s - xi(2) )
+         Nxi(1,6) =  4._RKIND*( s - xi(1) )
+         Nxi(2,6) = -4._RKIND*xi(1)
 
 !     1D elements
       CASE(eType_LIN)
@@ -589,6 +762,86 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 
       RETURN
       END SUBROUTINE GETGNN
+!--------------------------------------------------------------------
+!     Returns shape functions bounds
+      PURE SUBROUTINE GETNNBNDS(eType, eNoN, xib, Nb)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eType, eNoN
+      REAL(KIND=RKIND), INTENT(OUT) :: xib(2,nsd), Nb(2,eNoN)
+
+      xib(1,:) = -1._RKIND
+      xib(2,:) =  1._RKIND
+
+      Nb(1,:)  = 0._RKIND
+      Nb(2,:)  = 1._RKIND
+
+!     3D elements
+      SELECT CASE(eType)
+      CASE(eType_TET)
+         xib(1,:) =  0._RKIND
+
+      CASE(eType_WDG)
+         xib(1,3) = -1._RKIND
+
+      CASE(eType_QTE)
+         xib(1,:) =  0._RKIND
+
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  = -0.125_RKIND
+         Nb(1,4)  = -0.125_RKIND
+
+         Nb(2,5)  =  4._RKIND
+         Nb(2,6)  =  4._RKIND
+         Nb(2,7)  =  4._RKIND
+         Nb(2,8)  =  4._RKIND
+         Nb(2,9)  =  4._RKIND
+         Nb(2,10) =  4._RKIND
+
+!     2D elements
+      CASE(eType_TRI)
+         xib(1,:) =  0._RKIND
+
+      CASE(eType_BIQ)
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  = -0.125_RKIND
+         Nb(1,4)  = -0.125_RKIND
+         Nb(1,5)  = -0.125_RKIND
+         Nb(1,6)  = -0.125_RKIND
+         Nb(1,7)  = -0.125_RKIND
+         Nb(1,8)  = -0.125_RKIND
+         Nb(1,9)  =  0._RKIND
+
+      CASE(eType_QTR)
+         xib(1,:) =  0._RKIND
+
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  = -0.125_RKIND
+
+         Nb(2,4)  =  4._RKIND
+         Nb(2,5)  =  4._RKIND
+         Nb(2,6)  =  4._RKIND
+
+!     1D elements
+      CASE(eType_QUD)
+         Nb(1,1)  = -0.125_RKIND
+         Nb(1,2)  = -0.125_RKIND
+         Nb(1,3)  =  0._RKIND
+
+      END SELECT
+
+!     Add a small tolerance around the bounds
+      xib(1,:) = xib(1,:) - 1.0E-4_RKIND
+      xib(2,:) = xib(2,:) + 1.0E-4_RKIND
+
+      Nb(1,:)  = Nb(1,:)  - 1.0E-4_RKIND
+      Nb(2,:)  = Nb(2,:)  + 1.0E-4_RKIND
+
+      RETURN
+      END SUBROUTINE GETNNBNDS
 !####################################################################
       PURE SUBROUTINE GNN(eNoN, insd, Nxi, x, Nx, Jac, ks)
       USE COMMOD, ONLY: nsd
@@ -789,7 +1042,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !     Correct the position vector
       DO a=1, eNoN
          Ac = ib%msh(iM)%IEN(a,Ec)
-         lX(:,a) = ib%x(:,Ac) + ib%Uo(:,Ac)
+         lX(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
       END DO
 
 !     Calculating surface deflation
@@ -864,15 +1117,16 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !     This routine returns a vector at element "e" and Gauss point
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)).
-      SUBROUTINE GNNB(lFa, e, g, n)
+      SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: e, g
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
       REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
       TYPE(faceType), INTENT(IN) :: lFa
 
-      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN, insd
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
       REAL(KIND=RKIND) v(nsd)
 
       LOGICAL, ALLOCATABLE :: setIt(:)
@@ -882,7 +1136,6 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
-      insd = nsd - 1
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
 
@@ -890,7 +1143,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !     that are at the face at the beginning of the list and the rest at
 !     the end
       setIt = .TRUE.
-      DO a=1, lFa%eNoN
+      DO a=1, eNoNb
          Ac = lFa%IEN(a,e)
          DO b=1, eNoN
             IF (setIt(b)) THEN
@@ -904,7 +1157,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
             WRITE(*,'(A)') " ERROR: could not find matching face nodes"
             WRITE(*,'(A)',ADVANCE='NO') "    Face "//TRIM(lFa%name)//
      2         " e: "//STR(e)
-            DO b=1, lFa%eNoN
+            DO b=1, eNoNb
                WRITE(*,'(A)',ADVANCE='NO') " "//STR(lFa%IEN(b,e))
             END DO
             WRITE(*,'(A)')
@@ -921,7 +1174,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          ptr(a)   = b
          setIt(b) = .FALSE.
       END DO
-      a = lFa%eNoN
+      a = eNoNb
       DO b=1, eNoN
          IF (setIt(b)) THEN
             a      = a + 1
@@ -959,7 +1212,7 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
 !        Face element surface deflation
          ALLOCATE(xXi(nsd,1))
          xXi = 0._RKIND
-         DO a=1, lFa%eNoN
+         DO a=1, eNoNb
             b = ptr(a)
             xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
          END DO
@@ -984,10 +1237,10 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
       ELSE
          ALLOCATE(xXi(nsd,insd))
          xXi = 0._RKIND
-         DO a=1, lFa%eNoN
+         DO a=1, eNoNb
             b = ptr(a)
             DO i=1, insd
-               xXi(:,i) = xXi(:,i) + lFa%Nx(i,a,g)*lX(:,b)
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,b)
             END DO
          END DO
          n = CROSS(xXi)

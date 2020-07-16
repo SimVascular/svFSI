@@ -48,6 +48,32 @@
 
 !--------------------------------------------------------------------
 !     Here comes subTypes definitions later used in other derived types
+!     Function spaces (basis) type
+      TYPE fsType
+!        Whether the basis function is linear
+         LOGICAL lShpF
+!        Element type
+         INTEGER(KIND=IKIND) :: eType = eType_NA
+!        Number of basis functions, typically equals msh%eNoN
+         INTEGER(KIND=IKIND) eNoN
+!        Number of Gauss points for integration
+         INTEGER(KIND=IKIND) nG
+!        Gauss weights
+         REAL(KIND=RKIND), ALLOCATABLE :: w(:)
+!        Gauss integration points in parametric space
+         REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Bounds on Gauss integration points in parametric space
+         REAL(KIND=RKIND), ALLOCATABLE :: xib(:,:)
+!        Parent shape function
+         REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+!        Bounds on shape functions
+         REAL(KIND=RKIND), ALLOCATABLE :: Nb(:,:)
+!        Parent shape functions gradient
+         REAL(KIND=RKIND), ALLOCATABLE :: Nx(:,:,:)
+!        Second derivatives of shape functions - used for shells & IGA
+         REAL(KIND=RKIND), ALLOCATABLE :: Nxx(:,:,:)
+      END TYPE fsType
+
 !     This is the container for B-Splines
       TYPE bsType
 !        Number of knots (p + nNo + 1)
@@ -155,8 +181,9 @@
       TYPE bcType
 !        Strong/Weak application of Dirichlet BC
          LOGICAL :: weakDir
-!        Whether feedback force is along normal direction only
-         LOGICAL :: fbN = .FALSE.
+!        Whether load vector changes with deformation
+!        (Neu - struct/ustruct only)
+         LOGICAL :: flwP = .FALSE.
 !        Pre/Res/Flat/Para... boundary types
          INTEGER(KIND=IKIND) :: bType = 0
 !        Pointer to coupledBC%face
@@ -177,10 +204,8 @@
          REAL(KIND=RKIND) :: k = 0._RKIND
 !        Robin: damping
          REAL(KIND=RKIND) :: c = 0._RKIND
-!        Penalty parameters for weakly applied Dir BC / immersed bodies
+!        Penalty parameters for weakly applied Dir BC
          REAL(KIND=RKIND) :: tauB(2) = 0._RKIND
-!        IB: Feedback force constant
-         REAL(KIND=RKIND) :: tauF = 0._RKIND
 !        Direction vector for imposing the BC
          INTEGER(KIND=IKIND), ALLOCATABLE :: eDrn(:)
 !        Defined steady vector (traction)
@@ -269,6 +294,8 @@
          INTEGER(KIND=IKIND) :: nEl = 0
 !        Global number of elements
          INTEGER(KIND=IKIND) :: gnEl = 0
+!        Number of function spaces
+         INTEGER(KIND=IKIND) nFs
 !        Number of Gauss points for integration
          INTEGER(KIND=IKIND) nG
 !        Number of nodes
@@ -307,6 +334,8 @@
          TYPE(adjType) :: eAdj
 !        IB: tracers
          TYPE(traceType) :: trc
+!        Function spaces (basis)
+         TYPE(fsType), ALLOCATABLE :: fs(:)
       END TYPE faceType
 
 !     Declared type for outputed variables
@@ -445,16 +474,18 @@
          INTEGER(KIND=IKIND) :: eType = eType_NA
 !        Number of nodes (control points) in a single element
          INTEGER(KIND=IKIND) eNoN
-!        Global number of elements (knot spanes)
+!        Global number of elements (knot spans)
          INTEGER(KIND=IKIND) :: gnEl = 0
 !        Global number of nodes (control points)
          INTEGER(KIND=IKIND) :: gnNo = 0
 !        Number of element face. Used for reading Gambit mesh files
          INTEGER(KIND=IKIND) nEf
-!        Number of elements (knot spanes)
+!        Number of elements (knot spans)
          INTEGER(KIND=IKIND) :: nEl = 0
 !        Number of faces
          INTEGER(KIND=IKIND) :: nFa = 0
+!        Number of function spaces
+         INTEGER(KIND=IKIND) :: nFs
 !        Number of Gauss points for integration
          INTEGER(KIND=IKIND) nG
 !        Number of nodes (control points)
@@ -465,6 +496,8 @@
          INTEGER(KIND=IKIND) vtkType
 !        Number of fiber directions
          INTEGER(KIND=IKIND) nFn
+!        Mesh scale factor
+         REAL(KIND=RKIND) scF
 !        IB: Mesh size parameter
          REAL(KIND=RKIND) dx
 !        Element distribution between processors
@@ -496,14 +529,16 @@
          REAL(KIND=RKIND), ALLOCATABLE :: nW(:)
 !        Gauss weights
          REAL(KIND=RKIND), ALLOCATABLE :: w(:)
-!        Bounds on parameteric coordinates
-         REAL(KIND=RKIND), ALLOCATABLE :: xiL(:)
 !        Gauss integration points in parametric space
          REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Bounds on parameteric coordinates
+         REAL(KIND=RKIND), ALLOCATABLE :: xib(:,:)
 !        Position coordinates
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !        Parent shape function
          REAL(KIND=RKIND), ALLOCATABLE :: N(:,:)
+!        Shape function bounds
+         REAL(KIND=RKIND), ALLOCATABLE :: Nb(:,:)
 !        Normal vector to each nodal point (for Shells)
          REAL(KIND=RKIND), ALLOCATABLE :: nV(:,:)
 !        Fiber orientations stored at the element level - used for
@@ -519,6 +554,8 @@
          TYPE(adjType) :: nAdj
 !        Mesh element adjacency
          TYPE(adjType) :: eAdj
+!        Function spaces (basis)
+         TYPE(fsType), ALLOCATABLE :: fs(:)
 !        BSpline in different directions (NURBS)
          TYPE(bsType), ALLOCATABLE :: bs(:)
 !        Faces are stored in this variable
@@ -587,12 +624,8 @@
          TYPE(lsType) ls
 !        FSILS type of linear solver
          TYPE(FSILS_lsType) FSILS
-!        IB: FSILS type of linear solver
-         TYPE(FSILS_lsType) lsIB
 !        BCs associated with this equation
          TYPE(bcType), ALLOCATABLE :: bc(:)
-!        Body force associated with this equation
-         TYPE(bfType), ALLOCATABLE :: bf(:)
 !        IB: BCs associated with this equation on immersed surfaces
          TYPE(bcType), ALLOCATABLE :: bcIB(:)
 !        domains that this equation must be solved
@@ -603,6 +636,8 @@
          TYPE(outputType), ALLOCATABLE :: output(:)
 !        IB: Outputs
          TYPE(outputType), ALLOCATABLE :: outIB(:)
+!        Body force associated with this equation
+         TYPE(bfType), ALLOCATABLE :: bf(:)
       END TYPE eqType
 
 !     This type will be used to write data in the VTK files.
@@ -618,7 +653,7 @@
 !        Connectivity array
          INTEGER(KIND=IKIND), ALLOCATABLE :: IEN(:,:)
 !        Element based variables to be written
-         INTEGER(KIND=IKIND), ALLOCATABLE :: xe(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: xe(:,:)
 !        All the variables after transformation to global format
          REAL(KIND=RKIND), ALLOCATABLE :: gx(:,:)
 !        All the variables to be written (including position)
@@ -670,6 +705,8 @@
          LOGICAL :: savedOnce = .FALSE.
 !        IB formulation
          INTEGER(KIND=IKIND) :: mthd = ibMthd_NA
+!        IB coupling
+         INTEGER(KIND=IKIND) :: cpld = ibCpld_NA
 !        Current IB domain ID
          INTEGER(KIND=IKIND) :: cDmn
 !        Current equation
@@ -678,10 +715,6 @@
          INTEGER(KIND=IKIND) :: tnNo
 !        Number of IB meshes
          INTEGER(KIND=IKIND) :: nMsh
-!        Number of fiber directions
-         INTEGER(KIND=IKIND) :: nFn
-!        Number of IB faces in LHS passed to FSILS
-         INTEGER(KIND=IKIND) :: nFacesLS
 !        IB call duration
          REAL(KIND=RKIND) :: callD(3)
 !        IB Domain ID
@@ -692,30 +725,16 @@
          INTEGER(KIND=IKIND), ALLOCATABLE :: colPtr(:)
 !        IB position coordinates
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
-!        Fiber direction (for electrophysiology / structure mechanics)
-         REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:)
-!        Acceleration (new)
-         REAL(KIND=RKIND), ALLOCATABLE :: An(:,:)
-!        Acceleration (old)
-         REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)
 !        Velocity (new)
          REAL(KIND=RKIND), ALLOCATABLE :: Yn(:,:)
-!        Velocity (old)
-         REAL(KIND=RKIND), ALLOCATABLE :: Yo(:,:)
 !        Displacement (new)
          REAL(KIND=RKIND), ALLOCATABLE :: Un(:,:)
-!        Displacement (old)
-         REAL(KIND=RKIND), ALLOCATABLE :: Uo(:,:)
 !        FSI force (IFEM method)
          REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
-!        Feedback force
-         REAL(KIND=RKIND), ALLOCATABLE :: Rfb(:,:)
 
 !        DERIVED TYPE VARIABLES
 !        IB meshes
          TYPE(mshType), ALLOCATABLE :: msh(:)
-!        FSILS data structure to produce LHS sparse matrix
-         TYPE(FSILS_lhsType) lhs
 !        IB communicator
          TYPE(ibCommType) :: cm
       END TYPE ibType
@@ -761,9 +780,9 @@
       LOGICAL cmmVarWall
 !     Whether shell equation is being solved
       LOGICAL shlEq
-!     Whether PRESTRESS equation is solved
+!     Whether PRESTRESS is being solved
       LOGICAL pstEq
-!     Whether stabilized structural dynamics solver is used
+!     Whether velocity-pressure based structural dynamics solver is used
       LOGICAL sstEq
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
@@ -815,8 +834,6 @@
       INTEGER(KIND=IKIND) rsTS
 !     Number of stress values to be stored
       INTEGER(KIND=IKIND) nstd
-!     FSILS pointer for immersed boundaries
-      INTEGER(KIND=IKIND) ibLSptr
 
 !     REAL VARIABLES
 !     Time step size

@@ -47,7 +47,7 @@
 
       INTEGER(KIND=IKIND) a, Ac, iM
 
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:), tmpVe(:)
 
       DO iM=1, nMsh
          IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -60,15 +60,16 @@
             END DO
          ELSE IF (outGrp .EQ. outGrp_J) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-            ALLOCATE(tmpV(1,msh(iM)%nNo))
-            tmpV = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, lD, iEq, outGrp)
+            ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
+            tmpV  = 0._RKIND
+            tmpVe = 0._RKIND
+            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, iEq, outGrp)
             res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
                res(1,Ac) = tmpV(1,a)
             END DO
-            DEALLOCATE(tmpV)
+            DEALLOCATE(tmpV, tmpVe)
             ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
          ELSE IF (outGrp .EQ. outGrp_divV) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -318,22 +319,26 @@
       INTEGER(KIND=IKIND) a, Ac, e, Ec, i, j, iEq, iFa, eNoN, g
       REAL(KIND=RKIND) Tdn(nsd), ndTdn, taue(nsd), ux(nsd,nsd), mu, w,
      2   nV(nsd), Jac, ks(nsd,nsd), lRes(maxnsd), p, gam, mu_s
+      TYPE(fsType) :: fsP
 
       REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), gnV(:,:),
-     2   lnV(:,:), xl(:,:), ul(:,:), Nx(:,:), N(:), pl(:)
+     2   lnV(:,:), xl(:,:), ul(:,:), pl(:), N(:), Nx(:,:)
+
+      IF (outGrp.NE.outGrp_WSS .AND. outGrp.NE.outGrp_trac) err =
+     2   "Invalid output group. Correction is required in BPOST"
 
       iEq   = 1
       eNoN  = lM%eNoN
       FSIeq = .FALSE.
       IF (eq(iEq)%phys .EQ. phys_FSI) FSIeq = .TRUE.
 
-      ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), gnV(nsd,tnNo),
-     2   lnV(nsd,eNoN), xl(nsd,eNoN), ul(nsd,eNoN), Nx(nsd,eNoN),
-     3   N(eNoN), pl(eNoN))
+      ALLOCATE (sA(tnNo), sF(maxnsd,tnNo), xl(nsd,eNoN), ul(nsd,eNoN),
+     2   gnV(nsd,tnNo), lnV(nsd,eNoN), N(eNoN), Nx(nsd,eNoN))
       sA   = 0._RKIND
       sF   = 0._RKIND
       gnV  = 0._RKIND
       lRes = 0._RKIND
+
 !     First creating the norm field
       DO iFa=1, lM%nFa
          DO a=1, lM%fa(iFa)%nNo
@@ -342,8 +347,28 @@
          END DO
       END DO
 
-      IF (outGrp.NE.outGrp_WSS .AND. outGrp.NE.outGrp_trac) err =
-     2   "Invalid output group. Correction is required in BPOST"
+!     Update pressure function spaces
+      IF (lM%nFs .EQ. 1) THEN
+         fsP%nG    = lM%fs(1)%nG
+         fsP%eType = lM%fs(1)%eType
+         fsP%eNoN  = lM%fs(1)%eNoN
+         CALL ALLOCFS(fsP, nsd)
+         fsP%w  = lM%fs(1)%w
+         fsP%xi = lM%fs(1)%xi
+         fsP%N  = lM%fs(1)%N
+         fsP%Nx = lM%fs(1)%Nx
+      ELSE
+         fsP%nG    = lM%fs(1)%nG
+         fsP%eType = lM%fs(2)%eType
+         fsP%eNoN  = lM%fs(2)%eNoN
+         CALL ALLOCFS(fsP, nsd)
+         fsP%xi = lM%fs(1)%xi
+         DO g=1, fsP%nG
+            CALL GETGNN(nsd, fsP%eType, fsP%eNoN, fsP%xi(:,g),
+     2         fsP%N(:,g), fsP%Nx(:,:,g))
+         END DO
+      END IF
+      ALLOCATE(pl(fsP%eNoN))
 
       DO iFa=1, lM%nFa
          DO e=1, lM%fa(iFa)%nEl
@@ -351,6 +376,7 @@
             cDmn = DOMAIN(lM, iEq, Ec)
             IF (cDmn .EQ. 0) CYCLE
             IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, Ec)
+
 !     Finding the norm for all the nodes of this element, including
 !     those that don't belong to this face, which will be inerpolated
 !     from the nodes of the face
@@ -366,8 +392,13 @@
                ELSE
                   ul(:,a) = lY(1:nsd,Ac)
                END IF
-               pl(a)    = lY(nsd+1,Ac)
             END DO
+
+            DO a=1, fsP%eNoN
+               Ac    = lM%IEN(a,Ec)
+               pl(a) = lY(nsd+1,Ac)
+            END DO
+
             nV = nV/lM%fa(iFa)%eNoN
             DO a=1, eNoN
                IF (ISZERO(NORM(lnV(:,a)))) lnV(:,a) = nV
@@ -382,15 +413,18 @@
 !     Calculating ux = grad(u) and nV at a Gauss point
                ux = 0._RKIND
                nV = 0._RKIND
-               p  = 0._RKIND
                DO a=1, eNoN
                   nV = nV + N(a)*lnV(:,a)
-                  p  = p  + N(a)*pl(a)
                   DO i=1, nsd
                      DO j=1, nsd
                         ux(i,j) = ux(i,j) + Nx(i,a)*ul(j,a)
                      END DO
                   END DO
+               END DO
+
+               p = 0._RKIND
+               DO a=1, fsP%eNoN
+                  p = p + fsP%N(a,g)*pl(a)
                END DO
 
 !              Shear rate, gam := (2*e_ij*e_ij)^0.5
@@ -454,25 +488,25 @@
       END SUBROUTINE BPOST
 !####################################################################
 !     Routine for post processing stress tensor
-      SUBROUTINE TPOST(lM, m, res, lD, iEq, outGrp)
+      SUBROUTINE TPOST(lM, m, res, resE, lD, iEq, outGrp)
       USE COMMOD
       USE ALLFUN
       USE MATFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER(KIND=IKIND), INTENT(IN) :: m, iEq, outGrp
-      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo)
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
       REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
 
       INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd,
      2   nFn
-      REAL(KIND=RKIND) w, Jac, detF, ya, Ja, elM, nu, lambda, mu,
+      REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
      2   ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
      3   sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
       TYPE(stModelType) :: stModel
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
-     2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:)
+     2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -483,18 +517,20 @@
       IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN), sE(lM%nEl))
 
       sA   = 0._RKIND
       sF   = 0._RKIND
+      sE   = 0._RKIND
       insd = nsd
       ya   = 0._RKIND
       IF (lM%lFib) insd = 1
+
       DO e=1, lM%nEl
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_struct .AND.
-     2       cPhys .NE. phys_vms_struct .AND.
+     2       cPhys .NE. phys_ustruct .AND.
      3       cPhys .NE. phys_lElas) CYCLE
 
          IF (cPhys .EQ. phys_lElas) THEN
@@ -502,6 +538,8 @@
             nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
             lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
             mu     = 0.5_RKIND*elM/(1._RKIND + nu)
+         ELSE
+            stModel = eq(iEq)%dmn(cDmn)%stM
          END IF
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
@@ -519,13 +557,14 @@
             dl(:,a) = lD(:,Ac)
          END DO
 
-         stModel = eq(iEq)%dmn(cDmn)%stM
+         Je = 0._RKIND
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
                CALL GNN(eNoN, insd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
             END IF
-            w = lM%w(g)*Jac
-            N = lM%N(:,g)
+            w  = lM%w(g)*Jac
+            N  = lM%N(:,g)
+            Je = Je + w
 
             ed = 0._RKIND
             F  = MAT_ID(nsd)
@@ -573,6 +612,7 @@
                   sA(Ac)   = sA(Ac)   + w*N(a)
                   sF(1,Ac) = sF(1,Ac) + w*N(a)*detF
                END DO
+               sE(e) = sE(e) + w*detF
 
             ELSE IF (outGrp .EQ. outGrp_stress) THEN
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
@@ -592,7 +632,7 @@
                      sigma(2,2) = detF + 2._RKIND*mu*ed(2)
                      sigma(1,2) = mu*ed(3)
                   END IF
-               ELSE IF (cPhys .EQ. phys_vms_struct) THEN
+               ELSE IF (cPhys .EQ. phys_ustruct) THEN
                   CALL GETPK2CCdev(stModel, F, nFn, fN, ya, S, CC, Ja)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
@@ -648,6 +688,7 @@
                END DO
             END IF
          END DO
+         IF (.NOT.ISZERO(Je)) sE(e) = sE(e)/Je
       END DO
 
       CALL COMMU(sF)
@@ -660,7 +701,9 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, fN, pSl, N, Nx)
+      resE(:) = sE(:)
+
+      DEALLOCATE (sA, sF, sE, xl, dl, fN, pSl, N, Nx)
 
       RETURN
       END SUBROUTINE TPOST
@@ -800,7 +843,7 @@
          cDmn  = DOMAIN(lM, iEq, e)
          cPhys = eq(iEq)%dmn(cDmn)%phys
          IF (cPhys .NE. phys_struct .AND.
-     2       cPhys .NE. phys_vms_struct) CYCLE
+     2       cPhys .NE. phys_ustruct) CYCLE
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
          DO a=1, eNoN
@@ -1024,7 +1067,7 @@
                   divV = vx(1,1) + vx(2,2)
                END IF
 
-            ELSE IF (cPhys .EQ. phys_vms_struct) THEN
+            ELSE IF (cPhys .EQ. phys_ustruct) THEN
                vx = 0._RKIND
                F  = MAT_ID(nsd)
                IF (nsd .EQ. 3) THEN

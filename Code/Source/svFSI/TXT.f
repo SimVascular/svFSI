@@ -42,7 +42,7 @@
       IMPLICIT NONE
       LOGICAL, INTENT(IN) :: flag
 
-      LOGICAL ltmp, wtn(2), div
+      LOGICAL ltmp, wtn(2), div, pflag
       INTEGER(KIND=IKIND) fid, i, l, e, s, a, iOut, iEq, oGrp
       CHARACTER(LEN=stdL) fName(2)
 
@@ -97,8 +97,9 @@
             s = eq(iEq)%s + eq(iEq)%output(iOut)%o
             e = s + l - 1
 
-            oGrp = eq(iEq)%output(iOut)%grp
-            div  = .TRUE.
+            oGrp  = eq(iEq)%output(iOut)%grp
+            div   = .TRUE.
+            pflag = .FALSE.
             SELECT CASE (oGrp)
             CASE (outGrp_NA)
                err = "NA outGrp in TXT"
@@ -106,6 +107,7 @@
                tmpV(1:l,:) = An(s:e,:)
             CASE (outGrp_Y)
                tmpV(1:l,:) = Yn(s:e,:)
+               IF (l .EQ. 1) pflag = .TRUE.
             CASE (outGrp_D)
                tmpV(1:l,:) = Dn(s:e,:)
             CASE (outGrp_WSS, outGrp_vort, outGrp_trac)
@@ -143,7 +145,7 @@
             IF (flag) THEN
                CALL CCTXT(eq(iEq), fName, wtn)
             ELSE
-               CALL WTXT(eq(iEq), l, fName, tmpV, wtn, div)
+               CALL WTXT(eq(iEq), l, fName, tmpV, wtn, div, pflag)
             END IF
          END DO
 
@@ -164,10 +166,6 @@
             SELECT CASE (oGrp)
             CASE (outGrp_NA)
                err = "NA outGrp in TXT"
-            CASE (outGrp_A)
-               DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%An(s:e,a)/REAL(cm%np(), KIND=RKIND)
-               END DO
             CASE (outGrp_Y)
                DO a=1, ib%tnNo
                   tmpV(1:l,a) = ib%Yn(s:e,a)/REAL(cm%np(), KIND=RKIND)
@@ -338,18 +336,19 @@
       END SUBROUTINE TRIMFILE
 !####################################################################
 !     This is to write to txt file
-      SUBROUTINE WTXT(lEq, m, fName, tmpV, wtn, div)
+      SUBROUTINE WTXT(lEq, m, fName, tmpV, wtn, div, pflag)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(eqType), INTENT(IN) :: lEq
-      LOGICAL, INTENT(IN) :: wtn(2), div
+      LOGICAL, INTENT(IN) :: wtn(2), div, pflag
       INTEGER(KIND=IKIND), INTENT(IN) :: m
       REAL(KIND=RKIND), INTENT(IN) :: tmpV(maxnsd,tnNo)
       CHARACTER(LEN=stdL), INTENT(IN) :: fName(2)
 
       INTEGER(KIND=IKIND), PARAMETER :: prL = 10
 
+      LOGICAL :: lTH
       INTEGER(KIND=IKIND) iM, iFa, fid, i, iDmn
       REAL(KIND=RKIND) tmp
 
@@ -362,13 +361,20 @@
 
          IF (i .EQ. 1) THEN
             DO iM=1, nMsh
+               lTH = .FALSE.
+               IF (msh(iM)%nFs .EQ. 2) lTH = .TRUE.
                DO iFa=1, msh(iM)%nFa
                   IF (m .EQ. 1) THEN
                      IF (div) THEN
                         tmp = msh(iM)%fa(iFa)%area
                         tmp = Integ(msh(iM)%fa(iFa),tmpV,1)/tmp
                      ELSE
-                        tmp = Integ(msh(iM)%fa(iFa),tmpV,1)
+                        IF (pFlag .AND. lTH) THEN
+                           tmp = Integ(msh(iM)%fa(iFa),tmpV,1,
+     2                        THflag=.TRUE.)
+                        ELSE
+                           tmp = Integ(msh(iM)%fa(iFa),tmpV,1)
+                        END IF
                      END IF
                   ELSE IF (m .EQ. nsd) THEN
                      tmp = Integ(msh(iM)%fa(iFa),tmpV,1,m)
@@ -385,7 +391,7 @@
                   tmp = lEq%dmn(iDmn)%v
                   tmp = Integ(lEq%dmn(iDmn)%Id, tmpV, 1, m)/tmp
                ELSE
-                  tmp = Integ(lEq%dmn(iDmn)%Id, tmpV, 1, m)
+                  tmp = Integ(lEq%dmn(iDmn)%Id, tmpV, 1, m, pFlag)
                END IF
                IF (cm%mas())
      2            WRITE(fid,'(A)', ADVANCE='NO') STR(tmp,prL)//" "

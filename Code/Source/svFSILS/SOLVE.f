@@ -48,20 +48,19 @@
 !     the solution is returned
 !--------------------------------------------------------------------
 
-      SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, isS, incL, res)
+      SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, prec, incL, res)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       TYPE(FSILS_lsType), INTENT(INOUT) :: ls
-      INTEGER(KIND=LSIP), INTENT(IN) :: dof
+      INTEGER(KIND=LSIP), INTENT(IN) :: dof, prec
       REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
       REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
-      LOGICAL, INTENT(IN), OPTIONAL :: isS(lhs%nNo)
       INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
       REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
 
       LOGICAL flag
       INTEGER(KIND=LSIP) faIn, a, nNo, nnz, nFaces
-      REAL(KIND=LSRP), ALLOCATABLE :: R(:,:), W(:,:)
+      REAL(KIND=LSRP), ALLOCATABLE :: R(:,:), Wr(:,:), Wc(:,:)
 
       nNo    = lhs%nNo
       nnz    = lhs%nnz
@@ -91,13 +90,21 @@
          END DO
       END IF
 
-      ALLOCATE(R(dof,nNo), W(dof,nNo))
+      ALLOCATE(R(dof,nNo), Wr(dof,nNo), Wc(dof,nNo))
       DO a=1, nNo
          R(:,lhs%map(a)) = Ri(:,a)
       END DO
 
-      CALL PRECOND(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, Val,  &
-     &   R, W)
+      IF (prec .EQ. PRECOND_FSILS) THEN
+         CALL PRECONDDIAG(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
+     &      Val, R, Wc)
+      ELSE IF (prec .EQ. PRECOND_RCS) THEN
+         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
+     &      Val, R, Wr, Wc)
+      ELSE
+         PRINT *, "This linear solver and preconditioner combination"//
+     &      "is not supported."
+      END IF
 
       SELECT CASE (ls%LS_type)
          CASE (LS_TYPE_NS)
@@ -124,13 +131,13 @@
             PRINT *, 'FSILS: LS_type not defined'
             STOP "FSILS: FATAL ERROR"
       END SELECT
-      R = R*W
+      R = R*Wc
 
       DO a=1, nNo
          Ri(:,a) = R(:,lhs%map(a))
       END DO
 
-      DEALLOCATE(R, W)
+      DEALLOCATE(R, Wr, Wc)
 
       RETURN
       END SUBROUTINE FSILS_SOLVE

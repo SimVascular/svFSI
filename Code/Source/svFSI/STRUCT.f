@@ -32,10 +32,117 @@
 !--------------------------------------------------------------------
 !
 !     This routines is for solving nonlinear structural mechanics
-!     problem using pure displacement-based formulation.
+!     problem (pure displacement-based formulation).
 !
 !--------------------------------------------------------------------
 
+      SUBROUTINE CONSTRUCT_dSOLID(lM, Ag, Yg, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
+      REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
+     2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), ya_l(:), N(:),
+     3   Nx(:,:), lR(:,:), lK(:,:,:)
+
+      eNoN = lM%eNoN
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
+!     STRUCT: dof = nsd
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nstd,eNoN),
+     3   pSl(nstd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
+     4   lK(dof*dof,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_struct) CYCLE
+
+!        Update shape functions for NURBS
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Create local copies
+         fN   = 0._RKIND
+         pS0l = 0._RKIND
+         ya_l = 0._RKIND
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            yl(:,a)  = Yg(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+            IF (ALLOCATED(lM%fN)) THEN
+               DO iFn=1, nFn
+                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+               END DO
+            END IF
+            IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
+         END DO
+
+!        Gauss integration
+         lR = 0._RKIND
+         lK = 0._RKIND
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            END IF
+            w = lM%w(g) * Jac
+            N = lM%N(:,g)
+
+            pSl = 0._RKIND
+            IF (nsd .EQ. 3) THEN
+               CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2            pS0l, pSl, ya_l, lR, lK)
+
+            ELSE IF (nsd .EQ. 2) THEN
+               CALL STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+     2            pS0l, pSl, ya_l, lR, lK)
+
+            END IF
+
+!           Prestress
+            IF (pstEq) THEN
+               DO a=1, eNoN
+                  Ac = ptr(a)
+                  pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
+                  pSa(Ac)   = pSa(Ac)   + w*N(a)
+               END DO
+            END IF
+         END DO ! g: loop
+
+!        Assembly
+#ifdef WITH_TRILINOS
+         IF (eq(cEq)%assmTLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, N, Nx,
+     2   lR, lK)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_dSOLID
+!####################################################################
       SUBROUTINE STRUCT3D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
      2   pS0l, pSl, ya_l, lR, lK)
       USE COMMOD
@@ -396,4 +503,132 @@
 
       RETURN
       END SUBROUTINE STRUCT2D
+!####################################################################
+      SUBROUTINE BSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN), hl(eNoN),
+     2   dl(tDof,eNoN), nV(3)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
+      REAL(KIND=RKIND) :: af, h, Jac, wl, Ku, F(3,3), Fi(3,3), nFi(3),
+     2   NxFi(3,eNoN)
+
+      af     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      i      = eq(cEq)%s
+      j      = i + 1
+      k      = j + 1
+
+      h      = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      DO a=1, eNoN
+         h       = h      + N(a)*hl(a)
+         F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
+         F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
+         F(1,3)  = F(1,3) + Nx(3,a)*dl(i,a)
+         F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
+         F(2,2)  = F(2,2) + Nx(2,a)*dl(j,a)
+         F(2,3)  = F(2,3) + Nx(3,a)*dl(j,a)
+         F(3,1)  = F(3,1) + Nx(1,a)*dl(k,a)
+         F(3,2)  = F(3,2) + Nx(2,a)*dl(k,a)
+         F(3,3)  = F(3,3) + Nx(3,a)*dl(k,a)
+      END DO
+      Jac = MAT_DET(F, 3)
+      Fi  = MAT_INV(F, 3)
+
+      nFi(1) = nV(1)*Fi(1,1) + nV(2)*Fi(2,1) + nV(3)*Fi(3,1)
+      nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2) + nV(3)*Fi(3,2)
+      nFi(3) = nV(1)*Fi(1,3) + nV(2)*Fi(2,3) + nV(3)*Fi(3,3)
+
+      DO a=1, eNoN
+         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1) + Nx(3,a)*Fi(3,1)
+         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2) + Nx(3,a)*Fi(3,2)
+         NxFi(3,a) = Nx(1,a)*Fi(1,3) + Nx(2,a)*Fi(2,3) + Nx(3,a)*Fi(3,3)
+      END DO
+
+      wl = w*Jac*h
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
+         lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
+         lR(3,a) = lR(3,a) - wl*N(a)*nFi(3)
+
+         DO b=1, eNoN
+            Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
+            lK(2,a,b)     = lK(2,a,b)     + Ku
+            lK(dof+1,a,b) = lK(dof+1,a,b) - Ku
+
+            Ku = wl*af*N(a)*(nFi(3)*NxFi(1,b) - nFi(1)*NxFi(3,b))
+            lK(3,a,b)       = lK(3,a,b)       + Ku
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) - Ku
+
+            Ku = wl*af*N(a)*(nFi(3)*NxFi(2,b) - nFi(2)*NxFi(3,b))
+            lK(dof+3,a,b)   = lK(dof+3,a,b)   + Ku
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) - Ku
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE BSTRUCT3D
+!--------------------------------------------------------------------
+      SUBROUTINE BSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN), hl(eNoN),
+     2   dl(tDof,eNoN), nV(2)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) :: i, j, a, b
+      REAL(KIND=RKIND) :: af, h, Jac, wl, Ku, F(2,2), Fi(2,2), nFi(2),
+     2   NxFi(2,eNoN)
+
+      af     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      i      = eq(cEq)%s
+      j      = i + 1
+
+      h      = 0._RKIND
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      DO a=1, eNoN
+         h       = h      + N(a)*hl(a)
+         F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
+         F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
+         F(2,1)  = F(2,1) + Nx(1,a)*dl(j,a)
+         F(2,2)  = F(2,2) + Nx(2,a)*dl(j,a)
+      END DO
+      Jac = MAT_DET(F, 2)
+      Fi  = MAT_INV(F, 2)
+
+      nFi(1) = nV(1)*Fi(1,1) + nV(2)*Fi(2,1)
+      nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2)
+
+      DO a=1, eNoN
+         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1)
+         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2)
+      END DO
+
+      wl = w*Jac*h
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
+         lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
+
+         DO b=1, eNoN
+            Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
+            lK(2,a,b)     = lK(2,a,b)     + Ku
+            lK(dof+1,a,b) = lK(dof+1,a,b) - Ku
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE BSTRUCT2D
 !####################################################################

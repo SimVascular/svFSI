@@ -74,7 +74,7 @@
 !     modulus, Poisson's ratio, conductivity, internal force (X, Y, Z),
 !     permeability, stabilization coeff. for backflow divergence,
 !     external source, damping, shell thickness, stabilization coeffs.
-!     for VMS_STRUCT (mom., cont.)
+!     for USTRUCT (mom., cont.)
       INTEGER(KIND=IKIND), PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   solid_density = 2, solid_viscosity = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
@@ -82,24 +82,27 @@
      5   damping = 13, shell_thickness = 14, ctau_M = 15, ctau_C = 16
 !--------------------------------------------------------------------
 !     Types of accepted elements
-!     Linear (1D), triangle (2D), tetrahedral (3D), bilinear (2D), quad
-!     (1D), biquad (2D), brick (3D), general NURBS (1-3D)
+!     Linear (Q1-1D), triangle (P1-2D), tetrahedral (P1-3D), bilinear
+!     (Q1-2D), quad (Q2-1D), biquad (Q2-2D), brick (Q1-3D),
+!     general NURBS (1-3D), wedge, point (0D), quadratic triangle
+!     (P2-2D), quadratic tetrahedron (P2-3D)
       INTEGER(KIND=IKIND), PARAMETER :: eType_NA = 100, eType_LIN = 101,
      2   eType_TRI = 102, eType_TET = 103, eType_BIL = 104,
      3   eType_QUD = 105, eType_BIQ = 106, eType_BRK = 107,
-     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110
+     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110,
+     5   eType_QTR = 111, eType_QTE = 112
 !--------------------------------------------------------------------
 !     Types of equations that are included in this solver
-!     Fluid equation (Navier-Stokes), structure (non-linear), heat
-!     equation, linear elasticity, heat in a fluid
-!     (advection-diffusion), fluid-structure-interaction, mesh motion,
-!     Prestress, Shell mechanics, Coupled-Momentum-Method,
-!     Cardiac Electro-Physiology, VMS-stabilized-structure
+!     Fluid equation (Navier-Stokes), nonlinear structure (pure d), heat
+!     equation, linear elasticity, heat in fluid (advection-diffusion),
+!     fluid-structure-interaction, mesh motion, Shell mechanics,
+!     Coupled-Momentum-Method, Cardiac Electro-Physiology,
+!     Nonlinear structure (v-p), Stokes equations
       INTEGER(KIND=IKIND), PARAMETER :: phys_NA = 200, phys_fluid = 201,
      2   phys_struct = 202, phys_heatS = 203, phys_lElas = 204,
      3   phys_heatF = 205, phys_FSI = 206, phys_mesh = 207,
      4   phys_shell = 208, phys_CMM = 209, phys_CEP = 210,
-     5   phys_vms_struct = 211
+     5   phys_ustruct = 211, phys_stokes = 212
 !--------------------------------------------------------------------
 !     Differenty type of coupling for cplBC
 !     Not-available, implicit, semi-implicit, and explicit
@@ -190,7 +193,8 @@
      2   PREC_FSILS = 701, PREC_TRILINOS_DIAGONAL = 702,
      3   PREC_TRILINOS_BLOCK_JACOBI = 703, PREC_TRILINOS_ILU = 704,
      4   PREC_TRILINOS_ILUT = 705, PREC_TRILINOS_IC = 706,
-     5   PREC_TRILINOS_ICT = 707, PREC_TRILINOS_ML = 708
+     5   PREC_TRILINOS_ICT = 707, PREC_TRILINOS_ML = 708,
+     6   PREC_RCS = 709
 !--------------------------------------------------------------------
 !     Solver definitions
       INTEGER(KIND=IKIND), PARAMETER :: lSolver_NA = 799,
@@ -201,8 +205,13 @@
       INTEGER(KIND=IKIND), PARAMETER :: cntctM_NA = 800,
      2   cntctM_penalty = 801
 !--------------------------------------------------------------------
-!     Immersed Boundary (IB) treatment
-      INTEGER(KIND=IKIND), PARAMETER :: ibMthd_NA = 850,
-     2   ibMthd_SSM = 851, ibMthd_IFEM = 852
+!     IB treatment: traditional immersed finite element (IFEM),
+!     consistent/stabilized IFEM
+       INTEGER(KIND=IKIND), PARAMETER :: ibMthd_NA = 850,
+     2   ibMthd_IFEM = 851, ibMthd_FEIBStab = 852
+
+!     IB coupling: explicit/implicit
+      INTEGER(KIND=IKIND), PARAMETER :: ibCpld_NA = 899, ibCpld_E = 898,
+     2   ibCpld_I = 897
 !--------------------------------------------------------------------
 !#######################################################################

@@ -801,7 +801,6 @@ void setIFPACKPrec(AztecOO &Solver)
 
 } // setIFPACKPrec
 
-
 // ----------------------------------------------------------------------------
 /**
  * This routine is to be used with preconditioners such as ILUT which require

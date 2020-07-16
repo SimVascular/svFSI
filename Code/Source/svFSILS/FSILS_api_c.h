@@ -61,4 +61,4 @@ void fsils_ls_free_(FSILS_lsType* ls);
 void fsils_bc_create_(void* lhs, int* faIn, int* nNo, int* dof, int* BC_type, int* gNodes, double* Val);
 void fsils_bc_free_(void* lhs, int* faIn);
 
-void fsils_solve_(void* lhs, FSILS_lsType* ls, int* dof, double* Ri, double* Val, int* incL, double* res);
+void fsils_solve_(void* lhs, FSILS_lsType* ls, int* dof, double* Ri, double* Val, int* prec, int* incL, double* res);

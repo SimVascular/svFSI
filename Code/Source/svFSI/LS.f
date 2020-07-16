@@ -95,8 +95,8 @@
 
       ELSE
 #endif
-         CALL FSILS_SOLVE(lhs, lEq%FSILS, dof, R, Val, incL=incL,
-     2      res=res)
+         CALL FSILS_SOLVE(lhs, lEq%FSILS, dof, R, Val,
+     2      lEq%ls%PREC_Type, incL=incL, res=res)
 #ifdef WITH_TRILINOS
       END IF
 

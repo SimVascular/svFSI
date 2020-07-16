@@ -131,7 +131,7 @@
             END IF
 
             IF ((eq(iEq)%phys .EQ. phys_FSI .AND. sstEq) .OR.
-     2           eq(iEq)%phys .EQ. phys_vms_struct) THEN
+     2           eq(iEq)%phys .EQ. phys_ustruct) THEN
                c1  = eq(iEq)%gam * dt
                c1i = 1._RKIND / c1
                c2  = (eq(iEq)%gam - 1._RKIND)*dt
@@ -183,13 +183,6 @@
             END IF
          END DO ! iBc
       END DO ! iEq
-
-      IF (ibFlag) THEN
-         IF (ib%mthd .EQ. ibMthd_SSM) THEN
-            CALL IB_SETBCDIR(ib%Ao, ib%Yo, ib%Uo)
-            CALL IB_SSMPRJCTU(lY, lD, ib%Yo)
-         END IF
-      END IF
 
       RETURN
       END SUBROUTINE SETBCDIR
@@ -309,7 +302,11 @@
       END IF
 
 !     Add Neumann BCs contribution to the LHS/RHS
-      CALL BCONSTRUCT(lFa, hg, Yg, Dg)
+      IF (lBc%flwP) THEN
+         CALL BNEUFOLWP(lFa, hg, Dg)
+      ELSE
+         CALL BASSEMNEUBC(lFa, hg, Yg)
+      END IF
 
 !     Now treat Robin BC (stiffness and damping) here
       IF (BTEST(lBc%bType,bType_Robin))
@@ -376,7 +373,7 @@
          lK = 0._RKIND
          lR = 0._RKIND
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, nV)
+            CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV))
             w   = lFa%w(g)*Jac
             N   = lFa%N(:,g)
@@ -453,7 +450,7 @@
          lR  = 0._RKIND
          lKd = 0._RKIND
          DO g=1, lFa%nG
-            CALL GNNB(lFa, e, g, nV)
+            CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
             w  = lFa%w(g) * SQRT(NORM(nV))
             N  = lFa%N(:,g)
 
@@ -472,7 +469,7 @@
                   lR(3,a) = lR(3,a) - w*N(a)*h(3)
                END DO
 
-               IF (cPhys .EQ. phys_vms_struct) THEN
+               IF (cPhys .EQ. phys_ustruct) THEN
                   wl = w*af
                   DO a=1, eNoN
                      DO b=1, eNoN
@@ -510,7 +507,7 @@
                   lR(2,a) = lR(2,a) - w*N(a)*h(2)
                END DO
 
-               IF (cPhys .EQ. phys_vms_struct) THEN
+               IF (cPhys .EQ. phys_ustruct) THEN
                   wl = w*af
                   DO a=1, eNoN
                      DO b=1, eNoN
@@ -545,8 +542,8 @@
             CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
          ELSE
 #endif
-            IF (cPhys .EQ. phys_vms_struct) THEN
-               CALL VMS_STRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
+            IF (cPhys .EQ. phys_ustruct) THEN
+               CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
             ELSE
                CALL DOASSEM(eNoN, ptr, lK, lR)
             END IF
@@ -669,11 +666,11 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      LOGICAL :: eDir(maxnsd), l1, l2, l3, l4
+      LOGICAL :: eDir(maxnsd)
       INTEGER(KIND=IKIND) :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl,
      2   nG, eNoN, eNoNb, cPhys
       REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
-     2   ub(nsd), tauB(2), Ks(nsd,nsd), rt, xiL(2), Nl(2)
+     2   ub(nsd), tauB(2), Ks(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
@@ -738,21 +735,6 @@
       END DO
       xi0 = xi0 / REAL(lM%nG, KIND=RKIND)
 
-!     Set bounds on the parameteric coordinates
-      xiL(1) = -1.0001_RKIND
-      xiL(2) =  1.0001_RKIND
-      IF (lM%eType.EQ.eType_TRI .OR. lM%eType.EQ.eType_TET) THEN
-         xiL(1) = -1.E-4_RKIND
-      END IF
-
-!     Set bounds on shape functions
-      Nl(1) = -0.0001_RKIND
-      Nl(2) =  1.0001_RKIND
-      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_BIQ) THEN
-         Nl(1) = -0.1251_RKIND
-         Nl(2) =  1.0001_RKIND
-      END IF
-
       DO e=1, nEl
          Ec = lFa%gE(e)
          cDmn  = DOMAIN(lM, cEq, Ec)
@@ -779,7 +761,7 @@
          lK = 0._RKIND
          lR = 0._RKIND
          DO g=1, nG
-            CALL GNNB(lFa, e, g, nV)
+            CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV))
             nV  = nV/Jac
             w   = lFa%w(g) * Jac
@@ -793,29 +775,8 @@
             END DO
 
             xi = xi0
-            CALL GETXI(lM%eType, eNoN, xl, xp, xi, l1)
-
-!           Check if parameteric coordinate is within bounds
-            a = 0
-            DO i=1, nsd
-               IF (xi(i).GE.xiL(1) .AND. xi(i).LE.xiL(2)) a = a + 1
-            END DO
-            l2 = a .EQ. nsd
-
-            CALL GETGNN(nsd, lM%eType, eNoN, xi, N, Nxi)
-
-!           Check if shape functions are within bounds and sum to unity
-            i  = 0
-            rt = 0._RKIND
-            DO a=1, eNoN
-               rt = rt + N(a)
-               IF (N(a).GT.Nl(1) .AND. N(a).LT.Nl(2)) i = i + 1
-            END DO
-            l3 = i .EQ. eNoN
-            l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-            l1 = ALL((/l1, l2, l3, l4/))
-            IF (.NOT.l1) err = " Error in computing face shape function"
+            CALL GETNNX(lM%eType, eNoN, xl, lM%xib, lM%Nb, xp, xi, N,
+     2         Nxi)
 
             IF (g.EQ.1 .OR. .NOT.lM%lShpF)
      2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
@@ -1231,17 +1192,15 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, Ac, iM, eNoN
+      INTEGER(KIND=IKIND) a, e, Ac, iM
       REAL(KIND=RKIND) :: pSl(6), vwp(2)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: al(:,:), dl(:,:), xl(:,:),
      2   bfl(:,:)
 
-      iM   = lFa%iM
-      eNoN = lFa%eNoN
-      ALLOCATE(al(tDof,eNoN), dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN),
-     2   ptr(eNoN))
+      iM = lFa%iM
+      ALLOCATE(al(tDof,3), dl(tDof,3), xl(3,3), bfl(3,3), ptr(3))
 
 !     Constructing the CMM contributions to the LHS/RHS and
 !     assembling them
@@ -1251,7 +1210,7 @@
 
          pSl = 0._RKIND
          vwp = 0._RKIND
-         DO a=1, eNoN
+         DO a=1, 3
             Ac = lFa%IEN(a,e)
             ptr(a)   = Ac
             xl(:,a)  = x(:,Ac)
@@ -1265,11 +1224,11 @@
                vwp(:) = vwp(:) + varWallProps(:,Ac)
             END IF
          END DO
-         pSl(:) = pSl(:) / REAL(eNoN, KIND=RKIND)
-         vwp(:) = vwp(:) / REAL(eNoN, KIND=RKIND)
+         pSl(:) = pSl(:) / 3._RKIND
+         vwp(:) = vwp(:) / 3._RKIND
 
 !     Add CMM BCs contributions to the LHS/RHS
-         CALL CMMb(lFa, e, eNoN, al, dl, xl, bfl, pSl, vwp, ptr)
+         CALL CMMb(lFa, e, al, dl, xl, bfl, pSl, vwp, ptr)
       END DO
 
       DEALLOCATE(al, dl, xl, bfl, ptr)

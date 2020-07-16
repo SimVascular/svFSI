@@ -285,7 +285,7 @@
          DO iEq=1, nEq
             IF (eq(iEq)%phys .EQ. phys_CEP .OR.
      2          eq(iEq)%phys .EQ. phys_struct .OR.
-     3          eq(iEq)%phys .EQ. phys_vms_struct) i = i + 1
+     3          eq(iEq)%phys .EQ. phys_ustruct) i = i + 1
          END DO
          IF (i .NE. 2) err = "Both electrophysiology and struct have"//
      2      " to be solved for electro-mechanics"
@@ -298,7 +298,7 @@
      2         " only for 3D bodies"
             DO iEq=1, nEq
                DO i=1, eq(iEq)%nDmn
-                  IF (eq(iEq)%dmn(i)%phys .NE. phys_vms_struct .AND.
+                  IF (eq(iEq)%dmn(i)%phys .NE. phys_ustruct .AND.
      2                eq(iEq)%dmn(i)%phys .NE. phys_struct) CYCLE
                   IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO) err =
      2               "Active strain is allowed with Holzapfel-Ogden "//
@@ -338,6 +338,7 @@
 
       INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 19
 
+      LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
      2   propL(maxNProp,10), outPuts(maxOutput), nDOP(4)
       CHARACTER(LEN=stdL) ctmp
@@ -414,11 +415,13 @@
          END IF
       END IF
 
-      propL = prop_NA
+      THflag = .FALSE.
+      propL  = prop_NA
       SELECT CASE (eqName)
 !     FLUID Navier-Stokes solver ------------------------------------
       CASE ('fluid')
          lEq%phys = phys_fluid
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
          propL(1,1) = fluid_density
          propL(2,1) = permeability
@@ -533,10 +536,11 @@
 
          CALL READLS(lSolver_CG, lEq, list)
 
-!     VMS-stabilized nonlinear STRUCTURAL mechanics solver ---
-      CASE ('vms_struct')
-         lEq%phys = phys_vms_struct
+!     STRUCTURAL with nonlinear velocity-pressure based equation solver
+      CASE ('ustruct')
+         lEq%phys = phys_ustruct
          sstEq    = .TRUE.
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
@@ -550,7 +554,7 @@
 
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
-            err = "Prestress for VMS_STRUCT is not implemented yet"
+            err = "Prestress for USTRUCT is not implemented yet"
             nDOP = (/2,2,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
@@ -665,15 +669,15 @@
                propL(8,1) = elasticity_modulus
             END IF
 
-            nDOP = (/11,2,4,0/)
+            nDOP = (/11,4,3,0/)
             outPuts(1)  = out_velocity
             outPuts(2)  = out_pressure
-            outPuts(3)  = out_energyFlux
-            outPuts(4)  = out_acceleration
-            outPuts(5)  = out_WSS
-            outPuts(6)  = out_vorticity
-            outPuts(7)  = out_vortex
-            outPuts(8)  = out_displacement
+            outPuts(3)  = out_WSS
+            outPuts(4)  = out_displacement
+            outPuts(5)  = out_energyFlux
+            outPuts(6)  = out_acceleration
+            outPuts(7)  = out_vorticity
+            outPuts(8)  = out_vortex
             outPuts(9)  = out_strainInv
             outPuts(10) = out_viscosity
             outPuts(11) = out_divergence
@@ -701,13 +705,14 @@
 
 !     FLUID STRUCTURE INTERACTION equation solver---------------------
       CASE ('FSI')
-         mvMsh = .TRUE.
          lEq%phys = phys_FSI
+         mvMsh    = .TRUE.
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
-!        3 possible equations: fluid (must), struct/vms_struct/lElas
+!        3 possible equations: fluid (must), struct/ustruct/lElas
          phys(1) = phys_fluid
          phys(2) = phys_struct
-         phys(3) = phys_vms_struct
+         phys(3) = phys_ustruct
          phys(4) = phys_lElas
 
 !        fluid properties
@@ -727,7 +732,7 @@
          propL(6,2) = f_y
          IF (nsd .EQ. 3) propL(7,2) = f_z
 
-!        vms_struct properties
+!        ustruct properties
          propL(1,3) = solid_density
          propL(2,3) = elasticity_modulus
          propL(3,3) = poisson_ratio
@@ -817,10 +822,50 @@
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
+      CASE ('stokes')
+         lEq%phys = phys_stokes
+         lPtr => list%get(THflag, "Use Taylor-Hood type basis")
+
+         propL(1,1) = ctau_M
+         propL(2,1) = f_x
+         propL(3,1) = f_y
+         IF (nsd .EQ. 3) propL(4,1) = f_z
+         CALL READDOMAIN(lEq, propL, list)
+
+         nDOP = (/7,2,3,0/)
+         outPuts(1) = out_velocity
+         outPuts(2) = out_pressure
+         outPuts(3) = out_WSS
+         outPuts(4) = out_vorticity
+         outPuts(5) = out_traction
+         outPuts(6) = out_viscosity
+         outPuts(7) = out_divergence
+
+         CALL READLS(lSolver_CG, lEq, list)
+
       CASE DEFAULT
          err = "Equation type "//TRIM(eqName)//" is not defined"
       END SELECT
       CALL READOUTPUTS(lEq, nDOP, outPuts, list)
+
+!     Set number of function spaces
+      DO iM=1, nMsh
+         IF (.NOT.THFlag) THEN
+            msh(iM)%nFs = 1
+         ELSE
+            IF (ibFlag) err = "Taylor-Hood basis is not implemented "//
+     2         "for immersed boundaries"
+            IF (msh(iM)%lShl .OR. msh(iM)%lFib .OR.
+     2         (msh(iM)%eType.EQ.eType_NRB)) THEN
+               msh(iM)%nFs = 1
+               wrn = "Taylor-Hood basis is not allowed for NURBS mesh"//
+     2            " or shells and fibers"
+            ELSE
+               msh(iM)%nFs = 2
+            END IF
+         END IF
+      END DO
+
 !--------------------------------------------------------------------
 !     Searching for BCs
       lEq%nBc = list%srch("Add BC")
@@ -941,14 +986,14 @@
                lEq%dmn(iDmn)%phys = phys_fluid
             CASE("struct")
                lEq%dmn(iDmn)%phys = phys_struct
-            CASE("vms_struct")
-               lEq%dmn(iDmn)%phys = phys_vms_struct
+            CASE("ustruct")
+               lEq%dmn(iDmn)%phys = phys_ustruct
                IF (.NOT.sstEq) sstEq = .TRUE.
             CASE("lElas")
                lEq%dmn(iDmn)%phys = phys_lElas
             CASE DEFAULT
                err = TRIM(lPD%ping("Equation",lPtr))//
-     2            "Equation must be fluid/struct/vms_struct/lElas"
+     2            "Equation must be fluid/struct/ustruct/lElas"
             END SELECT
          ELSE
             lEq%dmn(iDmn)%phys = lEq%phys
@@ -1021,12 +1066,13 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_vms_struct) THEN
+     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
          END IF
 
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
-     2       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
+     3       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
             CALL READVISCMODEL(lEq%dmn(iDmn), lPD)
          END IF
       END DO
@@ -1047,7 +1093,7 @@
       TYPE(listType), INTENT(INOUT) :: list
 
       INTEGER(KIND=IKIND) lSolverType, FSILSType
-      CHARACTER(LEN=stdL) ctmp
+      CHARACTER(LEN=stdL) ctmp, stmp
       TYPE(listType), POINTER :: lPtr, lPL
 
 !     Default LS
@@ -1060,19 +1106,36 @@
          CASE('ns', 'bpn', 'bipn')
             lSolverType = lSolver_NS
             FSILSType   = LS_TYPE_NS
+            stmp = CLR("BIPN")
          CASE('gmres')
             lSolverType = lSolver_GMRES
             FSILSType   = LS_TYPE_GMRES
+            stmp = CLR("GMRES")
          CASE('cg')
             lSolverType = lSolver_CG
             FSILSType   = LS_TYPE_CG
+            stmp = CLR("CG")
          CASE('bicg', 'bicgs')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
+            stmp = CLR("BiCGStab")
          CASE DEFAULT
             err = TRIM(list%ping("LS type",lPL))//" Undefined type"
          END SELECT
-      END IF
+      ELSE
+         IF (lSolverType .EQ. lSolver_NS) THEN
+            stmp = CLR("BIPN")
+         ELSE IF (lSolverType .EQ. lSolver_GMRES) THEN
+            stmp = CLR("GMRES")
+         ELSE IF (lSolverType .EQ. lSolver_CG) THEN
+            stmp = CLR("CG")
+         ELSE IF (lSolverType .EQ. lSolver_BICGS) THEN
+            stmp = CLR("BiCGStab")
+         ELSE
+            err = " Undefined linear solver"
+         END IF
+       END IF
+      std = " Using linear solver: "//TRIM(stmp)
 
       lEq%ls%LS_Type = lSolverType
       CALL FSILS_LS_CREATE(lEq%FSILS, FSILSType)
@@ -1096,44 +1159,56 @@
             CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
                lEq%useTLS = .FALSE.
+               stmp = CLR("FSILS")
+            CASE('rcs', 'row-column-scaling')
+               lEq%ls%PREC_Type = PREC_RCS
+               lEq%useTLS = .FALSE.
+               stmp = CLR("RCS")
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-Diagonal")
             CASE('trilinos-blockjacobi', 'blockjacobi')
                lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-BlockJacobi")
             CASE('trilinos-ilu')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILU
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ILU")
             CASE('trilinos-ilut')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ILUT")
             CASE('trilinos-ic')
                lEq%ls%PREC_Type = PREC_TRILINOS_IC
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-IC")
             CASE('trilinos-ict')
                lEq%ls%PREC_Type = PREC_TRILINOS_ICT
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ICT")
             CASE ('trilinos-ml')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
                lEq%useTLS = .TRUE.
+               stmp = CLR("Trilinos-ML")
 #endif
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
      2          //" Undefined type"
             END SELECT
-            std = " Using preconditioner: "//TRIM(ctmp)
          ELSE
             SELECT CASE (lEq%ls%PREC_Type)
             CASE (PREC_FSILS)
-               std = " Using preconditioner: fsils"
+               stmp = CLR("FSILS")
             CASE (PREC_TRILINOS_DIAGONAL)
-               std = " Using preconditioner: trilinos-diagonal"
+               stmp = CLR("Trilinos-Diagonal")
             CASE DEFAULT
                err = " Undefined preconditioner"
             END SELECT
          END IF
+         std = " Using preconditioner: "//TRIM(stmp)
 
          IF (lEq%useTLS) THEN
             lPtr => lPL%get(lEq%assmTLS, "Use Trilinos for assembly")
@@ -1406,15 +1481,13 @@
          IF (ASSOCIATED(lPtr)) THEN
             iM  = lBc%iM
             iFa = lBc%iFa
-            i = nsd
-            j = 2
-            a = msh(iM)%fa(iFa)%nNo
             ALLOCATE(lBc%gm)
-            lBc%gm%nTP = j
-            lBc%gm%dof = i
-            ALLOCATE(lBc%gm%t(j), lBc%gm%d(i,a,j))
+            lBc%gm%nTP = 2
+            lBc%gm%dof = nsd
+            ALLOCATE(lBc%gm%t(2), lBc%gm%d(nsd,msh(iM)%fa(iFa)%nNo,2))
             lBc%gm%t(1) = 0._RKIND
-            lBc%gm%t(2) = HUGE(rtmp)
+            lBc%gm%t(2) = 1.E+10_RKIND
+            lBc%gm%period = lBc%gm%t(2)
 
             CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
             lBc%bType = IBSET(lBc%bType,bType_gen)
@@ -1541,6 +1614,24 @@
      2      "RCR cannot be used in conjunction with cplBC."
          cplBC%nFa = cplBC%nFa + 1
          lBc%cplBcPtr = cplBC%nFa
+      CASE ('Spatial')
+         lBc%bType = IBSET(lBc%bType,bType_gen)
+         IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Spatial BC"//
+     2      " is only defined for Neu BC"
+
+         lPtr => list%get(fTmp, "Spatial values file path")
+         iM  = lBc%iM
+         iFa = lBc%iFa
+         ALLOCATE(lBc%gm)
+         lBc%gm%nTP = 2
+         lBc%gm%dof = 1
+         ALLOCATE(lBc%gm%t(2), lBc%gm%d(1,msh(iM)%fa(iFa)%nNo,2))
+         lBc%gm%t(1) = 0._RKIND
+         lBc%gm%t(2) = 1.E+10_RKIND
+         lBc%gm%period = lBc%gm%t(2)
+
+         CALL READTRACBCFF(lBc%gm, msh(iM)%fa(iFa), fTmp%fname)
+
       CASE ('General')
          iM  = lBc%iM
          iFa = lBc%iFa
@@ -1730,6 +1821,15 @@ c     2         "can be applied for Neumann boundaries only"
          END SELECT
       END IF
 
+!     For Neumann BC, is load vector changing with deformation
+!     (follower pressure)
+      lBc%flwP = .FALSE.
+      IF (BTEST(lBc%bType,bType_Neu)) THEN
+         IF (phys.EQ.phys_struct .OR. phys.EQ.phys_ustruct) THEN
+            lPtr => list%get(lBc%flwP, "Follower pressure load")
+         END IF
+      END  IF
+
 !     If a Neumann BC face is undeforming
       lBc%masN = 0
       IF (BTEST(lBc%bType,bType_Neu)) THEN
@@ -1737,8 +1837,8 @@ c     2         "can be applied for Neumann boundaries only"
          lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
          lPtr => list%get(ltmp, "Undeforming Neu face")
          IF (ltmp) THEN
-            IF (phys .NE. phys_vms_struct) err = "Undeforming Neu "//
-     2         "face is currently formulated for VMS_STRUCT only"
+            IF (phys .NE. phys_ustruct) err = "Undeforming Neu "//
+     2         "face is currently formulated for USTRUCT only"
 
             IF (BTEST(lBc%bType,bType_cpl) .OR.
      2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//
@@ -2256,6 +2356,8 @@ c     2         "can be applied for Neumann boundaries only"
       IF (.NOT.incompFlag) THEN
          kap = E/(1._RKIND-2._RKIND*nu)/3._RKIND
          lam = E*nu/(1._RKIND+nu)/(1._RKIND-2._RKIND*nu)
+      ELSE
+         kap = 0._RKIND
       END IF
 
       lSt => lPD%get(ctmp, "Constitutive model")
@@ -2335,8 +2437,6 @@ c     2         "can be applied for Neumann boundaries only"
          err = "Undefined constitutive model used"
       END SELECT
 
-      IF (incompFlag) RETURN
-
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")
       IF (.NOT.ASSOCIATED(lPtr)) wrn =
@@ -2352,13 +2452,17 @@ c     2         "can be applied for Neumann boundaries only"
          lDmn%stM%volType = stVol_M94
 
       CASE DEFAULT
-         err = "Undefined dilational penalty model"
+         lDmn%stM%volType = stVol_ST91
       END SELECT
 
 !     Default penalty parameter is equal to bulk modulus
       lDmn%stM%Kpen = kap
       lPtr => lPD%get(rtmp, "Penalty parameter")
       IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
+      IF (ISZERO(lDmn%stM%Kpen)) THEN
+         IF (lDmn%phys .EQ. phys_struct) wrn = "Full incompressible "//
+     2      "struct (displacement-based) detected with 0 penalty const"
+      END IF
 
       RETURN
       END SUBROUTINE READMATMODEL
@@ -2383,7 +2487,6 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ("constant", "const", "newtonian")
          lDmn%visc%viscType = viscType_Const
          lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0._RKIND)
-         RETURN
 
       CASE ("carreau-yasuda", "cy")
          lDmn%visc%viscType = viscType_CY
@@ -2402,7 +2505,6 @@ c     2         "can be applied for Neumann boundaries only"
      2         "High shear-rate viscosity value should be higher than"//
      3         " low shear-rate value"
          END IF
-         RETURN
 
       CASE ("cassons", "cass")
          lDmn%visc%viscType = viscType_Cass
@@ -2413,11 +2515,15 @@ c     2         "can be applied for Neumann boundaries only"
          lDmn%visc%lam = 0.5_RKIND
          lPtr => lVis%get(rtmp,"Low shear-rate threshold")
          IF (ASSOCIATED(lPtr)) lDmn%visc%lam = rtmp
-         RETURN
 
       CASE DEFAULT
          err = "Undefined constitutive model for viscosity used"
       END SELECT
+
+      IF ((lDmn%phys .EQ. phys_stokes) .AND.
+     2    (lDmn%visc%viscType .NE. viscType_Const)) THEN
+         err = "Only constant viscosity is allowed for Stokes flow"
+      END IF
 
       RETURN
       END SUBROUTINE READVISCMODEL
@@ -2550,8 +2656,8 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE READBCT
 !####################################################################
-!     This subroutine reads traction data from a vtp file and stores
-!     in moving BC data structure
+!     This subroutine reads pressure/traction data from a vtp file and
+!     stores in moving BC data structure
       SUBROUTINE READTRACBCFF(lMB, lFa, fName)
       USE COMMOD
       USE LISTMOD
@@ -2562,12 +2668,12 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(faceType), INTENT(INOUT) :: lFa
       CHARACTER(LEN=stdL) :: fName
 
-      INTEGER(KIND=IKIND) :: iStat, a, Ac
+      INTEGER(KIND=IKIND) :: iStat, a, i, Ac
       TYPE(vtkXMLType) :: vtp
       TYPE(faceType) :: gFa
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX1(:), tmpX2(:,:)
 
 !     Read Traction data from VTP file
       iStat = 0
@@ -2578,18 +2684,20 @@ c     2         "can be applied for Neumann boundaries only"
       CALL getVTK_numPoints(vtp, gFa%nNo, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (num points)"
 
-      ALLOCATE(gFa%x(nsd,gFa%nNo), tmpX(maxNSD,gFa%nNo))
-      CALL getVTK_pointCoords(vtp, tmpX, iStat)
-      IF (iStat .LT. 0) err = "VTP file read error (coords)"
-      gFa%x(:,:) = tmpX(1:nsd,:)
+      ALLOCATE(tmpX1(gFa%nNo), tmpX2(maxNSD,gFa%nNo))
 
-!     Use gFa%N as temporary array to load traction data
-      ALLOCATE(gFa%N(nsd,gFa%nNo))
-      CALL getVTK_pointData(vtp, "Traction", tmpX, iStat)
-      gFa%N(:,:) = tmpX(1:nsd,:)
+      CALL getVTK_pointCoords(vtp, tmpX2, iStat)
+      IF (iStat .LT. 0) err = "VTP file read error (coords)"
+      ALLOCATE(gFa%x(nsd,gFa%nNo))
+      gFa%x(:,:) = tmpX2(1:nsd,:)
+
+      IF (lMB%dof .EQ. 1) THEN
+         CALL getVTK_pointData(vtp, "Pressure", tmpX1, iStat)
+      ELSE
+         CALL getVTK_pointData(vtp, "Traction", tmpX2, iStat)
+      END IF
       IF (iStat .LT. 0) err = "VTP file read error (point data)"
 
-      DEALLOCATE(tmpX)
       CALL flushVTK(vtp)
 
 !     Project traction from gFa to lFa. First prepare lFa%x, lFa%IEN
@@ -2603,15 +2711,25 @@ c     2         "can be applied for Neumann boundaries only"
       ptr = 0
       CALL FACEMATCH(lFa, gFa, ptr)
 
-!     Copy traction data to MB data structure
-      DO a=1, lFa%nNo
-         Ac = ptr(a)
-         lMB%d(:,a,1) = gFa%N(:,Ac)
-         lMB%d(:,a,2) = gFa%N(:,Ac)
-      END DO
+!     Copy pressure/traction data to MB data structure
+      IF (lMB%dof .EQ. 1) THEN
+         DO a=1, lFa%nNo
+            Ac = ptr(a)
+            lMB%d(1,a,1) = -tmpX1(Ac)
+            lMB%d(1,a,2) = -tmpX1(Ac)
+         END DO
+      ELSE
+         DO a=1, lFa%nNo
+            Ac = ptr(a)
+            DO i=1, lMB%dof
+               lMB%d(i,a,1) = tmpX2(i,Ac)
+               lMB%d(i,a,2) = tmpX2(i,Ac)
+            END DO
+         END DO
+      END IF
 
       CALL DESTROY(gFa)
-      DEALLOCATE(lFa%x, ptr)
+      DEALLOCATE(lFa%x, ptr, tmpX1, tmpX2)
 
       RETURN
       END SUBROUTINE READTRACBCFF

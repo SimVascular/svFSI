@@ -42,7 +42,7 @@
       REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
       LOGICAL :: flag
-      INTEGER(KIND=IKIND) :: i, a, iEq, iDmn, iM, ierr, nnz, gnnz
+      INTEGER(KIND=IKIND) :: i, a, iEq, iDmn, iM, iFa, ierr, nnz, gnnz
       CHARACTER(LEN=stdL) :: fTmp, sTmp
       REAL(KIND=RKIND) :: am
       TYPE(FSILS_commuType) :: communicator
@@ -61,13 +61,6 @@
             IF (eq(iEq)%bc(i)%weakDir) nFacesLS = nFacesLS - 1
          END DO
       END DO
-
-!     Pointer to all immersed solid nodes (iblank=1)
-      ibLSptr  = 0
-      IF (ibFlag) THEN
-         nFacesLS = nFacesLS + 1
-         ibLSptr  = nFacesLS
-      END IF
 
 !     For FSI simulations, LS pointer to structure nodes
       IF (mvMsh) nFacesLS = nFacesLS + 1
@@ -104,7 +97,7 @@
             eq(iEq)%dof = nsd
             eq(iEq)%am  = am
             eq(iEq)%sym = 'ST'
-         CASE (phys_vms_struct)
+         CASE (phys_ustruct)
             dFlag = .TRUE.
             eq(iEq)%dof = nsd + 1
             eq(iEq)%sym = 'ST'
@@ -130,6 +123,9 @@
          CASE (phys_CEP)
             eq(iEq)%dof = 1
             eq(iEq)%sym = 'EP'
+         CASE (phys_stokes)
+            eq(iEq)%dof = nsd + 1
+            eq(iEq)%sym = 'SS'
          CASE DEFAULT
             err = "Equation type "//eq(iEq)%sym//" is not defined"
          END SELECT
@@ -164,7 +160,7 @@
       END IF
       i = IKIND*(1+SIZE(stamp)) + RKIND*(2+nEq+cplBC%nX+i*tnNo)
 
-      IF (ibFlag) i = i + RKIND*(4*nsd+1)*ib%tnNo
+      IF (ibFlag) i = i + RKIND*(2*nsd+1)*ib%tnNo
       IF (cm%seq()) THEN
          recLn = i
       ELSE
@@ -225,7 +221,7 @@
       IF (ibFlag) CALL IB_MEMALLOC()
 
 !     Additional physics dependent variables
-!     VMS_STRUCT phys
+!     USTRUCT phys
       IF (sstEq) THEN
          ALLOCATE(Ad(nsd,tnNo), Rd(nsd,tnNo), Kd((nsd+1)*nsd,nnz))
          Ad = 0._RKIND
@@ -233,7 +229,7 @@
          Kd = 0._RKIND
       END IF
 
-!     PRESTRESS phys
+!     PRESTRESS
       IF (pstEq) THEN
          IF (ALLOCATED(pS0)) err = "Prestress already allocated. "//
      2      "Correction needed"
@@ -333,27 +329,22 @@
          END IF
       END DO
 
+!     Initialize function spaces
+      DO iM=1, nMsh
+         ALLOCATE(msh(iM)%fs(msh(iM)%nFs))
+         CALL INITFSMSH(msh(iM))
+         DO iFa=1, msh(iM)%nFa
+            msh(iM)%fa(iFa)%nFs = msh(iM)%nFs
+            ALLOCATE(msh(iM)%fa(iFa)%fs(msh(iM)%fa(iFa)%nFs))
+            CALL INITFSFACE(msh(iM)%fa(iFa))
+         END DO
+      END DO
+
 !     Initialize Immersed Boundary data structures
       ALLOCATE(iblank(tnNo), ighost(tnNo))
       iblank = 0
       ighost = 0
-      IF (ibFlag) THEN
-         CALL IB_INIT(Do)
-!        For all immersed shells, reset ibLSptr and nFacesLS
-         i = SUM(iblank)
-         i = cm%reduce(i)
-         IF (i.EQ.0 .OR. ib%mthd.EQ.ibMthd_IFEM) THEN
-            ibLSptr = 0
-            nFacesLS = nFacesLS - 1
-
-!        Reset FSILS structures as nFacesLS has been changed
-            CALL FSILS_COMMU_FREE(communicator)
-            CALL FSILS_LHS_FREE(lhs)
-            CALL FSILS_COMMU_CREATE(communicator, cm%com())
-            CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz,
-     2         ltg, rowPtr, colPtr, nFacesLS)
-         END IF
-      END IF
+      IF (ibFlag) CALL IB_INIT(Do)
 
 !     Calculating the volume of each domain
       ALLOCATE(s(1,tnNo))
@@ -422,12 +413,7 @@
 
       IF (ibFlag) THEN
          ib%R   = 0._RKIND
-         ib%Rfb = 0._RKIND
-         ib%Ao  = 0._RKIND
-         ib%An  = 0._RKIND
-         ib%Yo  = 0._RKIND
          ib%Yn  = 0._RKIND
-         ib%Uo  = 0._RKIND
          ib%Un  = 0._RKIND
       END IF
 
@@ -503,7 +489,7 @@
       REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
       INTEGER(KIND=IKIND), PARAMETER :: fid = 1
-      INTEGER(KIND=IKIND) tStamp(SIZE(stamp)), a, i
+      INTEGER(KIND=IKIND) tStamp(SIZE(stamp)), i
 
       i = 0
       IF (.NOT.bin2VTK) THEN
@@ -553,24 +539,15 @@
          IF (dFlag) THEN
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%An, ib%Yn,
-     3            ib%Un, ib%Rfb
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%Yn, ib%Un
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%An, ib%Yn, ib%Un,
-     3            ib%Rfb
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%Yn, ib%Un
             END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, ib%An, ib%Yn, ib%Un, ib%Rfb
+     2         cplBC%xo, Yo, Ao, ib%Yn, ib%Un
          END IF
-
-!        Compute ib%Uo
-         DO a=1, ib%tnNo
-            DO i=1, nsd
-               ib%Uo(i,a) = ib%Un(i,a) - dt*ib%Yn(i,a)
-            END DO
-         END DO
       END IF
       CLOSE(fid)
 
@@ -698,15 +675,9 @@
          IF (ALLOCATED(ib%rowPtr)) DEALLOCATE(ib%rowPtr)
          IF (ALLOCATED(ib%colPtr)) DEALLOCATE(ib%colPtr)
          IF (ALLOCATED(ib%x))      DEALLOCATE(ib%x)
-         IF (ALLOCATED(ib%fN))     DEALLOCATE(ib%fN)
-         IF (ALLOCATED(ib%An))     DEALLOCATE(ib%An)
-         IF (ALLOCATED(ib%Ao))     DEALLOCATE(ib%Ao)
          IF (ALLOCATED(ib%Yn))     DEALLOCATE(ib%Yn)
-         IF (ALLOCATED(ib%Yo))     DEALLOCATE(ib%Yo)
          IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
-         IF (ALLOCATED(ib%Uo))     DEALLOCATE(ib%Uo)
          IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
-         IF (ALLOCATED(ib%Rfb))    DEALLOCATE(ib%Rfb)
          IF (ALLOCATED(ib%cm%n))   DEALLOCATE(ib%cm%n)
          IF (ALLOCATED(ib%cm%gE))  DEALLOCATE(ib%cm%gE)
 
@@ -714,8 +685,6 @@
             CALL DESTROY(ib%msh(iM))
          END DO
          DEALLOCATE(ib%msh)
-
-         IF (ib%lhs%foc) CALL FSILS_LHS_FREE(ib%lhs)
 
          DEALLOCATE(ib)
       END IF

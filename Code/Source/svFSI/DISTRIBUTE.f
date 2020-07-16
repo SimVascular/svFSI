@@ -372,11 +372,11 @@
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) iM, iFa
-      LOGICAL flag
 
       IF (cm%slv()) ALLOCATE(ib)
 
       CALL cm%bcast(ib%mthd)
+      CALL cm%bcast(ib%cpld)
 
       CALL cm%bcast(ib%nMsh)
       CALL cm%bcast(ib%tnNo)
@@ -392,14 +392,6 @@
             CALL DISTIBFa(ib%msh(iM), ib%msh(iM)%fa(iFa))
          END DO
       END DO
-
-      CALL cm%bcast(ib%nFn)
-      flag = ALLOCATED(ib%fN)
-      CALL cm%bcast(flag)
-      IF (flag) THEN
-         IF (cm%slv()) ALLOCATE(ib%fN(ib%nFn*nsd,ib%tnNo))
-         CALL cm%bcast(ib%fN)
-      END IF
 
       RETURN
       END SUBROUTINE DISTIB
@@ -420,7 +412,9 @@
       CALL cm%bcast(lM%nFa)
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%name)
+      CALL cm%bcast(lM%scF)
       CALL cm%bcast(lM%dx)
+      CALL cm%bcast(lM%nFn)
 
       IF (cm%slv()) THEN
          lM%nNo = lM%gnNo
@@ -430,12 +424,14 @@
          ALLOCATE(lM%IEN(lM%eNoN, lM%nEl))
          ALLOCATE(lM%eId(lM%nEl))
          ALLOCATE(lM%fa(lM%nFa))
+         ALLOCATE(lM%fN(lM%nFn*nsd,lM%nEl))
          CALL SELECTELE(lM)
       END IF
       CALL cm%bcast(lM%gN)
       CALL cm%bcast(lM%lN)
       CALL cm%bcast(lM%IEN)
       CALL cm%bcast(lM%eId)
+      IF (lM%nFn .NE. 0) CALL cm%bcast(lM%fN)
 
       IF (lM%eType .EQ. eType_NRB) THEN
          CALL cm%bcast(lM%nSl)
@@ -572,13 +568,14 @@
             END IF
          END IF
 
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_vms_struct) THEN
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct)) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
 
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_fluid .OR.
-     2       lEq%dmn(iDmn)%phys .EQ. phys_CMM) THEN
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
+     3       (lEq%dmn(iDmn)%phys .EQ. phys_CMM .AND. .NOT.cmmInit))THEN
             CALL DIST_VISCMODEL(lEq%dmn(iDmn)%visc)
          END IF
       END DO
@@ -660,6 +657,7 @@
       CALL cm%bcast(lBc%h)
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
+      CALL cm%bcast(lBc%flwP)
       IF (BTEST(lBc%bType,bType_RCR)) THEN
          CALL cm%bcast(lBc%RCR%Rp)
          CALL cm%bcast(lBc%RCR%C)
@@ -828,15 +826,13 @@
       CALL cm%bcast(lBc%r)
       CALL cm%bcast(lBc%g)
       CALL cm%bcast(lBc%weakDir)
-      CALL cm%bcast(lBc%tauB)
-      CALL cm%bcast(lBc%tauF)
-      CALL cm%bcast(lBc%fbN)
 
 !     Communicating time-dependant BC data
       flag = ALLOCATED(lBc%gt)
       CALL cm%bcast(flag)
       IF (flag) THEN
          IF (cm%slv()) ALLOCATE(lBc%gt)
+         CALL cm%bcast(lBc%gt%lrmp)
          CALL cm%bcast(lBc%gt%qi)
          CALL cm%bcast(lBc%gt%qs)
          CALL cm%bcast(lBc%gt%ti)
@@ -1096,11 +1092,13 @@
       CALL cm%bcast(lM%eType)
       CALL cm%bcast(lM%eNoN)
       CALL cm%bcast(lM%nFa)
+      CALL cm%bcast(lM%nFs)
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%gnEl)
       CALL cm%bcast(lM%gnNo)
       CALL cm%bcast(lM%name)
       CALL cm%bcast(lM%nFn)
+      CALL cm%bcast(lM%scF)
       nFn = lM%nFn
 
       insd = nsd
@@ -1192,6 +1190,10 @@
             eNoNb = 1
          CASE(eType_QUD)
             eNoNb = 1
+         CASE(eType_QTE)
+            eNoNb = 6
+         CASE(eType_QTR)
+            eNoNb = 3
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT
@@ -1444,7 +1446,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       TYPE(faceType), INTENT(INOUT) :: lFa, gFa
       INTEGER(KIND=IKIND), INTENT(IN) :: gmtl(gtnNo)
 
-      INTEGER(KIND=IKIND) eNoNb, e, a, Ac, Ec, i, j
+      INTEGER(KIND=IKIND) eNoNb, e, a, Ac, Ec, i, j, iM
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), ePtr(:)
 
@@ -1452,22 +1454,25 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     populating gFa to all procs
       IF (cm%mas()) THEN
          gFa%d    = lFa%d
-         gFa%nNo  = lFa%nNo
-         gFa%nEl  = lFa%nEl
          gFa%eNoN = lFa%eNoN
+         gFa%iM   = lFa%iM
+         gFa%nEl  = lFa%nEl
          gFa%gnEl = lFa%gnEl
+         gFa%nNo  = lFa%nNo
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(1+gFa%eNoN,gFa%gnEl))
       ELSE
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(0,0))
       END IF
       CALL cm%bcast(gFa%d)
-      CALL cm%bcast(gFa%nNo)
-      CALL cm%bcast(gFa%nEl)
       CALL cm%bcast(gFa%eNoN)
+      CALL cm%bcast(gFa%iM)
+      CALL cm%bcast(gFa%nEl)
       CALL cm%bcast(gFa%gnEl)
+      CALL cm%bcast(gFa%nNo)
       CALL SELECTELEB(lM, gFa)
 
       eNoNb = gFa%eNoN
+      iM = gFa%iM
       ALLOCATE(gFa%IEN(eNoNb,gFa%nEl), gFa%gE(gFa%nEl), gFa%gN(gFa%nNo),
      2   ePtr(gFa%nEl))
       IF (cm%mas()) THEN
@@ -1479,6 +1484,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       lFa%d    = gFa%d
       lFa%eNoN = eNoNb
       CALL SELECTELEB(lM, lFa)
+      lFa%iM   = iM
 
       i = gFa%nEl*(2+eNoNb) + gFa%nNo
       ALLOCATE(part(i))

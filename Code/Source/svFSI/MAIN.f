@@ -41,8 +41,8 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL l1, l2, l3, l4
-      INTEGER(KIND=IKIND) i, iM, iBc, ierr, iEqOld
+      LOGICAL l1, l2, l3
+      INTEGER(KIND=IKIND) i, iM, iBc, ierr, iEqOld, stopTS
       REAL(KIND=RKIND) timeP(3)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incL(:)
@@ -55,7 +55,6 @@
       l1 = .FALSE.
       l2 = .FALSE.
       l3 = .FALSE.
-      l4 = .FALSE.
 
       savedOnce = .FALSE.
       CALL MPI_INIT(i)
@@ -77,6 +76,7 @@
 !     Initializing the solution vectors and constructing LHS matrix
 !     format
       CALL INITIALIZE(timeP)
+      stopTS = nTS
 
       dbg = 'Allocating intermediate variables'
       ALLOCATE(Ag(tDof,tnNo), Yg(tDof,tnNo), Dg(tDof,tnNo),
@@ -158,10 +158,12 @@
 !     synchronize residue, R before treating immersed boundaries
             IF (.NOT.eq(cEq)%assmTLS) CALL COMMU(R)
 
-!     Update residue in displacement equation for VMS_STRUCT physics.
-!     Note that this step is done only first iteration. The residue will
-!     be 0 for subsequent iterations
-            IF (sstEq) CALL VMS_STRUCTR(Yg)
+!     Update residue in displacement equation for USTRUCT physics. Note
+!     that this step is done only first iteration. The residue will be 0
+!     for subsequent iterations
+            IF (sstEq) CALL USTRUCTR(Yg)
+
+            IF (eq(cEq)%phys .EQ. phys_stokes) CALL THOOD_ValRC()
 
             CALL SETBCUNDEFNEU()
 
@@ -178,7 +180,6 @@
                   incL(i) = 1
                END IF
             END DO
-            IF (ibLSptr .NE. 0) incL(ibLSptr) = 1
 
             dbg = "Solving equation <"//eq(cEq)%sym//">"
             CALL LSSOLVE(eq(cEq), incL, res)
@@ -196,11 +197,8 @@
 !     End of inner loop
 
 !     Immersed body treatment: project flow variables from fluid mesh
-!     to IB solid mesh and enforce Dirichlet BCs
-         IF (ibFlag) THEN
-            CALL IB_PROJFVAR(An, Yn, Do, ib%An, ib%Yn, ib%Un)
-            CALL IB_SETBCDIR(ib%An, ib%Yn, ib%Un)
-         END IF
+!     to IB solid mesh
+         IF (ibFlag) CALL IB_PROJFVAR(Yn, Do)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
@@ -217,21 +215,29 @@
             END IF
          END IF
 
-         IF (cm%mas()) INQUIRE(FILE=stopTrigName, EXIST=l1)
-         CALL cm%bcast(l1)
-         l2 = cTS .GE. nTS
-         l3 = MOD(cTS,stFileIncr) .EQ. 0
+         IF (cm%mas()) THEN
+            INQUIRE(FILE=stopTrigName, EXIST=l1)
+            IF (l1) THEN
+               OPEN(664,FILE=TRIM(stopTrigName))
+               READ(664,'(I10)',ADVANCE='NO',IOSTAT=ierr) stopTS
+               CLOSE(664)
+               IF (ierr .EQ. -1) stopTS = cTS
+            END IF
+         END IF
+         CALL cm%bcast(stopTS)
+         l1 = cTS .GE. stopTS
+         l2 = MOD(cTS,stFileIncr) .EQ. 0
 !     Saving the result to restart bin file
-         IF (l1 .OR. l2 .OR. l3) CALL WRITERESTART(timeP)
+         IF (l1 .OR. l2) CALL WRITERESTART(timeP)
 
 !     Writing results into the disk with VTU format
          IF (saveVTK) THEN
-            l3 = MOD(cTS,saveIncr) .EQ. 0
-            l4 = cTS .GE. saveATS
-            IF (l3 .AND. l4) THEN
+            l2 = MOD(cTS,saveIncr) .EQ. 0
+            l3 = cTS .GE. saveATS
+            IF (l2 .AND. l3) THEN
                CALL OUTRESULT(timeP, 3, iEqOld)
                CALL WRITEVTUS(An, Yn, Dn)
-               IF (ibFlag) CALL IB_WRITEVTUS(ib%An, ib%Yn, ib%Un)
+               IF (ibFlag) CALL IB_WRITEVTUS(ib%Yn, ib%Un)
             ELSE
                CALL OUTRESULT(timeP, 2, iEqOld)
             END IF
@@ -242,8 +248,8 @@
 
          IF (ibFlag) CALL IB_OUTR()
 
-!     Exiting outer loop if l1 or l2 happens
-         IF (l1 .OR. l2) EXIT
+!     Exiting outer loop if l1
+         IF (l1) EXIT
 
 !     Solution is stored here before replacing it at next time step
          Ao = An
@@ -263,7 +269,7 @@
          GOTO 101
       END IF
 
-      IF (l2 .AND. saveAve) CALL CALCAVE
+      IF (l1 .AND. saveAve) CALL CALCAVE
 
       DEALLOCATE(Ag, Yg, Dg, incL, res)
       CALL FINALIZE()

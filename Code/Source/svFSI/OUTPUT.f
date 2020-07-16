@@ -154,7 +154,7 @@
       OPEN(fid, FILE=TRIM(fName), ACCESS='DIRECT', RECL=recLn)
       IF (.NOT.ibFlag) THEN
          IF (dFlag) THEN
-!           VMS_STRUCT
+!           USTRUCT
             IF (sstEq) THEN
 !              Prestress
                IF (pstEq) THEN
@@ -200,16 +200,14 @@
          IF (dFlag) THEN
             IF (pstEq) THEN
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2            eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%An, ib%Yn,
-     3            ib%Un, ib%Rfb
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, pS0, ib%Yn, ib%Un
             ELSE
                WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2            eq%iNorm, cplBC%xn, Yn, An, Dn, ib%An, ib%Yn, ib%Un,
-     3            ib%Rfb
+     2            eq%iNorm, cplBC%xn, Yn, An, Dn, ib%Yn, ib%Un
             END IF
          ELSE
             WRITE(fid, REC=myID) stamp, cTS, time, CPUT()-timeP(1),
-     2         eq%iNorm, cplBC%xn, Yn, An, ib%An, ib%Yn, ib%Un, ib%Rfb
+     2         eq%iNorm, cplBC%xn, Yn, An, ib%Yn, ib%Un
          END IF
       END IF
       CLOSE(fid)
@@ -239,7 +237,7 @@
          e = s + nsd - 1
          DO iDmn=1, eq(iEq)%nDmn
             IF ( (eq(iEq)%dmn(iDmn)%phys .NE. phys_struct) .AND.
-     2           (eq(iEq)%dmn(iDmn)%phys .NE. phys_vms_struct) .AND.
+     2           (eq(iEq)%dmn(iDmn)%phys .NE. phys_ustruct) .AND.
      3           (eq(iEq)%dmn(iDmn)%phys .NE. phys_lElas)  .AND.
      4           (eq(iEq)%dmn(iDmn)%phys .NE. phys_shell) .AND.
      5           (eq(iEq)%dmn(iDmn)%phys .NE. phys_CMM) ) CYCLE

@@ -35,6 +35,98 @@
 !
 !--------------------------------------------------------------------
 
+      SUBROUTINE CONSTRUCT_LELAS(lM, Ag, Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys
+      REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), dl(:,:),
+     2   bfl(:,:), pS0l(:,:), pSl(:), N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+
+      eNoN = lM%eNoN
+
+!     LELAS: dof = nsd
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), dl(tDof,eNoN),
+     2   bfl(nsd,eNoN), pS0l(nstd,eNoN), pSl(nstd), N(eNoN),
+     3   Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+
+!     Loop over all elements of mesh
+      DO e=1, lM%nEl
+!        Update domain and proceed if domain phys and eqn phys match
+         cDmn  = DOMAIN(lM, cEq, e)
+         cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_lElas) CYCLE
+
+!        Update shape functions for NURBS
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Create local copies
+         pS0l = 0._RKIND
+         DO a=1, eNoN
+            Ac = lM%IEN(a,e)
+            ptr(a)   = Ac
+            xl(:,a)  = x(:,Ac)
+            al(:,a)  = Ag(:,Ac)
+            dl(:,a)  = Dg(:,Ac)
+            bfl(:,a) = Bf(:,Ac)
+            IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+         END DO
+
+!        Gauss integration
+         lR = 0._RKIND
+         lK = 0._RKIND
+         DO g=1, lM%nG
+            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
+               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            END IF
+            w = lM%w(g) * Jac
+            N = lM%N(:,g)
+
+            pSl = 0._RKIND
+            IF (nsd .EQ. 3) THEN
+               CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
+     2            lK)
+
+            ELSE IF (nsd .EQ. 2) THEN
+               CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
+     2            lK)
+
+            END IF
+
+!           Prestress
+            IF (pstEq) THEN
+               DO a=1, eNoN
+                  Ac = ptr(a)
+                  pSn(:,Ac) = pSn(:,Ac) + w*N(a)*pSl(:)
+                  pSa(Ac)   = pSa(Ac)   + w*N(a)
+               END DO
+            END IF
+         END DO ! g: loop
+
+!        Assembly
+#ifdef WITH_TRILINOS
+         IF (eq(cEq)%assmTLS) THEN
+            CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
+         ELSE
+#endif
+            CALL DOASSEM(eNoN, ptr, lK, lR)
+#ifdef WITH_TRILINOS
+         END IF
+#endif
+      END DO ! e: loop
+
+      DEALLOCATE(ptr, xl, al, dl, bfl, pS0l, pSl, N, Nx, lR, lK)
+
+      RETURN
+      END SUBROUTINE CONSTRUCT_LELAS
+!####################################################################
       PURE SUBROUTINE LELAS3D (eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
      2   lR, lK)
       USE COMMOD
@@ -149,27 +241,6 @@
       RETURN
       END SUBROUTINE LELAS3D
 !--------------------------------------------------------------------
-!     This is for boundary elasticity equation
-      PURE SUBROUTINE BLELAS (eNoN, w, N, h, nV, lR)
-      USE COMMOD
-      IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
-      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), h, nV(nsd)
-      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN)
-
-      INTEGER(KIND=IKIND) a, i
-      REAL(KIND=RKIND) hc(nsd)
-
-      hc = h*nV
-      DO a=1,eNoN
-         DO i=1, nsd
-            lR(i,a) = lR(i,a) - w*N(a)*hc(i)
-         END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE BLELAS
-!--------------------------------------------------------------------
       PURE SUBROUTINE LELAS2D (eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
      2   lR, lK)
       USE COMMOD
@@ -253,4 +324,25 @@
 
       RETURN
       END SUBROUTINE LELAS2D
+!####################################################################
+!     This is for boundary elasticity equation
+      PURE SUBROUTINE BLELAS (eNoN, w, N, h, nV, lR)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), h, nV(nsd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN)
+
+      INTEGER(KIND=IKIND) a, i
+      REAL(KIND=RKIND) hc(nsd)
+
+      hc = h*nV
+      DO a=1,eNoN
+         DO i=1, nsd
+            lR(i,a) = lR(i,a) - w*N(a)*hc(i)
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE BLELAS
 !####################################################################
