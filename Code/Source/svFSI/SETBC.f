@@ -310,7 +310,7 @@
 
 !     Now treat Robin BC (stiffness and damping) here
       IF (BTEST(lBc%bType,bType_Robin))
-     2   CALL SETBCRBNL(lFa, lBc%k, lBc%c, Yg, Dg)
+     2   CALL SETBCRBNL(lFa, lBc%k, lBc%c, lBc%rbnN, Yg, Dg)
 
       RETURN
       END SUBROUTINE SETBCNEUL
@@ -405,17 +405,18 @@
       END SUBROUTINE SETBCTRACL
 !--------------------------------------------------------------------
 !     Set Robin BC
-      SUBROUTINE SETBCRBNL(lFa, ks, cs, Yg, Dg)
+      SUBROUTINE SETBCRBNL(lFa, ks, cs, isN, Yg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
+      LOGICAL, INTENT(IN) :: isN
       REAL(KIND=RKIND), INTENT(IN) :: ks, cs, Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, e, g, s, Ac, iM, eNoN, cPhys
       REAL(KIND=RKIND) :: af, am, afm, w, wl, T1, T2, nV(nsd), u(nsd),
-     2   ud(nsd), h(nsd)
+     2   ud(nsd), h(nsd), nDn(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), xl(:,:), yl(:,:), dl(:,:),
@@ -460,7 +461,18 @@
                u(:)  = u(:)  + N(a)*dl(:,a)
                ud(:) = ud(:) + N(a)*yl(:,a)
             END DO
-            h(:) = ks*u(:) + cs*ud(:)
+
+            nDn = MAT_ID(nsd)
+            IF (isN) THEN
+               h(:) = (ks*NORM(u, nV) + cs*NORM(ud, nV)) * nV(:)
+               DO a=1, nsd
+                  DO b=1, nsd
+                     nDn(a,b) = nV(a)*nV(b)
+                  END DO
+               END DO
+            ELSE
+               h(:) = ks*u(:) + cs*ud(:)
+            END IF
 
             IF (nsd .EQ. 3) THEN
                DO a=1, eNoN
@@ -478,26 +490,58 @@
                         T1 = T1*ks
 
 !                       dM_1/dV_1 + af/am*dM_1/dU_1
-                        lKd(1,a,b) = lKd(1,a,b) + T1
-                        lK(1,a,b)  = lK(1,a,b)  + T2
+                        lKd(1,a,b) = lKd(1,a,b) + T1*nDn(1,1)
+                        lK(1,a,b)  = lK(1,a,b)  + T2*nDn(1,1)
+
+!                       dM_1/dV_2 + af/am*dM_1/dU_2
+                        lKd(2,a,b) = lKd(2,a,b) + T1*nDn(1,2)
+                        lK(2,a,b)  = lK(2,a,b)  + T2*nDn(1,2)
+
+!                       dM_1/dV_3 + af/am*dM_1/dU_3
+                        lKd(3,a,b) = lKd(3,a,b) + T1*nDn(1,3)
+                        lK(3,a,b)  = lK(3,a,b)  + T2*nDn(1,3)
+
+!                       dM_2/dV_1 + af/am*dM_2/dU_1
+                        lKd(4,a,b) = lKd(4,a,b) + T1*nDn(2,1)
+                        lK(5,a,b)  = lK(5,a,b)  + T2*nDn(2,1)
 
 !                       dM_2/dV_2 + af/am*dM_2/dU_2
-                        lKd(5,a,b) = lKd(5,a,b) + T1
-                        lK(6,a,b)  = lK(6,a,b)  + T2
+                        lKd(5,a,b) = lKd(5,a,b) + T1*nDn(2,2)
+                        lK(6,a,b)  = lK(6,a,b)  + T2*nDn(2,2)
+
+!                       dM_2/dV_3 + af/am*dM_2/dU_3
+                        lKd(6,a,b) = lKd(6,a,b) + T1*nDn(2,3)
+                        lK(7,a,b)  = lK(7,a,b)  + T2*nDn(2,3)
+
+!                       dM_3/dV_1 + af/am*dM_3/dU_1
+                        lKd(7,a,b) = lKd(7,a,b) + T1*nDn(3,1)
+                        lK(9,a,b)  = lK(9,a,b)  + T2*nDn(3,1)
+
+!                       dM_3/dV_2 + af/am*dM_3/dU_2
+                        lKd(8,a,b) = lKd(8,a,b) + T1*nDn(3,2)
+                        lK(10,a,b) = lK(10,a,b) + T2*nDn(3,2)
 
 !                       dM_3/dV_3 + af/am*dM_3/dU_3
-                        lKd(9,a,b) = lKd(9,a,b) + T1
-                        lK(11,a,b) = lK(11,a,b) + T2
+                        lKd(9,a,b) = lKd(9,a,b) + T1*nDn(3,3)
+                        lK(11,a,b) = lK(11,a,b) + T2*nDn(3,3)
                      END DO
                   END DO
                ELSE
-                 wl = w*(ks*af + cs*am)
-                  DO  a=1, eNoN
+                  wl = w*(ks*af + cs*am)
+                  DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
-                        lK(1,a,b) = lK(1,a,b) - wl*T1
-                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1
-                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b) - wl*T1
+                        lK(1,a,b) = lK(1,a,b) - wl*T1*nDn(1,1)
+                        lK(2,a,b) = lK(2,a,b) - wl*T1*nDn(1,2)
+                        lK(3,a,b) = lK(3,a,b) - wl*T1*nDn(1,3)
+
+                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1*nDn(2,1)
+                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1*nDn(2,2)
+                        lK(dof+3,a,b) = lK(dof+3,a,b) - wl*T1*nDn(2,3)
+
+                        lK(2*dof+1,a,b) = lK(2*dof+1,a,b)-wl*T1*nDn(3,1)
+                        lK(2*dof+2,a,b) = lK(2*dof+2,a,b)-wl*T1*nDn(3,2)
+                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b)-wl*T1*nDn(3,3)
                      END DO
                   END DO
                END IF
@@ -516,12 +560,20 @@
                         T1 = T1*ks
 
 !                       dM_1/dV_1 + af/am*dM_1/dU_1
-                        lKd(1,a,b) = lKd(1,a,b) + T1
-                        lK(1,a,b)  = lK(1,a,b)  + T2
+                        lKd(1,a,b) = lKd(1,a,b) + T1*nDn(1,1)
+                        lK(1,a,b)  = lK(1,a,b)  + T2*nDn(1,1)
+
+!                       dM_1/dV_2 + af/am*dM_1/dU_2
+                        lKd(2,a,b) = lKd(2,a,b) + T1*nDn(1,2)
+                        lK(2,a,b)  = lK(2,a,b)  + T2*nDn(1,2)
+
+!                       dM_2/dV_1 + af/am*dM_2/dU_1
+                        lKd(3,a,b) = lKd(3,a,b) + T1*nDn(2,1)
+                        lK(4,a,b)  = lK(4,a,b)  + T2*nDn(2,1)
 
 !                       dM_2/dV_2 + af/am*dM_2/dU_2
-                        lKd(4,a,b) = lKd(4,a,b) + T1
-                        lK(5,a,b)  = lK(5,a,b)  + T2
+                        lKd(4,a,b) = lKd(4,a,b) + T1*nDn(2,2)
+                        lK(5,a,b)  = lK(5,a,b)  + T2*nDn(2,2)
                      END DO
                   END DO
                ELSE
@@ -529,8 +581,10 @@
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
-                        lK(1,a,b) = lK(1,a,b) - wl*T1
-                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1
+                        lK(1,a,b) = lK(1,a,b) - wl*T1*nDn(1,1)
+                        lK(2,a,b) = lK(2,a,b) - wl*T1*nDn(1,2)
+                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1*nDn(2,1)
+                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1*nDn(2,2)
                      END DO
                   END DO
                END IF
