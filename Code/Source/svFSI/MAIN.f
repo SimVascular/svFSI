@@ -222,6 +222,8 @@
                READ(664,'(I10)',ADVANCE='NO',IOSTAT=ierr) stopTS
                CLOSE(664)
                IF (ierr .EQ. -1) stopTS = cTS
+            ELSE
+               stopTS = nTS
             END IF
          END IF
          CALL cm%bcast(stopTS)

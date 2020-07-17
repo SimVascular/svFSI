@@ -184,6 +184,8 @@
 !        Whether load vector changes with deformation
 !        (Neu - struct/ustruct only)
          LOGICAL :: flwP = .FALSE.
+!        Robin: apply only in normal direction
+         LOGICAL :: rbnN = .FALSE.
 !        Pre/Res/Flat/Para... boundary types
          INTEGER(KIND=IKIND) :: bType = 0
 !        Pointer to coupledBC%face

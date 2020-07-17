@@ -1106,31 +1106,31 @@
          CASE('ns', 'bpn', 'bipn')
             lSolverType = lSolver_NS
             FSILSType   = LS_TYPE_NS
-            stmp = CLR("BIPN")
+            stmp = CLR("BIPN",3)
          CASE('gmres')
             lSolverType = lSolver_GMRES
             FSILSType   = LS_TYPE_GMRES
-            stmp = CLR("GMRES")
+            stmp = CLR("GMRES",3)
          CASE('cg')
             lSolverType = lSolver_CG
             FSILSType   = LS_TYPE_CG
-            stmp = CLR("CG")
+            stmp = CLR("CG",3)
          CASE('bicg', 'bicgs')
             lSolverType = lSolver_BICGS
             FSILSType   = LS_TYPE_BICGS
-            stmp = CLR("BiCGStab")
+            stmp = CLR("BiCGStab",3)
          CASE DEFAULT
             err = TRIM(list%ping("LS type",lPL))//" Undefined type"
          END SELECT
       ELSE
          IF (lSolverType .EQ. lSolver_NS) THEN
-            stmp = CLR("BIPN")
+            stmp = CLR("BIPN",3)
          ELSE IF (lSolverType .EQ. lSolver_GMRES) THEN
-            stmp = CLR("GMRES")
+            stmp = CLR("GMRES",3)
          ELSE IF (lSolverType .EQ. lSolver_CG) THEN
-            stmp = CLR("CG")
+            stmp = CLR("CG",3)
          ELSE IF (lSolverType .EQ. lSolver_BICGS) THEN
-            stmp = CLR("BiCGStab")
+            stmp = CLR("BiCGStab",3)
          ELSE
             err = " Undefined linear solver"
          END IF
@@ -1159,40 +1159,40 @@
             CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
                lEq%useTLS = .FALSE.
-               stmp = CLR("FSILS")
+               stmp = CLR("FSILS",3)
             CASE('rcs', 'row-column-scaling')
                lEq%ls%PREC_Type = PREC_RCS
                lEq%useTLS = .FALSE.
-               stmp = CLR("RCS")
+               stmp = CLR("RCS",3)
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-Diagonal")
+               stmp = CLR("Trilinos-Diagonal",3)
             CASE('trilinos-blockjacobi', 'blockjacobi')
                lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-BlockJacobi")
+               stmp = CLR("Trilinos-BlockJacobi",3)
             CASE('trilinos-ilu')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILU
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-ILU")
+               stmp = CLR("Trilinos-ILU",3)
             CASE('trilinos-ilut')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-ILUT")
+               stmp = CLR("Trilinos-ILUT",3)
             CASE('trilinos-ic')
                lEq%ls%PREC_Type = PREC_TRILINOS_IC
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-IC")
+               stmp = CLR("Trilinos-IC",3)
             CASE('trilinos-ict')
                lEq%ls%PREC_Type = PREC_TRILINOS_ICT
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-ICT")
+               stmp = CLR("Trilinos-ICT",3)
             CASE ('trilinos-ml')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
                lEq%useTLS = .TRUE.
-               stmp = CLR("Trilinos-ML")
+               stmp = CLR("Trilinos-ML",3)
 #endif
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
@@ -1201,9 +1201,9 @@
          ELSE
             SELECT CASE (lEq%ls%PREC_Type)
             CASE (PREC_FSILS)
-               stmp = CLR("FSILS")
+               stmp = CLR("FSILS",3)
             CASE (PREC_TRILINOS_DIAGONAL)
-               stmp = CLR("Trilinos-Diagonal")
+               stmp = CLR("Trilinos-Diagonal",3)
             CASE DEFAULT
                err = " Undefined preconditioner"
             END SELECT
@@ -1708,6 +1708,7 @@
       IF (BTEST(lBc%bType, bType_Robin)) THEN
          lPtr => list%get(lBc%k, "Stiffness", 1)
          lPtr => list%get(lBc%c, "Damping", 1)
+         lPtr => list%get(lBc%rbnN, "Apply along normal direction")
       END IF
 
 !     To impose value or flux

@@ -658,6 +658,7 @@
       CALL cm%bcast(lBc%weakDir)
       CALL cm%bcast(lBc%tauB)
       CALL cm%bcast(lBc%flwP)
+      CALL cm%bcast(lBc%rbnN)
       IF (BTEST(lBc%bType,bType_RCR)) THEN
          CALL cm%bcast(lBc%RCR%Rp)
          CALL cm%bcast(lBc%RCR%C)
