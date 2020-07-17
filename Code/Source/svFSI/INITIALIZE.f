@@ -331,12 +331,9 @@
 
 !     Initialize function spaces
       DO iM=1, nMsh
-         ALLOCATE(msh(iM)%fs(msh(iM)%nFs))
          CALL INITFSMSH(msh(iM))
          DO iFa=1, msh(iM)%nFa
-            msh(iM)%fa(iFa)%nFs = msh(iM)%nFs
-            ALLOCATE(msh(iM)%fa(iFa)%fs(msh(iM)%fa(iFa)%nFs))
-            CALL INITFSFACE(msh(iM)%fa(iFa))
+            CALL INITFSFACE(msh(iM), msh(iM)%fa(iFa))
          END DO
       END DO
 

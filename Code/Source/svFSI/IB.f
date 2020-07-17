@@ -181,7 +181,7 @@
 
          lPtr => lPM%get(fTmp,"Domain (IB) file path")
          IF (ASSOCIATED(lPtr)) THEN
-            i= LEN(TRIM(fTmp%fname))
+            i = LEN(TRIM(fTmp%fname))
             fExt = fTmp%fname(i-2:i)
             IF (TRIM(fExt).EQ."vtp" .OR. TRIM(fExt).EQ."vtu") THEN
                CALL SETDMNIDVTK(ib%msh(iM), fTmp%fname, "DOMAIN_ID")
@@ -260,60 +260,6 @@
       RETURN
       END SUBROUTINE IB_READMSH
 !####################################################################
-!     This routine reads IB options
-      SUBROUTINE IB_READOPTS(list)
-      USE COMMOD
-      USE LISTMOD
-      IMPLICIT NONE
-      TYPE(listType), INTENT(INOUT) :: list
-
-      CHARACTER(LEN=stdL) :: ctmp, stmp
-      TYPE(listType), POINTER :: lIBs, lPtr
-
-      lIBs => list%get(ctmp, "IB method")
-      IF (ASSOCIATED(lIBs)) THEN
-         CALL TO_LOWER(ctmp)
-         SELECT CASE (ctmp)
-         CASE ("ifem")
-            ib%mthd = ibMthd_IFEM
-            stmp = " IB method "//CLR("IFEM")
-
-         CASE ("feib", "feibs", "feibstab")
-            ib%mthd = ibMthd_IFEM
-            stmp = " IB method "//CLR("FEIBStab")
-
-         CASE DEFAULT
-            err = " Invalid IB method"
-
-         END SELECT
-
-         lPtr => lIBs%get(ctmp, "Coupling")
-         CALL TO_LOWER(ctmp)
-         SELECT CASE (ctmp)
-         CASE ("explicit","e")
-            ib%cpld = ibCpld_E
-            stmp = TRIM(stmp)//" with "//CLR("Explicit")//" coupling"
-
-         CASE ("implicit", "i")
-            ib%cpld = ibCpld_I
-            stmp = TRIM(stmp)//" with "//CLR("Implicit")//" coupling"
-
-         CASE DEFAULT
-            err = " Invalid IB coupling"
-
-         END SELECT
-         std = TRIM(stmp)
-      ELSE
-         std = " Choosing default IB method "//CLR("IFEM")//" with "//
-     2      CLR("Explicit")//" coupling"
-
-         ib%mthd = ibMthd_IFEM
-         ib%cpld = ibCpld_E
-      END IF
-
-      RETURN
-      END SUBROUTINE IB_READOPTS
-!####################################################################
 !     This routine reads IB domain properties and BCs in a given Eq
       SUBROUTINE IB_READEQ(lEq, list, eqName)
       USE COMMOD
@@ -362,14 +308,12 @@
          CASE("struct")
             lEq%dmnIB(iDmn)%phys = phys_struct
             propL(1) = solid_density
-            propL(2) = elasticity_modulus
-            propL(3) = poisson_ratio
-            propL(4) = solid_viscosity
-            propL(5) = ctau_M
-            propL(6) = ctau_C
-            propL(7) = f_x
-            propL(8) = f_y
-            IF (nsd .EQ. 3) propL(9) = f_z
+            propL(2) = solid_viscosity
+            propL(3) = elasticity_modulus
+            propL(4) = poisson_ratio
+            propL(5) = f_x
+            propL(6) = f_y
+            IF (nsd .EQ. 3) propL(7) = f_z
 
             nDOP = (/4,1,0,0/)
             outPuts(1) = out_displacement
@@ -391,26 +335,19 @@
                EXIT
             CASE (solid_density)
                lPtr => lPD%get(rtmp,"Density",1,ll=0._RKIND)
+            CASE (solid_viscosity)
+               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0._RKIND)
             CASE (poisson_ratio)
                lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0._RKIND,
      2            ul=0.5_RKIND)
-            CASE (solid_viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (f_x)
                lPtr => lPD%get(rtmp,"Force_X")
             CASE (f_y)
                lPtr => lPD%get(rtmp,"Force_Y")
             CASE (f_z)
                lPtr => lPD%get(rtmp,"Force_Z")
-            CASE (ctau_M)
-               IF (ib%mthd .EQ. ibMthd_FEIBStab) rtmp = 1.E-3_RKIND
-               lPtr => lPD%get(rtmp,
-     2            "Momentum stabilization coefficient")
-            CASE (ctau_C)
-               lPtr => lPD%get(rtmp,
-     2            "Continuity stabilization coefficient")
             CASE DEFAULT
                err = "Undefined properties (IB)"
             END SELECT
@@ -424,6 +361,11 @@
 
 !     Read IB outputs
       CALL IB_READOUTPUTS(lEq, nDOP, outPuts, list)
+
+!     Set number of function spaces
+      DO i=1, nMsh
+         ib%msh(i)%nFs = 1
+      END DO
 
 !--------------------------------------------------------------------
 !     Searching for BCs on immersed bodies
@@ -596,11 +538,8 @@
       CASE ("Neumann","Neu")
          lBc%bType = IBSET(lBc%bType,bType_Neu)
       CASE DEFAULT
-         err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
+         err = TRIM(list%ping("Type",lPtr))//" Unexpected IB BC type"
       END SELECT
-
-!     Weak Dirichlet BC for fluid/FSI equations
-      lBc%weakDir = .FALSE.
 
       ALLOCATE(lBc%eDrn(nsd))
       lBc%eDrn = 0
@@ -657,6 +596,8 @@
          err = " Cannot apply Resistance BCs for immersed bodies"
       CASE ('RCR', 'Windkessel')
          err = " Cannot apply RCR BCs for immersed bodies"
+      CASE ('Spatial')
+         err = " Cannot apply Spatial Neu BCs for immersed bodies"
       CASE ('General')
          lBc%bType = IBSET(lBc%bType,bType_gen)
          lPtr => list%get(ftmp,"BCT file path")
@@ -790,6 +731,9 @@
          err = TRIM(list%ping("Profile",lPtr))//" Unexpected profile"
       END SELECT
 
+      lBc%weakDir = .FALSE.
+      lBc%flwP = .FALSE.
+
       RETURN
       END SUBROUTINE IB_READBC
 !####################################################################
@@ -839,6 +783,14 @@
          END DO
       END IF
 
+!     Initialize function spaces
+      DO iM=1, ib%nMsh
+         CALL INITFSMSH(ib%msh(iM))
+         DO iFa=1, ib%msh(iM)%nFa
+            CALL INITFSFACE(ib%msh(iM), ib%msh(iM)%fa(iFa))
+         END DO
+      END DO
+
 !     Calculating the volume of each domain
       s = 1._RKIND
       DO iEq=1, nEq
@@ -855,7 +807,7 @@
       DO iM=1, ib%nMsh
          DO iFa=1, ib%msh(iM)%nFa
             ib%msh(iM)%fa(iFa)%iM = iM
-            CALL IB_FACEINI(ib%msh(iM)%fa(iFa))
+            CALL IB_FACEINI(ib%msh(iM), ib%msh(iM)%fa(iFa))
          END DO
       END DO
 
@@ -915,55 +867,160 @@
       END SUBROUTINE IB_INIT
 !####################################################################
 !     Initializing immersed boundary faces
-      SUBROUTINE IB_FACEINI(lFa)
+      SUBROUTINE IB_FACEINI(lM, lFa)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
-      INTEGER(KIND=IKIND) e, a, Ac, g, iM
-      REAL(KIND=RKIND) tmp, area, n(nsd), Jac
+      LOGICAL flag
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, Bc, Ec
+      REAL(KIND=RKIND) area, tmp, xi0(nsd), xi(nsd), xp(nsd), nV(nsd)
+      TYPE(fsType) :: fs, fsb
 
-      REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:)
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:), sVl(:,:), xbl(:,:),
+     2   xl(:,:), N(:), Nxi(:,:)
 
-!     Calculating the center of the face, diameter and its area
-      iM = lFa%iM
-      IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
-      ALLOCATE(lFa%nV(nsd,lFa%nNo))
-
-      ALLOCATE(sV(nsd,ib%tnNo))
-      sV   = 0._RKIND
-      area = 0._RKIND
-      DO e=1, lFa%nEl
-         IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(ib%msh(iM), lFa, e)
-         DO g=1, lFa%nG
-            CALL GNNIB(lFa, e, g, n)
-            Jac  = SQRT(NORM(n))
-            area = area + Jac*lFa%w(g)
-            DO a=1, lFa%eNoN
-               Ac       = lFa%IEN(a,e)
-               sV(:,Ac) = sV(:,Ac) + n*lFa%N(a,g)*lFa%w(g)
-            END DO
-         END DO
-      END DO
-      lFa%area = area
-      std = "    Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
+!     Calculating face area
+      ALLOCATE(N(ib%tnNo))
+      N    = 1._RKIND
+      area = Integ(lFa, N)
+      std  = "    Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
       IF (ISZERO(area)) THEN
          IF (cm%mas()) wrn = " <"//TRIM(lFa%name)//"> area is zero"
       END IF
+      lFa%area = area
+      DEALLOCATE(N)
 
+!     Compute face normals at nodes
+      IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
+      ALLOCATE(lFa%nV(nsd,lFa%nNo), sV(nsd,ib%tnNo))
+
+      flag = .FALSE.
+      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_QTR .OR.
+     2    lM%eType.EQ.eType_BIQ .OR. lM%eType.EQ.eType_QTE) THEN
+         flag =.TRUE.
+      END IF
+
+      IF (.NOT.flag) THEN
+!        For linear elements or NURBS, we simply project element normals
+!        to nodes
+         DO e=1, lFa%nEl
+            IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(lM, lFa, e)
+            DO g=1, lFa%nG
+               CALL GNNIB(lFa, e, g, nV)
+               DO a=1, lFa%eNoN
+                  Ac       = lFa%IEN(a,e)
+                  sV(:,Ac) = sV(:,Ac) + nV*lFa%N(a,g)*lFa%w(g)
+               END DO
+            END DO
+         END DO
+
+      ELSE
+!        For higher order elements, use reduced order basis on mesh
+!        to project element normals. Lumping method is used to project
+!        to face corners. Normals at edge nodes are computed by simple
+!        interpolation from reduced basis. Standard lumping using higher
+!        order basis could lead to spurious errors
+         CALL SETTHOODFS(fs, lM%eType)
+         CALL ALLOCFS(fs, nsd)
+         CALL SETTHOODFS(fsb, lFa%eType)
+         CALL GETGIP(nsd, fs%eType, fs%nG, fs%w, fs%xi)
+         DO g=1, fs%nG
+            CALL GETGNN(nsd, fs%eType, fs%eNoN, fs%xi(:,g), fs%N(:,g),
+     2         fs%Nx(:,:,g))
+         END DO
+         CALL GETNNBNDS(fs%eType, fs%eNoN, fs%xib, fs%Nb)
+
+         xi0 = 0._RKIND
+         DO g=1, fs%nG
+            xi0 = xi0 + fs%xi(:,g)
+         END DO
+         xi0 = xi0 / REAL(fs%nG, KIND=RKIND)
+
+         ALLOCATE(sVl(nsd,lFa%eNoN), xbl(nsd,lFa%eNoN), xl(nsd,fs%eNoN),
+     2      N(fs%eNoN), Nxi(nsd,fs%eNoN), ptr(fs%eNoN))
+         DO e=1, lFa%nEl
+            DO a=1, lFa%eNoN
+               Ac = lFa%IEN(a,e)
+               xbl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+            END DO
+
+            Ec  = lFa%gE(e)
+            ptr = 0
+            DO a=1, fs%eNoN
+               Ac = lM%IEN(a,Ec)
+               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+               DO b=1, fsb%eNoN
+                  Bc = lFa%IEN(b,e)
+                  IF (Ac .EQ. Bc) THEN
+                     ptr(a) = b
+                     EXIT
+                  END IF
+               END DO
+            END DO
+
+            sVl(:,:) = 0._RKIND
+            DO g=1, lFa%nG
+               xp = 0._RKIND
+               DO a=1, lFa%eNoN
+                  xp = xp + lFa%N(a,g)*xbl(:,a)
+               END DO
+
+               xi = xi0
+               CALL GETNNX(fs%eType, fs%eNoN, xl, fs%xib, fs%Nb, xp,
+     2            xi, N, Nxi)
+
+               CALL GNNIB(lFa, e, g, nV)
+
+               DO a=1, fs%eNoN
+                  b = ptr(a)
+                  IF (b .EQ. 0) CYCLE
+                  Ac = lM%IEN(a,Ec)
+                  sVl(:,b) = sVl(:,b) + lFa%w(g)*N(a)*nV(:)
+                  sV(:,Ac) = sV(:,Ac) + sVl(:,b)
+               END DO
+            END DO
+
+            DO b=fsb%eNoN+1, lFa%eNoN
+               xp = xbl(:,b)
+               xi = xi0
+               CALL GETNNX(fs%eType, fs%eNoN, xl, fs%xib, fs%Nb, xp,
+     2            xi, N, Nxi)
+
+               DO a=1, fs%eNoN
+                  IF (ptr(a) .EQ. 0) CYCLE
+                  sVl(:,b) = sVl(:,b) + N(a)*sVl(:,ptr(a))
+               END DO
+
+               Ac = lFa%IEN(b,e)
+               sV(:,Ac) = sV(:,Ac) + sVl(:,b)
+            END DO
+         END DO
+         DEALLOCATE(sVl, xbl, xl, N, Nxi, ptr)
+         CALL DESTROY(fs)
+         CALL DESTROY(fsb)
+      END IF
+
+      flag = .TRUE.
       DO a=1, lFa%nNo
          Ac  = lFa%gN(a)
          tmp = SQRT(NORM(sV(:,Ac)))
          IF (ISZERO(tmp)) THEN
-            wrn = " Skipping normal calculation of node "//a//
-     2         " in face <"//TRIM(lFa%name)//">"
+            IF (flag) THEN
+               wrn = " Skipping normal calculation of node "//a//
+     2            " in face <"//TRIM(lFa%name)//">"
+               flag = .FALSE.
+            END IF
             lFa%nV(:,a) = 0._RKIND
             lFa%nV(1,a) = 1._RKIND
             CYCLE
          END IF
          lFa%nV(:,a) = sV(:,Ac)/tmp
       END DO
+      DEALLOCATE(sV)
 
       RETURN
       END SUBROUTINE IB_FACEINI

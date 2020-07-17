@@ -221,7 +221,6 @@
          ibFlag = .TRUE.
          ALLOCATE(ib)
          CALL IB_READMSH(list)
-         CALL IB_READOPTS(list)
       END IF
 
 !--------------------------------------------------------------------

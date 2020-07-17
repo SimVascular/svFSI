@@ -375,9 +375,6 @@
 
       IF (cm%slv()) ALLOCATE(ib)
 
-      CALL cm%bcast(ib%mthd)
-      CALL cm%bcast(ib%cpld)
-
       CALL cm%bcast(ib%nMsh)
       CALL cm%bcast(ib%tnNo)
       IF (cm%slv()) THEN
@@ -405,16 +402,19 @@
 
       CALL cm%bcast(lM%lShpF)
       CALL cm%bcast(lM%lShl)
+      CALL cm%bcast(lM%lFib)
       CALL cm%bcast(lM%eType)
       CALL cm%bcast(lM%eNoN)
       CALL cm%bcast(lM%gnEl)
       CALL cm%bcast(lM%gnNo)
       CALL cm%bcast(lM%nFa)
+      CALL cm%bcast(lM%nFs)
       CALL cm%bcast(lM%nG)
-      CALL cm%bcast(lM%name)
+      CALL cm%bcast(lM%vtkType)
+      CALL cm%bcast(lM%nFn)
       CALL cm%bcast(lM%scF)
       CALL cm%bcast(lM%dx)
-      CALL cm%bcast(lM%nFn)
+      CALL cm%bcast(lM%name)
 
       IF (cm%slv()) THEN
          lM%nNo = lM%gnNo
@@ -827,6 +827,7 @@
       CALL cm%bcast(lBc%r)
       CALL cm%bcast(lBc%g)
       CALL cm%bcast(lBc%weakDir)
+      CALL cm%bcast(lBc%flwP)
 
 !     Communicating time-dependant BC data
       flag = ALLOCATED(lBc%gt)

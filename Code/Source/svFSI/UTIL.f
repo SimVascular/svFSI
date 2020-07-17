@@ -95,7 +95,7 @@
 
       INTERFACE STR
          MODULE PROCEDURE :: DTSTR, NDTSTR, VDTSTR, RTSTR, NRTSTR,
-     2      ITSTR, NITSTR
+     2      ITSTR, NITSTR, LLSTR
       END INTERFACE STR
 
       INTERFACE OPERATOR(//)
@@ -735,6 +735,21 @@
 
       RETURN
       END FUNCTION NITSTR
+!--------------------------------------------------------------------
+!     This is for logicals
+      PURE FUNCTION LLSTR(flag) RESULT(string)
+      IMPLICIT NONE
+      LOGICAL, INTENT(IN) :: flag
+      CHARACTER(LEN=1) string
+
+      IF (flag) THEN
+         string = 'T'
+      ELSE
+         string = 'F'
+      END IF
+
+      RETURN
+      END FUNCTION LLSTR
 !####################################################################
 !     Produces a color
       PURE FUNCTION CLR(iStr,clId) RESULT(oStr)

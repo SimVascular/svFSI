@@ -705,10 +705,6 @@
       TYPE ibType
 !        Whether any file being saved
          LOGICAL :: savedOnce = .FALSE.
-!        IB formulation
-         INTEGER(KIND=IKIND) :: mthd = ibMthd_NA
-!        IB coupling
-         INTEGER(KIND=IKIND) :: cpld = ibCpld_NA
 !        Current IB domain ID
          INTEGER(KIND=IKIND) :: cDmn
 !        Current equation
