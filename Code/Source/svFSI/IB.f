@@ -3503,7 +3503,7 @@ c      END DO
 
       INTEGER(KIND=IKIND) a, b, e, g, i, j, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoNb, eNoN, nFn
-      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), Gmat(nsd,nsd)
+      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), Gmat(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
      2   Nx(:,:), xbl(:,:), xl(:,:), al(:,:), yl(:,:), ul(:,:), fN(:,:),
@@ -3557,9 +3557,9 @@ c      END DO
                END IF
             END DO
 
-!           Compute shapefunction gradients and element Jacobian. The
-!           shapefunction gradients will be used to compute deformation
-!           gradient tensor
+!           Compute shapefunction gradients and element Jacobian in the
+!           reference configuration. The shapefunction gradients will be
+!           used to compute deformation gradient tensor
             CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,
      2         Gmat)
             IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
@@ -3589,9 +3589,17 @@ c      END DO
                xp(:) = xp(:) + Nb(b)*(xbl(:,b) + ib%Un(:,Bc))
             END DO
 
+!           Initialize parametric coordinate
+            xi = 0._RKIND
+            DO a=1, msh(jM)%nG
+               xi = xi + msh(jM)%xi(:,a)
+            END DO
+            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
+
 !           Find shape functions and derivatives on the background mesh
-!           at the integration point
-            CALL IB_GETNNx(msh(jM), xl, xp, N, Nxi)
+!           at the integration point.
+            CALL GETNNX(msh(jM)%eType, eNoN, xl, msh(jM)%xib,
+     2         msh(jM)%Nb, xp, xi, N, Nxi)
 
 !           Get the shapefunction derivatives in physical space
             CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Gmat)
@@ -3606,7 +3614,7 @@ c      END DO
                ib%R(:,Ac) = ib%R(:,Ac) + lR(:,a)
             END DO
 
-            DEALLOCATE(N, Nxi, Nx, xl, yl, lR)
+            DEALLOCATE(N, Nxi, Nx, xl, al, yl, lR)
          END DO
          DEALLOCATE(Nb, Nbx, xbl, ul, fN)
       END DO
@@ -3628,910 +3636,335 @@ c      END DO
       REAL(KIND=RKIND), INTENT(OUT) :: lR(nsd+1,eNoN)
 
       lR = 0._RKIND
-c      IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-c         IF (nsd .EQ. 3) THEN
-c            CALL IB_IFEM3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
-c     2         ul, fN, lR)
-c         ELSE
-c            CALL IB_IFEM2D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
-c     2         ul, fN, lR)
-c         END IF
-c      ELSE IF (ib%mthd .EQ. ibMthd_FEIBStab) THEN
-c         IF (nsd .EQ. 3) THEN
-c            CALL IB_FEIBStab3D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
-c     2         Gm, al, yl, ul, fN, lR)
-c         ELSE
-c            CALL IB_FEIBStab2D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
-c     2         Gm, al, yl, ul, fN, lR)
-c         END IF
-c      END IF
+      IF (nsd .EQ. 3) THEN
+         CALL IB_IFEM3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2      ul, fN, lR)
+      ELSE
+         CALL IB_IFEM2D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2      ul, fN, lR)
+      END IF
 
       RETURN
       END SUBROUTINE IB_CALCFFSIL
-c!--------------------------------------------------------------------
-c!     Compute the 3D FSI force due to IB in reference configuration
-c      SUBROUTINE IB_IFEM3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
-c     2   ul, fN, lR)
-c      USE COMMOD
-c      USE ALLFUN
-c      IMPLICIT NONE
-c      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
-c      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb),
-c     2   N(eNoN), Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ul(3,eNoNb),
-c     3   fN(3,nFn)
-c      REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
-
-c      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
-c      REAL(KIND=RKIND) :: ya, rt, fb(3), vd(3), v(3), vx(3,3), vVx(3),
-c     2   rV(3), rM(3,3)
-
-c!     Solid domain parameters
-c      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, F(3,3), Fi(3,3),
-c     2   S(3,3), PFt(3,3), CC(3,3,3,3)
-c      TYPE(stModelType) :: stModel
-
-c!     Fluid domain parameters
-c      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(3,3), mu_x
-
-c!     Define IB struct parameters
-c      iEq     = ib%cEq
-c      iDmn    = ib%cDmn
-c      stModel = eq(iEq)%dmnIB(iDmn)%stM
-c      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-c      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
-c      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-c      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
-
-c!     Define fluid parameters
-c      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-
-c!     Body force
-c      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-c      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-c      fb(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
-
-c!     Active strain/stress parameter
-c      ya = 0._RKIND
-
-c!     Inertia and body force
-c      vd     = -fb
-c      v      = 0._RKIND
-c      vx     = 0._RKIND
-c      DO a=1, eNoN
-c!        Acceleration (dv_i/dt)
-c         vd(1) = vd(1) + al(1,a)*N(a)
-c         vd(2) = vd(2) + al(2,a)*N(a)
-c         vd(3) = vd(3) + al(3,a)*N(a)
-
-c!        Velocity, v
-c         v(1) = v(1) + yl(1,a)*N(a)
-c         v(2) = v(2) + yl(2,a)*N(a)
-c         v(3) = v(3) + yl(3,a)*N(a)
-
-c!        Grad v (v_i,j) w.r.t. current coordinates
-c         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
-c         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
-c         vx(1,3) = vx(1,3) + yl(1,a)*Nx(3,a)
-
-c         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
-c         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
-c         vx(2,3) = vx(2,3) + yl(2,a)*Nx(3,a)
-
-c         vx(3,1) = vx(3,1) + yl(3,a)*Nx(1,a)
-c         vx(3,2) = vx(3,2) + yl(3,a)*Nx(2,a)
-c         vx(3,3) = vx(3,3) + yl(3,a)*Nx(3,a)
-c      END DO
-
-c!     Deformation gradient tensor
-c      F      = 0._RKIND
-c      F(1,1) = 1._RKIND
-c      F(2,2) = 1._RKIND
-c      F(3,3) = 1._RKIND
-c      DO b=1, eNoNb
-c!        Deformation tensor, F_{iI}. Here the shape function derivatives
-c!        are w.r.t. the reference coordinates
-c         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
-c         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
-c         F(1,3) = F(1,3) + ul(1,b)*Nbx(3,b)
-
-c         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
-c         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
-c         F(2,3) = F(2,3) + ul(2,b)*Nbx(3,b)
-
-c         F(3,1) = F(3,1) + ul(3,b)*Nbx(1,b)
-c         F(3,2) = F(3,2) + ul(3,b)*Nbx(2,b)
-c         F(3,3) = F(3,3) + ul(3,b)*Nbx(3,b)
-c      END DO
-c      Jac = MAT_DET(F, nsd)
-c      Fi  = MAT_INV(F, nsd)
-
-c!     V. grad V
-c      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
-c      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
-c      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
-
-c!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
-c      es(1,1) = vx(1,1) + vx(1,1)
-c      es(2,2) = vx(2,2) + vx(2,2)
-c      es(3,3) = vx(3,3) + vx(3,3)
-
-c      es(1,2) = vx(1,2) + vx(2,1)
-c      es(1,3) = vx(1,3) + vx(3,1)
-c      es(2,3) = vx(2,3) + vx(3,2)
-
-c      es(2,1) = es(1,2)
-c      es(3,1) = es(1,3)
-c      es(3,2) = es(2,3)
-
-c!     Shear-rate := (2*e_ij*e_ij)^.5
-c      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
-c     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
-c     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-c      gam = SQRT(0.5_RKIND*gam)
-
-c!     Compute viscosity based on shear-rate and chosen viscosity model
-c      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rt, mu_x)
-
-c!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-c!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
-c!     For compressible solids, Svol = J*p*Cinv where p is computed
-c!     based on the dilational penalty model
-c      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
-
-c!     1st Piola-Kirchhoff stress, P = F * S
-c      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
-c      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
-c      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
-
-c      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
-c      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
-c      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
-
-c      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
-c      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
-c      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
-
-c!     P * F_transpose
-c      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
-c      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
-c      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
-
-c      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
-c      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
-c      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
-
-c      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
-c      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
-c      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
-
-c!     Stress contribution
-c      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1)
-c      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2)
-c      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3)
-
-c      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1)
-c      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2)
-c      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3)
-
-c      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1)
-c      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2)
-c      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3)
-
-c!     Inertia contribution
-c      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1))
-c      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2))
-c      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3))
-
-c!     Residue
-c      DO a=1, eNoN
-c         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
-c     2      + Nx(3,a)*rM(1,3))
-c         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
-c     2      + Nx(3,a)*rM(2,3))
-c         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
-c     2      + Nx(3,a)*rM(3,3))
-c      END DO
-
-c      RETURN
-c      END SUBROUTINE IB_IFEM3D
-c!--------------------------------------------------------------------
-c!     Compute the 2D FSI force due to IB in reference configuration
-c      SUBROUTINE IB_IFEM2D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
-c     2   ul, fN, lR)
-c      USE COMMOD
-c      USE ALLFUN
-c      IMPLICIT NONE
-c      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
-c      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb),
-c     2   N(eNoN), Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ul(3,eNoNb),
-c     3   fN(3,nFn)
-c      REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
-
-c      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
-c      REAL(KIND=RKIND) :: ya, rt, fb(3), vd(3), v(3), vx(3,3), vVx(3),
-c     2   rV(3), rM(3,3)
-
-c!     Solid domain parameters
-c      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, F(3,3), Fi(3,3),
-c     2   S(3,3), PFt(3,3), CC(3,3,3,3)
-c      TYPE(stModelType) :: stModel
-
-c!     Fluid domain parameters
-c      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(3,3), mu_x
-
-c!     Define IB struct parameters
-c      iEq     = ib%cEq
-c      iDmn    = ib%cDmn
-c      stModel = eq(iEq)%dmnIB(iDmn)%stM
-c      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-c      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
-c      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-c      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
-
-c!     Define fluid parameters
-c      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-
-c!     Body force
-c      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-c      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-c      fb(3)  = eq(iEq)%dmnIB(iDmn)%prop(f_z)
-
-c!     Active strain/stress parameter
-c      ya = 0._RKIND
-
-c!     Inertia and body force
-c      vd     = -fb
-c      v      = 0._RKIND
-c      vx     = 0._RKIND
-c      DO a=1, eNoN
-c!        Acceleration (dv_i/dt)
-c         vd(1) = vd(1) + al(1,a)*N(a)
-c         vd(2) = vd(2) + al(2,a)*N(a)
-c         vd(3) = vd(3) + al(3,a)*N(a)
-
-c!        Velocity, v
-c         v(1) = v(1) + yl(1,a)*N(a)
-c         v(2) = v(2) + yl(2,a)*N(a)
-c         v(3) = v(3) + yl(3,a)*N(a)
-
-c!        Grad v (v_i,j) w.r.t. current coordinates
-c         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
-c         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
-c         vx(1,3) = vx(1,3) + yl(1,a)*Nx(3,a)
-
-c         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
-c         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
-c         vx(2,3) = vx(2,3) + yl(2,a)*Nx(3,a)
-
-c         vx(3,1) = vx(3,1) + yl(3,a)*Nx(1,a)
-c         vx(3,2) = vx(3,2) + yl(3,a)*Nx(2,a)
-c         vx(3,3) = vx(3,3) + yl(3,a)*Nx(3,a)
-c      END DO
-
-c!     Deformation gradient tensor
-c      F      = 0._RKIND
-c      F(1,1) = 1._RKIND
-c      F(2,2) = 1._RKIND
-c      F(3,3) = 1._RKIND
-c      DO b=1, eNoNb
-c!        Deformation tensor, F_{iI}. Here the shape function derivatives
-c!        are w.r.t. the reference coordinates
-c         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
-c         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
-c         F(1,3) = F(1,3) + ul(1,b)*Nbx(3,b)
-
-c         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
-c         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
-c         F(2,3) = F(2,3) + ul(2,b)*Nbx(3,b)
-
-c         F(3,1) = F(3,1) + ul(3,b)*Nbx(1,b)
-c         F(3,2) = F(3,2) + ul(3,b)*Nbx(2,b)
-c         F(3,3) = F(3,3) + ul(3,b)*Nbx(3,b)
-c      END DO
-c      Jac = MAT_DET(F, nsd)
-c      Fi  = MAT_INV(F, nsd)
-
-c!     V. grad V
-c      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
-c      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
-c      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
-
-c!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
-c      es(1,1) = vx(1,1) + vx(1,1)
-c      es(2,2) = vx(2,2) + vx(2,2)
-c      es(3,3) = vx(3,3) + vx(3,3)
-
-c      es(1,2) = vx(1,2) + vx(2,1)
-c      es(1,3) = vx(1,3) + vx(3,1)
-c      es(2,3) = vx(2,3) + vx(3,2)
-
-c      es(2,1) = es(1,2)
-c      es(3,1) = es(1,3)
-c      es(3,2) = es(2,3)
-
-c!     Shear-rate := (2*e_ij*e_ij)^.5
-c      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
-c     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
-c     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-c      gam = SQRT(0.5_RKIND*gam)
-
-c!     Compute viscosity based on shear-rate and chosen viscosity model
-c      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rt, mu_x)
-
-c!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-c!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
-c!     For compressible solids, Svol = J*p*Cinv where p is computed
-c!     based on the dilational penalty model
-c      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
-
-c!     1st Piola-Kirchhoff stress, P = F * S
-c      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
-c      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
-c      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
-
-c      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
-c      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
-c      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
-
-c      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
-c      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
-c      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
-
-c!     P * F_transpose
-c      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
-c      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
-c      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
-
-c      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
-c      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
-c      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
-
-c      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
-c      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
-c      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
-
-c!     Stress contribution
-c      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1)
-c      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2)
-c      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3)
-
-c      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1)
-c      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2)
-c      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3)
-
-c      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1)
-c      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2)
-c      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3)
-
-c!     Inertia contribution
-c      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1))
-c      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2))
-c      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3))
-
-c!     Residue
-c      DO a=1, eNoN
-c         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
-c     2      + Nx(3,a)*rM(1,3))
-c         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
-c     2      + Nx(3,a)*rM(2,3))
-c         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
-c     2      + Nx(3,a)*rM(3,3))
-c      END DO
-
-c      RETURN
-c      END SUBROUTINE IB_IFEM2D
-c!--------------------------------------------------------------------
-c      SUBROUTINE IB_FEIBStab3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
-c     2   ul, fN, lR)
-c      USE COMMOD
-c      USE ALLFUN
-c      IMPLICIT NONE
-c      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
-c      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(2,eNoNb),
-c     2   N(eNoN), Nx(2,eNoN), al(2,eNoN), yl(3,eNoN), ul(2,eNoNb),
-c     3   fN(2,nFn)
-c      REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
-
-c      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
-c      REAL(KIND=RKIND) :: ya, rt, fb(2), vd(2), v(2), vx(2,2), vVx(2),
-c     2   rV(2), rM(2,2)
-
-c!     Solid domain parameters
-c      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, nu_s, mu_s, F(2,2), Fi(2,2),
-c     2   S(2,2), PFt(2,2), CC(2,2,2,2)
-c      TYPE(stModelType) :: stModel
-
-c!     Fluid domain parameters
-c      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(2,2), mu_x
-
-c!     Define IB struct parameters
-c      iEq     = ib%cEq
-c      iDmn    = ib%cDmn
-c      stModel = eq(iEq)%dmnIB(iDmn)%stM
-c      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-c      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
-c      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-c      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
-
-c!     Define fluid parameters
-c      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-
-c!     Body force
-c      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-c      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-
-c!     Active strain/stress parameter
-c      ya = 0._RKIND
-
-c!     Inertia and body force
-c      vd     = -fb
-c      v      = 0._RKIND
-c      vx     = 0._RKIND
-c      DO a=1, eNoN
-c!        Acceleration (dv_i/dt)
-c         vd(1) = vd(1) + al(1,a)*N(a)
-c         vd(2) = vd(2) + al(2,a)*N(a)
-
-c!        Velocity, v
-c         v(1) = v(1) + yl(1,a)*N(a)
-c         v(2) = v(2) + yl(2,a)*N(a)
-
-c!        Grad v (v_i,j) w.r.t. current coordinates
-c         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
-c         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
-c         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
-c         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
-c      END DO
-
-c!     Deformation gradient tensor
-c      F      = 0._RKIND
-c      F(1,1) = 1._RKIND
-c      F(2,2) = 1._RKIND
-c      DO b=1, eNoNb
-c!        Acceleration (dv_i/dt)
-c         vd(1) = vd(1) + al(1,a)*N(a)
-c         vd(2) = vd(2) + al(2,a)*N(a)
-c         vd(3) = vd(3) + al(3,a)*N(a)
-
-c!        Velocity, v
-c         v(1) = v(1) + yl(1,a)*N(a)
-c         v(2) = v(2) + yl(2,a)*N(a)
-c         v(3) = v(3) + yl(3,a)*N(a)
-
-c!        Pressure, p
-c         p = p + yl(4,a)*N(a)
-
-c!        Grad p in reference coordinates
-c         px(1) = px(1) + yl(4,a)*Nx(1,a)
-c         px(2) = px(2) + yl(4,a)*Nx(2,a)
-c         px(3) = px(3) + yl(4,a)*Nx(3,a)
-
-c!        Grad v (v_i,j) w.r.t. current coordinates
-c         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
-c         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
-c         vx(1,3) = vx(1,3) + yl(1,a)*Nx(3,a)
-
-c         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
-c         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
-c         vx(2,3) = vx(2,3) + yl(2,a)*Nx(3,a)
-
-c         vx(3,1) = vx(3,1) + yl(3,a)*Nx(1,a)
-c         vx(3,2) = vx(3,2) + yl(3,a)*Nx(2,a)
-c         vx(3,3) = vx(3,3) + yl(3,a)*Nx(3,a)
-c      END DO
-
-c!     Deformation gradient tensor
-c      F      = 0._RKIND
-c      F(1,1) = 1._RKIND
-c      F(2,2) = 1._RKIND
-c      F(3,3) = 1._RKIND
-c      DO b=1, eNoNb
-c!        Deformation tensor, F_{iI}. Here the shape function derivatives
-c!        are w.r.t. the reference coordinates
-c         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
-c         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
-c         F(1,3) = F(1,3) + ul(1,b)*Nbx(3,b)
-
-c         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
-c         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
-c         F(2,3) = F(2,3) + ul(2,b)*Nbx(3,b)
-
-c         F(3,1) = F(3,1) + ul(3,b)*Nbx(1,b)
-c         F(3,2) = F(3,2) + ul(3,b)*Nbx(2,b)
-c         F(3,3) = F(3,3) + ul(3,b)*Nbx(3,b)
-c      END DO
-c      Jac = MAT_DET(F, nsd)
-c      Fi  = MAT_INV(F, nsd)
-
-c!     Divergence of velocity
-c      divV = vx(1,1) + vx(2,2) + vx(3,3)
-
-c!     V. grad V
-c      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
-c      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
-c      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
-
-c!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
-c      es(1,1) = vx(1,1) + vx(1,1)
-c      es(2,2) = vx(2,2) + vx(2,2)
-c      es(3,3) = vx(3,3) + vx(3,3)
-
-c      es(1,2) = vx(1,2) + vx(2,1)
-c      es(1,3) = vx(1,3) + vx(3,1)
-c      es(2,3) = vx(2,3) + vx(3,2)
-
-c       es(2,1) = es(1,2)
-c      es(3,1) = es(1,3)
-c      es(3,2) = es(2,3)
-
-c!     Shear-rate := (2*e_ij*e_ij)^.5
-c      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
-c     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
-c     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
-c      gam = SQRT(0.5_RKIND*gam)
-
-c!     Compute viscosity based on shear-rate and chosen viscosity model
-c      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, nu_f, mu_x)
-c      nu_f = nu_f/rho_f
-
-c!     First compute all fluid contribution including stabilization
-c      kU = v(1)*v(1)*Gm(1,1) + v(1)*v(2)*Gm(1,2) + v(1)*v(3)*Gm(1,3)
-c     2   + v(2)*v(1)*Gm(2,1) + v(2)*v(2)*Gm(2,2) + v(2)*v(3)*Gm(2,3)
-c     3   + v(3)*v(1)*Gm(3,1) + v(3)*v(2)*Gm(3,2) + v(3)*v(3)*Gm(3,3)
-
-c      kS = Gm(1,1)*Gm(1,1) + Gm(1,2)*Gm(1,2) + Gm(1,3)*Gm(1,3)
-c     2   + Gm(2,1)*Gm(2,1) + Gm(2,2)*Gm(2,2) + Gm(2,3)*Gm(2,3)
-c     3   + Gm(3,1)*Gm(3,1) + Gm(3,2)*Gm(3,2) + Gm(3,3)*Gm(3,3)
-
-c      rt = 2._RKIND*ct_f(1)/dt
-c      tauM_f = 1._RKIND/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
-
-c      vp_f(1) = -tauM_f * (vd(1) + vVx(1) + px(1)/rho_f)
-c      vp_f(2) = -tauM_f * (vd(2) + vVx(2) + px(2)/rho_f)
-c      vp_f(3) = -tauM_f * (vd(3) + vVx(3) + px(3)/rho_f)
-
-c      va_f(1) = v(1) + vp_f(1)
-c      va_f(2) = v(2) + vp_f(2)
-c      va_f(3) = v(3) + vp_f(3)
-
-c      rt = Gm(1,1) + Gm(2,2) + Gm(3,3)
-c      rt = rt*tauM_f
-c      tauC_f = 1._RKIND/(rt)
-
-c      tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
-c     2     + vp_f(1)*vp_f(3)*Gm(1,3)
-c     3     + vp_f(2)*vp_f(1)*Gm(2,1) + vp_f(2)*vp_f(2)*Gm(2,2)
-c     4     + vp_f(2)*vp_f(3)*Gm(2,3)
-c     5     + vp_f(3)*vp_f(1)*Gm(3,1) + vp_f(3)*vp_f(2)*Gm(3,2)
-c     6     + vp_f(3)*vp_f(3)*Gm(3,3)
-
-c      IF (ISZERO(tauB)) tauB = eps
-c      tauB = 1._RKIND/SQRT(tauB)
-
-c!     Solid stabilization parameters
-c      CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
-
-c      vp_s(1) = -tauM_s * (vd(1) + vVx(1) + px(1)/rho_s)
-c      vp_s(2) = -tauM_s * (vd(2) + vVx(2) + px(2)/rho_s)
-c      vp_s(3) = -tauM_s * (vd(3) + vVx(3) + px(3)/rho_s)
-
-c!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-c!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
-c!     For compressible solids, Svol = J*p*Cinv and the fluid pressure
-c!     contribution in the solid domain should be removed.
-c      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
-
-c!     F * S * F_t
-c      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
-c      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
-c      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
-
-c      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
-c      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
-c      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
-
-c      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
-c      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
-c      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
-
-c      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
-c      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
-c      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
-
-c      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
-c      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
-c      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
-
-c      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
-c      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
-c      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
-
-c      rV(1) = tauB*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2) + vp_f(3)*vx(1,3))
-c      rV(2) = tauB*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2) + vp_f(3)*vx(2,3))
-c      rV(3) = tauB*(vp_f(1)*vx(3,1) + vp_f(2)*vx(3,2) + vp_f(3)*vx(3,3))
-
-c      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1) +
-c     2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
-c      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2) +
-c     2   rho_f*Jac*(rV(1)*vp_f(2) - vp_f(1)*va_f(2))
-c      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3) +
-c     2   rho_f*Jac*(rV(1)*vp_f(3) - vp_f(1)*va_f(3))
-
-c      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1) +
-c     2   rho_f*Jac*(rV(2)*vp_f(1) - vp_f(2)*va_f(1))
-c      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2) +
-c     2   rho_f*Jac*(rV(2)*vp_f(2) - vp_f(2)*va_f(2) + tauC_f*divV)
-c      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3) +
-c     2   rho_f*Jac*(rV(2)*vp_f(3) - vp_f(2)*va_f(3))
-
-c      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1) +
-c     2   rho_f*Jac*(rV(3)*vp_f(1) - vp_f(3)*va_f(1))
-c      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2) +
-c     2   rho_f*Jac*(rV(3)*vp_f(2) - vp_f(3)*va_f(2))
-c      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3) +
-c     2   rho_f*Jac*(rV(3)*vp_f(3) - vp_f(3)*va_f(3) + tauC_f*divV)
-
-c      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1)) +
-c     2   rho_f*Jac*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2) + vp_f(3)*vx(1,3))
-
-c      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2)) +
-c     2   rho_f*Jac*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2) + vp_f(3)*vx(2,3))
-
-c      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3)) +
-c     2   rho_f*Jac*(vp_f(1)*vx(3,1) + vp_f(2)*vx(3,2) + vp_f(3)*vx(3,3))
-
-c!     Fully incompressible case
-c      DO a=1, eNoN
-c         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
-c     2      + Nx(3,a)*rM(1,3))
-c         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
-c     2      + Nx(3,a)*rM(2,3))
-c         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
-c     2      + Nx(3,a)*rM(3,3))
-c         lR(4,a) = -w*Jac*(Nx(1,a)*vp_f(1) + Nx(2,a)*vp_f(2)
-c     2      + Nx(3,a)*vp_f(3))
-c      END DO
-
-c      IF (incompFlag) THEN
-c         DO a=1, eNoN
-c            lR(4,a) = lR(4,a) + w*Jac*(Nx(1,a)*vp_s(1) + Nx(2,a)*vp_s(2)
-c     2         + Nx(3,a)*vp_s(3))
-c         END DO
-c         RETURN
-c      END IF
-
-c!     For compressible solids, remove fluid pressure from solid domain.
-c!     Also remove divergence term from continuity equation and add
-c!     pressure difference between solid and fluid with Lagrange
-c!     multiplier to weakly enforce their equality. Note that the solid
-c!     pressure returned is the one defined in Holzapfel book.
-c      ps = 0._RKIND
-c      CALL GETSVOLP(stModel, Jac, ps, rt)
-c      DO a=1, eNoN
-c         lR(1,a) = lR(1,a) - w*p*Nx(1,a)*Jac
-c         lR(2,a) = lR(2,a) - w*p*Nx(2,a)*Jac
-c         lR(3,a) = lR(3,a) - w*p*Nx(3,a)*Jac
-c         lR(4,a) = w*Jac*N(a)*(divV + ct_p*(-ps-p))
-c      END DO
-
-c      RETURN
-c      END SUBROUTINE IB_FEIBStab3D
-c!--------------------------------------------------------------------
-c!     Compute the 2D FSI force due to IB in reference configuration
-c      SUBROUTINE IB_FEIBStab2D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
-c     2   Gm, al, yl, ul, fN, lR)
-c      USE COMMOD
-c      USE ALLFUN
-c      IMPLICIT NONE
-c      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
-c      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(2,eNoNb),
-c     2   N(eNoN), Nx(2,eNoN), Gm(2,2), al(2,eNoN), yl(3,eNoN),
-c     3   ul(2,eNoNb), fN(2,nFn)
-c      REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
-
-c      REAL(KIND=RKIND), PARAMETER :: ct_f(2) = (/1._RKIND,36._RKIND/),
-c     2   ct_p = 1._RKIND
-
-c      LOGICAL :: incompFlag
-c      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
-c      REAL(KIND=RKIND) :: ya, fb(2), vd(2), v(2), p, px(2), vx(2,2),
-c     2   divV, vVx(2), rt, rV(2), rM(2,2)
-
-c!     Solid domain parameters
-c      REAL(KIND=RKIND) :: Jac, rho_s, eM_s, mu_s, nu_s, ps, F(2,2),
-c     2   Fi(2,2), S(2,2), PFt(2,2), CC(2,2,2,2), tauM_s, tauC_s, vp_s(2)
-c      TYPE(stModelType) :: stModel
-
-c!     Fluid domain parameters
-c      REAL(KIND=RKIND) :: rho_f, mu_f, nu_f, kU, kS, tauM_f, tauC_f,
-c     2   tauB, gam, vp_f(2), va_f(2), es(2,2), mu_x
-
-c!     Define IB struct parameters
-c      iEq     = ib%cEq
-c      iDmn    = ib%cDmn
-c      stModel = eq(iEq)%dmnIB(iDmn)%stM
-c      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-c      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
-c      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
-c      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
-
-c      incompFlag = .FALSE.
-c      IF (ISZERO(nu_s - 0.5_RKIND)) incompFlag = .TRUE.
-
-c!     Define fluid parameters
-c      rho_f  = eq(iEq)%dmn(cDmn)%prop(fluid_density)
-
-c!     Body force
-c      fb(1)  = eq(iEq)%dmnIB(iDmn)%prop(f_x)
-c      fb(2)  = eq(iEq)%dmnIB(iDmn)%prop(f_y)
-
-c!     Active strain/stress parameter
-c      ya = 0._RKIND
-
-c!     Inertia, body force and deformation tensor (F)
-c      vd     = -fb
-c      v      = 0._RKIND
-c      p      = 0._RKIND
-c      px     = 0._RKIND
-c      vx     = 0._RKIND
-c      DO a=1, eNoN
-c!        Acceleration (dv_i/dt)
-c         vd(1) = vd(1) + al(1,a)*N(a)
-c         vd(2) = vd(2) + al(2,a)*N(a)
-
-c!        Velocity, v
-c         v(1) = v(1) + yl(1,a)*N(a)
-c         v(2) = v(2) + yl(2,a)*N(a)
-
-c!        Pressure, p
-c         p = p + yl(3,a)*N(a)
-
-c!        Grad p in reference coordinates
-c         px(1) = px(1) + yl(3,a)*Nx(1,a)
-c         px(2) = px(2) + yl(3,a)*Nx(2,a)
-
-c!        Grad v (v_i,j) w.r.t. current coordinates
-c         vx(1,1) = vx(1,1) + yl(1,a)*Nx(1,a)
-c         vx(1,2) = vx(1,2) + yl(1,a)*Nx(2,a)
-c         vx(2,1) = vx(2,1) + yl(2,a)*Nx(1,a)
-c         vx(2,2) = vx(2,2) + yl(2,a)*Nx(2,a)
-c      END DO
-
-c!     Deformation gradient tensor
-c      F      = 0._RKIND
-c      F(1,1) = 1._RKIND
-c      F(2,2) = 1._RKIND
-c      DO b=1, eNoNb
-c!        Deformation tensor, F_{iI}. Here the shape function derivatives
-c!        are w.r.t. the reference coordinates
-c         F(1,1) = F(1,1) + ul(1,b)*Nbx(1,b)
-c         F(1,2) = F(1,2) + ul(1,b)*Nbx(2,b)
-
-c         F(2,1) = F(2,1) + ul(2,b)*Nbx(1,b)
-c         F(2,2) = F(2,2) + ul(2,b)*Nbx(2,b)
-c      END DO
-c      Jac = MAT_DET(F, nsd)
-c      Fi  = MAT_INV(F, nsd)
-
-c!     Divergence of velocity
-c      divV = vx(1,1) + vx(2,2)
-
-c!     V. grad V
-c      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2)
-c      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2)
-
-c!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
-c      es(1,1) = vx(1,1) + vx(1,1)
-c      es(2,2) = vx(2,2) + vx(2,2)
-c      es(1,2) = vx(1,2) + vx(2,1)
-c      es(2,1) = es(1,2)
-
-c!     Shear-rate := (2*e_ij*e_ij)^.5
-c      gam = es(1,1)*es(1,1) + es(2,2)*es(2,2) + 2._RKIND*es(1,2)*es(1,2)
-c      gam = SQRT(0.5_RKIND*gam)
-
-c!     Compute viscosity based on shear-rate and chosen viscosity model
-c      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, nu_f, mu_x)
-c      nu_f = nu_f/rho_f
-
-c!     First compute all fluid contribution including stabilization
-c      kU = v(1)*v(1)*Gm(1,1) + v(1)*v(2)*Gm(1,2)
-c     2   + v(2)*v(1)*Gm(2,1) + v(2)*v(2)*Gm(2,2)
-
-c      kS = Gm(1,1)*Gm(1,1) + Gm(1,2)*Gm(1,2)
-c     2   + Gm(2,1)*Gm(2,1) + Gm(2,2)*Gm(2,2)
-
-c      rt = 2._RKIND*ct_f(1)/dt
-c      tauM_f = 1._RKIND/SQRT(rt*rt + kU + ct_f(2)*nu_f*nu_f*kS)
-
-c      vp_f(1) = -tauM_f * (vd(1) + vVx(1) + px(1)/rho_f)
-c      vp_f(2) = -tauM_f * (vd(2) + vVx(2) + px(2)/rho_f)
-
-c      va_f(1) = v(1) + vp_f(1)
-c      va_f(2) = v(2) + vp_f(2)
-
-c      rt = Gm(1,1) + Gm(2,2)
-c      rt = rt*tauM_f
-c      tauC_f = 1._RKIND/(rt)
-
-c      tauB = vp_f(1)*vp_f(1)*Gm(1,1) + vp_f(1)*vp_f(2)*Gm(1,2)
-c     2     + vp_f(2)*vp_f(1)*Gm(2,1) + vp_f(2)*vp_f(2)*Gm(2,2)
-
-c      IF (ISZERO(tauB)) tauB = eps
-c      tauB = 1._RKIND/SQRT(tauB)
-
-c!     Solid stabilization parameters
-c      CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
-
-c      vp_s(1) = -tauM_s * (vd(1) + vVx(1) + px(1)/rho_s)
-c      vp_s(2) = -tauM_s * (vd(2) + vVx(2) + px(2)/rho_s)
-
-c!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-c!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
-c!     For compressible solids, Svol = J*p*Cinv and the fluid pressure
-c!     contribution in the solid domain should be removed.
-c      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
-
-c!     1st Piola-Kirchhoff stress, P = F * S
-c      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)
-c      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)
-c      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)
-c      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)
-
-c!     P * F_transpose
-c      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2)
-c      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2)
-c      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2)
-c      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2)
-
-c      rV(1) = tauB*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
-c      rV(2) = tauB*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
-
-c      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1) +
-c     2   rho_f*Jac*(rV(1)*vp_f(1) - vp_f(1)*va_f(1) + tauC_f*divV)
-c      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2) +
-c     2   rho_f*Jac*(rV(1)*vp_f(2) - vp_f(1)*va_f(2))
-
-c      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1) +
-c     2   rho_f*Jac*(rV(2)*vp_f(1) - vp_f(2)*va_f(1))
-c      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2) +
-c     2   rho_f*Jac*(rV(2)*vp_f(2) - vp_f(2)*va_f(2) + tauC_f*divV)
-
-c      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1)) +
-c     2   rho_f*Jac*(vp_f(1)*vx(1,1) + vp_f(2)*vx(1,2))
-
-c      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2)) +
-c     2   rho_f*Jac*(vp_f(1)*vx(2,1) + vp_f(2)*vx(2,2))
-
-c!     Fully incompressible case
-c      DO a=1, eNoN
-c         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2))
-c         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2))
-c         lR(3,a) = -w*Jac*(Nx(1,a)*vp_f(1) + Nx(2,a)*vp_f(2))
-c      END DO
-
-c      IF (incompFlag) THEN
-c         DO a=1, eNoN
-c            lR(3,a) = lR(3,a) + w*Jac*(Nx(1,a)*vp_s(1) +Nx(2,a)*vp_s(2))
-c         END DO
-c         RETURN
-c      END IF
-
-c!     For compressible solids, remove fluid pressure from solid domain.
-c!     Also remove divergence term from continuity equation and add
-c!     pressure difference between solid and fluid with Lagrange
-c!     multiplier to weakly enforce their equality. Note that the solid
-c!     pressure returned is the one defined in Holzapfel book.
-c      ps = 0._RKIND
-c      CALL GETSVOLP(stModel, Jac, ps, rt)
-c      DO a=1, eNoN
-c         lR(1,a) = lR(1,a) - w*p*Nx(1,a)*Jac
-c         lR(2,a) = lR(2,a) - w*p*Nx(2,a)*Jac
-c         lR(3,a) = w*Jac*N(a)*(divV + ct_p*(-ps-p))
-c      END DO
-
-c      RETURN
-c      END SUBROUTINE IB_FEIBStab2D
+!--------------------------------------------------------------------
+!     Compute the 3D FSI force due to IB in reference configuration
+      SUBROUTINE IB_IFEM3D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2   ul, fN, lR)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(3,eNoNb),
+     2   N(eNoN), Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ul(3,eNoNb),
+     3   fN(3,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
+
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
+      REAL(KIND=RKIND) :: ya, rt, fb(3), vd(3), v(3), vx(3,3), vVx(3),
+     2   rV(3), rM(3,3)
+
+!     Solid domain parameters
+      REAL(KIND=RKIND) :: Jac, rho_s, mu_s, eM_s, nu_s, F(3,3), Fi(3,3),
+     2   S(3,3), PFt(3,3), CC(3,3,3,3)
+      TYPE(stModelType) :: stModel
+
+!     Fluid domain parameters
+      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(3,3), mu_x
+
+!     Define IB struct parameters
+      iEq     = ib%cEq
+      iDmn    = ib%cDmn
+      stModel = eq(iEq)%dmnIB(iDmn)%stM
+      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
+      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
+
+!     Define fluid parameters
+      rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
+
+!     Body force
+      fb(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      fb(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+      fb(3)   = eq(iEq)%dmnIB(iDmn)%prop(f_z)
+
+!     Active strain/stress parameter (dummy value)
+      ya      = 0._RKIND
+
+!     Inertia and body force
+      v       = 0._RKIND
+      vd      = -fb
+      vx      = 0._RKIND
+      DO a=1, eNoN
+!        Velocity, v
+         v(1) = v(1)  + N(a)*yl(1,a)
+         v(2) = v(2)  + N(a)*yl(2,a)
+         v(3) = v(3)  + N(a)*yl(3,a)
+
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + N(a)*al(1,a)
+         vd(2) = vd(2) + N(a)*al(2,a)
+         vd(3) = vd(3) + N(a)*al(3,a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + Nx(1,a)*yl(1,a)
+         vx(1,2) = vx(1,2) + Nx(2,a)*yl(1,a)
+         vx(1,3) = vx(1,3) + Nx(3,a)*yl(1,a)
+
+         vx(2,1) = vx(2,1) + Nx(1,a)*yl(2,a)
+         vx(2,2) = vx(2,2) + Nx(2,a)*yl(2,a)
+         vx(2,3) = vx(2,3) + Nx(3,a)*yl(2,a)
+
+         vx(3,1) = vx(3,1) + Nx(1,a)*yl(3,a)
+         vx(3,2) = vx(3,2) + Nx(2,a)*yl(3,a)
+         vx(3,3) = vx(3,3) + Nx(3,a)*yl(3,a)
+      END DO
+
+!     Deformation gradient tensor
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      F(3,3) = 1._RKIND
+      DO b=1, eNoNb
+!        Deformation tensor, F_{iI}. Here the shape function derivatives
+!        are w.r.t. the reference coordinates
+         F(1,1) = F(1,1) + Nbx(1,b)*ul(1,b)
+         F(1,2) = F(1,2) + Nbx(2,b)*ul(1,b)
+         F(1,3) = F(1,3) + Nbx(3,b)*ul(1,b)
+
+         F(2,1) = F(2,1) + Nbx(1,b)*ul(2,b)
+         F(2,2) = F(2,2) + Nbx(2,b)*ul(2,b)
+         F(2,3) = F(2,3) + Nbx(3,b)*ul(2,b)
+
+         F(3,1) = F(3,1) + Nbx(1,b)*ul(3,b)
+         F(3,2) = F(3,2) + Nbx(2,b)*ul(3,b)
+         F(3,3) = F(3,3) + Nbx(3,b)*ul(3,b)
+      END DO
+      Jac = MAT_DET(F, nsd)
+      Fi  = MAT_INV(F, nsd)
+
+!     V. grad V
+      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2) + v(3)*vx(1,3)
+      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2) + v(3)*vx(2,3)
+      vVx(3) = v(1)*vx(3,1) + v(2)*vx(3,2) + v(3)*vx(3,3)
+
+!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
+      es(1,1) = vx(1,1) + vx(1,1)
+      es(2,2) = vx(2,2) + vx(2,2)
+      es(3,3) = vx(3,3) + vx(3,3)
+
+      es(1,2) = vx(1,2) + vx(2,1)
+      es(1,3) = vx(1,3) + vx(3,1)
+      es(2,3) = vx(2,3) + vx(3,2)
+
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5_RKIND*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rt, mu_x)
+
+!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
+!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
+!     For compressible solids, Svol = J*p*Cinv where p is computed
+!     based on the dilational penalty model
+      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
+
+!     1st Piola-Kirchhoff stress, P = F * S
+      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)  + F(1,3)*S(3,1)
+      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)  + F(1,3)*S(3,2)
+      rM(1,3)  = F(1,1)*S(1,3)  + F(1,2)*S(2,3)  + F(1,3)*S(3,3)
+
+      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)  + F(2,3)*S(3,1)
+      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)  + F(2,3)*S(3,2)
+      rM(2,3)  = F(2,1)*S(1,3)  + F(2,2)*S(2,3)  + F(2,3)*S(3,3)
+
+      rM(3,1)  = F(3,1)*S(1,1)  + F(3,2)*S(2,1)  + F(3,3)*S(3,1)
+      rM(3,2)  = F(3,1)*S(1,2)  + F(3,2)*S(2,2)  + F(3,3)*S(3,2)
+      rM(3,3)  = F(3,1)*S(1,3)  + F(3,2)*S(2,3)  + F(3,3)*S(3,3)
+
+!     P * F_transpose
+      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2) + rM(1,3)*F(1,3)
+      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2) + rM(1,3)*F(2,3)
+      PFt(1,3) = rM(1,1)*F(3,1) + rM(1,2)*F(3,2) + rM(1,3)*F(3,3)
+
+      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2) + rM(2,3)*F(1,3)
+      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2) + rM(2,3)*F(2,3)
+      PFt(2,3) = rM(2,1)*F(3,1) + rM(2,2)*F(3,2) + rM(2,3)*F(3,3)
+
+      PFt(3,1) = rM(3,1)*F(1,1) + rM(3,2)*F(1,2) + rM(3,3)*F(1,3)
+      PFt(3,2) = rM(3,1)*F(2,1) + rM(3,2)*F(2,2) + rM(3,3)*F(2,3)
+      PFt(3,3) = rM(3,1)*F(3,1) + rM(3,2)*F(3,2) + rM(3,3)*F(3,3)
+
+!     Stress contribution
+      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1)
+      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2)
+      rM(1,3) = (mu_f-mu_s)*Jac*es(1,3) - PFt(1,3)
+
+      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1)
+      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2)
+      rM(2,3) = (mu_f-mu_s)*Jac*es(2,3) - PFt(2,3)
+
+      rM(3,1) = (mu_f-mu_s)*Jac*es(3,1) - PFt(3,1)
+      rM(3,2) = (mu_f-mu_s)*Jac*es(3,2) - PFt(3,2)
+      rM(3,3) = (mu_f-mu_s)*Jac*es(3,3) - PFt(3,3)
+
+!     Inertia contribution
+      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1))
+      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2))
+      rV(3) = (rho_f*Jac-rho_s)*(vd(3) + vVx(3))
+
+!     Residue
+      DO a=1, eNoN
+         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2)
+     2      + Nx(3,a)*rM(1,3))
+         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2)
+     2      + Nx(3,a)*rM(2,3))
+         lR(3,a) = w*(N(a)*rV(3) + Nx(1,a)*rM(3,1) + Nx(2,a)*rM(3,2)
+     2      + Nx(3,a)*rM(3,3))
+      END DO
+
+      RETURN
+      END SUBROUTINE IB_IFEM3D
+!--------------------------------------------------------------------
+!     Compute the 2D FSI force due to IB in reference configuration
+      SUBROUTINE IB_IFEM2D(eNoNb, eNoN, nFn, w, Nb, Nbx, N, Nx, al, yl,
+     2   ul, fN, lR)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Nb(eNoNb), Nbx(2,eNoNb),
+     2   N(eNoN), Nx(2,eNoN), al(2,eNoN), yl(3,eNoN), ul(2,eNoNb),
+     3   fN(2,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
+
+      INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
+      REAL(KIND=RKIND) :: ya, rt, fb(2), vd(2), v(2), vx(2,2), vVx(2),
+     2   rV(2), rM(2,2)
+
+!     Solid domain parameters
+      REAL(KIND=RKIND) :: Jac, rho_s, mu_s, eM_s, nu_s, F(2,2), Fi(2,2),
+     2   S(2,2), PFt(2,2), CC(2,2,2,2)
+      TYPE(stModelType) :: stModel
+
+!     Fluid domain parameters
+      REAL(KIND=RKIND) :: rho_f, mu_f, gam, es(2,2), mu_x
+
+!     Define IB struct parameters
+      iEq     = ib%cEq
+      iDmn    = ib%cDmn
+      stModel = eq(iEq)%dmnIB(iDmn)%stM
+      rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+      eM_s    = eq(iEq)%dmnIB(iDmn)%prop(elasticity_modulus)
+      nu_s    = eq(iEq)%dmnIB(iDmn)%prop(poisson_ratio)
+
+!     Define fluid parameters
+      rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
+
+!     Body force
+      fb(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
+      fb(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
+
+!     Active strain/stress parameter (dummy value)
+      ya      = 0._RKIND
+
+!     Inertia and body force
+      v       = 0._RKIND
+      vd      = -fb
+      vx      = 0._RKIND
+      DO a=1, eNoN
+!        Velocity, v
+         v(1) = v(1)  + N(a)*yl(1,a)
+         v(2) = v(2)  + N(a)*yl(2,a)
+
+!        Acceleration (dv_i/dt)
+         vd(1) = vd(1) + N(a)*al(1,a)
+         vd(2) = vd(2) + N(a)*al(2,a)
+
+!        Grad v (v_i,j) w.r.t. current coordinates
+         vx(1,1) = vx(1,1) + Nx(1,a)*yl(1,a)
+         vx(1,2) = vx(1,2) + Nx(2,a)*yl(1,a)
+         vx(2,1) = vx(2,1) + Nx(1,a)*yl(2,a)
+         vx(2,2) = vx(2,2) + Nx(2,a)*yl(2,a)
+      END DO
+
+!     Deformation gradient tensor
+      F      = 0._RKIND
+      F(1,1) = 1._RKIND
+      F(2,2) = 1._RKIND
+      DO b=1, eNoNb
+!        Deformation tensor, F_{iI}. Here the shape function derivatives
+!        are w.r.t. the reference coordinates
+         F(1,1) = F(1,1) + Nbx(1,b)*ul(1,b)
+         F(1,2) = F(1,2) + Nbx(2,b)*ul(1,b)
+         F(2,1) = F(2,1) + Nbx(1,b)*ul(2,b)
+         F(2,2) = F(2,2) + Nbx(2,b)*ul(2,b)
+      END DO
+      Jac = MAT_DET(F, nsd)
+      Fi  = MAT_INV(F, nsd)
+
+!     V. grad V
+      vVx(1) = v(1)*vx(1,1) + v(2)*vx(1,2)
+      vVx(2) = v(1)*vx(2,1) + v(2)*vx(2,2)
+
+!     Strain rate tensor 2*e_ij := (v_ij + v_ji)
+      es(1,1) = vx(1,1) + vx(1,1)
+      es(2,2) = vx(2,2) + vx(2,2)
+      es(1,2) = vx(1,2) + vx(2,1)
+      es(2,1) = es(1,2)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2)
+     2    + es(2,1)*es(2,1) + es(2,2)*es(2,2)
+      gam = SQRT(0.5_RKIND*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rt, mu_x)
+
+!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
+!     Note that S = Siso + Svol. For incompressible solids, Svol = 0
+!     For compressible solids, Svol = J*p*Cinv where p is computed
+!     based on the dilational penalty model
+      CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
+
+!     1st Piola-Kirchhoff stress, P = F * S
+      rM(1,1)  = F(1,1)*S(1,1)  + F(1,2)*S(2,1)
+      rM(1,2)  = F(1,1)*S(1,2)  + F(1,2)*S(2,2)
+      rM(2,1)  = F(2,1)*S(1,1)  + F(2,2)*S(2,1)
+      rM(2,2)  = F(2,1)*S(1,2)  + F(2,2)*S(2,2)
+
+!     P * F_transpose
+      PFt(1,1) = rM(1,1)*F(1,1) + rM(1,2)*F(1,2)
+      PFt(1,2) = rM(1,1)*F(2,1) + rM(1,2)*F(2,2)
+      PFt(2,1) = rM(2,1)*F(1,1) + rM(2,2)*F(1,2)
+      PFt(2,2) = rM(2,1)*F(2,1) + rM(2,2)*F(2,2)
+
+!     Stress contribution
+      rM(1,1) = (mu_f-mu_s)*Jac*es(1,1) - PFt(1,1)
+      rM(1,2) = (mu_f-mu_s)*Jac*es(1,2) - PFt(1,2)
+      rM(2,1) = (mu_f-mu_s)*Jac*es(2,1) - PFt(2,1)
+      rM(2,2) = (mu_f-mu_s)*Jac*es(2,2) - PFt(2,2)
+
+!     Inertia contribution
+      rV(1) = (rho_f*Jac-rho_s)*(vd(1) + vVx(1))
+      rV(2) = (rho_f*Jac-rho_s)*(vd(2) + vVx(2))
+
+!     Residue
+      DO a=1, eNoN
+         lR(1,a) = w*(N(a)*rV(1) + Nx(1,a)*rM(1,1) + Nx(2,a)*rM(1,2))
+         lR(2,a) = w*(N(a)*rV(2) + Nx(1,a)*rM(2,1) + Nx(2,a)*rM(2,2))
+      END DO
+
+      RETURN
+      END SUBROUTINE IB_IFEM2D
 !####################################################################
 !     Add contribution from IB to the residue (RHS)
       SUBROUTINE IB_CONSTRUCT()
@@ -4541,7 +3974,7 @@ c      END SUBROUTINE IB_FEIBStab2D
       INTEGER(KIND=IKIND) a
 
       DO a=1, tnNo
-c         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
+         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
       END DO
 
       RETURN
@@ -4556,10 +3989,11 @@ c         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
 
       INTEGER(KIND=IKIND) :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoN, eNoNb
-      REAL(KIND=RKIND) :: w, Jac, xp(nsd), yp(nsd+1), Ks(nsd,nsd)
+      REAL(KIND=RKIND) :: w, Jac, xi(nsd), xp(nsd), yp(nsd+1),
+     2   Gmat(nsd,nsd)
 
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nx(:,:), Nbx(:,:),
-     2   xl(:,:), xbl(:,:), yl(:,:), sA(:), Uo(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), xbl(:,:), N(:),
+     2   Nx(:,:), xl(:,:), yl(:,:), sA(:), Uo(:,:)
 
       is = eq(ib%cEq)%s
       ie = eq(ib%cEq)%e
@@ -4589,17 +4023,21 @@ c         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
 
 !           Transfer to local arrays: IB mesh variables
             Nb = ib%msh(iM)%N(:,g)
+            IF (ib%msh(iM)%eType .EQ. eType_NRB)
+     2         CALL NRBNNX(ib%msh(iM), e)
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc) + Uo(:,Bc)
             END DO
-            CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,Ks)
+            CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,
+     2         Gmat)
             IF (ISZERO(Jac)) err = " Jac < 0 @ element "//e
             w = ib%msh(iM)%w(g) * Jac
 
 !           Transfer to local arrays: background mesh variables
             eNoN = msh(jM)%eNoN
-            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),yl(nsd+1,eNoN))
+            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
+     2         yl(nsd+1,eNoN))
             yl = 0._RKIND
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
@@ -4614,9 +4052,17 @@ c         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
                xp = xp + Nb(b)*xbl(:,b)
             END DO
 
+!           Initialize parametric coordinate
+            xi = 0._RKIND
+            DO a=1, msh(jM)%nG
+               xi = xi + msh(jM)%xi(:,a)
+            END DO
+            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
+
 !           Find shape functions and derivatives on the background mesh
-!           at the integration point
-            CALL IB_GETNNx(msh(jM), xl, xp, N, Nx)
+!           at the integration point.
+            CALL GETNNX(msh(jM)%eType, eNoN, xl, msh(jM)%xib,
+     2         msh(jM)%Nb, xp, xi, N, Nx)
 
 !           Use the computed shape functions to interpolate flow var at
 !           the IB integration point
@@ -4630,14 +4076,14 @@ c         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                ib%Yn(:,Bc) = ib%Yn(:,Bc) + w*Nb(b)*yp(:)
-               sA(Bc)   = sA(Bc)   + w*Nb(b)
+               sA(Bc) = sA(Bc) + w*Nb(b)
             END DO
             DEALLOCATE(N, Nx, xl, yl)
          END DO
          DEALLOCATE(Nb, Nbx, xbl)
       END DO
 
-!     Synchronize Ab, Yb across all the processes
+!     Synchronize Yb across all the processes
       ib%callD(3) = CPUT()
       CALL IB_SYNC(ib%Yn)
       CALL IB_SYNC(sA)
@@ -4656,54 +4102,6 @@ c         R(1:nsd+1,a) = R(1:nsd+1,a) - ib%R(:,a)
 
       RETURN
       END SUBROUTINE IB_PROJFVAR
-!####################################################################
-      SUBROUTINE IB_GETNNx(lM, xl, xp, N, Nx)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(mshType), INTENT(IN) :: lM
-      REAL(KIND=RKIND), INTENT(IN) :: xl(nsd,lM%eNoN), xp(nsd)
-      REAL(KIND=RKIND), INTENT(OUT) :: N(lM%eNoN), Nx(nsd,lM%eNoN)
-
-      LOGICAL l1, l2, l3, l4
-      INTEGER(KIND=IKIND) a, b
-      REAL(KIND=RKIND) :: rt, xi(nsd)
-
-!     Initialize parameteric coordinate for Newton's iterations
-      xi = 0._RKIND
-      DO a=1, lM%nG
-         xi = xi + lM%xi(:,a)
-      END DO
-      xi = xi / REAL(lM%nG, KIND=RKIND)
-
-      CALL GETXI(lM%eType, lM%eNoN, xl, xp, xi, l1)
-
-!     Check if parameteric coordinate is within bounds
-      b = 0
-      DO a=1, nsd
-         IF (xi(a).GE.lM%xib(1,a) .AND. xi(a).LE.lM%xib(2,a)) b = b + 1
-      END DO
-      l2 = b .EQ. nsd
-
-!     Get the shapefunction and its parameteric derivatives
-      CALL GETGNN(nsd, lM%eType, lM%eNoN, xi, N, Nx)
-
-!     Check if shape functions are within bounds and sum to unity
-      b  = 0
-      rt = 0._RKIND
-      DO a=1, lM%eNoN
-         rt = rt + N(a)
-         IF (N(a).GT.lM%Nb(1,a) .AND. N(a).LT.lM%Nb(2,a)) b = b + 1
-      END DO
-      l3 = b .EQ. lM%eNoN
-      l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
-
-      l1 = ALL((/l1, l2, l3, l4/))
-      IF (.NOT.l1) THEN
-         err = " IB tracer pointing to wrong fluid element (PROBEXI)"
-      END IF
-
-      RETURN
-      END SUBROUTINE IB_GETNNx
 !####################################################################
 !     Write IB call duration
       SUBROUTINE IB_OUTR()
