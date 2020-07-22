@@ -676,7 +676,7 @@
          IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
          IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
          IF (ALLOCATED(ib%cm%n))   DEALLOCATE(ib%cm%n)
-         IF (ALLOCATED(ib%cm%gE))  DEALLOCATE(ib%cm%gE)
+         IF (ALLOCATED(ib%cm%gN))  DEALLOCATE(ib%cm%gN)
 
          DO iM=1, ib%nMsh
             CALL DESTROY(ib%msh(iM))

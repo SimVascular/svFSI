@@ -81,8 +81,12 @@
          MODULE PROCEDURE GETEADJ_MSH, GETEADJ_FACE
       END INTERFACE
 
-      INTERFACE IB_SYNC
-         MODULE PROCEDURE IB_SYNCS, IB_SYNCV
+      INTERFACE IB_SYNCN
+         MODULE PROCEDURE IB_SYNCNS, IB_SYNCNV
+      END INTERFACE
+
+      INTERFACE IB_SYNCG
+         MODULE PROCEDURE IB_SYNCGS, IB_SYNCGV
       END INTERFACE
 
       CONTAINS
@@ -1124,7 +1128,6 @@
 
       CALL DESTROYADJ(lFa%nAdj)
       CALL DESTROYADJ(lFa%eAdj)
-      CALL DESTROYTRACE(lFa%trc)
 
       IF (ALLOCATED(lFa%fs)) THEN
          DO i=1, lFa%nFs
@@ -1448,9 +1451,12 @@
       IMPLICIT NONE
       TYPE(traceType), INTENT(OUT) :: trc
 
-      IF (ALLOCATED(trc%gE))  DEALLOCATE(trc%gE)
-      IF (ALLOCATED(trc%ptr)) DEALLOCATE(trc%ptr)
-      trc%n = 0
+      IF (ALLOCATED(trc%gN))    DEALLOCATE(trc%gN)
+      IF (ALLOCATED(trc%gE))    DEALLOCATE(trc%gE)
+      IF (ALLOCATED(trc%nptr))  DEALLOCATE(trc%nptr)
+      IF (ALLOCATED(trc%gptr))  DEALLOCATE(trc%gptr)
+      trc%n  = 0
+      trc%nG = 0
 
       RETURN
       END SUBROUTINE DESTROYTRACE
@@ -1461,6 +1467,8 @@
       TYPE(ibCommType), INTENT(OUT) :: ibCm
 
       IF (ALLOCATED(ibCm%n))  DEALLOCATE(ibCm%n)
+      IF (ALLOCATED(ibCm%nG)) DEALLOCATE(ibCm%nG)
+      IF (ALLOCATED(ibCm%gN)) DEALLOCATE(ibCm%gN)
       IF (ALLOCATED(ibCm%gE)) DEALLOCATE(ibCm%gE)
 
       RETURN
@@ -2237,13 +2245,13 @@
       RETURN
       END SUBROUTINE FINDE
 !####################################################################
-      SUBROUTINE IB_SYNCS(U)
+      SUBROUTINE IB_SYNCNS(U)
       USE COMMOD
       IMPLICIT NONE
 
       REAL(KIND=RKIND), INTENT(INOUT) :: U(:)
 
-      INTEGER(KIND=IKIND) i, a, e, Ac, iM, nl, ng, ierr, tag
+      INTEGER(KIND=IKIND) i, a, Ac, iM, nl, ng, ierr, tag
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
@@ -2260,11 +2268,9 @@
       incNd = 0
       DO iM=1, ib%nMsh
          DO i=1, ib%msh(iM)%trc%n
-            e = ib%msh(iM)%trc%gE(1,i)
-            DO a=1, ib%msh(iM)%eNoN
-               Ac = ib%msh(iM)%IEN(a,e)
-               incNd(Ac) = 1
-            END DO
+            a  = ib%msh(iM)%trc%gN(i)
+            Ac = ib%msh(iM)%gN(a)
+            incNd(Ac) = 1
          END DO
       END DO
 
@@ -2306,7 +2312,7 @@
 
          U = 0._RKIND
          DO a=1, ng
-            Ac    = ib%cm%gE(a)
+            Ac    = ib%cm%gN(a)
             U(Ac) = U(Ac) + gU(a)
          END DO
       ELSE IF (nl .NE. 0) THEN
@@ -2319,9 +2325,9 @@
       CALL cm%bcast(U)
 
       RETURN
-      END SUBROUTINE IB_SYNCS
+      END SUBROUTINE IB_SYNCNS
 !--------------------------------------------------------------------
-      SUBROUTINE IB_SYNCV(U)
+      SUBROUTINE IB_SYNCNV(U)
       USE COMMOD
       IMPLICIT NONE
 
@@ -2345,11 +2351,9 @@
       incNd = 0
       DO iM=1, ib%nMsh
          DO i=1, ib%msh(iM)%trc%n
-            e = ib%msh(iM)%trc%gE(1,i)
-            DO a=1, ib%msh(iM)%eNoN
-               Ac = ib%msh(iM)%IEN(a,e)
-               incNd(Ac) = 1
-            END DO
+            a  = ib%msh(iM)%trc%gN(i)
+            Ac = ib%msh(iM)%gN(a)
+            incNd(Ac) = 1
          END DO
       END DO
 
@@ -2397,6 +2401,183 @@
 
          U = 0._RKIND
          DO a=1, ng
+            Ac = ib%cm%gN(a)
+            s  = (a-1)*m + 1
+            e  = (a-1)*m + m
+            U(1:m,Ac) = U(1:m,Ac) + gU(s:e)
+         END DO
+      ELSE IF (nl .NE. 0) THEN
+         tag = cm%tF() * 100
+         CALL MPI_SEND(lU, nl*m, mpreal, master, tag, cm%com(), ierr)
+      END IF
+
+      DEALLOCATE(lU, gU)
+
+      CALL cm%bcast(U)
+
+      RETURN
+      END SUBROUTINE IB_SYNCNV
+!####################################################################
+      SUBROUTINE IB_SYNCGS(U)
+      USE COMMOD
+      IMPLICIT NONE
+
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:)
+
+      INTEGER(KIND=IKIND) i, a, e, Ac, iM, nl, ng, ierr, tag
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
+
+      IF (cm%seq()) RETURN
+
+      IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
+     2   "to synchronize IB data"
+
+      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+     2   "initialized. Correction necessary"
+
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         DO i=1, ib%msh(iM)%trc%nG
+            e = ib%msh(iM)%trc%gE(1,i)
+            DO a=1, ib%msh(iM)%eNoN
+               Ac = ib%msh(iM)%IEN(a,e)
+               incNd(Ac) = 1
+            END DO
+         END DO
+      END DO
+
+      nl = SUM(incNd)
+      ALLOCATE(lU(nl))
+      nl = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .EQ. 1) THEN
+            nl = nl + 1
+            lU(nl) = U(a)
+         END IF
+      END DO
+      DEALLOCATE(incNd)
+
+      ng = SUM(ib%cm%nG)
+      ALLOCATE(gU(ng))
+      IF (cm%mas()) THEN
+         ALLOCATE(rReq(cm%np()))
+         rReq = 0
+         gU   = 0._RKIND
+         ng   = 0
+         DO i=1, cm%np()
+            nl = ib%cm%nG(i)
+            IF (nl .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               gU(ng+1:ng+nl) = lU(1:nl)
+            ELSE
+               tag = i * 100
+               CALL MPI_IRECV(gU(ng+1:ng+nl), nl, mpreal, i-1, tag,
+     2            cm%com(), rReq(i), ierr)
+            END IF
+            ng = ng + nl
+         END DO
+
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%nG(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
+
+         U = 0._RKIND
+         DO a=1, ng
+            Ac    = ib%cm%gE(a)
+            U(Ac) = U(Ac) + gU(a)
+         END DO
+      ELSE IF (nl .NE. 0) THEN
+         tag = cm%tF() * 100
+         CALL MPI_SEND(lU, nl, mpreal, master, tag, cm%com(), ierr)
+      END IF
+
+      DEALLOCATE(lU, gU)
+
+      CALL cm%bcast(U)
+
+      RETURN
+      END SUBROUTINE IB_SYNCGS
+!--------------------------------------------------------------------
+      SUBROUTINE IB_SYNCGV(U)
+      USE COMMOD
+      IMPLICIT NONE
+
+      REAL(KIND=RKIND), INTENT(INOUT) :: U(:,:)
+
+      INTEGER(KIND=IKIND) m, i, a, e, s, Ac, iM, nl, ng, ierr, tag
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), rReq(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lU(:), gU(:)
+
+      IF (cm%seq()) RETURN
+
+      m = SIZE(U,1)
+      IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//
+     2   "to synchronize IB data"
+
+      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+     2   "initialized. Correction necessary"
+
+      ALLOCATE(incNd(ib%tnNo))
+      incNd = 0
+      DO iM=1, ib%nMsh
+         DO i=1, ib%msh(iM)%trc%nG
+            e = ib%msh(iM)%trc%gE(1,i)
+            DO a=1, ib%msh(iM)%eNoN
+               Ac = ib%msh(iM)%IEN(a,e)
+               incNd(Ac) = 1
+            END DO
+         END DO
+      END DO
+
+      nl = SUM(incNd)
+      ALLOCATE(lU(m*nl))
+      nl = 0
+      DO a=1, ib%tnNo
+         IF (incNd(a) .EQ. 1) THEN
+            nl = nl + 1
+            s  = (nl-1)*m + 1
+            e  = (nl-1)*m + m
+            lU(s:e) = U(1:m,a)
+         END IF
+      END DO
+      DEALLOCATE(incNd)
+
+      ng = SUM(ib%cm%nG)
+      ALLOCATE(gU(m*ng))
+      IF (cm%mas()) THEN
+         ALLOCATE(rReq(cm%np()))
+         rReq = 0
+         gU   = 0._RKIND
+         ng   = 0
+         DO i=1, cm%np()
+            nl = ib%cm%nG(i)
+            IF (nl .EQ. 0) CYCLE
+            IF (i .EQ. 1) THEN
+               s = 1
+               e = nl*m
+               gU(s:e) = lU(:)
+            ELSE
+               tag = i * 100
+               s = ng*m + 1
+               e = ng*m + nl*m
+               CALL MPI_IRECV(gU(s:e), nl*m, mpreal, i-1, tag,
+     2            cm%com(), rReq(i), ierr)
+            END IF
+            ng = ng + nl
+         END DO
+
+         DO i=1, cm%np()
+            IF (i.EQ.1 .OR. ib%cm%nG(i).EQ.0) CYCLE
+            CALL MPI_WAIT(rReq(i), MPI_STATUS_IGNORE, ierr)
+         END DO
+
+         U = 0._RKIND
+         DO a=1, ng
             Ac = ib%cm%gE(a)
             s  = (a-1)*m + 1
             e  = (a-1)*m + m
@@ -2412,7 +2593,7 @@
       CALL cm%bcast(U)
 
       RETURN
-      END SUBROUTINE IB_SYNCV
+      END SUBROUTINE IB_SYNCGV
 !####################################################################
       END MODULE ALLFUN
 !####################################################################

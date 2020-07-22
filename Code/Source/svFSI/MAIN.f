@@ -199,7 +199,7 @@
 
 !     Immersed body treatment: project flow variables from fluid mesh
 !     to IB solid mesh
-         IF (ibFlag) CALL IB_PROJFVAR(Yn, Do)
+         IF (ibFlag) CALL IB_RESTRICT(Yn, Do)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
