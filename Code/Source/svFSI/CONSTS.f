@@ -31,7 +31,7 @@
 !
 !--------------------------------------------------------------------
 !
-!     Parameters used for Aliev-Panfilov Ventricular Myocyte Model.
+!     Parameters used for svFSI.
 !
 !--------------------------------------------------------------------
 
@@ -207,7 +207,7 @@
 !--------------------------------------------------------------------
 !     IB method: traditional immersed finite element (IFEM)
       INTEGER(KIND=IKIND), PARAMETER :: ibMthd_NA = 850,
-     2  ibMthd_IFEM = 851
+     2  ibMthd_IFEM = 851, ibMthd_FEIBs = 852
 
 !     IB coupling: explicit/implicit
       INTEGER(KIND=IKIND), PARAMETER :: ibCpld_NA = 899, ibCpld_E = 898,

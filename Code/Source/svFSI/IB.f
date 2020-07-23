@@ -276,6 +276,9 @@
       CASE ("ifem")
          ib%mthd = ibMthd_IFEM
          std = " IB method: "//CLR("IFEM",3)
+      CASE ("feibs")
+         ib%mthd = ibMthd_FEIBs
+         std = " IB method: "//CLR("FEIB (stabilized)",3)
       CASE DEFAULT
          err = " Invalid IB method"
       END SELECT
@@ -3343,11 +3346,11 @@ c      END DO
 
       INTEGER(KIND=IKIND) a, b, e, g, i, j, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoNb, eNoN, nFn
-      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), Gmat(nsd,nsd)
+      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), Gxix(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
-     2   Nx(:,:), xbl(:,:), xl(:,:), al(:,:), yl(:,:), ul(:,:), fN(:,:),
-     3   lR(:,:)
+     2   Nx(:,:), xbl(:,:), xl(:,:), al(:,:), yl(:,:), ubl(:,:),
+     3   fN(:,:), lR(:,:)
 
 !     TODO: This is temporary. Later we get domain based on each IB node
 !     and communicate across IB process boundaries
@@ -3368,7 +3371,7 @@ c      END DO
          eNoNb = ib%msh(iM)%eNoN
          nFn   = MAX(ib%msh(iM)%nFn, 1)
          ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), xbl(nsd,eNoNb),
-     2      ul(nsd,eNoNb), fN(nsd,nFn))
+     2      ubl(nsd,eNoNb), fN(nsd,nFn))
 !        Loop over each trace of IB integration points
          DO i=1, ib%msh(iM)%trc%nG
             e  = ib%msh(iM)%trc%gE(1,i)
@@ -3389,7 +3392,7 @@ c      END DO
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc)
-               ul(:,b)  = ib%Un(:,Bc)
+               ubl(:,b) = ib%Un(:,Bc)
                IF (ALLOCATED(ib%msh(iM)%fN)) THEN
                   DO j=1, nFn
                      fN(:,j) = ib%msh(iM)%fN((j-1)*nsd+1:j*nsd,e)
@@ -3401,7 +3404,7 @@ c      END DO
 !           reference configuration. The shapefunction gradients will be
 !           used to compute deformation gradient tensor
             CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Jac,
-     2         Gmat)
+     2         Gxix)
             IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
 !           Scaled Gauss weight
@@ -3442,11 +3445,11 @@ c      END DO
      2         msh(jM)%Nb, xp, xi, N, Nxi)
 
 !           Get the shapefunction derivatives in physical space
-            CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Gmat)
+            CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Gxix)
 
 !           Compute the local residue due to IB-FSI forcing
             CALL IB_CALCFFSIL(eNoNb, eNoN, nFn, w, Jac, Nb, Nbx, N, Nx,
-     2         Gmat, al, yl, ul, fN, lR)
+     2         Gxix, al, yl, ubl, fN, lR)
 
 !           Assemble to global residue
             DO a=1, eNoN
@@ -3456,7 +3459,7 @@ c      END DO
 
             DEALLOCATE(N, Nxi, Nx, xl, al, yl, lR)
          END DO
-         DEALLOCATE(Nb, Nbx, xbl, ul, fN)
+         DEALLOCATE(Nb, Nbx, xbl, ubl, fN)
       END DO
 
       CALL COMMU(ib%R)
@@ -3466,36 +3469,48 @@ c      END DO
 !--------------------------------------------------------------------
 !     Compute the 3D FSI force due to IB in reference configuration
       SUBROUTINE IB_CALCFFSIL(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
-     2   Gm, al, yl, ul, fN, lR)
+     2   Gxix, al, yl, ubl, fN, lR)
       USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(nsd,eNoNb),
-     2   N(eNoN), Nx(nsd,eNoN), Gm(nsd,nsd), al(nsd,eNoN),
-     3   yl(nsd+1,eNoN), ul(nsd,eNoNb), fN(nsd,nFn)
+     2   N(eNoN), Nx(nsd,eNoN), Gxix(nsd,nsd), al(nsd,eNoN),
+     3   yl(nsd+1,eNoN), ubl(nsd,eNoNb), fN(nsd,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: lR(nsd+1,eNoN)
 
       lR = 0._RKIND
-      IF (nsd .EQ. 3) THEN
-         CALL IB_IFEM3D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ul, fN,
-     2      lR)
-      ELSE
-         CALL IB_IFEM2D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ul, fN,
-     2      lR)
+      IF (ib%mthd .EQ. ibMthd_IFEM) THEN
+         IF (nsd .EQ. 3) THEN
+            CALL IB_IFEM3D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ubl,
+     2         fN, lR)
+         ELSE
+            CALL IB_IFEM2D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ubl,
+     2         fN, lR)
+         END IF
+
+      ELSE IF (ib%mthd .EQ. ibMthd_FEIBs) THEN
+         IF (nsd .EQ. 3) THEN
+            CALL IB_FEIBs3D(eNoNb, eNoN, nFn, w, Je, Nbx, N, Nx, Gxix,
+     2         al, yl, ubl, fN, lR)
+         ELSE
+            CALL IB_FEIBs2D(eNoNb, eNoN, nFn, w, Je, Nbx, N, Nx, Gxix,
+     2         al, yl, ubl, fN, lR)
+         END IF
+
       END IF
 
       RETURN
       END SUBROUTINE IB_CALCFFSIL
 !--------------------------------------------------------------------
-!     Compute the 3D FSI force due to IB in reference configuration
-      SUBROUTINE IB_IFEM3D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ul,
+!     Compute the 3D FSI force using IFEM method
+      SUBROUTINE IB_IFEM3D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ubl,
      2   fN, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Nbx(3,eNoNb), N(eNoN),
-     2   Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ul(3,eNoNb), fN(3,nFn)
+     2   Nx(3,eNoN), al(3,eNoN), yl(4,eNoN), ubl(3,eNoNb), fN(3,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
@@ -3567,17 +3582,17 @@ c      END DO
       DO b=1, eNoNb
 !        Deformation tensor, F_{iI}. Here the shape function derivatives
 !        are w.r.t. the reference coordinates
-         F(1,1) = F(1,1) + Nbx(1,b)*ul(1,b)
-         F(1,2) = F(1,2) + Nbx(2,b)*ul(1,b)
-         F(1,3) = F(1,3) + Nbx(3,b)*ul(1,b)
+         F(1,1) = F(1,1) + Nbx(1,b)*ubl(1,b)
+         F(1,2) = F(1,2) + Nbx(2,b)*ubl(1,b)
+         F(1,3) = F(1,3) + Nbx(3,b)*ubl(1,b)
 
-         F(2,1) = F(2,1) + Nbx(1,b)*ul(2,b)
-         F(2,2) = F(2,2) + Nbx(2,b)*ul(2,b)
-         F(2,3) = F(2,3) + Nbx(3,b)*ul(2,b)
+         F(2,1) = F(2,1) + Nbx(1,b)*ubl(2,b)
+         F(2,2) = F(2,2) + Nbx(2,b)*ubl(2,b)
+         F(2,3) = F(2,3) + Nbx(3,b)*ubl(2,b)
 
-         F(3,1) = F(3,1) + Nbx(1,b)*ul(3,b)
-         F(3,2) = F(3,2) + Nbx(2,b)*ul(3,b)
-         F(3,3) = F(3,3) + Nbx(3,b)*ul(3,b)
+         F(3,1) = F(3,1) + Nbx(1,b)*ubl(3,b)
+         F(3,2) = F(3,2) + Nbx(2,b)*ubl(3,b)
+         F(3,3) = F(3,3) + Nbx(3,b)*ubl(3,b)
       END DO
       Jac = MAT_DET(F, nsd)
       Fi  = MAT_INV(F, nsd)
@@ -3672,15 +3687,15 @@ c      END DO
       RETURN
       END SUBROUTINE IB_IFEM3D
 !--------------------------------------------------------------------
-!     Compute the 2D FSI force due to IB in reference configuration
-      SUBROUTINE IB_IFEM2D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ul,
+!     Compute the 2D FSI force using IFEM method
+      SUBROUTINE IB_IFEM2D(eNoNb, eNoN, nFn, w, Nbx, N, Nx, al, yl, ubl,
      2   fN, lR)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Nbx(2,eNoNb), N(eNoN),
-     2   Nx(2,eNoN), al(2,eNoN), yl(3,eNoN), ul(2,eNoNb), fN(2,nFn)
+     2   Nx(2,eNoN), al(2,eNoN), yl(3,eNoN), ubl(2,eNoNb), fN(2,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, iEq, iDmn
@@ -3741,10 +3756,10 @@ c      END DO
       DO b=1, eNoNb
 !        Deformation tensor, F_{iI}. Here the shape function derivatives
 !        are w.r.t. the reference coordinates
-         F(1,1) = F(1,1) + Nbx(1,b)*ul(1,b)
-         F(1,2) = F(1,2) + Nbx(2,b)*ul(1,b)
-         F(2,1) = F(2,1) + Nbx(1,b)*ul(2,b)
-         F(2,2) = F(2,2) + Nbx(2,b)*ul(2,b)
+         F(1,1) = F(1,1) + Nbx(1,b)*ubl(1,b)
+         F(1,2) = F(1,2) + Nbx(2,b)*ubl(1,b)
+         F(2,1) = F(2,1) + Nbx(1,b)*ubl(2,b)
+         F(2,2) = F(2,2) + Nbx(2,b)*ubl(2,b)
       END DO
       Jac = MAT_DET(F, nsd)
       Fi  = MAT_INV(F, nsd)
@@ -3803,6 +3818,36 @@ c      END DO
 
       RETURN
       END SUBROUTINE IB_IFEM2D
+!--------------------------------------------------------------------
+!     Compute the 3D FSI force using FEIB stabilization
+      SUBROUTINE IB_FEIBs3D(eNoNb, eNoN, nFn, w, Je, Nbx, N, Nx, Gxix,
+     2   al, yl, ubl, fN, lR)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nbx(3,eNoNb), N(eNoN),
+     2   Nx(3,eNoN), Gxix(3,3), al(3,eNoN), yl(4,eNoN), ubl(3,eNoNb),
+     3   fN(3,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(4,eNoN)
+
+      RETURN
+      END SUBROUTINE IB_FEIBs3D
+!--------------------------------------------------------------------
+!     Compute the 2D FSI force using FEIB stabilization
+      SUBROUTINE IB_FEIBs2D(eNoNb, eNoN, nFn, w, Je, Nbx, N, Nx, Gxix,
+     2   al, yl, ubl, fN, lR)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNb, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nbx(2,eNoNb), N(eNoN),
+     2   Nx(2,eNoN), Gxix(2,2), al(2,eNoN), yl(3,eNoN), ubl(2,eNoNb),
+     3   fN(2,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lR(3,eNoN)
+
+      RETURN
+      END SUBROUTINE IB_FEIBs2D
 !####################################################################
 !     Add contribution from IB to the residue (RHS)
       SUBROUTINE IB_CONSTRUCT()
