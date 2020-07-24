@@ -47,6 +47,8 @@
       IF (lM%lShl) insd = nsd - 1
       IF (lM%lFib) insd = 1
 
+      ALLOCATE(lM%fs(lM%nFs))
+
 !     The first set of basis is inherited directly from mesh basis
       lM%fs(1)%lShpF = lM%lShpF
       lM%fs(1)%eType = lM%eType
@@ -87,20 +89,23 @@
       END SUBROUTINE INITFSMSH
 !--------------------------------------------------------------------
 !     Initialize function spaces over a face
-      SUBROUTINE INITFSFACE(lFa)
+      SUBROUTINE INITFSFACE(lM, lFa)
       USE COMMOD
       IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa
 
-      INTEGER(KIND=IKIND) g, iM, insd
+      INTEGER(KIND=IKIND) g, insd
 
-      iM   = lFa%iM
       insd = nsd-1
-      IF (msh(iM)%lShl) insd = insd - 1
-      IF (msh(iM)%lFib) insd = 0
+      IF (lM%lShl) insd = insd - 1
+      IF (lM%lFib) insd = 0
+
+      lFa%nFs = lM%nFs
+      ALLOCATE(lFa%fs(lFa%nFs))
 
 !     The first set of basis is inherited directly from face basis
-      lFa%fs(1)%lShpF = msh(iM)%lShpF
+      lFa%fs(1)%lShpF = lM%lShpF
       lFa%fs(1)%eType = lFa%eType
       lFa%fs(1)%eNoN  = lFa%eNoN
       lFa%fs(1)%nG    = lFa%nG

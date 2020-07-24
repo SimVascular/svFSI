@@ -155,7 +155,8 @@
             IF (iCntct) CALL CONTACTFORCES(Dg)
 
 !     Synchronize R across processes. Note: that it is important to
-!     synchronize residue, R before treating immersed boundaries
+!     synchronize residue, R before treating immersed boundaries as
+!     ib%R is already communicated across processes
             IF (.NOT.eq(cEq)%assmTLS) CALL COMMU(R)
 
 !     Update residue in displacement equation for USTRUCT physics. Note
@@ -198,7 +199,7 @@
 
 !     Immersed body treatment: project flow variables from fluid mesh
 !     to IB solid mesh
-         IF (ibFlag) CALL IB_PROJFVAR(Yn, Do)
+         IF (ibFlag) CALL IB_RESTRICT(Yn, Do)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)

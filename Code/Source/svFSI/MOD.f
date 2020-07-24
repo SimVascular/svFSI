@@ -270,16 +270,25 @@
       END TYPE adjType
 
 !     Tracer type used for immersed boundaries. Identifies traces of
-!     nodes on background/foreground mesh elements
+!     nodes and integration points on background mesh elements
       TYPE traceType
-!        No. of non-zero traces
+!        No. of non-zero nodal traces
          INTEGER(KIND=IKIND) :: n = 0
-!        Pointer of each trace to the global element# and the
-!        integration point#
+!        No. of non-zero integration point traces
+         INTEGER(KIND=IKIND) :: nG = 0
+!        Self pointer of each trace to the IB global node
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:)
+!        Self pointer of each trace to the IB integration point and
+!        element ID
          INTEGER(KIND=IKIND), ALLOCATABLE :: gE(:,:)
-!        Trace pointer array stores two values for each trace. First is
-!        the element to which the trace points to. Second is the mesh no
-         INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:,:)
+!        Nodal trace pointer array stores two values for each trace.
+!        (1) background mesh element to which the trace points to,
+!        (2) mesh ID
+         INTEGER(KIND=IKIND), ALLOCATABLE :: nptr(:,:)
+!        Integration point tracer array stores two values for each trace
+!        (1) background mesh element to which the trace points to,
+!        (2) mesh ID
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gptr(:,:)
       END TYPE traceType
 
 !     The face type containing mesh at boundary
@@ -334,8 +343,6 @@
          TYPE(adjType) :: nAdj
 !        Face element adjacency
          TYPE(adjType) :: eAdj
-!        IB: tracers
-         TYPE(traceType) :: trc
 !        Function spaces (basis)
          TYPE(fsType), ALLOCATABLE :: fs(:)
       END TYPE faceType
@@ -695,9 +702,13 @@
       END TYPE rmshType
 
       TYPE ibCommType
-!        Num nodes local to each process
+!        Num traces (nodes) local to each process
          INTEGER(KIND=IKIND), ALLOCATABLE :: n(:)
-!        Pointer to global node num stacked contiguously
+!        Pointer to global trace (node num) stacked contiguously
+         INTEGER(KIND=IKIND), ALLOCATABLE :: gN(:)
+!        Num traces (Gauss points) local to each process
+         INTEGER(KIND=IKIND), ALLOCATABLE :: nG(:)
+!        Pointer to global trace (Gauss point) stacked contiguously
          INTEGER(KIND=IKIND), ALLOCATABLE :: gE(:)
       END TYPE ibCommType
 
@@ -705,10 +716,12 @@
       TYPE ibType
 !        Whether any file being saved
          LOGICAL :: savedOnce = .FALSE.
-!        IB formulation
+!        IB method
          INTEGER(KIND=IKIND) :: mthd = ibMthd_NA
 !        IB coupling
          INTEGER(KIND=IKIND) :: cpld = ibCpld_NA
+!        IB restriction method
+         INTEGER(KIND=IKIND) :: restr = ibRestr_NA
 !        Current IB domain ID
          INTEGER(KIND=IKIND) :: cDmn
 !        Current equation

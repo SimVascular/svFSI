@@ -135,16 +135,6 @@
             Yg(s:e,a) = Yo(s:e,a)*coef(3) + Yn(s:e,a)*coef(4)
             Dg(s:e,a) = Do(s:e,a)*coef(3) + Dn(s:e,a)*coef(4)
          END DO
-
-!        Reset pressure variable initiator
-         IF ( (eq(i)%phys .EQ. phys_fluid .OR.
-     2         eq(i)%phys .EQ. phys_CMM   .OR.
-     3         eq(i)%phys .EQ. phys_FSI) .AND.
-     4        .NOT.sstEq .AND. .NOT.cmmInit ) THEN
-            DO a=1, tnNo
-               Yg(e,a) = Yn(e,a)
-            END DO
-         END IF
       END DO
 
       IF (pstEq) THEN
@@ -163,34 +153,23 @@
 
       LOGICAL :: l1, l2, l3, l4
       INTEGER(KIND=IKIND) :: s, e, a, Ac
-      REAL(KIND=RKIND) :: coef(5), r1, dUl(nsd)
+      REAL(KIND=RKIND) :: coef(4), r1, dUl(nsd)
 
       s       = eq(cEq)%s
       e       = eq(cEq)%e
       coef(1) = eq(cEq)%gam*dt
-      coef(2) = eq(cEq)%af*coef(1)
-      coef(3) = eq(cEq)%beta*dt*dt
-      coef(4) = 1._RKIND / eq(cEq)%am
-      coef(5) = coef(2)*coef(4)
+      coef(2) = eq(cEq)%beta*dt*dt
+      coef(3) = 1._RKIND / eq(cEq)%am
+      coef(4) = eq(cEq)%af*coef(1)*coef(3)
 
-      IF ( (eq(cEq)%phys .EQ. phys_fluid .OR.
-     2      eq(cEq)%phys .EQ. phys_CMM   .OR.
-     3      eq(cEq)%phys .EQ. phys_FSI) .AND.
-     4     .NOT.sstEq .AND. .NOT.cmmInit ) THEN
-         DO a=1, tnNo
-            An(s:e,a)   = An(s:e,a)   - R(:,a)
-            Yn(s:e-1,a) = Yn(s:e-1,a) - R(1:dof-1,a)*coef(1)
-            Yn(e,a)     = Yn(e,a)     - R(dof,a)*coef(2)
-            Dn(s:e,a)   = Dn(s:e,a)   - R(:,a)*coef(3)
-         END DO
-      ELSE IF (sstEq) THEN
+      IF (sstEq) THEN
 !        ustruct, FSI (ustruct)
          IF (eq(cEq)%phys .EQ. phys_ustruct .OR.
      2       eq(cEq)%phys .EQ. phys_FSI) THEN
             DO a=1, tnNo
                An(s:e,a)   = An(s:e,a)   - R(:,a)
                Yn(s:e,a)   = Yn(s:e,a)   - R(:,a)*coef(1)
-               dUl(:)      = Rd(:,a)*coef(4) + R(1:dof-1,a)*coef(5)
+               dUl(:)      = Rd(:,a)*coef(3) + R(1:dof-1,a)*coef(4)
                Ad(:,a)     = Ad(:,a)     - dUl(:)
                Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
             END DO
@@ -198,14 +177,14 @@
             DO a=1, tnNo
                An(s:e,a)   = An(s:e,a) - R(:,a)
                Yn(s:e,a)   = Yn(s:e,a) - R(:,a)*coef(1)
-               Dn(s:e,a)   = Dn(s:e,a) - R(:,a)*coef(3)
+               Dn(s:e,a)   = Dn(s:e,a) - R(:,a)*coef(2)
             END DO
          END IF
       ELSE
          DO a=1, tnNo
             An(s:e,a) = An(s:e,a) - R(:,a)
             Yn(s:e,a) = Yn(s:e,a) - R(:,a)*coef(1)
-            Dn(s:e,a) = Dn(s:e,a) - R(:,a)*coef(3)
+            Dn(s:e,a) = Dn(s:e,a) - R(:,a)*coef(2)
          END DO
       END IF
 
