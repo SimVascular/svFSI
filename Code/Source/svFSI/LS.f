@@ -80,7 +80,7 @@
       IF (lEq%useTLS) THEN
          ALLOCATE(Wr(dof,lhs%nNo), Wc(dof,lhs%nNo))
          CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
-         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
+         CALL PRECONDRCS(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
      2      Val, R, Wr, Wc)
       END IF
 

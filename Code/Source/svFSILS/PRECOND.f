@@ -147,7 +147,7 @@
 !--------------------------------------------------------------------
 !     Row and column preconditioner, to precondition both LHS and RHS.
 !--------------------------------------------------------------------
-      SUBROUTINE PRECONDRNC(lhs, rowPtr, colPtr, diagPtr, dof, Val, R, 
+      SUBROUTINE PRECONDRCS(lhs, rowPtr, colPtr, diagPtr, dof, Val, R, 
      2   W1, W2)
 
       INCLUDE "FSILS_STD.h"
@@ -244,7 +244,7 @@
          iter = iter + 1
          IF (iter .GE. maxiter) THEN 
             PRINT *, "Warning: maximum iteration number reached"//
-     2            "@ SUBROUTINE PRECONDRNC."
+     2            "@ SUBROUTINE PRECONDRCS."
             PRINT *, MAXVAL(Wr), MAXVAL(Wc)
             flag = .False.
          END IF
@@ -327,6 +327,9 @@
 
          CALL FSILS_COMMUV(lhs, dof, Wr)
          CALL FSILS_COMMUV(lhs, dof, Wc)
+
+         IF (MAXVAL(ABS(1._LSRP - Wr)) .LT. tol .AND. 
+     2       MAXVAL(ABS(1._LSRP - Wc)) .LT. tol) flag = .False.
          
          Wr = 1._LSRP/SQRT(Wr)
          Wc = 1._LSRP/SQRT(Wc)
@@ -336,9 +339,6 @@
 
          W1 = W1*Wr
          W2 = W2*Wc
-
-         IF (ABS( 1._LSRP - MAXVAL(Wr) ) .LT. tol .AND. 
-     2       ABS( 1._LSRP - MAXVAL(Wc) ) .LT. tol) flag = .False.
 
          IF (lhs%commu%nTasks .GT. 1) THEN 
             CALL MPI_ALLGATHER(flag, 1, mplog, gflag, 1, mplog, 
@@ -365,7 +365,7 @@
    !    END DO
 
       RETURN
-      END SUBROUTINE PRECONDRNC
+      END SUBROUTINE PRECONDRCS
 
 !--------------------------------------------------------------------
 !     Pre-multipling Val with W: Val = W*Val

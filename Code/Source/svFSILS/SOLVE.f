@@ -101,7 +101,7 @@
          CALL PRECONDDIAG(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
      &      Val, R, Wc)
       ELSE IF (prec .EQ. PRECOND_RCS) THEN
-         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
+         CALL PRECONDRCS(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
      &      Val, R, Wr, Wc)
       ELSE
          PRINT *, "This linear solver and preconditioner combination"//
