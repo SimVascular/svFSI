@@ -197,10 +197,7 @@
      4   Pdev(3,3), Bm(6,3,eNoNw), DBm(6,3), NxFi(3,eNoNw), VxFi(3,3),
      5   VxNx(3,eNoNw), BtDB, NxSNx, T1, T2, T3, Ku
 
-      TYPE (stModelType) :: stModel
-
 !     Define parameters
-      stModel = eq(cEq)%dmn(cDmn)%stM
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -268,10 +265,11 @@
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(stModel, F, nFn, fN, ya_g, Siso, CCiso, Ja)
+      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, CCiso,
+     2   Ja)
 
 !     Compute rho and beta depending on the volumetric penalty model
-      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, Ja)
+      CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
@@ -570,10 +568,7 @@
      4   Pdev(2,2), Bm(3,2,eNoNw), DBm(3,2), NxFi(2,eNoNw), VxFi(2,2),
      5   VxNx(2,eNoNw), BtDB, NxSNx, T1, T2, T3, Ku
 
-      TYPE (stModelType) :: stModel
-
 !     Define parameters
-      stModel = eq(cEq)%dmn(cDmn)%stM
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
@@ -626,10 +621,11 @@
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(stModel, F, nFn, fN, ya_g, Siso, CCiso, Ja)
+      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, CCiso,
+     2   Ja)
 
 !     Compute rho and beta depending on the volumetric penalty model
-      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, Ja)
+      CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
@@ -810,10 +806,7 @@
      4   PxFi(3), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(3,eNoNw), NxNx, T1,
      5   T2, T3, Ku
 
-      TYPE (stModelType) :: stModel
-
 !     Define parameters
-      stModel = eq(cEq)%dmn(cDmn)%stM
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -881,7 +874,8 @@
       END DO
 
 !     Compute rho and beta depending on the volumetric penalty model
-      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, 1._RKIND)
+      CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta,
+     2   1._RKIND)
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
@@ -1023,10 +1017,7 @@
      4   PxFi(2), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(2,eNoNw), NxNx, T1,
      5   T2, T3, Ku
 
-      TYPE (stModelType) :: stModel
-
 !     Define parameters
-      stModel = eq(cEq)%dmn(cDmn)%stM
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
@@ -1078,7 +1069,8 @@
       END DO
 
 !     Compute rho and beta depending on the volumetric penalty model
-      CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, 1._RKIND)
+      CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta,
+     2   1._RKIND)
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN

@@ -38,15 +38,16 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC(stM, F, nfd, fl, ya, S, CC)
+      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, CC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-      TYPE(stModelType), INTENT(IN) :: stM
+      TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
+      TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
      2   Inv4, Inv6, Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
      3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
@@ -59,6 +60,7 @@
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
 !     Some preliminaries
+      stM  = lDmn%stM
       nd   = REAL(nsd, KIND=RKIND)
       Kp   = stM%Kpen
 
@@ -380,16 +382,17 @@
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev(stM, F, nfd, fl, ya, S, CC, Ja)
+      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, ya, S, CC, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-      TYPE(stModelType), INTENT(IN) :: stM
+      TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd),
      2   Ja
 
+      TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,
      2   Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
@@ -403,6 +406,7 @@
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
 !     Some preliminaries
+      stM  = lDmn%stM
       nd   = REAL(nsd, KIND=RKIND)
 
 !     Electromechanics coupling based on active strain
@@ -662,25 +666,25 @@
 !--------------------------------------------------------------------
 !     Compute rho and beta depending on the Gibb's free-energy based
 !     volumetric penalty model
-      SUBROUTINE GVOLPEN(stM, p, ro, bt, dro, dbt, Ja)
+      SUBROUTINE GVOLPEN(lDmn, p, ro, bt, dro, dbt, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
-      TYPE(stModelType), INTENT(IN) :: stM
+      TYPE(dmnType), INTENT(IN) :: lDmn
       REAL(KIND=RKIND), INTENT(IN) :: p, Ja
       REAL(KIND=RKIND), INTENT(OUT) :: ro, bt, dro, dbt
 
       REAL(KIND=RKIND) :: Kp, r1, r2
 
-      ro  = eq(cEq)%dmn(cDmn)%prop(solid_density)/Ja
+      ro  = lDmn%prop(solid_density)/Ja
       bt  = 0._RKIND
       dbt = 0._RKIND
       dro = 0._RKIND
 
-      Kp  = stM%Kpen
+      Kp  = lDmn%stM%Kpen
       IF (ISZERO(Kp)) RETURN
 
-      SELECT CASE (stM%volType)
+      SELECT CASE (lDmn%stM%volType)
       CASE (stVol_Quad)
          r1  = 1._RKIND/(Kp - p)
 

@@ -247,34 +247,34 @@
       RETURN
       END SUBROUTINE CMMb
 !####################################################################
-      SUBROUTINE CMM3D (eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+      SUBROUTINE CMM3D(eNoN, w, N, Nx, al, yl, bfl, Kxi, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
       REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
+     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(3,eNoN), Kxi(3,3)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
-
       INTEGER(KIND=IKIND) a, b
-      REAL(KIND=RKIND) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3,
-     2  divU, amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3),
-     3  ua(3), ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3),
-     4  rM(3,3), NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN)
+      REAL(KIND=RKIND) ctM, ctC, tauM, tauC, tauB, kT, kS, kU, mu, rho,
+     2   divU, amd, wl, wr, p, pa, u(3), ud(3), px(3), f(3), up(3),
+     3   ua(3), ux(3,3), es(3,3), rV(3), rM(3,3), uNx(eNoN), upNx(eNoN),
+     4   uaNx(eNoN), NxNx, gam, mu_s, mu_x, es_x(3,eNoN), T1, T2, T3
+
+      ctM  = 1._RKIND
+      ctC  = 36._RKIND
 
       rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
 
-      wr   = w*rho
-      T1   = eq(cEq)%af*eq(cEq)%gam*dt
+      T1   = eq(cEq)%af * eq(cEq)%gam * dt
       amd  = eq(cEq)%am/T1
-      wrl  = wr*T1
       wl   = w*T1
+      wr   = w*rho
 
 !     Indices are not selected based on the equation only
 !     because fluid equation always come first
@@ -308,121 +308,117 @@
          ux(2,3) = ux(2,3) + Nx(2,a)*yl(3,a)
          ux(3,3) = ux(3,3) + Nx(3,a)*yl(3,a)
       END DO
+      divU = ux(1,1) + ux(2,2) + ux(3,3)
+
+      IF (mvMsh) THEN
+         DO a=1, eNoN
+            u(1) = u(1) - N(a)*yl(5,a)
+            u(2) = u(2) - N(a)*yl(6,a)
+            u(3) = u(3) - N(a)*yl(7,a)
+         END DO
+      END IF
 
 !     Strain rate tensor 2*e_ij := (u_ij + u_ji)
       es(1,1) = ux(1,1) + ux(1,1)
+      es(2,1) = ux(2,1) + ux(1,2)
+      es(3,1) = ux(3,1) + ux(1,3)
+      es(1,2) = es(2,1)
       es(2,2) = ux(2,2) + ux(2,2)
+      es(3,2) = ux(3,2) + ux(2,3)
+      es(1,3) = es(3,1)
+      es(2,3) = es(3,2)
       es(3,3) = ux(3,3) + ux(3,3)
 
-      es(1,2) = ux(1,2) + ux(2,1)
-      es(1,3) = ux(1,3) + ux(3,1)
-      es(2,3) = ux(2,3) + ux(3,2)
-
-      es(2,1) = es(1,2)
-      es(3,1) = es(1,3)
-      es(3,2) = es(2,3)
-
       DO a=1, eNoN
-        es_x(1,a) = es(1,1)*Nx(1,a) + es(1,2)*Nx(2,a) + es(1,3)*Nx(3,a)
-        es_x(2,a) = es(2,1)*Nx(1,a) + es(2,2)*Nx(2,a) + es(2,3)*Nx(3,a)
-        es_x(3,a) = es(3,1)*Nx(1,a) + es(3,2)*Nx(2,a) + es(3,3)*Nx(3,a)
+        es_x(1,a) = es(1,1)*Nx(1,a) + es(2,1)*Nx(2,a) + es(3,1)*Nx(3,a)
+        es_x(2,a) = es(1,2)*Nx(1,a) + es(2,2)*Nx(2,a) + es(3,2)*Nx(3,a)
+        es_x(3,a) = es(1,3)*Nx(1,a) + es(2,3)*Nx(2,a) + es(3,3)*Nx(3,a)
       END DO
 
 !     Shear-rate := (2*e_ij*e_ij)^.5
-      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
-     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
-     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = es(1,1)*es(1,1) + es(2,1)*es(2,1) + es(3,1)*es(3,1)
+     2    + es(1,2)*es(1,2) + es(2,2)*es(2,2) + es(3,2)*es(3,2)
+     3    + es(1,3)*es(1,3) + es(2,3)*es(2,3) + es(3,3)*es(3,3)
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
-      nu   = nu/rho
-      nu_s = nu_s/rho
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_x)
       IF (ISZERO(gam)) THEN
-         nu_x = 0._RKIND
+         mu_x = 0._RKIND
       ELSE
-         nu_x = nu_x/rho/gam
+         mu_x = mu_x/gam
       END IF
-      s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
 
-      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
-     2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2)
-     3   + u(2)*u(2)*ksix(2,2) + u(3)*u(2)*ksix(3,2)
-     4   + u(1)*u(3)*ksix(1,3) + u(2)*u(3)*ksix(2,3)
-     5   + u(3)*u(3)*ksix(3,3)
+      kT = 4._RKIND*(ctM/dt)**2_RKIND
 
-      kS = ksix(1,1)*ksix(1,1) + ksix(2,1)*ksix(2,1)
-     2   + ksix(3,1)*ksix(3,1) + ksix(1,2)*ksix(1,2)
-     3   + ksix(2,2)*ksix(2,2) + ksix(3,2)*ksix(3,2)
-     4   + ksix(1,3)*ksix(1,3) + ksix(2,3)*ksix(2,3)
-     5   + ksix(3,3)*ksix(3,3)
+      kU = u(1)*u(1)*Kxi(1,1) + u(2)*u(1)*Kxi(2,1) + u(3)*u(1)*Kxi(3,1)
+     2   + u(1)*u(2)*Kxi(1,2) + u(2)*u(2)*Kxi(2,2) + u(3)*u(2)*Kxi(3,2)
+     3   + u(1)*u(3)*Kxi(1,3) + u(2)*u(3)*Kxi(2,3) + u(3)*u(3)*Kxi(3,3)
 
-      tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
-     2   ct(2)*nu_s*nu_s*kS + s*s)
+      kS = Kxi(1,1)*Kxi(1,1) + Kxi(2,1)*Kxi(2,1) + Kxi(3,1)*Kxi(3,1)
+     2   + Kxi(1,2)*Kxi(1,2) + Kxi(2,2)*Kxi(2,2) + Kxi(3,2)*Kxi(3,2)
+     3   + Kxi(1,3)*Kxi(1,3) + Kxi(2,3)*Kxi(2,3) + Kxi(3,3)*Kxi(3,3)
+      kS = ctC * kS * (mu/rho)**2._RKIND
 
-      up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
-     2      + u(3)*ux(3,1) + s*u(1))
-      up(2) = -tauM*(ud(2) + px(2)/rho + u(1)*ux(1,2) + u(2)*ux(2,2)
-     2      + u(3)*ux(3,2) + s*u(2))
-      up(3) = -tauM*(ud(3) + px(3)/rho + u(1)*ux(1,3) + u(2)*ux(2,3)
-     2      + u(3)*ux(3,3) + s*u(3))
+      tauM = 1._RKIND / (rho * SQRT( kT + kU + kS ))
+      tauC = 1._RKIND / (tauM * (Kxi(1,1) + Kxi(2,2) + Kxi(3,3)))
 
-      tauC = ksix(1,1) + ksix(2,2) + ksix(3,3)
-      tauC = 1._RKIND/tauM/tauC
+      rV(1) = ud(1) + u(1)*ux(1,1) + u(2)*ux(2,1) + u(3)*ux(3,1)
+      rV(2) = ud(2) + u(1)*ux(1,2) + u(2)*ux(2,2) + u(3)*ux(3,2)
+      rV(3) = ud(3) + u(1)*ux(1,3) + u(2)*ux(2,3) + u(3)*ux(3,3)
 
-      tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
-     2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2)
-     3     + up(2)*up(2)*ksix(2,2) + up(3)*up(2)*ksix(3,2)
-     4     + up(1)*up(3)*ksix(1,3) + up(2)*up(3)*ksix(2,3)
-     5     + up(3)*up(3)*ksix(3,3)
+      up(1) = -tauM*(rho*rV(1) + px(1))
+      up(2) = -tauM*(rho*rV(2) + px(2))
+      up(3) = -tauM*(rho*rV(3) + px(3))
 
+      tauB = up(1)*up(1)*Kxi(1,1) + up(2)*up(1)*Kxi(2,1)
+     2     + up(3)*up(1)*Kxi(3,1) + up(1)*up(2)*Kxi(1,2)
+     3     + up(2)*up(2)*Kxi(2,2) + up(3)*up(2)*Kxi(3,2)
+     4     + up(1)*up(3)*Kxi(1,3) + up(2)*up(3)*Kxi(2,3)
+     5     + up(3)*up(3)*Kxi(3,3)
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1._RKIND/SQRT(tauB)
-
-      divU = ux(1,1) + ux(2,2) + ux(3,3)
+      tauB = rho/SQRT(tauB)
 
       ua(1) = u(1) + up(1)
       ua(2) = u(2) + up(2)
       ua(3) = u(3) + up(3)
+      pa    = p - tauC*divU
 
       rV(1) = tauB*(up(1)*ux(1,1) + up(2)*ux(2,1) + up(3)*ux(3,1))
       rV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2) + up(3)*ux(3,2))
       rV(3) = tauB*(up(1)*ux(1,3) + up(2)*ux(2,3) + up(3)*ux(3,3))
 
-      rM(1,1) = nu*es(1,1) - up(1)*ua(1) + rV(1)*up(1) + divU*tauC
-     2        - p/rho
-      rM(2,1) = nu*es(2,1) - up(2)*ua(1) + rV(2)*up(1)
-      rM(3,1) = nu*es(3,1) - up(3)*ua(1) + rV(3)*up(1)
+      rM(1,1) = mu*es(1,1) - rho*up(1)*ua(1) + rV(1)*up(1) - pa
+      rM(2,1) = mu*es(2,1) - rho*up(1)*ua(2) + rV(1)*up(2)
+      rM(3,1) = mu*es(3,1) - rho*up(1)*ua(3) + rV(1)*up(3)
 
-      rM(1,2) = nu*es(1,2) - up(1)*ua(2) + rV(1)*up(2)
-      rM(2,2) = nu*es(2,2) - up(2)*ua(2) + rV(2)*up(2) + divU*tauC
-     2        - p/rho
-      rM(3,2) = nu*es(3,2) - up(3)*ua(2) + rV(3)*up(2)
+      rM(1,2) = mu*es(1,2) - rho*up(2)*ua(1) + rV(2)*up(1)
+      rM(2,2) = mu*es(2,2) - rho*up(2)*ua(2) + rV(2)*up(2) - pa
+      rM(3,2) = mu*es(3,2) - rho*up(2)*ua(3) + rV(2)*up(3)
 
-      rM(1,3) = nu*es(1,3) - up(1)*ua(3) + rV(1)*up(3)
-      rM(2,3) = nu*es(2,3) - up(2)*ua(3) + rV(2)*up(3)
-      rM(3,3) = nu*es(3,3) - up(3)*ua(3) + rV(3)*up(3) + divU*tauC
-     2        - p/rho
+      rM(1,3) = mu*es(1,3) - rho*up(3)*ua(1) + rV(3)*up(1)
+      rM(2,3) = mu*es(2,3) - rho*up(3)*ua(2) + rV(3)*up(2)
+      rM(3,3) = mu*es(3,3) - rho*up(3)*ua(3) + rV(3)*up(3) - pa
 
-      rV(1) = ud(1) + ua(1)*(s+ux(1,1)) + ua(2)*ux(2,1) + ua(3)*ux(3,1)
-      rV(2) = ud(2) + ua(1)*ux(1,2) + ua(2)*(s+ux(2,2)) + ua(3)*ux(3,2)
-      rV(3) = ud(3) + ua(1)*ux(1,3) + ua(2)*ux(2,3) + ua(3)*(s+ux(3,3))
+      rV(1) = ud(1) + ua(1)*ux(1,1) + ua(2)*ux(2,1) + ua(3)*ux(3,1)
+      rV(2) = ud(2) + ua(1)*ux(1,2) + ua(2)*ux(2,2) + ua(3)*ux(3,2)
+      rV(3) = ud(3) + ua(1)*ux(1,3) + ua(2)*ux(2,3) + ua(3)*ux(3,3)
 
       DO a=1, eNoN
-         udNx(a)  = u(1)*Nx(1,a)  + u(2)*Nx(2,a)  + u(3)*Nx(3,a)
-         updNx(a) = up(1)*Nx(1,a) + up(2)*Nx(2,a) + up(3)*Nx(3,a)
-         uadNx(a) = updNx(a) + udNx(a)
+         uNx(a)  = u(1)*Nx(1,a)  + u(2)*Nx(2,a)  + u(3)*Nx(3,a)
+         upNx(a) = up(1)*Nx(1,a) + up(2)*Nx(2,a) + up(3)*Nx(3,a)
+         uaNx(a) = uNx(a) + upNx(a)
 
-         lR(1,a) = lR(1,a) + wr*(rV(1)*N(a) + rM(1,1)*Nx(1,a)
-     2      + rM(1,2)*Nx(2,a) + rM(1,3)*Nx(3,a))
+         lR(1,a) = lR(1,a) + wr*N(a)*rV(1) + w*(Nx(1,a)*rM(1,1)
+     2      + Nx(2,a)*rM(2,1) + Nx(3,a)*rM(3,1))
 
-         lR(2,a) = lR(2,a) + wr*(rV(2)*N(a) + rM(2,1)*Nx(1,a)
-     2      + rM(2,2)*Nx(2,a) + rM(2,3)*Nx(3,a))
+         lR(2,a) = lR(2,a) + wr*N(a)*rV(2) + w*(Nx(1,a)*rM(1,2)
+     2      + Nx(2,a)*rM(2,2) + Nx(3,a)*rM(3,2))
 
-         lR(3,a) = lR(3,a) + wr*(rV(3)*N(a) + rM(3,1)*Nx(1,a)
-     2      + rM(3,2)*Nx(2,a) + rM(3,3)*Nx(3,a))
+         lR(3,a) = lR(3,a) + wr*N(a)*rV(3) + w*(Nx(1,a)*rM(1,3)
+     2      + Nx(2,a)*rM(2,3) + Nx(3,a)*rM(3,3))
 
-         lR(4,a) = lR(4,a) + w*(N(a)*divU - updNx(a))
+         lR(4,a) = lR(4,a) + w*(N(a)*divU - upNx(a))
       END DO
 
       DO a=1, eNoN
@@ -437,46 +433,50 @@
             rM(2,3) = Nx(2,a)*Nx(3,b)
             rM(3,3) = Nx(3,a)*Nx(3,b)
 
-            NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
+            NxNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
 
-            T1 = nu*NxdNx + tauB*updNx(a)*updNx(b)
-     2         + N(a)*((s+amd)*N(b) + uadNx(b))
-     3         + tauM*uadNx(a)*(udNx(b) + (s+amd)*N(b))
+            T1 = mu*NxNx + tauB*upNx(a)*upNx(b)
+     2         + rho*( N(a)*(amd*N(b) + uaNx(b))
+     3         + rho*tauM*uaNx(a)*(uNx(b) + amd*N(b)) )
 
-            T2 = tauM*udNx(a)
-            T3 = tauM*(amd*N(b) + udNx(b))
+            T2 = rho*tauM*uNx(a)
+
+            T3 = rho*tauM*(amd*N(b) + uNx(b))
+
 !           dM/dU
-            lK(1,a,b)  = lK(1,a,b)  + wrl*((nu + tauC)*rM(1,1) + T1 +
-     2         nu_x*es_x(1,a)*es_x(1,b))
-            lK(2,a,b)  = lK(2,a,b)  + wrl*(nu*rM(2,1) + tauC*rM(1,2) +
-     2         nu_x*es_x(1,a)*es_x(2,b))
-            lK(3,a,b)  = lK(3,a,b)  + wrl*(nu*rM(3,1) + tauC*rM(1,3) +
-     2         nu_x*es_x(1,a)*es_x(3,b))
+            lK(1,a,b)  = lK(1,a,b)  + wl*((mu + tauC)*rM(1,1) + T1
+     2         + mu_x*es_x(1,a)*es_x(1,b))
+            lK(2,a,b)  = lK(2,a,b)  + wl*(mu*rM(2,1) + tauC*rM(1,2)
+     2         + mu_x*es_x(1,a)*es_x(2,b))
+            lK(3,a,b)  = lK(3,a,b)  + wl*(mu*rM(3,1) + tauC*rM(1,3)
+     2         + mu_x*es_x(1,a)*es_x(3,b))
 
-            lK(5,a,b)  = lK(5,a,b)  + wrl*(nu*rM(1,2) + tauC*rM(2,1) +
-     2         nu_x*es_x(2,a)*es_x(1,b))
-            lK(6,a,b)  = lK(6,a,b)  + wrl*((nu + tauC)*rM(2,2) + T1 +
-     2         nu_x*es_x(2,a)*es_x(2,b))
-            lK(7,a,b)  = lK(7,a,b)  + wrl*(nu*rM(3,2) + tauC*rM(2,3) +
-     2         nu_x*es_x(2,a)*es_x(3,b))
+            lK(5,a,b)  = lK(5,a,b)  + wl*(mu*rM(1,2) + tauC*rM(2,1)
+     2         + mu_x*es_x(2,a)*es_x(1,b))
+            lK(6,a,b)  = lK(6,a,b)  + wl*((mu + tauC)*rM(2,2) + T1
+     2         + mu_x*es_x(2,a)*es_x(2,b))
+            lK(7,a,b)  = lK(7,a,b)  + wl*(mu*rM(3,2) + tauC*rM(2,3)
+     2         + mu_x*es_x(2,a)*es_x(3,b))
 
-            lK(9,a,b)  = lK(9,a,b)  + wrl*(nu*rM(1,3) + tauC*rM(3,1) +
-     2         nu_x*es_x(3,a)*es_x(1,b))
-            lK(10,a,b) = lK(10,a,b) + wrl*(nu*rM(2,3) + tauC*rM(3,2) +
-     2         nu_x*es_x(3,a)*es_x(2,b))
-            lK(11,a,b) = lK(11,a,b) + wrl*((nu + tauC)*rM(3,3) + T1 +
-     2         nu_x*es_x(3,a)*es_x(3,b))
+            lK(9,a,b)  = lK(9,a,b)  + wl*(mu*rM(1,3) + tauC*rM(3,1)
+     2         + mu_x*es_x(3,a)*es_x(1,b))
+            lK(10,a,b) = lK(10,a,b) + wl*(mu*rM(2,3) + tauC*rM(3,2)
+     2         + mu_x*es_x(3,a)*es_x(2,b))
+            lK(11,a,b) = lK(11,a,b) + wl*((mu + tauC)*rM(3,3) + T1
+     2         + mu_x*es_x(3,a)*es_x(3,b))
 
 !           dM/dP
             lK(4,a,b)  = lK(4,a,b)  - wl*(Nx(1,a)*N(b) - Nx(1,b)*T2)
             lK(8,a,b)  = lK(8,a,b)  - wl*(Nx(2,a)*N(b) - Nx(2,b)*T2)
             lK(12,a,b) = lK(12,a,b) - wl*(Nx(3,a)*N(b) - Nx(3,b)*T2)
+
 !           dC/dU
-            lK(13,a,b) = lK(13,a,b) + wl*(Nx(1,b)*N(a) + Nx(1,a)*T3)
-            lK(14,a,b) = lK(14,a,b) + wl*(Nx(2,b)*N(a) + Nx(2,a)*T3)
-            lK(15,a,b) = lK(15,a,b) + wl*(Nx(3,b)*N(a) + Nx(3,a)*T3)
+            lK(13,a,b) = lK(13,a,b) + wl*(N(a)*Nx(1,b) + Nx(1,a)*T3)
+            lK(14,a,b) = lK(14,a,b) + wl*(N(a)*Nx(2,b) + Nx(2,a)*T3)
+            lK(15,a,b) = lK(15,a,b) + wl*(N(a)*Nx(3,b) + Nx(3,a)*T3)
+
 !           dC/dP
-            lK(16,a,b) = lK(16,a,b) + wl*(tauM*NxdNx)/rho
+            lK(16,a,b) = lK(16,a,b) + wl*(tauM*NxNx)
          END DO
       END DO
 

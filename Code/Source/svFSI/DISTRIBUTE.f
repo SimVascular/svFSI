@@ -402,6 +402,7 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
 
+      LOGICAL fnFlag
       INTEGER(KIND=IKIND) i, insd
 
       CALL cm%bcast(lM%lShpF)
@@ -420,6 +421,9 @@
       CALL cm%bcast(lM%dx)
       CALL cm%bcast(lM%name)
 
+      fnFlag = ALLOCATED(lM%fN)
+      CALL cm%bcast(fnFlag)
+
       IF (cm%slv()) THEN
          lM%nNo = lM%gnNo
          lM%nEl = lM%gnEl
@@ -428,14 +432,14 @@
          ALLOCATE(lM%IEN(lM%eNoN, lM%nEl))
          ALLOCATE(lM%eId(lM%nEl))
          ALLOCATE(lM%fa(lM%nFa))
-         ALLOCATE(lM%fN(lM%nFn*nsd,lM%nEl))
+         IF (fnFlag) ALLOCATE(lM%fN(lM%nFn*nsd,lM%nEl))
          CALL SELECTELE(lM)
       END IF
       CALL cm%bcast(lM%gN)
       CALL cm%bcast(lM%lN)
       CALL cm%bcast(lM%IEN)
       CALL cm%bcast(lM%eId)
-      IF (lM%nFn .NE. 0) CALL cm%bcast(lM%fN)
+      IF (fnFlag) CALL cm%bcast(lM%fN)
 
       IF (lM%eType .EQ. eType_NRB) THEN
          CALL cm%bcast(lM%nSl)

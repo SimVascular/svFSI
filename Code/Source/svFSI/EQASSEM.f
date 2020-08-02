@@ -161,6 +161,9 @@
             CASE (phys_shell)
                CALL BLELAS(eNoN, w, N, h, nV, lR)
 
+            CASE (phys_mesh)
+               CALL BLELAS(eNoN, w, N, h, nV, lR)
+
             CASE (phys_stokes)
                CALL BLELAS(eNoN, w, N, h, nV, lR)
 

@@ -424,11 +424,10 @@
          lPtr => list%get(THflag, "Use Taylor-Hood type basis")
 
          propL(1,1) = fluid_density
-         propL(2,1) = permeability
-         propL(3,1) = backflow_stab
-         propL(4,1) = f_x
-         propL(5,1) = f_y
-         IF (nsd .EQ. 3) propL(6,1) = f_z
+         propL(2,1) = backflow_stab
+         propL(3,1) = f_x
+         propL(4,1) = f_y
+         IF (nsd .EQ. 3) propL(5,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/11,2,3,0/)
@@ -659,14 +658,13 @@
 
          IF (.NOT.cmmInit) THEN
             propL(1,1) = fluid_density
-            propL(2,1) = permeability
-            propL(3,1) = backflow_stab
-            propL(4,1) = solid_density
-            propL(5,1) = poisson_ratio
-            propL(6,1) = damping
+            propL(2,1) = backflow_stab
+            propL(3,1) = solid_density
+            propL(4,1) = poisson_ratio
+            propL(5,1) = damping
             IF (.NOT.cmmVarWall) THEN
-               propL(7,1) = shell_thickness
-               propL(8,1) = elasticity_modulus
+               propL(6,1) = shell_thickness
+               propL(7,1) = elasticity_modulus
             END IF
 
             nDOP = (/11,4,3,0/)
@@ -717,11 +715,10 @@
 
 !        fluid properties
          propL(1,1) = fluid_density
-         propL(2,1) = permeability
-         propL(3,1) = backflow_stab
-         propL(4,1) = f_x
-         propL(5,1) = f_y
-         IF (nsd .EQ. 3) propL(6,1) = f_z
+         propL(2,1) = backflow_stab
+         propL(3,1) = f_x
+         propL(4,1) = f_y
+         IF (nsd .EQ. 3) propL(5,1) = f_z
 
 !        struct properties
          propL(1,2) = solid_density
@@ -1034,9 +1031,6 @@
                lPtr => lPD%get(rtmp,"Force_Y")
             CASE (f_z)
                lPtr => lPD%get(rtmp,"Force_Z")
-            CASE (permeability)
-               rtmp = 1.E+6_RKIND
-               lPtr => lPD%get(rtmp,"Permeability",lb=0._RKIND)
             CASE (backflow_stab)
                rtmp = 0.2_RKIND
                lPtr => lPD%get(rtmp,"Backflow stabilization coefficient"
