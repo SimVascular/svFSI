@@ -57,13 +57,13 @@
          ib%callD(1) = CPUT()
 
 !        Set IB Dirichlet BCs
-         CALL IB_SETBCDIR(ib%Yn, ib%Un)
+         CALL IB_SETBCDIR(ib%Yb, ib%Ub)
 
 !        Update IB location and tracers
          CALL IB_UPDATE(Do)
          ib%callD(2) = CPUT() - ib%callD(1)
 
-!        Compute FSI forcing (ib%R) for immersed bodies (IFEM)
+!        Compute FSI forcing (ib%R) for immersed bodies
          CALL IB_CALCFFSI(Ao, Yo, Do)
          ib%callD(1) = CPUT() - ib%callD(1)
       END IF

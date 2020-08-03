@@ -199,7 +199,7 @@
 
 !     Immersed body treatment: project flow variables from fluid mesh
 !     to IB solid mesh
-         IF (ibFlag) CALL IB_RESTRICT(Yn, Do)
+         IF (ibFlag) CALL IB_PROJECTVAR(Yn, Do)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
@@ -240,7 +240,7 @@
             IF (l2 .AND. l3) THEN
                CALL OUTRESULT(timeP, 3, iEqOld)
                CALL WRITEVTUS(An, Yn, Dn)
-               IF (ibFlag) CALL IB_WRITEVTUS(ib%Yn, ib%Un)
+               IF (ibFlag) CALL IB_WRITEVTUS(ib%Yb, ib%Ub)
             ELSE
                CALL OUTRESULT(timeP, 2, iEqOld)
             END IF

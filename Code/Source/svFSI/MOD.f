@@ -289,6 +289,10 @@
 !        (1) background mesh element to which the trace points to,
 !        (2) mesh ID
          INTEGER(KIND=IKIND), ALLOCATABLE :: gptr(:,:)
+!        Parametric coordinate for each nodal trace
+         REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Parametric coordinate for each Gauss point trace
+         REAL(KIND=RKIND), ALLOCATABLE :: xiG(:,:)
       END TYPE traceType
 
 !     The face type containing mesh at boundary
@@ -741,9 +745,11 @@
 !        IB position coordinates
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !        Velocity (new)
-         REAL(KIND=RKIND), ALLOCATABLE :: Yn(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Yb(:,:)
 !        Displacement (new)
-         REAL(KIND=RKIND), ALLOCATABLE :: Un(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ub(:,:)
+!        Displacement (projected on background mesh)
+         REAL(KIND=RKIND), ALLOCATABLE :: U(:,:)
 !        FSI force (IFEM method)
          REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
 

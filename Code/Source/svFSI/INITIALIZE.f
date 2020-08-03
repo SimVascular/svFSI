@@ -409,9 +409,10 @@
       END IF
 
       IF (ibFlag) THEN
+         ib%Yb  = 0._RKIND
+         ib%Ub  = 0._RKIND
+         ib%U   = 0._RKIND
          ib%R   = 0._RKIND
-         ib%Yn  = 0._RKIND
-         ib%Un  = 0._RKIND
       END IF
 
 !     Load any explicitly provided solution variables
@@ -536,14 +537,14 @@
          IF (dFlag) THEN
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%Yn, ib%Un
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%Yb, ib%Ub
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%Yn, ib%Un
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%Yb, ib%Ub
             END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, ib%Yn, ib%Un
+     2         cplBC%xo, Yo, Ao, ib%Yb, ib%Ub
          END IF
       END IF
       CLOSE(fid)
@@ -672,8 +673,9 @@
          IF (ALLOCATED(ib%rowPtr)) DEALLOCATE(ib%rowPtr)
          IF (ALLOCATED(ib%colPtr)) DEALLOCATE(ib%colPtr)
          IF (ALLOCATED(ib%x))      DEALLOCATE(ib%x)
-         IF (ALLOCATED(ib%Yn))     DEALLOCATE(ib%Yn)
-         IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
+         IF (ALLOCATED(ib%Yb))     DEALLOCATE(ib%Yb)
+         IF (ALLOCATED(ib%Ub))     DEALLOCATE(ib%Ub)
+         IF (ALLOCATED(ib%U))      DEALLOCATE(ib%U)
          IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
          IF (ALLOCATED(ib%cm%n))   DEALLOCATE(ib%cm%n)
          IF (ALLOCATED(ib%cm%gN))  DEALLOCATE(ib%cm%gN)

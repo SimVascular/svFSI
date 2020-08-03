@@ -168,11 +168,11 @@
                err = "NA outGrp in TXT"
             CASE (outGrp_Y)
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%Yn(s:e,a)/REAL(cm%np(), KIND=RKIND)
+                  tmpV(1:l,a) = ib%Yb(s:e,a)/REAL(cm%np(), KIND=RKIND)
                END DO
             CASE (outGrp_D)
                DO a=1, ib%tnNo
-                  tmpV(1:l,a) = ib%Un(s:e,a)/REAL(cm%np(), KIND=RKIND)
+                  tmpV(1:l,a) = ib%Ub(s:e,a)/REAL(cm%np(), KIND=RKIND)
                END DO
             CASE (outGrp_I)
                div = .FALSE.

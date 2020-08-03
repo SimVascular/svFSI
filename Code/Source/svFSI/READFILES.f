@@ -1062,6 +1062,11 @@
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
      2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
+            IF (ISZERO(lEq%dmn(iDmn)%stM%Kpen) .AND.
+     2          lEq%dmn(iDmn)%phys .EQ. phys_struct) THEN
+               err = "Incompressible struct is not allowed. Use "//
+     2            "penalty method or ustruct"
+            END IF
          END IF
 
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
@@ -2454,10 +2459,6 @@ c     2         "can be applied for Neumann boundaries only"
       lDmn%stM%Kpen = kap
       lPtr => lPD%get(rtmp, "Penalty parameter")
       IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
-      IF (ISZERO(lDmn%stM%Kpen)) THEN
-         IF (lDmn%phys .EQ. phys_struct) wrn = "Full incompressible "//
-     2      "struct (displacement-based) detected with 0 penalty const"
-      END IF
 
       RETURN
       END SUBROUTINE READMATMODEL

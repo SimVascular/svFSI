@@ -459,7 +459,7 @@
      2            CALL NRBNNX(ib%msh(iM), e)
                DO a=1, eNoN
                   Ac      = ib%msh(iM)%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+                  xl(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
                   IF (l .EQ. u) THEN
                      sl(a) = s(l,Ac)
                    ELSE
@@ -1455,6 +1455,9 @@
       IF (ALLOCATED(trc%gE))    DEALLOCATE(trc%gE)
       IF (ALLOCATED(trc%nptr))  DEALLOCATE(trc%nptr)
       IF (ALLOCATED(trc%gptr))  DEALLOCATE(trc%gptr)
+      IF (ALLOCATED(trc%xi))    DEALLOCATE(trc%xi)
+      IF (ALLOCATED(trc%xiG))   DEALLOCATE(trc%xiG)
+
       trc%n  = 0
       trc%nG = 0
 

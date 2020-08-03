@@ -802,9 +802,10 @@
       USE COMMOD
       IMPLICIT NONE
 
+      ALLOCATE(ib%Yb(nsd+1,ib%tnNo))
+      ALLOCATE(ib%Ub(nsd,ib%tnNo))
+      ALLOCATE(ib%U(nsd,tnNo))
       ALLOCATE(ib%R(nsd+1,tnNo))
-      ALLOCATE(ib%Yn(nsd+1,ib%tnNo))
-      ALLOCATE(ib%Un(nsd,ib%tnNo))
 
       RETURN
       END SUBROUTINE IB_MEMALLOC
@@ -885,7 +886,7 @@
       std = "    Non-zeros in LHS matrix (IB): "//nnz
 
 !     Set IB Dirichlet BCs
-      CALL IB_SETBCDIR(ib%Yn, ib%Un)
+      CALL IB_SETBCDIR(ib%Yb, ib%Ub)
 
 !     To compute IB traces, calculate node/element adjacency for
 !     background lumen mesh
@@ -961,6 +962,9 @@
 !     Now that we have updated iblank field and IB traces, time to
 !     update ghost cells
       CALL IB_SETIGHOST()
+
+!     Project IB displacement on background mesh
+      CALL IB_PRJCTU(Dg)
 
       RETURN
       END SUBROUTINE IB_UPDATE
@@ -1044,14 +1048,14 @@
          DO e=1, lFa%nEl
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)
-               xbl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+               xbl(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
             END DO
 
             Ec  = lFa%gE(e)
             ptr = 0
             DO a=1, fs%eNoN
                Ac = lM%IEN(a,Ec)
-               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
                DO b=1, fsb%eNoN
                   Bc = lFa%IEN(b,e)
                   IF (Ac .EQ. Bc) THEN
@@ -1344,8 +1348,8 @@
       END DO
 
       DO i=1, nsd
-         minb(i) = MINVAL(ib%x(i,:) + ib%Un(i,:)) - dx
-         maxb(i) = MAXVAL(ib%x(i,:) + ib%Un(i,:)) + dx
+         minb(i) = MINVAL(ib%x(i,:) + ib%Ub(i,:)) - dx
+         maxb(i) = MAXVAL(ib%x(i,:) + ib%Ub(i,:)) + dx
       END DO
 
       ALLOCATE(chck(tnNo))
@@ -1467,7 +1471,7 @@
                xb = 0._RKIND
                DO a=1, ib%msh(iM)%fa(iFa)%eNoN
                   Ac = ib%msh(iM)%fa(iFa)%IEN(a,e)
-                  xb = xb + ib%x(:,Ac) + ib%Un(:,Ac)
+                  xb = xb + ib%x(:,Ac) + ib%Ub(:,Ac)
                END DO
                xb = xb / REAL(ib%msh(iM)%fa(iFa)%eNoN, KIND=RKIND)
                dS = SQRT( SUM( (xp(:)-xb(:))**2._RKIND ) )
@@ -1490,7 +1494,7 @@
       xb = 0._RKIND
       DO a=1, ib%msh(jM)%fa(jFa)%eNoN
          Ac = ib%msh(jM)%fa(jFa)%IEN(a,Ec)
-         xb = xb + ib%x(:,Ac) + ib%Un(:,Ac)
+         xb = xb + ib%x(:,Ac) + ib%Ub(:,Ac)
       END DO
       xb   = xb / REAL(ib%msh(jM)%fa(jFa)%eNoN, KIND=RKIND)
       dotP = NORM(xp-xb, nV)
@@ -1505,7 +1509,7 @@
 !        if the probe is along the tangent, perform sign check with one
 !        of the vertices of the closest node instead of the centroid
          Ac   = ib%msh(jM)%fa(jFa)%IEN(1,Ec)
-         xb   = ib%x(:,Ac) + ib%Un(:,Ac)
+         xb   = ib%x(:,Ac) + ib%Ub(:,Ac)
          dotP = NORM(xp-xb,nV)
          IF (ABS(dotP) .LT. 1.E-9_RKIND) THEN
             flag = .TRUE.
@@ -1528,8 +1532,14 @@
 !     Find nodal traces
       CALL IB_FINDNDTRACES(lM, lD)
 
+!     Find parametric coordinate for nodal traces
+      CALL IB_FINDXINDTRC(lM, lD)
+
 !     Find Gauss point traces
       CALL IB_FINDGPTRACES(lM, lD)
+
+!     Find parametric coordinate for Gauss point traces
+      CALL IB_FINDXIGPTRC(lM, lD)
 
       RETURN
       END SUBROUTINE IB_FINDTRACES
@@ -1558,7 +1568,7 @@
       xpL = 0._RKIND
       DO a=1, lM%nNo
          Ac = lM%gN(a)
-         xpL(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+         xpL(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
       END DO
 
 !     Create a bounding box around the intersection of immersed body
@@ -1994,7 +2004,7 @@
       xpL = 0._RKIND
       DO a=1, lM%nNo
          Ac = lM%gN(a)
-         xpL(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+         xpL(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
       END DO
 
 !     Create a bounding box around the intersection of immersed body
@@ -2481,7 +2491,7 @@
       DO a=1, lM%nNo
          IF (part(a) .NE. 0) CYCLE
          Ac   = lM%gN(a)
-         xp   = ib%x(:,Ac) + ib%Un(:,Ac)
+         xp   = ib%x(:,Ac) + ib%Ub(:,Ac)
          minS = HUGE(minS)
          DO b=1, gM%nNo
             Bc = gM%gN(b)
@@ -2584,6 +2594,127 @@
 
       RETURN
       END SUBROUTINE IB_FPSRCH
+!####################################################################
+!     Find parametric coordinate with respect to the parent element
+!     of the background mesh for each IB nodal trace
+      SUBROUTINE IB_FINDXINDTRC(lM, lD)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
+
+      INTEGER a, b, i, Ac, Bc, Ec, iM, eNoN
+      REAL(KIND=RKIND) :: xi(nsd), xp(nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), xl(:,:)
+
+      IF (ALLOCATED(lM%trc%xi)) DEALLOCATE(lM%trc%xi)
+      ALLOCATE(lM%trc%xi(nsd,lM%trc%n))
+      lM%trc%xi = 0._RKIND
+
+      DO i=1, lM%trc%n
+         b  = lM%trc%gN(i)
+         Bc = lM%gN(b)
+         Ec = lM%trc%nptr(1,i)
+         iM = lM%trc%nptr(2,i)
+
+!        Transfer to local arrays: background mesh variables
+         eNoN = msh(iM)%eNoN
+         ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN))
+         DO a=1, eNoN
+            Ac = msh(iM)%IEN(a,Ec)
+            xl(:,a) = x(:,Ac)
+            IF (mvMsh) xl(:,a) = xl(:,a) + lD(:,Ac)
+         END DO
+
+!        Initialize parametric coordinate
+         xi = 0._RKIND
+         DO a=1, msh(iM)%nG
+            xi = xi + msh(iM)%xi(:,a)
+         END DO
+         xi = xi / REAL(msh(iM)%nG, KIND=RKIND)
+
+!        Coordinates of the IB node
+         xp = ib%x(:,Bc) + ib%Ub(:,Bc)
+
+!        Find shape functions and derivatives on the background mesh
+!        at the IB node
+         CALL GETNNX(msh(iM)%eType, eNoN, xl, msh(iM)%xib, msh(iM)%Nb,
+     2      xp, xi, N, Nx)
+
+         lM%trc%xi(:,i) = xi(:)
+
+         DEALLOCATE(N, Nx, xl)
+      END DO
+
+      RETURN
+      END SUBROUTINE IB_FINDXINDTRC
+!--------------------------------------------------------------------
+!     Find parametric coordinate with respect to the parent element
+!     of the background mesh for each IB Gauss point trace
+      SUBROUTINE IB_FINDXIGPTRC(lM, lD)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
+
+      INTEGER a, b, e, g, i, Ac, Bc, Ec, iM, eNoN
+      REAL(KIND=RKIND) :: xi(nsd), xp(nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), N(:), Nx(:,:), xl(:,:)
+
+      IF (ALLOCATED(lM%trc%xiG)) DEALLOCATE(lM%trc%xiG)
+      ALLOCATE(lM%trc%xiG(nsd,lM%trc%nG))
+      lM%trc%xiG = 0._RKIND
+
+      ALLOCATE(Nb(lM%eNoN))
+      DO i=1, lM%trc%nG
+         e  = lM%trc%gE(1,i)
+         g  = lM%trc%gE(2,i)
+         Ec = lM%trc%gptr(1,i)
+         iM = lM%trc%gptr(2,i)
+
+         Nb = lM%N(:,g)
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Transfer to local arrays: background mesh variables
+         eNoN = msh(iM)%eNoN
+         ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN))
+         DO a=1, eNoN
+            Ac = msh(iM)%IEN(a,Ec)
+            xl(:,a) = x(:,Ac)
+            IF (mvMsh) xl(:,a) = xl(:,a) + lD(:,Ac)
+         END DO
+
+!        Initialize parametric coordinate
+         xi = 0._RKIND
+         DO a=1, msh(iM)%nG
+            xi = xi + msh(iM)%xi(:,a)
+         END DO
+         xi = xi / REAL(msh(iM)%nG, KIND=RKIND)
+
+!        Coordinates of the IB node
+         xp = 0._RKIND
+         DO b=1, lM%eNoN
+            Bc = lM%IEN(b,e)
+            xp(:) = xp(:) + Nb(b)*(ib%x(:,Bc) + ib%Ub(:,Bc))
+         END DO
+
+!        Find shape functions and derivatives on the background mesh
+!        at the IB node
+         CALL GETNNX(msh(iM)%eType, eNoN, xl, msh(iM)%xib, msh(iM)%Nb,
+     2      xp, xi, N, Nx)
+
+         lM%trc%xiG(:,i) = xi(:)
+
+         DEALLOCATE(N, Nx, xl)
+      END DO
+      DEALLOCATE(Nb)
+
+      RETURN
+      END SUBROUTINE IB_FINDXIGPTRC
 !####################################################################
 !     Communication structure for IB is initialized here. Here we
 !     create a list of traces on master that are local to other
@@ -3338,6 +3469,123 @@ c      END DO
       RETURN
       END SUBROUTINE IB_SETBCDIRL
 !####################################################################
+      SUBROUTINE IB_PRJCTU(Dg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
+
+      INTEGER(KIND=IKIND) :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN,
+     2   eNoNb
+      REAL(KIND=RKIND) :: w, Je, Jac, xi(nsd), up(nsd), F(nsd,nsd)
+
+      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), Nb(:), Nbx(:,:), xbl(:,:),
+     2   ubl(:,:), N(:), Nx(:,:), xl(:,:)
+
+      ib%U = 0._RKIND
+
+      ALLOCATE(sA(tnNo))
+      sA = 0._RKIND
+      DO iM=1, ib%nMsh
+         eNoNb = ib%msh(iM)%eNoN
+         ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), xbl(nsd,eNoNb),
+     2      ubl(nsd,eNoNb))
+!        Loop over each trace, as we need to first interpolate flow var
+!        at the IB integration points based on its trace
+         DO i=1, ib%msh(iM)%trc%nG
+            e  = ib%msh(iM)%trc%gE(1,i)
+            g  = ib%msh(iM)%trc%gE(2,i)
+            Ec = ib%msh(iM)%trc%gptr(1,i)
+            jM = ib%msh(iM)%trc%gptr(2,i)
+
+!           Transfer to local arrays: IB mesh variables
+            Nb = ib%msh(iM)%N(:,g)
+            IF (ib%msh(iM)%eType .EQ. eType_NRB)
+     2         CALL NRBNNX(ib%msh(iM), e)
+            DO b=1, eNoNb
+               Bc = ib%msh(iM)%IEN(b,e)
+               xbl(:,b) = ib%x(:,Bc)
+               ubl(:,b) = ib%Ub(:,Bc)
+            END DO
+            CALL GNN(eNoNb, nsd, ib%msh(iM)%Nx(:,:,g), xbl, Nbx, Je, F)
+            IF (ISZERO(Je)) err = " Jac < 0 @ element "//e
+
+            F = 0._RKIND
+            IF (nsd .EQ. 3) THEN
+               F(1,1) = 1._RKIND
+               F(2,2) = 1._RKIND
+               F(3,3) = 1._RKIND
+               DO b=1, eNoNb
+                  F(1,1) = F(1,1) + Nbx(1,b)*ubl(1,b)
+                  F(1,2) = F(1,2) + Nbx(2,b)*ubl(1,b)
+                  F(1,3) = F(1,3) + Nbx(3,b)*ubl(1,b)
+
+                  F(2,1) = F(2,1) + Nbx(1,b)*ubl(2,b)
+                  F(2,2) = F(2,2) + Nbx(2,b)*ubl(2,b)
+                  F(2,3) = F(2,3) + Nbx(3,b)*ubl(2,b)
+
+                  F(3,1) = F(3,1) + Nbx(1,b)*ubl(3,b)
+                  F(3,2) = F(3,2) + Nbx(2,b)*ubl(3,b)
+                  F(3,3) = F(3,3) + Nbx(3,b)*ubl(3,b)
+               END DO
+            ELSE
+               F(1,1) = 1._RKIND
+               F(2,2) = 1._RKIND
+               DO b=1, eNoNb
+                  F(1,1) = F(1,1) + Nbx(1,b)*ubl(1,b)
+                  F(1,2) = F(1,2) + Nbx(2,b)*ubl(1,b)
+                  F(2,1) = F(2,1) + Nbx(1,b)*ubl(2,b)
+                  F(2,2) = F(2,2) + Nbx(2,b)*ubl(2,b)
+               END DO
+            END IF
+            Jac = MAT_DET(F, nsd)
+            w   = ib%msh(iM)%w(g) * Jac * Je
+
+!           Transfer to local arrays: background mesh variables
+            eNoN = msh(jM)%eNoN
+            ALLOCATE(N(eNoN), Nx(nsd,eNoN), xl(nsd,eNoN))
+            DO a=1, eNoN
+               Ac = msh(jM)%IEN(a,Ec)
+               xl(:,a) = x(:,Ac)
+               IF (mvMsh) xl(:,a) = xl(:,a) + Dg(nsd+2:2*nsd+1,Ac)
+            END DO
+
+!           Displacement of the integration point
+            up = 0._RKIND
+            DO b=1, eNoNb
+               up = up + Nb(b)*ubl(:,b)
+            END DO
+
+!           Find shape functions and derivatives on the background mesh
+!           at the integration point.
+            xi = ib%msh(iM)%trc%xiG(:,i)
+            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
+
+!           Project flow variables to IB nodes
+            DO a=1, eNoN
+               Ac = msh(jM)%IEN(a,Ec)
+               sA(Ac) = sA(Ac) + w*N(a)
+               ib%U(:,Ac) = ib%U(:,Ac) + w*N(a)*up(:)
+            END DO
+
+            DEALLOCATE(N, Nx, xl)
+         END DO
+         DEALLOCATE(Nb, Nbx, xbl, ubl)
+      END DO
+
+      CALL COMMU(ib%U)
+      CALL COMMU(sA)
+
+      DO a=1, tnNo
+         IF (.NOT.ISZERO(sA(a))) THEN
+            ib%U(:,a) = ib%U(:,a) / sA(a)
+         END IF
+      END DO
+      DEALLOCATE(sA)
+
+      RETURN
+      END SUBROUTINE IB_PRJCTU
+!####################################################################
 !     Compute FSI force on the immersed bodies using Immersed Finite
 !     Element Method (IFEM)
       SUBROUTINE IB_CALCFFSI(Ag, Yg, Dg)
@@ -3349,7 +3597,7 @@ c      END DO
 
       INTEGER(KIND=IKIND) a, b, e, g, i, j, Ac, Bc, Ec, iM, jM, eNoNb,
      2   eNoN, nFn
-      REAL(KIND=RKIND) w, Jac, rt, xp(nsd), xi(nsd), Kxi(nsd,nsd)
+      REAL(KIND=RKIND) w, Jac, rt, xi(nsd), Kxi(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
      2   Nx(:,:), xbl(:,:), xl(:,:), al(:,:), yl(:,:), ubl(:,:),
@@ -3391,7 +3639,7 @@ c      END DO
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc)
-               ubl(:,b) = ib%Un(:,Bc)
+               ubl(:,b) = ib%Ub(:,Bc)
                IF (ALLOCATED(ib%msh(iM)%fN)) THEN
                   DO j=1, nFn
                      fN(:,j) = ib%msh(iM)%fN((j-1)*nsd+1:j*nsd,e)
@@ -3421,26 +3669,10 @@ c      END DO
                IF (mvMsh) xl(:,a) = xl(:,a) + Dg(nsd+1:2*nsd+1,Ac)
             END DO
 
-!           To compute test/weighting function and its gradient, get the
-!           trace of the IB integration point and the shape functions
-!           with respect to the background mesh
-!           Get IB integration point
-            xp = 0._RKIND
-            DO b=1, eNoNb
-               xp(:) = xp(:) + Nb(b)*(xbl(:,b) + ubl(:,b))
-            END DO
-
-!           Initialize parametric coordinate
-            xi = 0._RKIND
-            DO a=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,a)
-            END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
-
 !           Find shape functions and derivatives on the background mesh
 !           at the integration point.
-            CALL GETNNX(msh(jM)%eType, eNoN, xl, msh(jM)%xib,
-     2         msh(jM)%Nb, xp, xi, N, Nxi)
+            xi = ib%msh(iM)%trc%xiG(:,i)
+            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nxi)
 
 !           Get the shapefunction derivatives in physical space
             CALL GNN(eNoN, nsd, Nxi, xl, Nx, rt, Kxi)
@@ -4203,12 +4435,12 @@ c      END DO
       RETURN
       END SUBROUTINE IB_CONSTRUCT
 !####################################################################
-!     Restriction: extract velocity/pressure and displacement at IB
+!     Projection: extract velocity/pressure and displacement at IB
 !     nodes from background mesh
-!     1: restriction is performed directly at the IB nodes
-!     2: restriction is performed at the integration points and
-!        a lumped L2 projection is used to transfer data to nodes
-      SUBROUTINE IB_RESTRICT(Yg, Dg)
+!     1: projection is performed directly at the IB nodes
+!     2: projection is performed at the integration points and a
+!        lumped L2 projection is used to transfer data to nodes
+      SUBROUTINE IB_PROJECTVAR(Yg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -4216,14 +4448,16 @@ c      END DO
 
       IF (ib%restr .EQ. ibRestr_ND) THEN
          CALL IB_PROJVARND(Yg, Dg)
+
       ELSE IF (ib%restr .EQ. ibRestr_L2) THEN
          CALL IB_PROJVARGPL2(Yg, Dg)
+
       ELSE
          err = " Unknown restriction method"
       END IF
 
       RETURN
-      END SUBROUTINE IB_RESTRICT
+      END SUBROUTINE IB_PROJECTVAR
 !--------------------------------------------------------------------
       SUBROUTINE IB_PROJVARND(Yg, Dg)
       USE COMMOD
@@ -4232,7 +4466,7 @@ c      END DO
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, i, is, ie, Ac, Bc, Ec, iM, jM, eNoN
-      REAL(KIND=RKIND) :: xi(nsd), xp(nsd), yp(nsd+1)
+      REAL(KIND=RKIND) :: xi(nsd), yp(nsd+1)
 
       REAL(KIND=RKIND), ALLOCATABLE :: wgt(:), Uo(:,:), N(:), Nx(:,:),
      2   xl(:,:), yl(:,:)
@@ -4241,14 +4475,14 @@ c      END DO
       ie = eq(ib%cEq)%e
       IF (ie .EQ. nsd+1) ie = ie - 1
 
-!     Copy ib%Un
+!     Copy ib%Ub
       ALLOCATE(wgt(ib%tnNo), Uo(nsd,ib%tnNo))
       wgt = 0._RKIND
-      Uo  = ib%Un
+      Uo  = ib%Ub
 
 !     Initialize to 0
-      ib%Yn = 0._RKIND
-      ib%Un = 0._RKIND
+      ib%Yb = 0._RKIND
+      ib%Ub = 0._RKIND
 
       DO iM=1, ib%nMsh
 !        Loop over each trace, as we need to first interpolate flow var
@@ -4271,20 +4505,10 @@ c      END DO
                IF (mvMsh) xl(:,a) = xl(:,a) + Dg(ie+2:ie+nsd+1,Ac)
             END DO
 
-!           Initialize parametric coordinate
-            xi = 0._RKIND
-            DO a=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,a)
-            END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
-
-!           Coordinates of the IB node
-            xp = ib%x(:,Bc) + Uo(:,Bc)
-
 !           Find shape functions and derivatives on the background mesh
 !           at the IB node
-            CALL GETNNX(msh(jM)%eType, eNoN, xl, msh(jM)%xib,
-     2         msh(jM)%Nb, xp, xi, N, Nx)
+            xi = ib%msh(iM)%trc%xi(:,i)
+            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
 
 !           Use computed shape functions to interpolate flow variables
             yp = 0._RKIND
@@ -4292,7 +4516,7 @@ c      END DO
                yp = yp + N(a)*yl(:,a)
             END DO
 
-            ib%Yn(:,Bc) = ib%Yn(:,Bc) + yp(:)
+            ib%Yb(:,Bc) = ib%Yb(:,Bc) + yp(:)
             wgt(Bc) = wgt(Bc) + 1._RKIND
 
             DEALLOCATE(N, Nx, xl, yl)
@@ -4301,16 +4525,16 @@ c      END DO
 
 !     Synchronize Yb across all the processes
       ib%callD(3) = CPUT()
-      CALL IB_SYNCN(ib%Yn)
+      CALL IB_SYNCN(ib%Yb)
       CALL IB_SYNCN(wgt)
       ib%callD(3) = CPUT() - ib%callD(3)
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(wgt(a))) THEN
-            ib%Yn(:,a) = ib%Yn(:,a) / wgt(a)
+            ib%Yb(:,a) = ib%Yb(:,a) / wgt(a)
          END IF
          DO i=1, nsd
-            ib%Un(i,a) = Uo(i,a) + ib%Yn(i,a)*dt
+            ib%Ub(i,a) = Uo(i,a) + ib%Yb(i,a)*dt
          END DO
       END DO
 
@@ -4327,8 +4551,7 @@ c      END DO
 
       INTEGER(KIND=IKIND) :: a, b, e, g, i, is, ie, Ac, Bc, Ec, iM, jM,
      2   eNoN, eNoNb
-      REAL(KIND=RKIND) :: w, Jac, xi(nsd), xp(nsd), yp(nsd+1),
-     2   Gmat(nsd,nsd)
+      REAL(KIND=RKIND) :: w, Jac, xi(nsd), yp(nsd+1), Gmat(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), xbl(:,:), N(:),
      2   Nx(:,:), xl(:,:), yl(:,:), sA(:), Uo(:,:)
@@ -4337,14 +4560,14 @@ c      END DO
       ie = eq(ib%cEq)%e
       IF (ie .EQ. nsd+1) ie = ie - 1
 
-!     Copy ib%Un
+!     Copy ib%Ub
       ALLOCATE(sA(ib%tnNo), Uo(nsd,ib%tnNo))
       sA = 0._RKIND
-      Uo = ib%Un
+      Uo = ib%Ub
 
 !     Initialize to 0
-      ib%Yn = 0._RKIND
-      ib%Un = 0._RKIND
+      ib%Yb = 0._RKIND
+      ib%Ub = 0._RKIND
 
 !     Use L2 projection with mass lumping to project flow variables from
 !     background fluid mesh to IB
@@ -4384,23 +4607,10 @@ c      END DO
                IF (mvMsh) xl(:,a) = xl(:,a) + Dg(ie+2:ie+nsd+1,Ac)
             END DO
 
-!           Coordinates of the integration point
-            xp = 0._RKIND
-            DO b=1, eNoNb
-               xp = xp + Nb(b)*xbl(:,b)
-            END DO
-
-!           Initialize parametric coordinate
-            xi = 0._RKIND
-            DO a=1, msh(jM)%nG
-               xi = xi + msh(jM)%xi(:,a)
-            END DO
-            xi = xi / REAL(msh(jM)%nG, KIND=RKIND)
-
 !           Find shape functions and derivatives on the background mesh
 !           at the integration point.
-            CALL GETNNX(msh(jM)%eType, eNoN, xl, msh(jM)%xib,
-     2         msh(jM)%Nb, xp, xi, N, Nx)
+            xi = ib%msh(iM)%trc%xiG(:,i)
+            CALL GETGNN(nsd, msh(jM)%eType, eNoN, xi, N, Nx)
 
 !           Use the computed shape functions to interpolate flow var at
 !           the IB integration point
@@ -4412,7 +4622,7 @@ c      END DO
 !           Project flow variables to IB nodes
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
-               ib%Yn(:,Bc) = ib%Yn(:,Bc) + w*Nb(b)*yp(:)
+               ib%Yb(:,Bc) = ib%Yb(:,Bc) + w*Nb(b)*yp(:)
                sA(Bc) = sA(Bc) + w*Nb(b)
             END DO
 
@@ -4423,16 +4633,16 @@ c      END DO
 
 !     Synchronize Yb across all the processes
       ib%callD(3) = CPUT()
-      CALL IB_SYNCG(ib%Yn)
+      CALL IB_SYNCG(ib%Yb)
       CALL IB_SYNCG(sA)
       ib%callD(3) = CPUT() - ib%callD(3)
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(sA(a))) THEN
-            ib%Yn(:,a) = ib%Yn(:,a) / sA(a)
+            ib%Yb(:,a) = ib%Yb(:,a) / sA(a)
          END IF
          DO i=1, nsd
-            ib%Un(i,a) = Uo(i,a) + ib%Yn(i,a)*dt
+            ib%Ub(i,a) = Uo(i,a) + ib%Yb(i,a)*dt
          END DO
       END DO
 
@@ -4568,7 +4778,7 @@ c      END DO
       ALLOCATE(xpL(nsd,lM%nNo))
       DO Ac=1, ib%tnNo
          a = lM%lN(Ac)
-         xpL(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+         xpL(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
       END DO
 
       ALLOCATE(sCount(cm%np()), disps(cm%np()))
@@ -4704,7 +4914,7 @@ c      END DO
          DO e=1, lM%nEl
             DO a=1, lM%eNoN
                Ac = lM%IEN(a,e)
-               xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+               xl(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
             END DO
             DO g=1, lM%nG
                Ec = ePtr(1,g,e)
