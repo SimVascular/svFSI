@@ -197,9 +197,9 @@
          END DO
 !     End of inner loop
 
-!     Immersed body treatment: project flow variables from fluid mesh
-!     to IB solid mesh
-         IF (ibFlag) CALL IB_PROJECTVAR(Yn, Do)
+!     Immersed body treatment: interpolate flow variables on IB mesh
+!     from background fluid mesh (for explicit coupling)
+         IF (ibFlag) CALL IB_INTERPY(Yn, Do)
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)

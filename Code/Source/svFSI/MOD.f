@@ -724,8 +724,8 @@
          INTEGER(KIND=IKIND) :: mthd = ibMthd_NA
 !        IB coupling
          INTEGER(KIND=IKIND) :: cpld = ibCpld_NA
-!        IB restriction method
-         INTEGER(KIND=IKIND) :: restr = ibRestr_NA
+!        IB interpolation method
+         INTEGER(KIND=IKIND) :: intrp = ibIntrp_NA
 !        Current IB domain ID
          INTEGER(KIND=IKIND) :: cDmn
 !        Current equation

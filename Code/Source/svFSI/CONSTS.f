@@ -213,8 +213,8 @@
       INTEGER(KIND=IKIND), PARAMETER :: ibCpld_NA = 899, ibCpld_E = 898,
      2   ibCpld_I = 897
 
-!     IB restriction: direct/L2
-      INTEGER(KIND=IKIND), PARAMETER :: ibRestr_NA = 900,
-     2   ibRestr_ND = 901, ibRestr_L2 = 902
+!     IB interpolation: direct extraction / L2 projection
+      INTEGER(KIND=IKIND), PARAMETER :: ibIntrp_NA = 900,
+     2   ibIntrp_DI = 901, ibIntrp_L2 = 902
 !--------------------------------------------------------------------
 !#######################################################################

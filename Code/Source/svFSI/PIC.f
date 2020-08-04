@@ -63,9 +63,11 @@
          CALL IB_UPDATE(Do)
          ib%callD(2) = CPUT() - ib%callD(1)
 
-!        Compute FSI forcing (ib%R) for immersed bodies
-         CALL IB_CALCFFSI(Ao, Yo, Do)
-         ib%callD(1) = CPUT() - ib%callD(1)
+!        FSI forcing (ib%R) for immersed bodies (for explicit coupling)
+         IF (ib%cpld .EQ. ibCpld_E) THEN
+            CALL IB_CALCFFSI(Ao, Yo, Do)
+            ib%callD(1) = CPUT() - ib%callD(1)
+         END IF
       END IF
 
       DO iEq=1, nEq

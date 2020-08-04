@@ -377,7 +377,7 @@
 
       CALL cm%bcast(ib%mthd)
       CALL cm%bcast(ib%cpld)
-      CALL cm%bcast(ib%restr)
+      CALL cm%bcast(ib%intrp)
 
       CALL cm%bcast(ib%nMsh)
       CALL cm%bcast(ib%tnNo)
