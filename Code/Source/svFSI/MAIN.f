@@ -121,7 +121,7 @@
                CALL SETBCDIR(An, Yn, Dn)
             END IF
 
-!     Initiator step (quantities at n+am, n+af)
+!        Initiator step (quantities at n+am, n+af)
             CALL PICI(Ag, Yg, Dg)
             IF (ALLOCATED(Rd)) THEN
                Rd = 0._RKIND
@@ -131,8 +131,8 @@
             dbg = 'Allocating the RHS and LHS'
             CALL LSALLOC(eq(cEq))
 
-!           Compute body forces. If phys is shells or CMM (init),
-!           apply contribution from body forces (pressure) to residue
+!        Compute body forces. If phys is shells or CMM (init), apply
+!        contribution from body forces (pressure) to residue
             CALL SETBF(Dg)
 
             dbg = "Assembling equation <"//eq(cEq)%sym//">"
@@ -141,35 +141,43 @@
                dbg = "Mesh "//iM//" is assembled"
             END DO
 
-!     Treatment of boundary conditions on faces
-!     Apply Neumman or Traction boundary conditions
+!        Treatment of boundary conditions on faces
+!        Apply Neumman or Traction boundary conditions
             CALL SETBCNEU(Yg, Dg)
 
-!     Apply CMM BC conditions
+!        Apply CMM BC conditions
             IF (.NOT.cmmInit) CALL SETBCCMM(Ag, Dg)
 
-!     Apply weakly applied Dirichlet BCs
+!        Apply weakly applied Dirichlet BCs
             CALL SETBCDIRW(Yg, Dg)
 
-!     Apply contact model and add its contribution to residue
+!        Apply contact model and add its contribution to residue
             IF (iCntct) CALL CONTACTFORCES(Dg)
 
-!     Synchronize R across processes. Note: that it is important to
-!     synchronize residue, R before treating immersed boundaries as
-!     ib%R is already communicated across processes
+!        Synchronize R across processes. Note: that it is important
+!        to synchronize residue, R before treating immersed bodies as
+!        ib%R is already communicated across processes
             IF (.NOT.eq(cEq)%assmTLS) CALL COMMU(R)
 
-!     Update residue in displacement equation for USTRUCT physics. Note
-!     that this step is done only first iteration. The residue will be 0
-!     for subsequent iterations
+!        Update residue in displacement equation for USTRUCT phys.
+!        Note that this step is done only first iteration. Residue
+!        will be 0 for subsequent iterations
             IF (sstEq) CALL USTRUCTR(Yg)
 
             IF (eq(cEq)%phys .EQ. phys_stokes) CALL THOOD_ValRC()
 
             CALL SETBCUNDEFNEU()
 
-!     Add contribution from IB to residue
-            IF (ibFlag) CALL IB_CONSTRUCT()
+!        IB treatment: for explicit coupling, simply construct residue.
+!        for implicit coupling, initiate, update FSI forcing and tangent
+!        matrices and then update LHS and RHS
+            IF (ibFlag) THEN
+               IF (ib%cpld .EQ. ibCpld_I) THEN
+                  CALL IB_PICI()
+                  CALL IB_CALCFFSI(Ag, Yg, Dg, ib%Auk, ib%Ubk)
+               END IF
+               CALL IB_CONSTRUCT()
+            END IF
 
             incL = 0
             IF (eq(cEq)%phys .EQ. phys_mesh) incL(nFacesLS) = 1
@@ -185,21 +193,31 @@
             dbg = "Solving equation <"//eq(cEq)%sym//">"
             CALL LSSOLVE(eq(cEq), incL, res)
 
-!     Solution is obtained, now updating (Corrector)
+!        Solution is obtained, now updating (Corrector)
             CALL PICC
 
-!     Checking for exceptions
+!        Checking for exceptions
             CALL EXCEPTIONS
 
-!     Writing out the time passed, residual, and etc.
+!        Writing out the time passed, residual, and etc.
             IF (ALL(eq%ok)) EXIT
             CALL OUTRESULT(timeP, 2, iEqOld)
          END DO
 !     End of inner loop
 
-!     Immersed body treatment: interpolate flow variables on IB mesh
-!     from background fluid mesh (for explicit coupling)
-         IF (ibFlag) CALL IB_INTERPY(Yn, Do)
+!     IB treatment: interpolate flow data on IB mesh from background
+!     fluid mesh for explicit coupling, update old solution for implicit
+!     coupling
+         IF (ibFlag) THEN
+            IF (ib%cpld .EQ. ibCpld_E) THEN
+               CALL IB_INTERPYU(Do)
+
+            ELSE IF (ib%cpld .EQ. ibCpld_I) THEN
+               ib%Auo = ib%Aun
+               ib%Ubo = ib%Ubn
+
+            END IF
+         END IF
 
 !     Saving the TXT files containing average and fluxes
          CALL TXT(.FALSE.)
@@ -240,7 +258,7 @@
             IF (l2 .AND. l3) THEN
                CALL OUTRESULT(timeP, 3, iEqOld)
                CALL WRITEVTUS(An, Yn, Dn)
-               IF (ibFlag) CALL IB_WRITEVTUS(ib%Yb, ib%Ub)
+               IF (ibFlag) CALL IB_WRITEVTUS(ib%Yb, ib%Ubo)
             ELSE
                CALL OUTRESULT(timeP, 2, iEqOld)
             END IF

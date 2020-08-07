@@ -746,12 +746,30 @@
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !        Velocity (new)
          REAL(KIND=RKIND), ALLOCATABLE :: Yb(:,:)
+!        Time derivative of displacement (old)
+         REAL(KIND=RKIND), ALLOCATABLE :: Auo(:,:)
+!        Time derivative of displacement (new)
+         REAL(KIND=RKIND), ALLOCATABLE :: Aun(:,:)
+!        Time derivative of displacement (n+am)
+         REAL(KIND=RKIND), ALLOCATABLE :: Auk(:,:)
+!        Displacement (old)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ubo(:,:)
 !        Displacement (new)
-         REAL(KIND=RKIND), ALLOCATABLE :: Ub(:,:)
-!        Displacement (projected on background mesh)
-         REAL(KIND=RKIND), ALLOCATABLE :: U(:,:)
-!        FSI force (IFEM method)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ubn(:,:)
+!        Displacement (n+af)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ubk(:,:)
+!        Displacement (projected on background mesh, old)
+         REAL(KIND=RKIND), ALLOCATABLE :: Uo(:,:)
+!        Displacement (projected on background mesh, new, n+af)
+         REAL(KIND=RKIND), ALLOCATABLE :: Un(:,:)
+!        Residue (FSI force)
          REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
+!        Residue (displacement, background mesh)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ru(:,:)
+!        Residue (displacement, IB mesh)
+         REAL(KIND=RKIND), ALLOCATABLE :: Rub(:,:)
+!        LHS tangent matrix for displacement
+         REAL(KIND=RKIND), ALLOCATABLE :: Ku(:,:)
 
 !        DERIVED TYPE VARIABLES
 !        IB meshes
@@ -888,11 +906,9 @@
 !     non-wall nodal displacements
       INTEGER(KIND=IKIND), ALLOCATABLE :: cmmBdry(:)
 
-!     Additional arrays for immersed boundaries
-!     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid)
-      INTEGER(KIND=IKIND), ALLOCATABLE :: iblank(:)
-!     IB: Solid nodes with iblank=1, and are part of ghost cells
-      INTEGER(KIND=IKIND), ALLOCATABLE :: ighost(:)
+!     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid,
+!     0.5 => node lies on the ghost layer)
+      REAL(KIND=RKIND), ALLOCATABLE :: iblank(:)
 
 !     Old time derivative of variables (acceleration)
       REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)

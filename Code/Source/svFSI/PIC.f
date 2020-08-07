@@ -52,21 +52,34 @@
          Do = 0._RKIND
       END IF
 
-!     Immersed body treatment (explicit)
+!     IB treatment: Set dirichlet BC and update traces. For explicit
+!     coupling, compute FSI forcing and freeze it for the time step.
+!     For implicit coupling, project IB displacement on background
+!     mesh and predict quantities at next time step
       IF (ibFlag) THEN
          ib%callD(1) = CPUT()
 
 !        Set IB Dirichlet BCs
-         CALL IB_SETBCDIR(ib%Yb, ib%Ub)
+         CALL IB_SETBCDIR(ib%Yb, ib%Ubo)
 
 !        Update IB location and tracers
          CALL IB_UPDATE(Do)
          ib%callD(2) = CPUT() - ib%callD(1)
 
-!        FSI forcing (ib%R) for immersed bodies (for explicit coupling)
          IF (ib%cpld .EQ. ibCpld_E) THEN
-            CALL IB_CALCFFSI(Ao, Yo, Do)
+!           FSI forcing for immersed bodies (explicit coupling)
+            CALL IB_CALCFFSI(Ao, Yo, Do, ib%Auo, ib%Ubo)
+
+!           CPU time for force calculation
             ib%callD(1) = CPUT() - ib%callD(1)
+
+         ELSE IF (ib%cpld .EQ. ibCpld_I) THEN
+!           Project IB displacement (Ubn) to background mesh
+            CALL IB_PRJCTU(Do)
+
+!           Predictor step for implicit coupling
+            CALL IB_PICP()
+
          END IF
       END IF
 
@@ -236,6 +249,9 @@
             Dn(s:e-1,a) = Dn(s:e-1,a)*r1
          END DO
       END IF
+
+!     IB treatment
+      IF (ibFlag) CALL IB_PICC()
 
       IF (ISZERO(eq(cEq)%FSILS%RI%iNorm)) eq(cEq)%FSILS%RI%iNorm = eps
       IF (ISZERO(eq(cEq)%iNorm)) eq(cEq)%iNorm = eq(cEq)%FSILS%RI%iNorm

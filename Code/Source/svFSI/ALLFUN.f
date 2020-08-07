@@ -413,7 +413,7 @@
                    ELSE
                      sl(a) = SQRT(NORM(s(l:u,Ac)))
                   END IF
-                  ibl = ibl + iblank(Ac)
+                  IF (iblank(Ac) .GT. 0.5_RKIND) ibl = ibl + 1
                END DO
                IF (ibl .EQ. eNoN) CYCLE
 
@@ -459,7 +459,7 @@
      2            CALL NRBNNX(ib%msh(iM), e)
                DO a=1, eNoN
                   Ac      = ib%msh(iM)%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Ub(:,Ac)
+                  xl(:,a) = ib%x(:,Ac) + ib%Ubo(:,Ac)
                   IF (l .EQ. u) THEN
                      sl(a) = s(l,Ac)
                    ELSE
@@ -2437,7 +2437,7 @@
       IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
      2   "to synchronize IB data"
 
-      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+      IF (.NOT.ALLOCATED(ib%cm%nG)) err = " IB comm structure not "//
      2   "initialized. Correction necessary"
 
       ALLOCATE(incNd(ib%tnNo))
@@ -2522,7 +2522,7 @@
       IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//
      2   "to synchronize IB data"
 
-      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+      IF (.NOT.ALLOCATED(ib%cm%nG)) err = " IB comm structure not "//
      2   "initialized. Correction necessary"
 
       ALLOCATE(incNd(ib%tnNo))
