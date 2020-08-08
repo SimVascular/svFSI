@@ -3620,6 +3620,28 @@ c      END DO
       RETURN
       END SUBROUTINE IB_PICP
 !####################################################################
+!     Implicit coupling
+      SUBROUTINE IB_IMPLICIT(Ag, Yg, Dg)
+      USE COMMOD
+      IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
+     2   Dg(tDof,tnNo)
+
+!     Initiate IB variables at n+am, n+af
+      CALL IB_PICI()
+
+!     Update FSI forcing and tangent matrices
+      CALL IB_CALCFFSI(Ag, Yg, Dg, ib%Auk, ib%Ubk)
+
+!     Interpolate flow variables (v, p) from fluid mesh to IB
+      CALL IB_INTERPYU(Yg, Dg)
+
+!     Correct RHS and compute ib%Rub
+      CALL IB_RHSUpdate()
+
+      RETURN
+      END SUBROUTINE IB_IMPLICIT
+!####################################################################
 !     Initiator step (implicit) - compute Au_(n+am) and Ub_(n+af)
       SUBROUTINE IB_PICI()
       USE COMMOD
@@ -3678,9 +3700,6 @@ c      END DO
       END DO
       CALL IB_INTERP(nsd, Rg, Dn, Rb)
 
-!     Interpolate flow variables (v, p) from fluid mesh to IB
-      CALL IB_INTERPYU(Dn)
-
 !     Correct IB solution (ib%Aun, ib%Ubn)
       DO a=1, ib%tnNo
          DO i=1, nsd
@@ -3707,13 +3726,13 @@ c      END DO
 
       INTEGER(KIND=IKIND) a, b, e, g, i, j, Ac, Bc, Ec, iM, jM, eNoNb,
      2   eNoN, nFn
-      REAL(KIND=RKIND) w, Jac, rt, xi(nsd), Kxi(nsd,nsd)
+      REAL(KIND=RKIND) w, Jac, dtF, rt, xi(nsd), Kxi(nsd,nsd)
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
      2   Nx(:,:), xbl(:,:), xl(:,:), al(:,:), yl(:,:), aul(:,:),
-     3   ubl(:,:), ul(:,:), fN(:,:), lR(:,:), lRu(:,:), lRub(:,:),
-     4   lKu(:,:,:), lK(:,:,:)
+     3   ubl(:,:), ul(:,:), fN(:,:), lR(:,:), lRu(:,:), lKu(:,:,:),
+     4   lK(:,:,:), sA(:)
 
 !     TODO: This is temporary. Later we get domain based on each IB node
 !     and communicate across IB process boundaries
@@ -3722,9 +3741,10 @@ c      END DO
 !     Initialize residues to 0
       ib%R = 0._RKIND
       IF (ib%cpld .EQ. ibCpld_I) THEN
-         ib%Ru  = 0._RKIND
-         ib%Rub = 0._RKIND
-         ib%Ku  = 0._RKIND
+         ALLOCATE(sA(tnNo))
+         sA    = 0._RKIND
+         ib%Ru = 0._RKIND
+         ib%Ku = 0._RKIND
       END IF
 
 !     We compute the fluid-structure interaction force on the IB domain
@@ -3737,7 +3757,7 @@ c      END DO
          eNoNb = ib%msh(iM)%eNoN
          nFn   = MAX(ib%msh(iM)%nFn, 1)
          ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), fN(nsd,nFn),xbl(nsd,eNoNb),
-     2      ubl(nsd,eNoNb), aul(nsd,eNoNb), lRub(nsd,eNoNb))
+     2      ubl(nsd,eNoNb), aul(nsd,eNoNb))
 !        Loop over each trace of IB integration points
          DO i=1, ib%msh(iM)%trc%nG
             e  = ib%msh(iM)%trc%gE(1,i)
@@ -3787,7 +3807,6 @@ c      END DO
             lK   = 0._RKIND
             lRu  = 0._RKIND
             lKu  = 0._RKIND
-            lRub = 0._RKIND
 
 !           Transfer to local arrays: background mesh variables
             ul   = 0._RKIND
@@ -3811,11 +3830,11 @@ c      END DO
 !           Compute the local residue due to IB-FSI forcing
             IF (nsd .EQ. 3) THEN
                CALL IB_CALCFFSIL3D(eNoNb, eNoN, nFn, w, Jac, Nb, Nbx, N,
-     2            Nx, al, yl, aul, ubl, fN, lR, lRu, lRub, lKu, lK)
+     2            Nx, al, yl, aul, ubl, fN, dtF, lR, lRu, lKu, lK)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL IB_CALCFFSIL2D(eNoNb, eNoN, nFn, w, Jac, Nb, Nbx, N,
-     2            Nx, al, yl, aul, ubl, fN, lR, lRu, lRub, lKu, lK)
+     2            Nx, al, yl, aul, ubl, fN, dtF, lR, lRu, lKu, lK)
             END IF
 
 !           Assemble to global residue
@@ -3827,9 +3846,10 @@ c      END DO
 
 !           Assemble ib%Rub and stiffness matrices
             IF (ib%cpld .EQ. ibCpld_I) THEN
-               DO b=1, eNoNb
-                  Bc = ib%msh(iM)%IEN(b,e)
-                  ib%Rub(:,Bc) = ib%Rub(:,Bc) + lRub(:,b)
+               DO a=1, eNoN
+                  Ac = ptr(a)
+                  sA(Ac) = sA(Ac) + w*dtF*N(a)
+                  ib%Ru(:,Ac) = ib%Ru(:,Ac) + lRu(:,a)
                END DO
 
 !              Compute and assemble material stiffness tensor
@@ -3843,23 +3863,23 @@ c      END DO
                IF (eq(cEq)%assmTLS) err = "Cannot assemble IB data"//
      2            " using Trilinos"
 #endif
-               CALL IB_DOASSEM(eNoN, ptr, lKu, lK, lRu)
+               CALL IB_DOASSEM(eNoN, ptr, lKu, lK)
             END IF
 
             DEALLOCATE(N, Nxi, Nx, xl, al, yl, ul, ptr, lR, lRu, lK,lKu)
          END DO
-         DEALLOCATE(Nb, Nbx, xbl, ubl, aul, fN, lRub)
+         DEALLOCATE(Nb, Nbx, xbl, ubl, aul, fN)
       END DO
 
       CALL COMMU(ib%R)
 
       IF (ib%cpld .EQ. ibCpld_I) THEN
-!     Sync ib%Ru at process boundaries
          CALL COMMU(ib%Ru)
-!     Update RHS using Ku and Ru
-         CALL IB_RHSUpdate()
-!     Sync ib%Rub
-         CALL IB_SYNCG(ib%Rub)
+         CALL COMMU(sA)
+         DO a=1, tnNo
+            IF (.NOT.ISZERO(sA(a))) ib%Ru(:,a) = ib%Ru(:,a)/sA(a)
+         END DO
+         DEALLOCATE(sA)
       END IF
 
       RETURN
@@ -3867,7 +3887,7 @@ c      END DO
 !--------------------------------------------------------------------
 !     Compute the 3D FSI force due to IB on the background fluid
       SUBROUTINE IB_CALCFFSIL3D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
-     2   al, yl, aul, ubl, fN, lR, lRu, lRub, lKu, lK)
+     2   al, yl, aul, ubl, fN, Jac, lR, lRu, lKu, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -3875,8 +3895,9 @@ c      END DO
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(3,eNoNb),
      2   N(eNoN), Nx(3,eNoN), al(tDof,eNoN), yl(tDof,eNoN),aul(3,eNoNb),
      3   ubl(3,eNoNb), fN(3,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: Jac
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(4,eNoN), lRu(3,eNoN),
-     2   lRub(3,eNoNb), lKu(12,eNoN,eNoN), lK(16,eNoN,eNoN)
+     2   lKu(12,eNoN,eNoN), lK(16,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) a, b, iEq, iDmn
       REAL(KIND=RKIND) amf, wl, wJ, rho_f, mu_f, rtmp, mu_fx, gam, pd,
@@ -3885,7 +3906,7 @@ c      END DO
      4   rMNx(3,eNoN), T1, T2, T3, T4
 
 !     Solid domain parameters
-      REAL(KIND=RKIND) rho_s, mu_s, bta_s, drho_s, dbta_s, Jac, tauM_s,
+      REAL(KIND=RKIND) rho_s, mu_s, bta_s, drho_s, dbta_s, tauM_s,
      2   tauC_s, rC, rCd, ud(3), vp_s(3), F(3,3), S(3,3), CC(3,3,3,3),
      3   Sgm(3,3)
 
@@ -4225,18 +4246,12 @@ c      END DO
          lRu(3,a) = N(a)*rV(3)
       END DO
 
-      DO b=1, eNoNb
-         lRub(1,b) = Nb(b)*rV(1)
-         lRub(2,b) = Nb(b)*rV(2)
-         lRub(3,b) = Nb(b)*rV(3)
-      END DO
-
       RETURN
       END SUBROUTINE IB_CALCFFSIL3D
 !--------------------------------------------------------------------
 !     Compute the 2D FSI force due to IB on the background fluid
       SUBROUTINE IB_CALCFFSIL2D(eNoNb, eNoN, nFn, w, Je, Nb, Nbx, N, Nx,
-     2   al, yl, aul, ubl, fN, lR, lRu, lRub, lKu, lK)
+     2   al, yl, aul, ubl, fN, Jac, lR, lRu, lKu, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -4244,8 +4259,9 @@ c      END DO
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nb(eNoNb), Nbx(2,eNoNb),
      2   N(eNoN), Nx(2,eNoN), al(tDof,eNoN), yl(tDof,eNoN),aul(2,eNoNb),
      3   ubl(2,eNoNb), fN(2,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: Jac
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(3,eNoN), lRu(2,eNoN),
-     2   lRub(2,eNoNb), lKu(6,eNoN,eNoN), lK(9,eNoN,eNoN)
+     2   lKu(6,eNoN,eNoN), lK(9,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) a, b, iEq, iDmn
       REAL(KIND=RKIND) amf, wl, wJ, rho_f, mu_f, rtmp, mu_fx, gam, pd,
@@ -4254,7 +4270,7 @@ c      END DO
      4   rMNx(2,eNoN), T1, T2, T3, T4
 
 !     Solid domain parameters
-      REAL(KIND=RKIND) rho_s, mu_s, bta_s, drho_s, dbta_s, Jac, tauM_s,
+      REAL(KIND=RKIND) rho_s, mu_s, bta_s, drho_s, dbta_s, tauM_s,
      2   tauC_s, rC, rCd, ud(2), vp_s(2), F(2,2), S(2,2), CC(2,2,2,2),
      3   Sgm(2,2)
 
@@ -4498,11 +4514,6 @@ c      END DO
       DO a=1, eNoN
          lRu(1,a) = N(a)*rV(1)
          lRu(2,a) = N(a)*rV(2)
-      END DO
-
-      DO b=1, eNoNb
-         lRub(1,b) = Nb(b)*rV(1)
-         lRub(2,b) = Nb(b)*rV(2)
       END DO
 
       RETURN
@@ -4864,19 +4875,18 @@ c      END DO
       RETURN
       END SUBROUTINE IB_CALCSTK2D
 !####################################################################
-      SUBROUTINE IB_DOASSEM(eNoN, ptr, lKu, lK, lRu)
+      SUBROUTINE IB_DOASSEM(eNoN, ptr, lKu, lK)
       USE TYPEMOD
-      USE COMMOD!, ONLY: dof, nsd, rowPtr, colPtr, Val, ib, err
+      USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, ptr(eNoN)
       REAL(KIND=RKIND), INTENT(IN) :: lKu((nsd+1)*nsd,eNoN,eNoN),
-     2   lK(dof*dof,eNoN,eNoN), lRu(nsd,eNoN)
+     2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) a, b, rowN, colN, idx
 
       DO a=1, eNoN
          rowN = ptr(a)
-         ib%Ru(:,rowN) = ib%Ru(:,rowN) + lRu(:,a)
          DO b=1, eNoN
             colN = ptr(b)
             CALL GETCOLPTR()
@@ -4919,6 +4929,12 @@ c      END DO
       REAL(KIND=RKIND) ami
 
       REAL(KIND=RKIND), ALLOCATABLE :: KR(:,:)
+
+      DO a=1, ib%tnNo
+         DO i=1, nsd
+            ib%Rub(i,a) = ib%Auk(i,a) - ib%Yb(i,a)
+         END DO
+      END DO
 
       ami = 1._RKIND/eq(ib%cEq)%am
 
@@ -4993,25 +5009,25 @@ c      END DO
 !     Interpolate flow velocity and pressure at IB nodes from background
 !     mesh. Use IB velocity to compute IB displacement (for explicit
 !     coupling)
-      SUBROUTINE IB_INTERPYU(Dg)
+      SUBROUTINE IB_INTERPYU(Yg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER a, i, is, ie
-      REAL(KIND=RKIND), ALLOCATABLE :: Yg(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Yl(:,:)
 
       is = eq(ib%cEq)%s
       ie = eq(ib%cEq)%e
 
-      ALLOCATE(Yg(nsd+1,tnNo))
+      ALLOCATE(Yl(nsd+1,tnNo))
       DO a=1, tnNo
-         Yg(:,a) = Yn(is:ie,a)
+         Yl(:,a) = Yg(is:ie,a)
       END DO
 
-      CALL IB_INTERP(nsd+1, Yg, Dg, ib%Yb)
-      DEALLOCATE(Yg)
+      CALL IB_INTERP(nsd+1, Yl, Dg, ib%Yb)
+      DEALLOCATE(Yl)
 
       IF (ib%cpld .EQ. ibCpld_E) THEN
          DO a=1, ib%tnNo

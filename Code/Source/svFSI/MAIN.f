@@ -169,12 +169,9 @@
             CALL SETBCUNDEFNEU()
 
 !        IB treatment: for explicit coupling, simply construct residue.
-!        for implicit coupling, initiate, update FSI forcing and tangent
-!        matrices and then update LHS and RHS
             IF (ibFlag) THEN
                IF (ib%cpld .EQ. ibCpld_I) THEN
-                  CALL IB_PICI()
-                  CALL IB_CALCFFSI(Ag, Yg, Dg, ib%Auk, ib%Ubk)
+                  CALL IB_IMPLICIT(Ag, Yg, Dg)
                END IF
                CALL IB_CONSTRUCT()
             END IF
@@ -209,13 +206,10 @@
 !     fluid mesh for explicit coupling, update old solution for implicit
 !     coupling
          IF (ibFlag) THEN
-            IF (ib%cpld .EQ. ibCpld_E) THEN
-               CALL IB_INTERPYU(Do)
-
-            ELSE IF (ib%cpld .EQ. ibCpld_I) THEN
+            CALL IB_INTERPYU(Yn, Dn)
+            IF (ib%cpld .EQ. ibCpld_I) THEN
                ib%Auo = ib%Aun
                ib%Ubo = ib%Ubn
-
             END IF
          END IF
 
