@@ -339,7 +339,7 @@
 
 !     Initialize Immersed Boundary data structures
       ALLOCATE(iblank(tnNo))
-      iblank = 0._RKIND
+      iblank = 0
       IF (ibFlag) CALL IB_INIT(Do)
 
 !     Calculating the volume of each domain

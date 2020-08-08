@@ -261,7 +261,7 @@
          END IF
          IF (pstEq) CALL OUTDNORM()
 
-         IF (ibFlag) CALL IB_OUTR()
+         IF (ibFlag) CALL IB_OUTCPUT()
 
 !     Exiting outer loop if l1
          IF (l1) EXIT

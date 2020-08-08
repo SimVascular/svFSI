@@ -416,7 +416,6 @@
       LOGICAL :: l1, l2, lJac
       INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
      2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, ne, iFn, nFn
-      REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) :: fName
       TYPE(dataType) :: d(nMsh)
       TYPE(vtkXMLType) :: vtu
@@ -427,9 +426,9 @@
 
       lJac = .FALSE.
       l1 = .FALSE.
-      rtmp = SUM(iblank(:))
-      rtmp = cm%reduce(rtmp)
-      IF (rtmp .GT. 0._RKIND) l1 = .TRUE.
+      a  = SUM(iblank(:))
+      a  = cm%reduce(a)
+      IF (a .GT. 0) l1 = .TRUE.
 
       l2 = .FALSE.
       DO iEq=1, nEq
@@ -657,7 +656,7 @@
             outNames(cOut) = "IBLANK"
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
-               d(iM)%x(is:ie,a) = iblank(Ac)
+               d(iM)%x(is:ie,a) = REAL(iblank(Ac), KIND=RKIND)
             END DO
          END IF
       END DO

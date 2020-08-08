@@ -413,7 +413,7 @@
                    ELSE
                      sl(a) = SQRT(NORM(s(l:u,Ac)))
                   END IF
-                  IF (iblank(Ac) .GT. 0.5_RKIND) ibl = ibl + 1
+                  ibl = ibl + iblank(Ac)
                END DO
                IF (ibl .EQ. eNoN) CYCLE
 

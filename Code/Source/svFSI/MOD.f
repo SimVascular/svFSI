@@ -734,8 +734,8 @@
          INTEGER(KIND=IKIND) :: tnNo
 !        Number of IB meshes
          INTEGER(KIND=IKIND) :: nMsh
-!        IB call duration
-         REAL(KIND=RKIND) :: callD(3)
+!        IB call duration (1: total time; 2: update; 3,4: communication)
+         REAL(KIND=RKIND) :: callD(4)
 !        IB Domain ID
          INTEGER(KIND=IKIND), ALLOCATABLE :: dmnID(:)
 !        Row pointer (for sparse LHS matrix storage)
@@ -906,9 +906,8 @@
 !     non-wall nodal displacements
       INTEGER(KIND=IKIND), ALLOCATABLE :: cmmBdry(:)
 
-!     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid,
-!     0.5 => node lies on the ghost layer)
-      REAL(KIND=RKIND), ALLOCATABLE :: iblank(:)
+!     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid)
+      INTEGER, ALLOCATABLE :: iblank(:)
 
 !     Old time derivative of variables (acceleration)
       REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)

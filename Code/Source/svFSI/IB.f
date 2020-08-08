@@ -306,7 +306,7 @@
          ib%intrp = ibIntrp_L2
          std = " IB interpolation method: "//CLR("L2 projection",3)
       CASE DEFAULT
-         err = " Invalid IB restriction chosen"
+         err = " Invalid IB interpolation chosen"
       END SELECT
 
       RETURN
@@ -403,9 +403,11 @@
             CASE (f_z)
                lPtr => lPD%get(rtmp,"Force_Z")
             CASE (ctau_M)
+               rtmp = 1e-3_RKIND
                lPtr => lPD%get(rtmp,
      2            "Momentum stabilization coefficient")
             CASE (ctau_C)
+               rtmp = 1e-3_RKIND
                lPtr => lPD%get(rtmp,
      2            "Continuity stabilization coefficient")
             CASE DEFAULT
@@ -830,11 +832,11 @@
       REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) a, iM, iFa, iEq, iDmn, iBc, nnz
-      REAL(KIND=RKIND) lD(nsd,tnNo), s(1,ib%tnNo)
+      REAL(KIND=RKIND) tt, lD(nsd,tnNo), s(1,ib%tnNo)
       CHARACTER(LEN=stdL) sOut
 
+      tt = CPUT()
       ib%callD = 0._RKIND
-      ib%callD(1) = CPUT()
 
       std = " ================================="
       std = " Initializing IB data structures.."
@@ -928,10 +930,9 @@
 !     Identify ghost cells for immersed boundaries
       CALL IB_SETIGHOST()
 
-      ib%callD(1) = CPUT() - ib%callD(1)
-      WRITE(sOut,'(F6.2)') ib%callD(1)
-      WRITE(sOut,'(A)') "    Immersed boundary setting time: "//
-     2   TRIM(sOut)//" sec"
+      tt = CPUT() - tt
+      WRITE(sOut,'(F6.2)') tt
+      WRITE(sOut,'(A)') "    IB setting time: "//TRIM(sOut)//" sec"
       std = TRIM(sOut)
 
       std = " IB initialization complete.."
@@ -947,7 +948,11 @@
       REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) :: a, iM
+      REAL(KIND=RKIND) tt
       REAL(KIND=RKIND), ALLOCATABLE :: lD(:,:)
+
+      ib%callD = 0._RKIND
+      tt = CPUT()
 
       ALLOCATE(lD(nsd,tnNo))
       lD = 0._RKIND
@@ -974,6 +979,10 @@
 !     Now that we have updated iblank field and IB traces, time to
 !     update ghost cells
       CALL IB_SETIGHOST()
+
+      ib%callD(2) = CPUT() - tt
+      ib%callD(4) = ib%callD(3)
+      ib%callD(3) = 0._RKIND
 
       RETURN
       END SUBROUTINE IB_UPDATE
@@ -1345,7 +1354,7 @@
       LOGICAL, ALLOCATABLE :: chck(:)
 
 !     Initialize iblank field
-      iblank(:) = 0._RKIND
+      iblank(:) = 0
 
 !     Fit a bounding box around IB and probe only those nodes lying
 !     inside the box
@@ -1383,7 +1392,7 @@
             xp(:) = x(:,Ac) + lD(:,Ac)
             incL  = .FALSE.
             CALL IB_CHECKINOUT(xp, incL)
-            IF (incL) iblank(Ac) = 1._RKIND
+            IF (incL) iblank(Ac) = 1
             chck(Ac) = .FALSE.
          END DO
       END DO
@@ -1407,11 +1416,11 @@
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), ptr(:)
 
 !     Just in case a fresh iblank appears in the current process
-      IF (SUM(iblank) .EQ. 0._RKIND) CALL IB_SETIBLANK(lD)
+      IF (SUM(iblank) .EQ. 0) CALL IB_SETIBLANK(lD)
 
       ALLOCATE(incNd(tnNo))
       DO a=1, tnNo
-         incNd(a) = NINT(iblank(a), KIND=IKIND)
+         incNd(a) = iblank(a)
       END DO
 
 !     Do multiple sweeps to get the neighborhood of iblank field. Probe
@@ -1450,13 +1459,13 @@
       END DO
 
 !     Probe each node if it is inside or outside the immersed body
-      iblank = 0._RKIND
+      iblank = 0
       DO a=1, nNo
          Ac = ptr(a)
          xp = x(:,Ac) + lD(:,Ac)
          flag  = .FALSE.
          CALL IB_CHECKINOUT(xp, flag)
-         IF (flag) iblank(Ac) = 1._RKIND
+         IF (flag) iblank(Ac) = 1
       END DO
       DEALLOCATE(incNd, ptr)
 
@@ -1565,7 +1574,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, e, i, j, iM, Ac, Ec, nNe, ne, ierr
-      REAL(KIND=RKIND) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
+      REAL(KIND=RKIND) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd), tt
       TYPE(queueType) :: probeNdQ
 
       LOGICAL, ALLOCATABLE :: ichk(:)
@@ -1646,7 +1655,7 @@
             b = 0
             DO a=1, msh(iM)%eNoN
                Ac = msh(iM)%IEN(a,e)
-               b  = b + NINT(iblank(Ac), KIND=IKIND)
+               b  = b + iblank(Ac)
             END DO
             IF (b .EQ. 0) eList(e) = 0
          END DO
@@ -1822,7 +1831,10 @@
          ptr = nPtr(1,a)
       END DO
 
+      tt = CPUT()
       gptr = cm%reduce(ptr, MPI_MAX)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
+
       i = 0
       DO a=1, lM%nNo
          IF (gptr(a) .NE. 0) i = i + 1
@@ -1839,9 +1851,12 @@
       ALLOCATE(sCount(cm%np()), disps(cm%np()))
       sCount = 0
       disps  = 0
-      i = lM%trc%n
+      i  = lM%trc%n
+
+      tt = CPUT()
       CALL MPI_GATHER(i, 1, mpint, sCount, 1, mpint, master, cm%com(),
      2   ierr)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       j = SUM(sCount(:))
       sCount = 3*sCount(:)
@@ -1857,9 +1872,12 @@
          ptr(3*i)   = lM%trc%nptr(2,i)
       END DO
 
-      i = 3*lM%trc%n
+      i  = 3*lM%trc%n
+
+      tt = CPUT()
       CALL MPI_GATHERV(ptr, i, mpint, gptr, sCount, disps, mpint,
      2   master, cm%com(), ierr)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DEALLOCATE(ptr, disps, sCount)
 
@@ -1895,9 +1913,11 @@
       DEALLOCATE(gptr)
 
 !     Share the element list to all processes
+      tt = CPUT()
       CALL cm%bcast(j)
       IF (cm%slv()) ALLOCATE(incNd(j))
       CALL cm%bcast(incNd)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
 !     Loop over all the background mesh and find traces of each left out
 !     integration point onto the elements of the background mesh
@@ -1979,7 +1999,10 @@
          ptr = nPtr(1,a)
       END DO
 
+      tt = CPUT()
       gptr = cm%reduce(ptr, MPI_MAX)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
+
       i = 0
       DO a=1, lM%nNo
          IF (gptr(a) .NE. 0) i = i + 1
@@ -2001,7 +2024,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: lD(nsd,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, e, g, i, j, iM, Ac, Ec, nNe, ne, ierr
-      REAL(KIND=RKIND) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd)
+      REAL(KIND=RKIND) :: xp(nsd), xi(nsd), minb(nsd), maxb(nsd), tt
       TYPE(queueType) :: probeElQ
 
       LOGICAL, ALLOCATABLE :: ichk(:)
@@ -2088,7 +2111,7 @@
             b = 0
             DO a=1, msh(iM)%eNoN
                Ac = msh(iM)%IEN(a,e)
-               b  = b + NINT(iblank(Ac), KIND=IKIND)
+               b  = b + iblank(Ac)
             END DO
             IF (b .EQ. 0) eList(e) = 0
          END DO
@@ -2293,7 +2316,10 @@
       END DO
 
 !     Check if all traces are found and return if yes
-      i = cm%reduce(lM%trc%n)
+      tt = CPUT()
+      i  = cm%reduce(lM%trc%n)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
+
       j = lM%nEl*lM%nG
       IF (i .GE. j) THEN
          DEALLOCATE(xpL, ePtr)
@@ -2307,9 +2333,12 @@
       ALLOCATE(sCount(cm%np()), disps(cm%np()))
       sCount = 0
       disps  = 0
-      i = lM%trc%nG
+      i  = lM%trc%nG
+
+      tt = CPUT()
       CALL MPI_GATHER(i, 1, mpint, sCount, 1, mpint, master, cm%com(),
      2   ierr)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       j = SUM(sCount(:))
       sCount = 4*sCount(:)
@@ -2325,9 +2354,11 @@
          ptr(4*i)   = lM%trc%gptr(2,i)
       END DO
 
-      i = 4*lM%trc%nG
+      i  = 4*lM%trc%nG
+      tt = CPUT()
       CALL MPI_GATHERV(ptr, i, mpint, gptr, sCount, disps, mpint,
      2   master, cm%com(), ierr)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DEALLOCATE(ptr, disps, sCount)
 
@@ -2366,9 +2397,11 @@
       DEALLOCATE(gptr)
 
 !     Share the element list to all processes
+      tt = CPUT()
       CALL cm%bcast(ne)
       IF (cm%slv()) ALLOCATE(incEl(ne))
       CALL cm%bcast(incEl)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
 !     Loop over all the background mesh and find traces of each left out
 !     integration point onto the elements of the background mesh
@@ -2458,8 +2491,11 @@
       DEALLOCATE(ePtr)
 
 !     Abort simulation if all traces are still not found
-      i = cm%reduce(lM%trc%nG)
-      j = lM%nEl * lM%nG
+      tt = CPUT()
+      i  = cm%reduce(lM%trc%nG)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
+
+      j  = lM%nEl * lM%nG
       IF (i .LT. j) CALL DEBUGIBGPTRCS(lM)
 
       RETURN
@@ -2475,7 +2511,7 @@
       INTEGER(KIND=IKIND), INTENT(OUT) :: part(lM%nNo)
 
       INTEGER(KIND=IKIND) :: itr, a, b, e, Ac, Bc, ierr
-      REAL(KIND=RKIND) :: f, tol, dS, minS, xp(nsd), xb(nsd)
+      REAL(KIND=RKIND) :: tt, f, tol, dS, minS, xp(nsd), xb(nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: tmpI(:), gN(:)
 
@@ -2492,7 +2528,7 @@
       END DO
 
       itr = 0
-      f   = 0.05_RKIND
+      f   = 0.1_RKIND
       ALLOCATE(tmpI(lM%nNo))
  001  part = 0
       tmpI = 0
@@ -2516,8 +2552,10 @@
          END IF
       END DO
 
+      tt = CPUT()
       CALL MPI_ALLREDUCE(part, tmpI, lM%nNo, mpint, MPI_MAX, cm%com(),
      2   ierr)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       b = 0
       DO a=1, lM%nNo
@@ -2525,10 +2563,11 @@
       END DO
 
       IF (b .NE. lM%nNo) THEN
-         wrn = "Found only "//STR(b)//" nodes in pass "//STR(itr)//
-     2      " out of "//STR(lM%nNo)//" nodes"
-         IF (itr .GT. 5) err = "Could not distribute all nodes in "//
-     2      STR(itr)//" passes. Try changing mesh edge size."
+c         wrn = "Found only "//STR(b)//" nodes in pass "//STR(itr)//
+c     2      " out of "//STR(lM%nNo)//" nodes"
+         IF (itr .GT. 5) err = "Could not partition mesh in "//
+     2      STR(itr)//" passes (IB_PARTMSH). Mesh could be distorted "//
+     3      " or try changing edge size."
          GOTO 001
       END IF
 
@@ -2755,6 +2794,7 @@
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) i, a, n, Ac, iM, ierr, tag
+      REAL(KIND=RKIND) tt
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), ptr(:), rA(:,:),
      2   rReq(:)
@@ -2794,6 +2834,7 @@
 !     these nodes will later be gathered by master from other processes
       ALLOCATE(ib%cm%n(cm%np()))
       ib%cm%n = 0
+      tt = CPUT()
       CALL MPI_GATHER(n, 1, mpint, ib%cm%n, 1, mpint, master, cm%com(),
      2   ierr)
 
@@ -2840,6 +2881,7 @@
          tag = cm%tF() * 100
          CALL MPI_SEND(ptr, n, mpint, master, tag, cm%com(), ierr)
       END IF
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DEALLOCATE(incNd, ptr, rA)
 
@@ -2852,6 +2894,7 @@
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) i, a, e, nG, Ac, iM, ierr, tag
+      REAL(KIND=RKIND) tt
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), ptr(:), rA(:,:),
      2   rReq(:)
@@ -2896,6 +2939,7 @@
 !     these nodes will later be gathered by master from other processes
       ALLOCATE(ib%cm%nG(cm%np()))
       ib%cm%nG = 0
+      tt = CPUT()
       CALL MPI_GATHER(nG, 1, mpint, ib%cm%nG, 1, mpint, master,
      2   cm%com(), ierr)
 
@@ -2942,6 +2986,7 @@
          tag = cm%tF() * 100
          CALL MPI_SEND(ptr, nG, mpint, master, tag, cm%com(), ierr)
       END IF
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DEALLOCATE(incNd, ptr, rA)
 
@@ -2951,7 +2996,7 @@
 !     Set ighost field
 !        ighost is set for both solids and shells
 !        For solids, ghost node is a fluid node connected to atleast one
-!        iblank=1 solid node. Takes value 0.5.
+!        iblank=1 solid node. iblank is set to -1 on ghost nodes
 !        For shells, ghost nodes are nodes that belong to ghost cells
       SUBROUTINE IB_SETIGHOST()
       USE COMMOD
@@ -2959,6 +3004,7 @@
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) :: a, b, e, Ac, iM
+      REAL(KIND=RKIND) tt
 
       REAL(KIND=RKIND), ALLOCATABLE :: rG(:)
 
@@ -2971,13 +3017,13 @@
             b = 0
             DO a=1, msh(iM)%eNoN
                Ac = msh(iM)%IEN(a,e)
-               b = b + NINT(iblank(Ac), KIND=IKIND)
+               b = b + iblank(Ac)
             END DO
             IF (b.GT.0 .AND. b.LT.msh(iM)%eNoN) THEN
                msh(iM)%iGC(e) = 1
                DO a=1, msh(iM)%eNoN
                   Ac = msh(iM)%IEN(a,e)
-                  b  = NINT(iblank(Ac), KIND=IKIND)
+                  b  = iblank(Ac)
                   IF (b .EQ. 0) rG(Ac) = 1._RKIND
                END DO
             END IF
@@ -2997,10 +3043,13 @@ c               END DO
 c            END DO
 c         END IF
 c      END DO
+
+      tt = CPUT()
       CALL COMMU(rG)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DO a=1, tnNo
-         IF (rG(a) .GT. 1.E-6_RKIND) iblank(a) = 0.5_RKIND
+         IF (rG(a) .GT. 1.E-6_RKIND) iblank(a) = -1
       END DO
 
       RETURN
@@ -3489,11 +3538,12 @@ c      END DO
 
       INTEGER(KIND=IKIND) :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN,
      2   eNoNb
-      REAL(KIND=RKIND) :: w, Je, Jac, xi(nsd), up(nsd), F(nsd,nsd)
+      REAL(KIND=RKIND) :: w, Je, Jac, xi(nsd), up(nsd), F(nsd,nsd),tt(2)
 
       REAL(KIND=RKIND), ALLOCATABLE :: sA(:), Nb(:), Nbx(:,:), xbl(:,:),
      2   ubl(:,:), N(:), Nx(:,:), xl(:,:)
 
+      tt(1) = CPUT()
       ib%Un = 0._RKIND
 
       ALLOCATE(sA(tnNo))
@@ -3585,8 +3635,10 @@ c      END DO
          DEALLOCATE(Nb, Nbx, xbl, ubl)
       END DO
 
+      tt(2) = CPUT()
       CALL COMMU(ib%Un)
       CALL COMMU(sA)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt(2)
 
       DO a=1, tnNo
          IF (.NOT.ISZERO(sA(a))) THEN
@@ -3594,6 +3646,8 @@ c      END DO
          END IF
       END DO
       DEALLOCATE(sA)
+
+      ib%callD(1) = ib%callD(1) + CPUT() - tt(1)
 
       RETURN
       END SUBROUTINE IB_PRJCTU
@@ -3604,8 +3658,9 @@ c      END DO
       IMPLICIT NONE
 
       INTEGER a
-      REAL(KIND=RKIND) coef
+      REAL(KIND=RKIND) coef, tt
 
+      tt = CPUT()
       coef = (eq(ib%cEq)%gam - 1._RKIND)/eq(ib%cEq)%gam
 
       DO a=1, ib%tnNo
@@ -3616,6 +3671,8 @@ c      END DO
       DO a=1, tnNo
          ib%Uo(:,a) = ib%Un(:,a)
       END DO
+
+      ib%callD(1) = ib%callD(1) + CPUT() - tt
 
       RETURN
       END SUBROUTINE IB_PICP
@@ -3648,9 +3705,10 @@ c      END DO
       IMPLICIT NONE
 
       INTEGER a
-      REAL(KIND=8) :: coef(4)
+      REAL(KIND=8) :: coef(4), tt
 
       IF (ib%cpld .NE. ibCpld_I) RETURN
+      tt = CPUT()
 
       coef(1) = 1._RKIND - eq(ib%cEq)%am
       coef(2) = eq(ib%cEq)%am
@@ -3666,6 +3724,8 @@ c      END DO
          ib%Un(:,a) = ib%Uo(:,a)*coef(3) + ib%Un(:,a)*coef(4)
       END DO
 
+      ib%callD(1) = ib%callD(1) + CPUT() - tt
+
       RETURN
       END SUBROUTINE IB_PICI
 !####################################################################
@@ -3677,13 +3737,14 @@ c      END DO
       IMPLICIT NONE
 
       INTEGER a, i, s, iEq
-      REAL(KIND=RKIND) :: gdt, ami, afm, dUl(nsd)
+      REAL(KIND=RKIND) :: gdt, ami, afm, dUl(nsd), tt
 
       REAL(KIND=RKIND), ALLOCATABLE :: Rg(:,:), Rb(:,:)
 
       iEq = ib%cEq
       IF (eq(iEq)%phys.NE.phys_fluid .OR. ib%cpld.NE.ibCpld_I) RETURN
 
+      tt  = CPUT()
       s   = eq(iEq)%s
       gdt = eq(iEq)%gam * dt
       ami = 1._RKIND / eq(iEq)%am
@@ -3710,6 +3771,8 @@ c      END DO
       END DO
       DEALLOCATE(Rg, Rb)
 
+      ib%callD(1) = ib%callD(1) + CPUT() - tt
+
 !     Project IB displacement (ib%Ubn) to background mesh (ib%Un)
       CALL IB_PRJCTU(Dn)
 
@@ -3725,8 +3788,8 @@ c      END DO
      2   Dg(tDof,tnNo), Aug(nsd,ib%tnNo), Ubg(nsd,ib%tnNo)
 
       INTEGER(KIND=IKIND) a, b, e, g, i, j, Ac, Bc, Ec, iM, jM, eNoNb,
-     2   eNoN, nFn
-      REAL(KIND=RKIND) w, Jac, dtF, rt, xi(nsd), Kxi(nsd,nsd)
+     2   eNoN, nFn, ibl
+      REAL(KIND=RKIND) w, Jac, dtF, rt, xi(nsd), Kxi(nsd,nsd), tt(2)
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), N(:), Nxi(:,:),
@@ -3734,8 +3797,7 @@ c      END DO
      3   ubl(:,:), ul(:,:), fN(:,:), lR(:,:), lRu(:,:), lKu(:,:,:),
      4   lK(:,:,:), sA(:)
 
-!     TODO: This is temporary. Later we get domain based on each IB node
-!     and communicate across IB process boundaries
+      tt(1) = CPUT()
       cDmn = DOMAIN(msh(1), ib%cEq, 1)
 
 !     Initialize residues to 0
@@ -3838,14 +3900,18 @@ c      END DO
             END IF
 
 !           Assemble to global residue
+            ibl = 0
             DO a=1, eNoN
                Ac = msh(jM)%IEN(a,Ec)
                ptr(a) = Ac
-               ib%R(:,Ac) = ib%R(:,Ac) + lR(:,a)
+               DO j=1, nsd+1
+                  ib%R(j,Ac) = ib%R(j,Ac) + lR(j,a)
+               END DO
+               ibl = ibl + iblank(Ac)
             END DO
 
 !           Assemble ib%Rub and stiffness matrices
-            IF (ib%cpld .EQ. ibCpld_I) THEN
+            IF (ib%cpld.EQ.ibCpld_I .AND. ibl.EQ.eNoN) THEN
                DO a=1, eNoN
                   Ac = ptr(a)
                   sA(Ac) = sA(Ac) + w*dtF*N(a)
@@ -3871,16 +3937,23 @@ c      END DO
          DEALLOCATE(Nb, Nbx, xbl, ubl, aul, fN)
       END DO
 
+      tt(2) = CPUT()
       CALL COMMU(ib%R)
+      ib%callD(2) = ib%callD(2) + CPUT() - tt(2)
 
       IF (ib%cpld .EQ. ibCpld_I) THEN
+         tt(2) = CPUT()
          CALL COMMU(ib%Ru)
          CALL COMMU(sA)
+         ib%callD(2) = ib%callD(2) + CPUT() - tt(2)
+
          DO a=1, tnNo
             IF (.NOT.ISZERO(sA(a))) ib%Ru(:,a) = ib%Ru(:,a)/sA(a)
          END DO
          DEALLOCATE(sA)
       END IF
+
+      ib%callD(1) = ib%callD(1) + CPUT() - tt(1)
 
       RETURN
       END SUBROUTINE IB_CALCFFSI
@@ -4044,13 +4117,16 @@ c      END DO
 !        based on the dilational penalty model
          CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, CC)
 
-!        Jacobian scaling for rho_s
-         rho_s = rho_s / Jac
+!        Jacobian scaling for rho_s for compressible solids
+         IF (.NOT.ISZERO(eq(iEq)%dmnIB(iDmn)%stM%Kpen))
+     2      rho_s = rho_s / Jac
 
 !        No stabilization for IFEM
          bta_s  = 0._RKIND
          drho_s = 0._RKIND
          dbta_s = 0._RKIND
+         tauM_s = 0._RKIND
+         tauC_s = 0._RKIND
          vp_s   = 0._RKIND
          rC     = 0._RKIND
 
@@ -4376,8 +4452,9 @@ c      END DO
 !        based on the dilational penalty model
          CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, CC)
 
-!        Jacobian scaling for rho_s
-         rho_s = rho_s / Jac
+!        Jacobian scaling for rho_s for compressible solids
+         IF (.NOT.ISZERO(eq(iEq)%dmnIB(iDmn)%stM%Kpen))
+     2      rho_s = rho_s / Jac
 
 !        No stabilization for IFEM
          bta_s  = 0._RKIND
@@ -4926,9 +5003,11 @@ c      END DO
       IMPLICIT NONE
 
       INTEGER a, i, c
-      REAL(KIND=RKIND) ami
+      REAL(KIND=RKIND) ami, tt(2)
 
       REAL(KIND=RKIND), ALLOCATABLE :: KR(:,:)
+
+      tt(1) = CPUT()
 
       DO a=1, ib%tnNo
          DO i=1, nsd
@@ -4955,7 +5034,9 @@ c      END DO
             END DO
          END DO
 
+         tt(2) = CPUT()
          CALL COMMU(KR)
+         ib%callD(3) = ib%callD(3) + CPUT() - tt(2)
 
          DO a=1, tnNo
             ib%R(1,a) = ib%R(1,a) - ami*KR(1,a)
@@ -4989,6 +5070,8 @@ c      END DO
 
       END IF
 
+      ib%callD(1) = ib%callD(1) + CPUT() - tt(1)
+
       RETURN
       END SUBROUTINE IB_RHSUpdate
 !####################################################################
@@ -5016,8 +5099,11 @@ c      END DO
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER a, i, is, ie
+      REAL(KIND=RKIND) tt
+
       REAL(KIND=RKIND), ALLOCATABLE :: Yl(:,:)
 
+      tt = CPUT()
       is = eq(ib%cEq)%s
       ie = eq(ib%cEq)%e
 
@@ -5036,6 +5122,7 @@ c      END DO
             END DO
          END DO
       END IF
+      ib%callD(1) = ib%callD(1) + CPUT() - tt
 
       RETURN
       END SUBROUTINE IB_INTERPYU
@@ -5072,7 +5159,7 @@ c      END DO
       REAL(KIND=RKIND), INTENT(OUT) :: Ub(m,ib%tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, i, Ac, Bc, Ec, iM, jM, eNoN
-      REAL(KIND=RKIND) :: xi(nsd), up(m)
+      REAL(KIND=RKIND) :: xi(nsd), up(m), tt
 
       REAL(KIND=RKIND), ALLOCATABLE :: wgt(:), N(:), Nx(:,:), xl(:,:),
      2   ul(:,:)
@@ -5120,10 +5207,10 @@ c      END DO
       END DO
 
 !     Synchronize Yb across all the processes
-      ib%callD(3) = CPUT()
+      tt = CPUT()
       CALL IB_SYNCN(Ub)
       CALL IB_SYNCN(wgt)
-      ib%callD(3) = CPUT() - ib%callD(3)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(wgt(a))) THEN
@@ -5146,7 +5233,7 @@ c      END DO
 
       INTEGER(KIND=IKIND) :: a, b, e, g, i, Ac, Bc, Ec, iM, jM, eNoN,
      2   eNoNb
-      REAL(KIND=RKIND) :: w, Jac, xi(nsd), up(m), Gmat(nsd,nsd)
+      REAL(KIND=RKIND) :: w, Jac, xi(nsd), up(m), Gmat(nsd,nsd), tt
 
       REAL(KIND=RKIND), ALLOCATABLE :: Nb(:), Nbx(:,:), xbl(:,:), N(:),
      2   Nx(:,:), xl(:,:), ul(:,:), sA(:)
@@ -5217,10 +5304,10 @@ c      END DO
       END DO
 
 !     Synchronize Yb across all the processes
-      ib%callD(3) = CPUT()
+      tt = CPUT()
       CALL IB_SYNCG(Ub)
       CALL IB_SYNCG(sA)
-      ib%callD(3) = CPUT() - ib%callD(3)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt
 
       DO a=1, ib%tnNo
          IF (.NOT.ISZERO(sA(a))) THEN
@@ -5234,15 +5321,21 @@ c      END DO
       END SUBROUTINE IB_INTERPGP
 !####################################################################
 !     Write IB call duration
-      SUBROUTINE IB_OUTR()
+      SUBROUTINE IB_OUTCPUT()
       USE COMMOD
       IMPLICIT NONE
 
       REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) sOut
 
-      IF (ib%cpld .NE. ibCpld_E) RETURN
-      std = REPEAT("-",55)
+      IF (ib%cpld .EQ. ibCpld_I) THEN
+         ib%callD(1) = ib%callD(1) / REAL(eq(ib%cEq)%itr, KIND=RKIND)
+         ib%callD(3) = ib%callD(3) / REAL(eq(ib%cEq)%itr, KIND=RKIND)
+      END IF
+      ib%callD(3) = ib%callD(3) + ib%callD(4)
+      ib%callD(1) = ib%callD(1) + ib%callD(2) + ib%callD(3)
+
+      std = REPEAT("-",69)
       WRITE(sOut,'(F6.2)') ib%callD(1)
       WRITE(sOut,'(A)') " IB call duration: "//TRIM(sOut)//' sec'
       rtmp = 100._RKIND*ib%callD(3)/ib%callD(1)
@@ -5252,10 +5345,10 @@ c      END DO
       WRITE(sOut,'(A)') TRIM(sOut)//", (updt."//
      2   STR(NINT(rtmp, KIND=IKIND),3)//"%)"
       std = sOut
-      std = REPEAT("-",55)
+      std = REPEAT("-",69)
 
       RETURN
-      END SUBROUTINE IB_OUTR
+      END SUBROUTINE IB_OUTCPUT
 !####################################################################
 !     Debugs FSI force on the IB
       SUBROUTINE DEBUGIBR(incNd)

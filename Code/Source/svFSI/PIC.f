@@ -57,21 +57,15 @@
 !     For implicit coupling, project IB displacement on background
 !     mesh and predict quantities at next time step
       IF (ibFlag) THEN
-         ib%callD(1) = CPUT()
-
 !        Set IB Dirichlet BCs
          CALL IB_SETBCDIR(ib%Yb, ib%Ubo)
 
 !        Update IB location and tracers
          CALL IB_UPDATE(Do)
-         ib%callD(2) = CPUT() - ib%callD(1)
 
          IF (ib%cpld .EQ. ibCpld_E) THEN
 !           FSI forcing for immersed bodies (explicit coupling)
             CALL IB_CALCFFSI(Ao, Yo, Do, ib%Auo, ib%Ubo)
-
-!           CPU time for force calculation
-            ib%callD(1) = CPUT() - ib%callD(1)
 
          ELSE IF (ib%cpld .EQ. ibCpld_I) THEN
 !           Project IB displacement (Ubn) to background mesh
