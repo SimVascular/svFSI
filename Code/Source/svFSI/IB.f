@@ -3939,13 +3939,13 @@ c      END DO
 
       tt(2) = CPUT()
       CALL COMMU(ib%R)
-      ib%callD(2) = ib%callD(2) + CPUT() - tt(2)
+      ib%callD(3) = ib%callD(3) + CPUT() - tt(2)
 
       IF (ib%cpld .EQ. ibCpld_I) THEN
          tt(2) = CPUT()
          CALL COMMU(ib%Ru)
          CALL COMMU(sA)
-         ib%callD(2) = ib%callD(2) + CPUT() - tt(2)
+         ib%callD(3) = ib%callD(3) + CPUT() - tt(2)
 
          DO a=1, tnNo
             IF (.NOT.ISZERO(sA(a))) ib%Ru(:,a) = ib%Ru(:,a)/sA(a)
