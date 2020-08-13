@@ -289,6 +289,10 @@
 !        (1) background mesh element to which the trace points to,
 !        (2) mesh ID
          INTEGER(KIND=IKIND), ALLOCATABLE :: gptr(:,:)
+!        Parametric coordinate for each nodal trace
+         REAL(KIND=RKIND), ALLOCATABLE :: xi(:,:)
+!        Parametric coordinate for each Gauss point trace
+         REAL(KIND=RKIND), ALLOCATABLE :: xiG(:,:)
       END TYPE traceType
 
 !     The face type containing mesh at boundary
@@ -720,8 +724,8 @@
          INTEGER(KIND=IKIND) :: mthd = ibMthd_NA
 !        IB coupling
          INTEGER(KIND=IKIND) :: cpld = ibCpld_NA
-!        IB restriction method
-         INTEGER(KIND=IKIND) :: restr = ibRestr_NA
+!        IB interpolation method
+         INTEGER(KIND=IKIND) :: intrp = ibIntrp_NA
 !        Current IB domain ID
          INTEGER(KIND=IKIND) :: cDmn
 !        Current equation
@@ -730,8 +734,8 @@
          INTEGER(KIND=IKIND) :: tnNo
 !        Number of IB meshes
          INTEGER(KIND=IKIND) :: nMsh
-!        IB call duration
-         REAL(KIND=RKIND) :: callD(3)
+!        IB call duration (1: total time; 2: update; 3,4: communication)
+         REAL(KIND=RKIND) :: callD(4)
 !        IB Domain ID
          INTEGER(KIND=IKIND), ALLOCATABLE :: dmnID(:)
 !        Row pointer (for sparse LHS matrix storage)
@@ -741,11 +745,31 @@
 !        IB position coordinates
          REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !        Velocity (new)
-         REAL(KIND=RKIND), ALLOCATABLE :: Yn(:,:)
+         REAL(KIND=RKIND), ALLOCATABLE :: Yb(:,:)
+!        Time derivative of displacement (old)
+         REAL(KIND=RKIND), ALLOCATABLE :: Auo(:,:)
+!        Time derivative of displacement (new)
+         REAL(KIND=RKIND), ALLOCATABLE :: Aun(:,:)
+!        Time derivative of displacement (n+am)
+         REAL(KIND=RKIND), ALLOCATABLE :: Auk(:,:)
+!        Displacement (old)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ubo(:,:)
 !        Displacement (new)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ubn(:,:)
+!        Displacement (n+af)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ubk(:,:)
+!        Displacement (projected on background mesh, old)
+         REAL(KIND=RKIND), ALLOCATABLE :: Uo(:,:)
+!        Displacement (projected on background mesh, new, n+af)
          REAL(KIND=RKIND), ALLOCATABLE :: Un(:,:)
-!        FSI force (IFEM method)
+!        Residue (FSI force)
          REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
+!        Residue (displacement, background mesh)
+         REAL(KIND=RKIND), ALLOCATABLE :: Ru(:,:)
+!        Residue (displacement, IB mesh)
+         REAL(KIND=RKIND), ALLOCATABLE :: Rub(:,:)
+!        LHS tangent matrix for displacement
+         REAL(KIND=RKIND), ALLOCATABLE :: Ku(:,:)
 
 !        DERIVED TYPE VARIABLES
 !        IB meshes
@@ -882,11 +906,8 @@
 !     non-wall nodal displacements
       INTEGER(KIND=IKIND), ALLOCATABLE :: cmmBdry(:)
 
-!     Additional arrays for immersed boundaries
 !     IB: iblank used for immersed boundaries (1 => solid, 0 => fluid)
-      INTEGER(KIND=IKIND), ALLOCATABLE :: iblank(:)
-!     IB: Solid nodes with iblank=1, and are part of ghost cells
-      INTEGER(KIND=IKIND), ALLOCATABLE :: ighost(:)
+      INTEGER, ALLOCATABLE :: iblank(:)
 
 !     Old time derivative of variables (acceleration)
       REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)

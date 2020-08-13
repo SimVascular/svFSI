@@ -413,10 +413,9 @@
       REAL(KIND=RKIND), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
      2   lD(tDof,tnNo)
 
-      LOGICAL :: l1, l2, l3, lJac
+      LOGICAL :: l1, l2, lJac
       INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
-     2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, itmp, ne,
-     3   iFn, nFn
+     2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, ne, iFn, nFn
       CHARACTER(LEN=stdL) :: fName
       TYPE(dataType) :: d(nMsh)
       TYPE(vtkXMLType) :: vtu
@@ -427,19 +426,14 @@
 
       lJac = .FALSE.
       l1 = .FALSE.
-      itmp = SUM(iblank(:))
-      itmp = cm%reduce(itmp)
-      IF (itmp .GT. 0) l1 = .TRUE.
+      a  = SUM(iblank(:))
+      a  = cm%reduce(a)
+      IF (a .GT. 0) l1 = .TRUE.
 
       l2 = .FALSE.
-      itmp = SUM(ighost(:))
-      itmp = cm%reduce(itmp)
-      IF (itmp .GT. 0) l2 = .TRUE.
-
-      l3 = .FALSE.
       DO iEq=1, nEq
          IF (eq(iEq)%phys .EQ. phys_CMM .AND. ALLOCATED(Dinit)) THEN
-            l3 = .TRUE.
+            l2 = .TRUE.
             EXIT
          END IF
       END DO
@@ -464,20 +458,14 @@
          END DO
       END DO
 
-!     iblank array for immersed solids
+!     iblank array for immersed bodies
       IF (l1) THEN
          nOut   = nOut + 1
          outDof = outDof + 1
       END IF
 
-!     ighost array for immersed solids/shells
-      IF (l2) THEN
-         nOut   = nOut + 1
-         outDof = outDof + 1
-      END IF
-
 !     Initial displacements for CMM equation
-      IF (l3) THEN
+      IF (l2) THEN
          nOut = nOut + 1
          outDof = outDof + nsd
       END IF
@@ -497,7 +485,7 @@
             d(iM)%x(1:nsd,a) = x(:,Ac)/msh(iM)%scF
          END DO
 
-         IF (l3) THEN
+         IF (l2) THEN
             cOut           = cOut + 1
             is             = outS(cOut)
             ie             = is + nsd - 1
@@ -669,18 +657,6 @@
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
                d(iM)%x(is:ie,a) = REAL(iblank(Ac), KIND=RKIND)
-            END DO
-         END IF
-
-         IF (l2) THEN
-            cOut = cOut + 1
-            is   = outS(cOut)
-            ie   = is
-            outS(cOut+1)   = ie + 1
-            outNames(cOut) = "IGHOST"
-            DO a=1, msh(iM)%nNo
-               Ac = msh(iM)%gN(a)
-               d(iM)%x(is:ie,a) = REAL(ighost(Ac), KIND=RKIND)
             END DO
          END IF
       END DO

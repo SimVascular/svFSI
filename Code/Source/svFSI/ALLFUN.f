@@ -459,7 +459,7 @@
      2            CALL NRBNNX(ib%msh(iM), e)
                DO a=1, eNoN
                   Ac      = ib%msh(iM)%IEN(a,e)
-                  xl(:,a) = ib%x(:,Ac) + ib%Un(:,Ac)
+                  xl(:,a) = ib%x(:,Ac) + ib%Ubo(:,Ac)
                   IF (l .EQ. u) THEN
                      sl(a) = s(l,Ac)
                    ELSE
@@ -1455,6 +1455,9 @@
       IF (ALLOCATED(trc%gE))    DEALLOCATE(trc%gE)
       IF (ALLOCATED(trc%nptr))  DEALLOCATE(trc%nptr)
       IF (ALLOCATED(trc%gptr))  DEALLOCATE(trc%gptr)
+      IF (ALLOCATED(trc%xi))    DEALLOCATE(trc%xi)
+      IF (ALLOCATED(trc%xiG))   DEALLOCATE(trc%xiG)
+
       trc%n  = 0
       trc%nG = 0
 
@@ -2434,7 +2437,7 @@
       IF (SIZE(U,1) .NE. ib%tnNo) err = " Inconsistent vector size "//
      2   "to synchronize IB data"
 
-      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+      IF (.NOT.ALLOCATED(ib%cm%nG)) err = " IB comm structure not "//
      2   "initialized. Correction necessary"
 
       ALLOCATE(incNd(ib%tnNo))
@@ -2519,7 +2522,7 @@
       IF (SIZE(U,2) .NE. ib%tnNo) err = " Inconsistent vector size "//
      2   "to synchronize IB data"
 
-      IF (.NOT.ALLOCATED(ib%cm%n)) err = " IB comm structure not "//
+      IF (.NOT.ALLOCATED(ib%cm%nG)) err = " IB comm structure not "//
      2   "initialized. Correction necessary"
 
       ALLOCATE(incNd(ib%tnNo))

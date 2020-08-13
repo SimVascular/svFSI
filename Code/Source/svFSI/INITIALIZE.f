@@ -160,7 +160,7 @@
       END IF
       i = IKIND*(1+SIZE(stamp)) + RKIND*(2+nEq+cplBC%nX+i*tnNo)
 
-      IF (ibFlag) i = i + RKIND*(2*nsd+1)*ib%tnNo
+      IF (ibFlag) i = i + RKIND*(3*nsd+1)*ib%tnNo
       IF (cm%seq()) THEN
          recLn = i
       ELSE
@@ -338,9 +338,8 @@
       END DO
 
 !     Initialize Immersed Boundary data structures
-      ALLOCATE(iblank(tnNo), ighost(tnNo))
+      ALLOCATE(iblank(tnNo))
       iblank = 0
-      ighost = 0
       IF (ibFlag) CALL IB_INIT(Do)
 
 !     Calculating the volume of each domain
@@ -409,9 +408,18 @@
       END IF
 
       IF (ibFlag) THEN
-         ib%R   = 0._RKIND
-         ib%Yn  = 0._RKIND
-         ib%Un  = 0._RKIND
+         ib%Yb  = 0._RKIND
+         ib%Auo = 0._RKIND
+         ib%Ubo = 0._RKIND
+
+         IF (ib%cpld .EQ. ibCpld_I) THEN
+            ib%Aun = 0._RKIND
+            ib%Auk = 0._RKIND
+            ib%Ubn = 0._RKIND
+            ib%Ubk = 0._RKIND
+            ib%Uo  = 0._RKIND
+            ib%Un  = 0._RKIND
+         END IF
       END IF
 
 !     Load any explicitly provided solution variables
@@ -536,14 +544,19 @@
          IF (dFlag) THEN
             IF (pstEq) THEN
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%Yn, ib%Un
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, ib%Yb, ib%Auo,
+     3            ib%Ubo
             ELSE
                READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%Yn, ib%Un
+     2            eq%iNorm, cplBC%xo, Yo, Ao, Do, ib%Yb, ib%Auo, ib%Ubo
             END IF
          ELSE
             READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1), eq%iNorm,
-     2         cplBC%xo, Yo, Ao, ib%Yn, ib%Un
+     2         cplBC%xo, Yo, Ao, ib%Yb, ib%Auo, ib%Ubo
+         END IF
+         IF (ib%cpld .EQ. ibCpld_I) THEN
+            ib%Aun = ib%Auo
+            ib%Ubn = ib%Ubo
          END IF
       END IF
       CLOSE(fid)
@@ -627,7 +640,6 @@
       IF (ALLOCATED(idMap))    DEALLOCATE(idMap)
       IF (ALLOCATED(cmmBdry))  DEALLOCATE(cmmBdry)
       IF (ALLOCATED(iblank))   DEALLOCATE(iblank)
-      IF (ALLOCATED(ighost))   DEALLOCATE(ighost)
 
       IF (ALLOCATED(Ao))       DEALLOCATE(Ao)
       IF (ALLOCATED(An))       DEALLOCATE(An)
@@ -672,9 +684,19 @@
          IF (ALLOCATED(ib%rowPtr)) DEALLOCATE(ib%rowPtr)
          IF (ALLOCATED(ib%colPtr)) DEALLOCATE(ib%colPtr)
          IF (ALLOCATED(ib%x))      DEALLOCATE(ib%x)
-         IF (ALLOCATED(ib%Yn))     DEALLOCATE(ib%Yn)
+         IF (ALLOCATED(ib%Yb))     DEALLOCATE(ib%Yb)
+         IF (ALLOCATED(ib%Auo))    DEALLOCATE(ib%Auo)
+         IF (ALLOCATED(ib%Aun))    DEALLOCATE(ib%Aun)
+         IF (ALLOCATED(ib%Auk))    DEALLOCATE(ib%Auk)
+         IF (ALLOCATED(ib%Ubo))    DEALLOCATE(ib%Ubo)
+         IF (ALLOCATED(ib%Ubn))    DEALLOCATE(ib%Ubn)
+         IF (ALLOCATED(ib%Ubk))    DEALLOCATE(ib%Ubk)
+         IF (ALLOCATED(ib%Uo))     DEALLOCATE(ib%Uo)
          IF (ALLOCATED(ib%Un))     DEALLOCATE(ib%Un)
          IF (ALLOCATED(ib%R))      DEALLOCATE(ib%R)
+         IF (ALLOCATED(ib%Ru))     DEALLOCATE(ib%Ru)
+         IF (ALLOCATED(ib%Rub))    DEALLOCATE(ib%Rub)
+         IF (ALLOCATED(ib%Ku))     DEALLOCATE(ib%Ku)
          IF (ALLOCATED(ib%cm%n))   DEALLOCATE(ib%cm%n)
          IF (ALLOCATED(ib%cm%gN))  DEALLOCATE(ib%cm%gN)
 

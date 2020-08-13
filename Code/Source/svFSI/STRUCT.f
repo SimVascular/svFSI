@@ -143,7 +143,7 @@
       RETURN
       END SUBROUTINE CONSTRUCT_dSOLID
 !####################################################################
-      SUBROUTINE STRUCT3D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+      SUBROUTINE STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
      2   pS0l, pSl, ya_l, lR, lK)
       USE COMMOD
       USE ALLFUN
@@ -160,10 +160,8 @@
       REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3),
      2   NxSNx, BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3),
      3   Bm(6,3,eNoN), CC(3,3,3,3), S0(3,3)
-      TYPE (stModelType) :: stModel
 
 !     Define parameters
-      stModel = eq(cEq)%dmn(cDmn)%stM
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -212,7 +210,7 @@
       S0(3,2) = S0(2,3)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, nFn, fN, ya_g, S, CC)
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, CC)
 
 !     Prestress
       pSl(1) = S(1,1)
@@ -360,7 +358,7 @@
       RETURN
       END SUBROUTINE STRUCT3D
 !####################################################################
-      SUBROUTINE STRUCT2D (eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
+      SUBROUTINE STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
      2   pS0l, pSl, ya_l, lR, lK)
       USE COMMOD
       USE ALLFUN
@@ -377,10 +375,8 @@
       REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(2), ud(2),
      2   NxSNx, BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2),
      3   Bm(3,2,eNoN), CC(2,2,2,2), S0(2,2)
-      TYPE (stModelType) :: stModel
 
 !     Define parameters
-      stModel = eq(cEq)%dmn(cDmn)%stM
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -415,7 +411,7 @@
       S0(2,1) = S0(1,2)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(stModel, F, nFn, fN, ya_g, S, CC)
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, CC)
 
 !     Prestress
       pSl(1) = S(1,1)

@@ -375,7 +375,6 @@
       IF (ALLOCATED(idMap))    DEALLOCATE(idMap)
       IF (ALLOCATED(cmmBdry))  DEALLOCATE(cmmBdry)
       IF (ALLOCATED(iblank))   DEALLOCATE(iblank)
-      IF (ALLOCATED(ighost))   DEALLOCATE(ighost)
       IF (ALLOCATED(Ao))       DEALLOCATE(Ao)
       IF (ALLOCATED(An))       DEALLOCATE(An)
       IF (ALLOCATED(Do))       DEALLOCATE(Do)

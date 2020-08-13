@@ -72,14 +72,14 @@
 !     When adding more properties, remember to increase maxNProp
 !     Density of fluid, density of solid, viscosity of solid, elasticity
 !     modulus, Poisson's ratio, conductivity, internal force (X, Y, Z),
-!     permeability, stabilization coeff. for backflow divergence,
-!     external source, damping, shell thickness, stabilization coeffs.
-!     for USTRUCT (mom., cont.)
+!     stabilization coeff. for backflow divergence, external source,
+!     damping, shell thickness, stabilization coeffs. for USTRUCT
+!     (momentum, continuity)
       INTEGER(KIND=IKIND), PARAMETER :: prop_NA = 0, fluid_density = 1,
      2   solid_density = 2, solid_viscosity = 3, elasticity_modulus = 4,
      3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
-     4   permeability = 10, backflow_stab = 11, source_term = 12,
-     5   damping = 13, shell_thickness = 14, ctau_M = 15, ctau_C = 16
+     4   backflow_stab = 10, source_term = 11, damping = 12,
+     5   shell_thickness = 13, ctau_M = 14, ctau_C = 15
 !--------------------------------------------------------------------
 !     Types of accepted elements
 !     Linear (Q1-1D), triangle (P1-2D), tetrahedral (P1-3D), bilinear
@@ -213,8 +213,8 @@
       INTEGER(KIND=IKIND), PARAMETER :: ibCpld_NA = 899, ibCpld_E = 898,
      2   ibCpld_I = 897
 
-!     IB restriction: direct/L2
-      INTEGER(KIND=IKIND), PARAMETER :: ibRestr_NA = 900,
-     2   ibRestr_ND = 901, ibRestr_L2 = 902
+!     IB interpolation: direct extraction / L2 projection
+      INTEGER(KIND=IKIND), PARAMETER :: ibIntrp_NA = 900,
+     2   ibIntrp_DI = 901, ibIntrp_L2 = 902
 !--------------------------------------------------------------------
 !#######################################################################

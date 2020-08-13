@@ -503,7 +503,6 @@
       REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
      2   ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
      3   sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
-      TYPE(stModelType) :: stModel
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
      2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
@@ -538,8 +537,6 @@
             nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
             lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
             mu     = 0.5_RKIND*elM/(1._RKIND + nu)
-         ELSE
-            stModel = eq(iEq)%dmn(cDmn)%stM
          END IF
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
@@ -632,14 +629,18 @@
                      sigma(2,2) = detF + 2._RKIND*mu*ed(2)
                      sigma(1,2) = mu*ed(3)
                   END IF
+
                ELSE IF (cPhys .EQ. phys_ustruct) THEN
-                  CALL GETPK2CCdev(stModel, F, nFn, fN, ya, S, CC, Ja)
+                  CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya, S,
+     2               CC, Ja)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
+
                ELSE IF (cPhys .EQ. phys_struct) THEN
-                  CALL GETPK2CC(stModel, F, nFn, fN, ya, S, CC)
+                  CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya, S,CC)
                   sigma = S
+
                END IF
 
                IF (nsd .EQ. 3) THEN
