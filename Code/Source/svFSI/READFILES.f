@@ -98,18 +98,16 @@
          sstEq        = .FALSE.
          ibFlag       = .FALSE.
 
-         flag  = .FALSE.
-         mfsIn = "svFSI.inp"
-         INQUIRE(FILE=mfsIn, EXIST=flag)
-         IF (.NOT.flag) THEN
-            i = IARGC()
-            IF (i .EQ. 0) THEN
-               err = "Configuration file is required as an argument"
-            ELSEIF (i .GT. 1) THEN
-               err = "Too many arguments"
-            END IF
+         i = IARGC()
+         IF (i .NE. 0) THEN
+            IF (i .GT. 1) err = " Too many arguments"
             CALL GETARG(1,ctmp)
             mfsIn = ctmp
+         ELSE
+            mfsIn = "svFSI.inp"
+            INQUIRE(FILE=mfsIn, EXIST=flag)
+            IF (.NOT.flag) err =
+     2         "Configuration file is required as an argument"
          END IF
       END IF
 
