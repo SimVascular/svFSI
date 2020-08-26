@@ -1220,13 +1220,15 @@
       IMPLICIT NONE
       TYPE(bcType), INTENT(OUT) :: lBc
 
-      IF (ALLOCATED(lBc%eDrn))   DEALLOCATE(lBc%eDrn)
-      IF (ALLOCATED(lBc%h))      DEALLOCATE(lBc%h)
-      IF (ALLOCATED(lBc%gx))     DEALLOCATE(lBc%gx)
+      IF (ALLOCATED(lBc%eDrn)) DEALLOCATE(lBc%eDrn)
+      IF (ALLOCATED(lBc%h))    DEALLOCATE(lBc%h)
+      IF (ALLOCATED(lBc%gx))   DEALLOCATE(lBc%gx)
 
       IF (ALLOCATED(lBc%gt)) THEN
-         IF (ALLOCATED(lBc%gt%r)) DEALLOCATE(lBc%gt%r)
-         IF (ALLOCATED(lBc%gt%i)) DEALLOCATE(lBc%gt%i)
+         IF (ALLOCATED(lBc%gt%qi)) DEALLOCATE(lBc%gt%qi)
+         IF (ALLOCATED(lBc%gt%qs)) DEALLOCATE(lBc%gt%qs)
+         IF (ALLOCATED(lBc%gt%r))  DEALLOCATE(lBc%gt%r)
+         IF (ALLOCATED(lBc%gt%i))  DEALLOCATE(lBc%gt%i)
          DEALLOCATE(lBc%gt)
       END IF
 
@@ -1258,10 +1260,10 @@
       IF (ALLOCATED(lBf%b))  DEALLOCATE(lBf%b)
       IF (ALLOCATED(lBf%bx)) DEALLOCATE(lBf%bx)
       IF (ALLOCATED(lBf%bt)) THEN
-         DO i=1, lBf%dof
-            IF (ALLOCATED(lBf%bt(i)%r)) DEALLOCATE(lBf%bt(i)%r)
-            IF (ALLOCATED(lBf%bt(i)%i)) DEALLOCATE(lBf%bt(i)%i)
-         END DO
+         IF (ALLOCATED(lBf%bt%qi)) DEALLOCATE(lBf%bt%qi)
+         IF (ALLOCATED(lBf%bt%qs)) DEALLOCATE(lBf%bt%qs)
+         IF (ALLOCATED(lBf%bt%r))  DEALLOCATE(lBf%bt%r)
+         IF (ALLOCATED(lBf%bt%i))  DEALLOCATE(lBf%bt%i)
          DEALLOCATE(lBf%bt)
       END IF
       IF (ALLOCATED(lBf%bm)) THEN

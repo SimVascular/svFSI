@@ -1531,9 +1531,14 @@
          END IF
       CASE ('Unsteady')
          lBc%bType = IBSET(lBc%bType,bType_ustd)
-         IF (BTEST(lBc%bType,bType_trac)) err =
-     2      "For unsteady traction, use general time dependence"
          ALLOCATE(lBc%gt)
+
+         IF (BTEST(lBc%bType,bType_trac)) THEN
+            lBc%gt%d = nsd
+         ELSE
+            lBc%gt%d = 1
+         END IF
+
          lPtr => list%get(fTmp,"Temporal values file path")
          IF (ASSOCIATED(lPtr)) THEN
             ltmp = .FALSE.
@@ -1547,8 +1552,9 @@
             END IF
             lBc%gt%n = j
             IF (lBc%gt%lrmp) lBc%gt%n = 1
-            ALLOCATE(lBc%gt%r(lBc%gt%n))
-            ALLOCATE(lBc%gt%i(lBc%gt%n))
+            ALLOCATE(lBc%gt%qi(lBc%gt%d), lBc%gt%qs(lBc%gt%d))
+            ALLOCATE(lBc%gt%r(lBc%gt%d,lBc%gt%n))
+            ALLOCATE(lBc%gt%i(lBc%gt%d,lBc%gt%n))
             CALL FFT(fid, i, lBc%gt)
             CLOSE(fid)
          ELSE
@@ -1556,17 +1562,18 @@
             IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
      2         "unsteady type BC"
             lBc%gt%lrmp = .FALSE.
+            ALLOCATE(lBc%gt%qi(lBc%gt%d), lBc%gt%qs(lBc%gt%d))
             fid = fTmp%open()
             READ (fid,*) lBc%gt%ti
             READ (fid,*) lBc%gt%T
-            READ (fid,*) lBc%gt%qi
-            READ (fid,*) lBc%gt%qs
-            READ (fid,*) j
-            lBc%gt%n = j
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
-            DO i=1, j
-               READ (fid,*) lBc%gt%r(i), lBc%gt%i(i)
+            READ (fid,*) (lBc%gt%qi(i), i=1, lBc%gt%d)
+            READ (fid,*) (lBc%gt%qs(i), i=1, lBc%gt%d)
+            READ (fid,*) lBc%gt%n
+            ALLOCATE(lBc%gt%r(lBc%gt%d,lBc%gt%n))
+            ALLOCATE(lBc%gt%i(lBc%gt%d,lBc%gt%n))
+            DO j=1, lBc%gt%n
+               READ (fid,*) (lBc%gt%r(i,j), i=1, lBc%gt%d),
+     2            (lBc%gt%i(i,j), i=1, lBc%gt%d)
             END DO
             CLOSE(fid)
          END IF
@@ -2008,41 +2015,45 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ('unsteady')
          lBf%bType = IBSET(lBf%bType,bfType_ustd)
 
-         ALLOCATE(lBf%bt(lBf%dof))
-         flag = .FALSE.
-         lPtr => list%get(flag,"Ramp function")
-         DO a=1, lBf%dof
-            lBf%bt(a)%lrmp = flag
-            lPtr => list%get(ftmp, "Temporal values file path", a)
-            IF (ASSOCIATED(lPtr)) THEN
-               fid = fTmp%open()
-               READ(fid,*) i, j
-               IF (i .LT. 2) THEN
-                  std = "Enter nPnts nFCoef; nPts*(t Q)"
-                  err = "Wrong format in: "//fTmp%fname
-               END IF
-               lBf%bt(a)%n = j
-               ALLOCATE(lBf%bt(a)%r(j))
-               ALLOCATE(lBf%bt(a)%i(j))
-               CALL FFT(fid, i, lBf%bt(1))
-               CLOSE(fid)
-            ELSE
-               lPtr => list%get(fTmp,"Fourier coefficients file path",a)
-               fid = fTmp%open()
-               READ (fid,*) lBf%bt(a)%ti
-               READ (fid,*) lBf%bt(a)%T
-               READ (fid,*) lBf%bt(a)%qi
-               READ (fid,*) lBf%bt(a)%qs
-               READ (fid,*) j
-               lBf%bt(a)%n = j
-               ALLOCATE(lBf%bt(a)%r(j))
-               ALLOCATE(lBf%bt(a)%i(j))
-               DO i=1, j
-                  READ (fid,*) lBf%bt(a)%r(i), lBf%bt(a)%i(i)
-               END DO
-               CLOSE(fid)
+         ALLOCATE(lBf%bt)
+         lBf%bt%d = lBf%dof
+
+         lPtr => list%get(ftmp, "Temporal values file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            flag = .FALSE.
+            lPtr => list%get(flag,"Ramp function")
+            lBf%bt%lrmp = flag
+            fid = fTmp%open()
+            READ(fid,*) i, j
+            IF (i .LT. 2) THEN
+               std = "Enter nPnts nFCoef; nPts*(t Q)"
+               err = "Wrong format in: "//fTmp%fname
             END IF
-         END DO
+            lBf%bt%n = j
+            IF (lBf%bt%lrmp) lBf%bt%n = 1
+            ALLOCATE(lBf%bt%qi(lBf%bt%d), lBf%bt%qs(lBf%bt%d))
+            ALLOCATE(lBf%bt%r(lBf%bt%d,j))
+            ALLOCATE(lBf%bt%i(lBf%bt%d,j))
+            CALL FFT(fid, i, lBf%bt)
+            CLOSE(fid)
+         ELSE
+            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
+            lBf%bt%lrmp = .FALSE.
+            ALLOCATE(lBf%bt%qi(lBf%bt%d), lBf%bt%qs(lBf%bt%d))
+            fid = fTmp%open()
+            READ (fid,*) lBf%bt%ti
+            READ (fid,*) lBf%bt%T
+            READ (fid,*) (lBf%bt%qi(i), i=1, lBf%bt%d)
+            READ (fid,*) (lBf%bt%qs(i), i=1, lBf%bt%d)
+            READ (fid,*) lBf%bt%n
+            ALLOCATE(lBf%bt%r(lBf%bt%d,lBf%bt%n))
+            ALLOCATE(lBf%bt%i(lBf%bt%d,lBf%bt%n))
+            DO j=1, lBf%bt%n
+               READ (fid,*) (lBf%bt%r(i,j), i=1, lBf%bt%d),
+     2            (lBf%bt%i(i,j), i=1, lBf%bt%d)
+            END DO
+            CLOSE(fid)
+         END IF
 
       CASE ('spatial')
          lBf%bType = IBSET(lBf%bType,bfType_spl)
