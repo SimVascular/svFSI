@@ -334,7 +334,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 19
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 20
 
       LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
@@ -486,15 +486,18 @@
 
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
-            nDOP = (/2,2,0,0/)
+            nDOP = (/3,3,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
+            outPuts(3) = out_mises
          ELSE
-            nDOP = (/4,1,0,0/)
+            nDOP = (/6,2,0,0/)
             outPuts(1) = out_displacement
-            outPuts(2) = out_velocity
-            outPuts(3) = out_acceleration
-            outPuts(4) = out_integ
+            outPuts(2) = out_mises
+            outPuts(3) = out_velocity
+            outPuts(4) = out_acceleration
+            outPuts(5) = out_integ
+            outPuts(6) = out_jacobian
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -514,21 +517,23 @@
 
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
-            nDOP = (/2,2,0,0/)
+            nDOP = (/3,3,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
+            outPuts(3) = out_mises
          ELSE
-            nDOP = (/10,1,0,0/)
+            nDOP = (/11,2,0,0/)
             outPuts(1)  = out_displacement
-            outPuts(2)  = out_velocity
-            outPuts(3)  = out_acceleration
-            outPuts(4)  = out_stress
-            outPuts(5)  = out_fibDir
-            outPuts(6)  = out_fibAlign
-            outputs(7)  = out_strainInv
-            outPuts(8)  = out_integ
-            outPuts(9)  = out_jacobian
-            outPuts(10) = out_defGrad
+            outPuts(2)  = out_mises
+            outPuts(3)  = out_stress
+            outPuts(4)  = out_velocity
+            outPuts(5)  = out_acceleration
+            outPuts(6)  = out_fibDir
+            outPuts(7)  = out_fibAlign
+            outputs(8)  = out_strainInv
+            outPuts(9)  = out_integ
+            outPuts(10) = out_jacobian
+            outPuts(11) = out_defGrad
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -552,23 +557,25 @@
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
             err = "Prestress for USTRUCT is not implemented yet"
-            nDOP = (/2,2,0,0/)
+            nDOP = (/3,3,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
+            outPuts(3) = out_mises
          ELSE
-            nDOP = (/12,1,0,0/)
+            nDOP = (/13,2,0,0/)
             outPuts(1)  = out_displacement
-            outPuts(2)  = out_velocity
-            outPuts(3)  = out_pressure
-            outPuts(4)  = out_acceleration
-            outPuts(5)  = out_stress
-            outPuts(6)  = out_fibDir
-            outPuts(7)  = out_fibAlign
-            outPuts(8)  = out_strainInv
-            outPuts(9)  = out_integ
-            outPuts(10) = out_jacobian
-            outPuts(11) = out_defGrad
-            outPuts(12) = out_divergence
+            outPuts(2)  = out_mises
+            outPuts(3)  = out_stress
+            outPuts(4)  = out_velocity
+            outPuts(5)  = out_pressure
+            outPuts(6)  = out_acceleration
+            outPuts(7)  = out_fibDir
+            outPuts(8)  = out_fibAlign
+            outPuts(9)  = out_strainInv
+            outPuts(10) = out_integ
+            outPuts(11) = out_jacobian
+            outPuts(12) = out_defGrad
+            outPuts(13) = out_divergence
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -747,26 +754,27 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/19,3,2,0/)
+         nDOP = (/20,4,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
-         outPuts(4)  = out_energyFlux
-         outPuts(5)  = out_absVelocity
-         outPuts(6)  = out_acceleration
-         outPuts(7)  = out_WSS
-         outPuts(8)  = out_vorticity
-         outPuts(9)  = out_vortex
-         outPuts(10) = out_traction
-         outPuts(11) = out_stress
-         outPuts(12) = out_fibDir
-         outPuts(13) = out_fibAlign
-         outPuts(14) = out_strainInv
-         outPuts(15) = out_integ
-         outPuts(16) = out_jacobian
-         outPuts(17) = out_defGrad
-         outPuts(18) = out_viscosity
-         outPuts(19) = out_divergence
+         outPuts(4)  = out_mises
+         outPuts(5)  = out_energyFlux
+         outPuts(6)  = out_absVelocity
+         outPuts(7)  = out_acceleration
+         outPuts(8)  = out_WSS
+         outPuts(9)  = out_vorticity
+         outPuts(10) = out_vortex
+         outPuts(11) = out_traction
+         outPuts(12) = out_stress
+         outPuts(13) = out_fibDir
+         outPuts(14) = out_fibAlign
+         outPuts(15) = out_strainInv
+         outPuts(16) = out_integ
+         outPuts(17) = out_jacobian
+         outPuts(18) = out_defGrad
+         outPuts(19) = out_viscosity
+         outPuts(20) = out_divergence
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1388,6 +1396,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Viscosity"
+         CASE (out_mises)
+            lEq%output(iOut)%grp  = outGrp_Mises
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "VonMises_stress"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT

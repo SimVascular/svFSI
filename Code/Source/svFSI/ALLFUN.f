@@ -1255,8 +1255,6 @@
       IMPLICIT NONE
       TYPE(bfType), INTENT(OUT) :: lBf
 
-      INTEGER(KIND=IKIND) i
-
       IF (ALLOCATED(lBf%b))  DEALLOCATE(lBf%b)
       IF (ALLOCATED(lBf%bx)) DEALLOCATE(lBf%bx)
       IF (ALLOCATED(lBf%bt)) THEN

@@ -59,7 +59,7 @@
       TYPE(mshType), INTENT(IN) :: lM
       REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, i, Ac, idof, nNo, eNoN
+      INTEGER(KIND=IKIND) a, e, Ac, idof, nNo, eNoN
       REAL(KIND=RKIND) rtmp
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
