@@ -1234,8 +1234,8 @@
           IF(.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_CMM)) CYCLE
           iFa = eq(cEq)%bc(iBc)%iFa
           iM = eq(cEq)%bc(iBc)%iM
-          IF (msh(iM)%eType .NE. eType_TET .AND.
-     2        msh(iM)%fa(iFa)%eType .NE. eType_TRI) THEN
+          IF (msh(iM)%eType .NE. eType_TET4 .AND.
+     2        msh(iM)%fa(iFa)%eType .NE. eType_TRI3) THEN
               err = "CMM equation is formulated for tetrahedral "//
      2           "elements (volume) and triangular (surface) elements"
           END IF

@@ -537,7 +537,7 @@
             Xtmp(:,a) = lM%x(:,a)
          END DO
          DEALLOCATE (lM%x)
-         IF (lM%eType .EQ. eType_BIQ) THEN
+         IF (lM%eType .EQ. eType_QUD9) THEN
 !     We will start adding intermediate nodes from faces. Here I assume
 !     there is no overlapping between faces
             DO iFa=1, lM%nFa
@@ -626,7 +626,7 @@
       END IF
       IF (b1 .EQ. 0) RETURN
 
-      IF (lM%eType .EQ. eType_BIQ) THEN
+      IF (lM%eType .EQ. eType_QUD9) THEN
          IF (b1.EQ.1 .AND. b2.EQ.2) THEN
             i = 5
          ELSE IF (b1.EQ.2 .AND. b2.EQ.3) THEN

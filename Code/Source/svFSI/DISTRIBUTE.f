@@ -1194,26 +1194,32 @@
 
 !     This is to get eNoNb
          SELECT CASE (lM%eType)
-         CASE(eType_BRK)
-            eNoNb = 4
-         CASE(eType_TET)
+         CASE(eType_TET4)
             eNoNb = 3
+         CASE(eType_TET10)
+            eNoNb = 6
+         CASE(eType_HEX8)
+            eNoNb = 4
+         CASE(eType_HEX20)
+            eNoNb = 8
+         CASE(eType_HEX27)
+            eNoNb = 9
          CASE(eType_WDG)
             eNoNb = 3
-         CASE(eType_TRI)
+         CASE(eType_TRI3)
             eNoNb = 2
-         CASE(eType_BIL)
+         CASE(eType_TRI6)
+            eNoNb = 3
+         CASE(eType_QUD4)
             eNoNb = 2
-         CASE(eType_BIQ)
+         CASE(eType_QUD8)
             eNoNb = 3
-         CASE(eType_LIN)
-            eNoNb = 1
-         CASE(eType_QUD)
-            eNoNb = 1
-         CASE(eType_QTE)
-            eNoNb = 6
-         CASE(eType_QTR)
+         CASE(eType_QUD9)
             eNoNb = 3
+         CASE(eType_LIN1)
+            eNoNb = 1
+         CASE(eType_LIN2)
+            eNoNb = 1
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT

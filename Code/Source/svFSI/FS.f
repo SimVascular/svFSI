@@ -180,29 +180,35 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eType
 
       SELECT CASE (eType)
-      CASE (eType_QUD)
-         fs%eType = eType_LIN
+      CASE (eType_TET10)
+         fs%eType = eType_TET4
          fs%lShpF = .TRUE.
-         fs%eNoN  = 2
-         fs%nG    = 2
+         fs%eNoN  = 4
+         fs%nG    = 4
 
-      CASE (eType_QTR)
-         fs%eType = eType_TRI
+      CASE (eType_HEX27)
+         fs%eType = eType_HEX8
+         fs%lShpF = .TRUE.
+         fs%eNoN  = 8
+         fs%nG    = 8
+
+      CASE (eType_TRI6)
+         fs%eType = eType_TRI3
          fs%lShpF = .TRUE.
          fs%eNoN  = 3
          fs%nG    = 3
 
-      CASE (eType_BIQ)
-         fs%eType = eType_BIL
+      CASE (eType_QUD9)
+         fs%eType = eType_QUD4
          fs%lShpF = .FALSE.
          fs%eNoN  = 4
          fs%nG    = 4
 
-      CASE (eType_QTE)
-         fs%eType = eType_TET
+      CASE (eType_LIN2)
+         fs%eType = eType_LIN1
          fs%lShpF = .TRUE.
-         fs%eNoN  = 4
-         fs%nG    = 4
+         fs%eNoN  = 2
+         fs%nG    = 2
 
       CASE DEFAULT
          err = " Cannot choose Taylor-Hood basis"

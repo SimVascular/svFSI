@@ -1025,7 +1025,7 @@
       RETURN
       END SUBROUTINE INTMSHDATA
 !--------------------------------------------------------------------
-!     This routine will interpolates NURBS into a BIL/BRK mesh, so you
+!     This routine will interpolates NURBS into a QUD4/HEX8 mesh, so you
 !     can write it into a VTK file.
       SUBROUTINE INTNRBDATA(lM, d, outDof)
       USE COMMOD

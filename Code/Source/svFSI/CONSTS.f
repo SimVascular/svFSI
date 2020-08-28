@@ -82,15 +82,17 @@
      5   shell_thickness = 13, ctau_M = 14, ctau_C = 15
 !--------------------------------------------------------------------
 !     Types of accepted elements
-!     Linear (Q1-1D), triangle (P1-2D), tetrahedral (P1-3D), bilinear
-!     (Q1-2D), quad (Q2-1D), biquad (Q2-2D), brick (Q1-3D),
-!     general NURBS (1-3D), wedge, point (0D), quadratic triangle
-!     (P2-2D), quadratic tetrahedron (P2-3D)
-      INTEGER(KIND=IKIND), PARAMETER :: eType_NA = 100, eType_LIN = 101,
-     2   eType_TRI = 102, eType_TET = 103, eType_BIL = 104,
-     3   eType_QUD = 105, eType_BIQ = 106, eType_BRK = 107,
-     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110,
-     5   eType_QTR = 111, eType_QTE = 112
+!     Point, Line (linear), Line (quadratic), Triangle (linear),
+!     Triangle (quadratic), Quads (bilinear), Quads (serendipity),
+!     Quads (biquadratic), Tetrahedron (linear), Tets (quadratic),
+!     Hexgonal bricks (trilinear), Hex (quadratic/serendipity),
+!     Hex (triquadratic), Wedge, NURBS
+      INTEGER(KIND=IKIND), PARAMETER :: eType_NA = 100, eType_PNT = 101,
+     2   eType_LIN1 = 102, eType_LIN2 = 103, eType_TRI3 = 104,
+     3   eType_TRI6 = 105, eType_QUD4 = 106, eType_QUD8 = 107,
+     4   eType_QUD9 = 108, eType_TET4 = 109, eType_TET10 = 110,
+     5   eType_HEX8 = 111, eType_HEX20 = 112, eType_HEX27 = 113,
+     6   eType_WDG = 114, eType_NRB = 115
 !--------------------------------------------------------------------
 !     Types of equations that are included in this solver
 !     Fluid equation (Navier-Stokes), nonlinear structure (pure d), heat

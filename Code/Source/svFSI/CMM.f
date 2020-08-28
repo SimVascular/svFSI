@@ -68,10 +68,10 @@
          IF (cPhys .NE. phys_cmm) CYCLE
 
          IF (cmmInit) THEN
-            IF (lM%eType .NE. eType_TRI) err = "CMM initialization "//
+            IF (lM%eType .NE. eType_TRI3) err = "CMM initialization "//
      2         "is allowed for triangular meshes only"
          ELSE
-            IF (lM%eType .NE. eType_TET) err = "CMM equation "//
+            IF (lM%eType .NE. eType_TET4) err = "CMM equation "//
      2         "is allowed for tetrahedral meshes only"
          END IF
 
