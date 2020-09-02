@@ -82,7 +82,7 @@
             lM%lShpF   = .FALSE.
          CASE(20)
             lM%eType   = eType_HEX20
-            lM%nG      = 8
+            lM%nG      = 27
             lM%vtkType = 25
             lM%nEf     = 6
             lM%lShpF   = .FALSE.
@@ -124,7 +124,7 @@
             lM%lShpF   = .FALSE.
          CASE(8)
             lM%eType   = eType_QUD8
-            lM%nG      = 4
+            lM%nG      = 9
             lM%vtkType = 23
             lM%nEf     = 4
             lM%lShpF   = .FALSE.
@@ -214,7 +214,7 @@
             lFa%nG    = 4
          CASE(8)
             lFa%eType = eType_QUD8
-            lFa%nG    = 4
+            lFa%nG    = 9
          CASE(9)
             lFa%eType = eType_QUD9
             lFa%nG    = 9
@@ -320,17 +320,44 @@
          xi(1,8) = t; xi(2,8) = s; xi(3,8) = s
 
       CASE(eType_HEX20)
-         w =  1._RKIND
-         s =  1._RKIND/SQRT(3._RKIND)
-         t = -1._RKIND/SQRT(3._RKIND)
-         xi(1,1) = t; xi(2,1) = t; xi(3,1) = t
-         xi(1,2) = s; xi(2,2) = t; xi(3,2) = t
-         xi(1,3) = s; xi(2,3) = s; xi(3,3) = t
-         xi(1,4) = t; xi(2,4) = s; xi(3,4) = t
-         xi(1,5) = t; xi(2,5) = t; xi(3,5) = s
-         xi(1,6) = s; xi(2,6) = t; xi(3,6) = s
-         xi(1,7) = s; xi(2,7) = s; xi(3,7) = s
-         xi(1,8) = t; xi(2,8) = s; xi(3,8) = s
+         w(1 : 8) = 125._RKIND/729._RKIND
+         w(9 :20) = 200._RKIND/729._RKIND
+         w(21:26) = 320._RKIND/729._RKIND
+         w(27)    = 512._RKIND/729._RKIND
+
+         s = SQRT(0.6_RKIND)
+         t = 0._RKIND
+
+         xi(1, 1) = -s; xi(2, 1) = -s; xi(3, 1) = -s
+         xi(1, 2) =  s; xi(2, 2) = -s; xi(3, 2) = -s
+         xi(1, 3) =  s; xi(2, 3) =  s; xi(3, 3) = -s
+         xi(1, 4) = -s; xi(2, 4) =  s; xi(3, 4) = -s
+         xi(1, 5) = -s; xi(2, 5) = -s; xi(3, 5) =  s
+         xi(1, 6) =  s; xi(2, 6) = -s; xi(3, 6) =  s
+         xi(1, 7) =  s; xi(2, 7) =  s; xi(3, 7) =  s
+         xi(1, 8) = -s; xi(2, 8) =  s; xi(3, 8) =  s
+
+         xi(1, 9) =  t; xi(2, 9) = -s; xi(3, 9) = -s
+         xi(1,10) =  s; xi(2,10) =  t; xi(3,10) = -s
+         xi(1,11) =  t; xi(2,11) =  s; xi(3,11) = -s
+         xi(1,12) = -s; xi(2,12) =  t; xi(3,12) = -s
+         xi(1,13) =  t; xi(2,13) = -s; xi(3,13) =  s
+         xi(1,14) =  s; xi(2,14) =  t; xi(3,14) =  s
+         xi(1,15) =  t; xi(2,15) =  s; xi(3,15) =  s
+         xi(1,16) = -s; xi(2,16) =  t; xi(3,16) =  s
+         xi(1,17) = -s; xi(2,17) = -s; xi(3,17) =  t
+         xi(1,18) =  s; xi(2,18) = -s; xi(3,18) =  t
+         xi(1,19) =  s; xi(2,19) =  s; xi(3,19) =  t
+         xi(1,20) = -s; xi(2,20) =  s; xi(3,20) =  t
+
+         xi(1,21) = -s; xi(2,21) =  t; xi(3,21) =  t
+         xi(1,22) =  s; xi(2,22) =  t; xi(3,22) =  t
+         xi(1,23) =  t; xi(2,23) = -s; xi(3,23) =  t
+         xi(1,24) =  t; xi(2,24) =  s; xi(3,24) =  t
+         xi(1,25) =  t; xi(2,25) =  t; xi(3,25) = -s
+         xi(1,26) =  t; xi(2,26) =  t; xi(3,26) =  s
+
+         xi(1,27) =  t; xi(2,27) =  t; xi(3,27) =  t
 
       CASE(eType_HEX27)
          w(1 : 8) = 125._RKIND/729._RKIND
@@ -423,12 +450,22 @@
          xi(1,4) = -s; xi(2,4) =  s
 
       CASE(eType_QUD8)
-         w = 1._RKIND
-         s = 1._RKIND/SQRT(3._RKIND)
+         w(1:4) = 25._RKIND/81._RKIND
+         w(5:8) = 40._RKIND/81._RKIND
+         w(9)   = 64._RKIND/81._RKIND
+
+         s = SQRT(0.6_RKIND)
+         t = 0._RKIND
+
          xi(1,1) = -s; xi(2,1) = -s
          xi(1,2) =  s; xi(2,2) = -s
          xi(1,3) =  s; xi(2,3) =  s
          xi(1,4) = -s; xi(2,4) =  s
+         xi(1,5) =  t; xi(2,5) = -s
+         xi(1,6) =  s; xi(2,6) =  t
+         xi(1,7) =  t; xi(2,7) =  s
+         xi(1,8) = -s; xi(2,8) =  t
+         xi(1,9) =  t; xi(2,9) =  t
 
       CASE(eType_QUD9)
          w(1:4) = 25._RKIND/81._RKIND
@@ -727,130 +764,130 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          ux = 1._RKIND + xi(1)
          uy = 1._RKIND + xi(2)
          uz = 1._RKIND + xi(3)
-         mx = xi(1)
-         my = xi(2)
-         mz = xi(3)
+         mx = lx*ux
+         my = ly*uy
+         mz = lz*uz
 
-         N(1)  = -mx*lx*my*ly*mz*lz/8._RKIND
-         N(2)  =  mx*ux*my*ly*mz*lz/8._RKIND
-         N(3)  = -mx*ux*my*uy*mz*lz/8._RKIND
-         N(4)  =  mx*lx*my*uy*mz*lz/8._RKIND
-         N(5)  =  mx*lx*my*ly*mz*uz/8._RKIND
-         N(6)  = -mx*ux*my*ly*mz*uz/8._RKIND
-         N(7)  =  mx*ux*my*uy*mz*uz/8._RKIND
-         N(8)  = -mx*lx*my*uy*mz*uz/8._RKIND
-         N(9)  =  lx*ux*my*ly*mz*lz/4._RKIND
-         N(10) = -mx*ux*ly*uy*mz*lz/4._RKIND
-         N(11) = -lx*ux*my*uy*mz*lz/4._RKIND
-         N(12) =  mx*lx*ly*uy*mz*lz/4._RKIND
-         N(13) = -lx*ux*my*ly*mz*uz/4._RKIND
-         N(14) =  mx*ux*ly*uy*mz*uz/4._RKIND
-         N(15) =  lx*ux*my*uy*mz*uz/4._RKIND
-         N(16) = -mx*lx*ly*uy*mz*uz/4._RKIND
-         N(17) =  mx*lx*my*ly*lz*uz/4._RKIND
-         N(18) = -mx*ux*my*ly*lz*uz/4._RKIND
-         N(19) =  mx*ux*my*uy*lz*uz/4._RKIND
-         N(20) = -mx*lx*my*uy*lz*uz/4._RKIND
+         N(1)  = lx*ly*lz*(lx+ly+lz-5._RKIND)/8._RKIND
+         N(2)  = ux*ly*lz*(ux+ly+lz-5._RKIND)/8._RKIND
+         N(3)  = ux*uy*lz*(ux+uy+lz-5._RKIND)/8._RKIND
+         N(4)  = lx*uy*lz*(lx+uy+lz-5._RKIND)/8._RKIND
+         N(5)  = lx*ly*uz*(lx+ly+uz-5._RKIND)/8._RKIND
+         N(6)  = ux*ly*uz*(ux+ly+uz-5._RKIND)/8._RKIND
+         N(7)  = ux*uy*uz*(ux+uy+uz-5._RKIND)/8._RKIND
+         N(8)  = lx*uy*uz*(lx+uy+uz-5._RKIND)/8._RKIND
+         N(9)  = mx*ly*lz/4._RKIND
+         N(10) = ux*my*lz/4._RKIND
+         N(11) = mx*uy*lz/4._RKIND
+         N(12) = lx*my*lz/4._RKIND
+         N(13) = mx*ly*uz/4._RKIND
+         N(14) = ux*my*uz/4._RKIND
+         N(15) = mx*uy*uz/4._RKIND
+         N(16) = lx*my*uz/4._RKIND
+         N(17) = lx*ly*mz/4._RKIND
+         N(18) = ux*ly*mz/4._RKIND
+         N(19) = ux*uy*mz/4._RKIND
+         N(20) = lx*uy*mz/4._RKIND
 
-c        N(1)  = -mx*lx*my*ly*mz*lz/8._RKIND
-         Nxi(1,1)  = -(lx - mx)*my*ly*mz*lz/8._RKIND
-         Nxi(2,1)  = -(ly - my)*mx*lx*mz*lz/8._RKIND
-         Nxi(3,1)  = -(lz - mz)*mx*lx*my*ly/8._RKIND
+c        N(1)  = lx*ly*lz*(lx+ly+lz-5._RKIND)/8._RKIND
+         Nxi(1,1)  = -ly*lz*(lx+ly+lz-5._RKIND+lx)/8._RKIND
+         Nxi(2,1)  = -lx*lz*(lx+ly+lz-5._RKIND+ly)/8._RKIND
+         Nxi(3,1)  = -lx*ly*(lx+ly+lz-5._RKIND+lz)/8._RKIND
 
-c        N(2)  =  mx*ux*my*ly*mz*lz/8._RKIND
-         Nxi(1,2)  =  (mx + ux)*my*ly*mz*lz/8._RKIND
-         Nxi(2,2)  =  (ly - my)*mx*ux*mz*lz/8._RKIND
-         Nxi(3,2)  =  (lz - mz)*mx*ux*my*ly/8._RKIND
+c        N(2)  = ux*ly*lz*(ux+ly+lz-5._RKIND)/8._RKIND
+         Nxi(1,2)  =  ly*lz*(ux+ly+lz-5._RKIND+ux)/8._RKIND
+         Nxi(2,2)  = -ux*lz*(ux+ly+lz-5._RKIND+ly)/8._RKIND
+         Nxi(3,2)  = -ux*ly*(ux+ly+lz-5._RKIND+lz)/8._RKIND
 
-c        N(3)  = -mx*ux*my*uy*mz*lz/8._RKIND
-         Nxi(1,3)  = -(mx + ux)*my*uy*mz*lz/8._RKIND
-         Nxi(2,3)  = -(my + uy)*mx*ux*mz*lz/8._RKIND
-         Nxi(3,3)  = -(lz - mz)*mx*ux*my*uy/8._RKIND
+c        N(3)  = ux*uy*lz*(ux+uy+lz-5._RKIND)/8._RKIND
+         Nxi(1,3)  =  uy*lz*(ux+uy+lz-5._RKIND+ux)/8._RKIND
+         Nxi(2,3)  =  ux*lz*(ux+uy+lz-5._RKIND+uy)/8._RKIND
+         Nxi(3,3)  = -ux*uy*(ux+uy+lz-5._RKIND+lz)/8._RKIND
 
-c        N(4)  =  mx*lx*my*uy*mz*lz/8._RKIND
-         Nxi(1,4)  =  (lx - mx)*my*uy*mz*lz/8._RKIND
-         Nxi(2,4)  =  (my + uy)*mx*lx*mz*lz/8._RKIND
-         Nxi(3,4)  =  (lz - mz)*mx*lx*my*uy/8._RKIND
+c        N(4)  = lx*uy*lz*(lx+uy+lz-5._RKIND)/8._RKIND
+         Nxi(1,4)  = -uy*lz*(lx+uy+lz-5._RKIND+lx)/8._RKIND
+         Nxi(2,4)  =  lx*lz*(lx+uy+lz-5._RKIND+uy)/8._RKIND
+         Nxi(3,4)  = -lx*uy*(lx+uy+lz-5._RKIND+lz)/8._RKIND
 
-c        N(5)  =  mx*lx*my*ly*mz*uz/8._RKIND
-         Nxi(1,5)  =  (lx - mx)*my*ly*mz*uz/8._RKIND
-         Nxi(2,5)  =  (ly - my)*mx*lx*mz*uz/8._RKIND
-         Nxi(3,5)  =  (mz + uz)*mx*lx*my*ly/8._RKIND
+c        N(5)  = lx*ly*uz*(lx+ly+uz-5._RKIND)/8._RKIND
+         Nxi(1,5)  = -ly*uz*(lx+ly+uz-5._RKIND+lx)/8._RKIND
+         Nxi(2,5)  = -lx*uz*(lx+ly+uz-5._RKIND+ly)/8._RKIND
+         Nxi(3,5)  =  lx*ly*(lx+ly+uz-5._RKIND+uz)/8._RKIND
 
-c        N(6)  = -mx*ux*my*ly*mz*uz/8._RKIND
-         Nxi(1,6)  = -(mx + ux)*my*ly*mz*uz/8._RKIND
-         Nxi(2,6)  = -(ly - my)*mx*ux*mz*uz/8._RKIND
-         Nxi(3,6)  = -(mz + uz)*mx*ux*my*ly/8._RKIND
+c        N(6)  = ux*ly*uz*(ux+ly+uz-5._RKIND)/8._RKIND
+         Nxi(1,6)  =  ly*uz*(ux+ly+uz-5._RKIND+ux)/8._RKIND
+         Nxi(2,6)  = -ux*uz*(ux+ly+uz-5._RKIND+ly)/8._RKIND
+         Nxi(3,6)  =  ux*ly*(ux+ly+uz-5._RKIND+uz)/8._RKIND
 
-c        N(7)  =  mx*ux*my*uy*mz*uz/8._RKIND
-         Nxi(1,7)  =  (mx + ux)*my*uy*mz*uz/8._RKIND
-         Nxi(2,7)  =  (my + uy)*mx*ux*mz*uz/8._RKIND
-         Nxi(3,7)  =  (mz + uz)*mx*ux*my*uy/8._RKIND
+c        N(7)  = ux*uy*uz*(ux+uy+uz-5._RKIND)/8._RKIND
+         Nxi(1,7)  =  uy*uz*(ux+uy+uz-5._RKIND+ux)/8._RKIND
+         Nxi(2,7)  =  ux*uz*(ux+uy+uz-5._RKIND+uy)/8._RKIND
+         Nxi(3,7)  =  ux*uy*(ux+uy+uz-5._RKIND+uz)/8._RKIND
 
-c        N(8)  = -mx*lx*my*uy*mz*uz/8._RKIND
-         Nxi(1,8)  = -(lx - mx)*my*uy*mz*uz/8._RKIND
-         Nxi(2,8)  = -(my + uy)*mx*lx*mz*uz/8._RKIND
-         Nxi(3,8)  = -(mz + uz)*mx*lx*my*uy/8._RKIND
+c        N(8)  = lx*uy*uz*(lx+uy+uz-5._RKIND)/8._RKIND
+         Nxi(1,8)  = -uy*uz*(lx+uy+uz-5._RKIND+lx)/8._RKIND
+         Nxi(2,8)  =  lx*uz*(lx+uy+uz-5._RKIND+uy)/8._RKIND
+         Nxi(3,8)  =  lx*uy*(lx+uy+uz-5._RKIND+uz)/8._RKIND
 
-c        N(9)  =  lx*ux*my*ly*mz*lz/4._RKIND
-         Nxi(1,9)  =  (lx - ux)*my*ly*mz*lz/4._RKIND
-         Nxi(2,9)  =  (ly - my)*lx*ux*mz*lz/4._RKIND
-         Nxi(3,9)  =  (lz - mz)*lx*ux*my*ly/4._RKIND
+c        N(9)  = mx*ly*lz/4._RKIND
+         Nxi(1,9)  =  (lx - ux)*ly*lz/4._RKIND
+         Nxi(2,9)  = -mx*lz/4._RKIND
+         Nxi(3,9)  = -mx*ly/4._RKIND
 
-c        N(10) = -mx*ux*ly*uy*mz*lz/4._RKIND
-         Nxi(1,10) = -(mx + ux)*ly*uy*mz*lz/4._RKIND
-         Nxi(2,10) = -(ly - uy)*mx*ux*mz*lz/4._RKIND
-         Nxi(3,10) = -(lz - mz)*mx*ux*ly*uy/4._RKIND
+c        N(10) = ux*my*lz/4._RKIND
+         Nxi(1,10) =  my*lz/4._RKIND
+         Nxi(2,10) =  (ly - uy)*ux*lz/4._RKIND
+         Nxi(3,10) = -ux*my/4._RKIND
 
-c        N(11) = -lx*ux*my*uy*mz*lz/4._RKIND
-         Nxi(1,11) = -(lx - ux)*my*uy*mz*lz/4._RKIND
-         Nxi(2,11) = -(my + uy)*lx*ux*mz*lz/4._RKIND
-         Nxi(3,11) = -(lz - mz)*lx*ux*my*uy/4._RKIND
+c        N(11) = mx*uy*lz/4._RKIND
+         Nxi(1,11) =  (lx - ux)*uy*lz/4._RKIND
+         Nxi(2,11) =  mx*lz/4._RKIND
+         Nxi(3,11) = -mx*uy/4._RKIND
 
-c        N(12) =  mx*lx*ly*uy*mz*lz/4._RKIND
-         Nxi(1,12) =  (lx - mx)*ly*uy*mz*lz/4._RKIND
-         Nxi(2,12) =  (ly - uy)*mx*lx*mz*lz/4._RKIND
-         Nxi(3,12) =  (lz - mz)*mx*lx*ly*uy/4._RKIND
+c        N(12) = lx*my*lz/4._RKIND
+         Nxi(1,12) = -my*lz/4._RKIND
+         Nxi(2,12) =  (ly - uy)*lx*lz/4._RKIND
+         Nxi(3,12) = -lx*my/4._RKIND
 
-c        N(13) = -lx*ux*my*ly*mz*uz/4._RKIND
-         Nxi(1,13) = -(lx - ux)*my*ly*mz*uz/4._RKIND
-         Nxi(2,13) = -(ly - my)*lx*ux*mz*uz/4._RKIND
-         Nxi(3,13) = -(mz + uz)*lx*ux*my*ly/4._RKIND
+c        N(13) = mx*ly*uz/4._RKIND
+         Nxi(1,13) =  (lx - ux)*ly*uz/4._RKIND
+         Nxi(2,13) = -mx*uz/4._RKIND
+         Nxi(3,13) =  mx*ly/4._RKIND
 
-c        N(14) =  mx*ux*ly*uy*mz*uz/4._RKIND
-         Nxi(1,14) =  (mx + ux)*ly*uy*mz*uz/4._RKIND
-         Nxi(2,14) =  (ly - uy)*mx*ux*mz*uz/4._RKIND
-         Nxi(3,14) =  (mz + uz)*mx*ux*ly*uy/4._RKIND
+c        N(14) = ux*my*uz/4._RKIND
+         Nxi(1,14) =  my*uz/4._RKIND
+         Nxi(2,14) =  (ly - uy)*ux*uz/4._RKIND
+         Nxi(3,14) =  ux*my/4._RKIND
 
-c        N(15) =  lx*ux*my*uy*mz*uz/4._RKIND
-         Nxi(1,15) =  (lx - ux)*my*uy*mz*uz/4._RKIND
-         Nxi(2,15) =  (my + uy)*lx*ux*mz*uz/4._RKIND
-         Nxi(3,15) =  (mz + uz)*lx*ux*my*uy/4._RKIND
+c        N(15) = mx*uy*uz/4._RKIND
+         Nxi(1,15) =  (lx - ux)*uy*uz/4._RKIND
+         Nxi(2,15) =  mx*uz/4._RKIND
+         Nxi(3,15) =  mx*uy/4._RKIND
 
-c        N(16) = -mx*lx*ly*uy*mz*uz/4._RKIND
-         Nxi(1,16) = -(lx - mx)*ly*uy*mz*uz/4._RKIND
-         Nxi(2,16) = -(ly - uy)*mx*lx*mz*uz/4._RKIND
-         Nxi(3,16) = -(mz + uz)*mx*lx*ly*uy/4._RKIND
+c        N(16) = lx*my*uz/4._RKIND
+         Nxi(1,16) = -my*uz/4._RKIND
+         Nxi(2,16) =  (ly - uy)*lx*uz/4._RKIND
+         Nxi(3,16) =  lx*my/4._RKIND
 
-c        N(17) =  mx*lx*my*ly*lz*uz/4._RKIND
-         Nxi(1,17) =  (lx - mx)*my*ly*lz*uz/4._RKIND
-         Nxi(2,17) =  (ly - my)*mx*lx*lz*uz/4._RKIND
-         Nxi(3,17) =  (lz - uz)*mx*lx*my*ly/4._RKIND
+c        N(17) = lx*ly*mz/4._RKIND
+         Nxi(1,17) = -ly*mz/4._RKIND
+         Nxi(2,17) = -lx*mz/4._RKIND
+         Nxi(3,17) =  (lz - uz)*lx*ly/4._RKIND
 
-c        N(18) = -mx*ux*my*ly*lz*uz/4._RKIND
-         Nxi(1,18) = -(mx + ux)*my*ly*lz*uz/4._RKIND
-         Nxi(2,18) = -(ly - my)*mx*ux*lz*uz/4._RKIND
-         Nxi(3,18) = -(lz - uz)*mx*ux*my*ly/4._RKIND
+c        N(18) = ux*ly*mz/4._RKIND
+         Nxi(1,18) =  ly*mz/4._RKIND
+         Nxi(2,18) = -ux*mz/4._RKIND
+         Nxi(3,18) =  (lz - uz)*ux*ly/4._RKIND
 
-c        N(19) =  mx*ux*my*uy*lz*uz/4._RKIND
-         Nxi(1,19) =  (mx + ux)*my*uy*lz*uz/4._RKIND
-         Nxi(2,19) =  (my + uy)*mx*ux*lz*uz/4._RKIND
-         Nxi(3,19) =  (lz - uz)*mx*ux*my*uy/4._RKIND
+c        N(19) = ux*uy*mz/4._RKIND
+         Nxi(1,19) =  uy*mz/4._RKIND
+         Nxi(2,19) =  ux*mz/4._RKIND
+         Nxi(3,19) =  (lz - uz)*ux*uy/4._RKIND
 
-c        N(20) = -mx*lx*my*uy*lz*uz/4._RKIND
-         Nxi(1,20) = -(lx - mx)*my*uy*lz*uz/4._RKIND
-         Nxi(2,20) = -(my + uy)*mx*lx*lz*uz/4._RKIND
-         Nxi(3,20) = -(lz - uz)*mx*lx*my*uy/4._RKIND
+c        N(20) = lx*uy*mz/4._RKIND
+         Nxi(1,20) = -uy*mz/4._RKIND
+         Nxi(2,20) =  lx*mz/4._RKIND
+         Nxi(3,20) =  (lz - uz)*lx*uy/4._RKIND
 
       CASE(eType_HEX27)
          lx = 1._RKIND - xi(1)
@@ -1119,34 +1156,49 @@ c        N(27) =  lx*ux*ly*uy*lz*uz
          ly = 1._RKIND - xi(2)
          ux = 1._RKIND + xi(1)
          uy = 1._RKIND + xi(2)
-         mx = xi(1)
-         my = xi(2)
+         mx = lx*ux
+         my = ly*uy
 
-         N(1) =  mx*lx*my*ly/4._RKIND
-         N(2) = -mx*ux*my*ly/4._RKIND
-         N(3) =  mx*ux*my*uy/4._RKIND
-         N(4) = -mx*lx*my*uy/4._RKIND
-         N(5) = -lx*ux*my*ly*0.5_RKIND
-         N(6) =  mx*ux*ly*uy*0.5_RKIND
-         N(7) =  lx*ux*my*uy*0.5_RKIND
-         N(8) = -mx*lx*ly*uy*0.5_RKIND
+         N(1) = lx*ly*(lx+ly-3._RKIND)/4._RKIND
+         N(2) = ux*ly*(ux+ly-3._RKIND)/4._RKIND
+         N(3) = ux*uy*(ux+uy-3._RKIND)/4._RKIND
+         N(4) = lx*uy*(lx+uy-3._RKIND)/4._RKIND
+         N(5) = mx*ly*0.5_RKIND
+         N(6) = ux*my*0.5_RKIND
+         N(7) = mx*uy*0.5_RKIND
+         N(8) = lx*my*0.5_RKIND
 
-         Nxi(1,1) =  (lx - mx)*my*ly/4._RKIND
-         Nxi(2,1) =  (ly - my)*mx*lx/4._RKIND
-         Nxi(1,2) = -(ux + mx)*my*ly/4._RKIND
-         Nxi(2,2) = -(ly - my)*mx*ux/4._RKIND
-         Nxi(1,3) =  (ux + mx)*my*uy/4._RKIND
-         Nxi(2,3) =  (uy + my)*mx*ux/4._RKIND
-         Nxi(1,4) = -(lx - mx)*my*uy/4._RKIND
-         Nxi(2,4) = -(uy + my)*mx*lx/4._RKIND
-         Nxi(1,5) = -(lx - ux)*my*ly*0.5_RKIND
-         Nxi(2,5) = -(ly - my)*lx*ux*0.5_RKIND
-         Nxi(1,6) =  (ux + mx)*ly*uy*0.5_RKIND
-         Nxi(2,6) =  (ly - uy)*mx*ux*0.5_RKIND
-         Nxi(1,7) =  (lx - ux)*my*uy*0.5_RKIND
-         Nxi(2,7) =  (uy + my)*lx*ux*0.5_RKIND
-         Nxi(1,8) = -(lx - mx)*ly*uy*0.5_RKIND
-         Nxi(2,8) = -(ly - uy)*mx*lx*0.5_RKIND
+c        N(1) = lx*ly*(lx+ly-3._RKIND)/4._RKIND
+         Nxi(1,1) = -ly*(lx+ly-3._RKIND+lx)/4._RKIND
+         Nxi(2,1) = -lx*(lx+ly-3._RKIND+ly)/4._RKIND
+
+c        N(2) = ux*ly*(ux+ly-3._RKIND)/4._RKIND
+         Nxi(1,2) =  ly*(ux+ly-3._RKIND+ux)/4._RKIND
+         Nxi(2,2) = -ux*(ux+ly-3._RKIND+ly)/4._RKIND
+
+c        N(3) = ux*uy*(ux+uy-3._RKIND)/4._RKIND
+         Nxi(1,3) =  uy*(ux+uy-3._RKIND+ux)/4._RKIND
+         Nxi(2,3) =  ux*(ux+uy-3._RKIND+uy)/4._RKIND
+
+c        N(4) = lx*uy*(lx+uy-3._RKIND)/4._RKIND
+         Nxi(1,4) = -uy*(lx+uy-3._RKIND+lx)/4._RKIND
+         Nxi(2,4) =  lx*(lx+uy-3._RKIND+uy)/4._RKIND
+
+c        N(5) = mx*ly*0.5_RKIND
+         Nxi(1,5) =  (lx - ux)*ly*0.5_RKIND
+         Nxi(2,5) = -mx*0.5_RKIND
+
+c        N(6) = ux*my*0.5_RKIND
+         Nxi(1,6) =  my*0.5_RKIND
+         Nxi(2,6) =  (ly - uy)*ux*0.5_RKIND
+
+c        N(7) = mx*uy*0.5_RKIND
+         Nxi(1,7) =  (lx - ux)*uy*0.5_RKIND
+         Nxi(2,7) =  mx*0.5_RKIND
+
+c        N(8) = lx*my*0.5_RKIND
+         Nxi(1,8) = -my*0.5_RKIND
+         Nxi(2,8) =  (ly - uy)*lx*0.5_RKIND
 
       CASE(eType_QUD9)
          lx = 1._RKIND - xi(1)

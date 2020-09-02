@@ -186,6 +186,12 @@
          fs%eNoN  = 4
          fs%nG    = 4
 
+      CASE (eType_HEX20)
+         fs%eType = eType_HEX8
+         fs%lShpF = .TRUE.
+         fs%eNoN  = 8
+         fs%nG    = 8
+
       CASE (eType_HEX27)
          fs%eType = eType_HEX8
          fs%lShpF = .TRUE.
@@ -197,6 +203,12 @@
          fs%lShpF = .TRUE.
          fs%eNoN  = 3
          fs%nG    = 3
+
+      CASE (eType_QUD8)
+         fs%eType = eType_QUD4
+         fs%lShpF = .FALSE.
+         fs%eNoN  = 4
+         fs%nG    = 4
 
       CASE (eType_QUD9)
          fs%eType = eType_QUD4
