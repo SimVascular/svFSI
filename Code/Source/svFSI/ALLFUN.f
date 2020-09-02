@@ -1770,7 +1770,7 @@
       IMPLICIT NONE
       TYPE(mshType),  INTENT(INOUT) :: lM
 
-      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, i, j, maxAdj
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, i, j, k, maxAdj
       LOGICAL :: flag
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), adjL(:,:)
@@ -1801,15 +1801,26 @@
                Bc = lM%IEN(b,e)
                Bc = lM%lN(Bc)
                flag = .TRUE.
+               j = 1
                DO i=1, incNd(Ac)
-                  IF (adjL(i,Ac) .EQ. Bc) THEN
+                  IF (Bc .EQ. adjL(i,Ac)) THEN
                      flag = .FALSE.
                      EXIT
+                  ELSE IF (Bc .GT. adjL(i,Ac)) THEN
+                     j = i + 1
                   END IF
                END DO
                IF (flag) THEN
-                  incNd(Ac) = incNd(Ac) + 1
-                  adjL(incNd(Ac),Ac) = Bc
+                  IF (incNd(Ac) .EQ. 0) THEN
+                     incNd(Ac)  = 1
+                     adjL(1,Ac) = Bc
+                  ELSE
+                     DO k=incNd(Ac), j, -1
+                        adjL(k+1,Ac) = adjL(k,Ac)
+                     END DO
+                     adjL(j,Ac) = Bc
+                     incNd(Ac) = incNd(Ac) + 1
+                  END IF
                END IF
             END DO
          END DO
@@ -1849,7 +1860,7 @@
       IMPLICIT NONE
       TYPE(faceType),  INTENT(INOUT) :: lFa
 
-      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, i, j, maxAdj
+      INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, i, j, k, maxAdj
       LOGICAL :: flag
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNd(:), adjL(:,:)
@@ -1880,15 +1891,26 @@
                Bc = lFa%IEN(b,e)
                Bc = lfa%lN(Bc)
                flag = .TRUE.
+               j = 1
                DO i=1, incNd(Ac)
-                  IF (adjL(i,Ac) .EQ. Bc) THEN
+                  IF (Bc .EQ. adjL(i,Ac)) THEN
                      flag = .FALSE.
                      EXIT
+                  ELSE IF (Bc .GT. adjL(i,Ac)) THEN
+                     j = i + 1
                   END IF
                END DO
                IF (flag) THEN
-                  incNd(Ac) = incNd(Ac) + 1
-                  adjL(incNd(Ac),Ac) = Bc
+                  IF (incNd(Ac) .EQ. 0) THEN
+                     incNd(Ac)  = 1
+                     adjL(1,Ac) = Bc
+                  ELSE
+                     DO k=incNd(Ac), j, -1
+                        adjL(k+1,Ac) = adjL(k,Ac)
+                     END DO
+                     adjL(j,Ac) = Bc
+                     incNd(Ac)  = incNd(Ac) + 1
+                  END IF
                END IF
             END DO
          END DO
