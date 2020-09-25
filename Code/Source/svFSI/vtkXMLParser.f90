@@ -206,7 +206,6 @@
       public :: putVTK_imageSpacing
       public :: putVTK_pieceExtent
 
-
       interface getVTK_pointData
          module procedure getVTK_pointDataIntS, getVTK_pointDataRealS, &
                           getVTK_pointDataIntV, getVTK_pointDataRealV

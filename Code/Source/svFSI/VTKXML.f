@@ -122,6 +122,7 @@
       CALL getVTK_pointData(vtp, "GlobalNodeID", lFa%gN, iStat)
       IF (iStat .LT. 0) THEN
          DEALLOCATE(lFa%gN)
+         wrn = " Could not find GlobalNodeID in the vtp file"
       ELSE
          DO e=1, lFa%nEl
             DO a=1, lFa%eNoN
@@ -136,6 +137,7 @@
       CALL getVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
       IF (iStat .LT. 0) THEN
          DEALLOCATE(lFa%gE)
+         wrn = " Could not find GlobalElementID in the vtp file"
       ELSE
          lFa%gnEl = lFa%nEl
          ALLOCATE(lFa%gebc(1+lFa%eNoN,lFa%gnEl))
