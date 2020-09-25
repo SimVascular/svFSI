@@ -82,15 +82,17 @@
      5   shell_thickness = 13, ctau_M = 14, ctau_C = 15
 !--------------------------------------------------------------------
 !     Types of accepted elements
-!     Linear (Q1-1D), triangle (P1-2D), tetrahedral (P1-3D), bilinear
-!     (Q1-2D), quad (Q2-1D), biquad (Q2-2D), brick (Q1-3D),
-!     general NURBS (1-3D), wedge, point (0D), quadratic triangle
-!     (P2-2D), quadratic tetrahedron (P2-3D)
-      INTEGER(KIND=IKIND), PARAMETER :: eType_NA = 100, eType_LIN = 101,
-     2   eType_TRI = 102, eType_TET = 103, eType_BIL = 104,
-     3   eType_QUD = 105, eType_BIQ = 106, eType_BRK = 107,
-     4   eType_NRB = 108, eType_WDG = 109, eType_PNT = 110,
-     5   eType_QTR = 111, eType_QTE = 112
+!     Point, Line (linear), Line (quadratic), Triangle (linear),
+!     Triangle (quadratic), Quads (bilinear), Quads (serendipity),
+!     Quads (biquadratic), Tetrahedron (linear), Tets (quadratic),
+!     Hexgonal bricks (trilinear), Hex (quadratic/serendipity),
+!     Hex (triquadratic), Wedge, NURBS
+      INTEGER(KIND=IKIND), PARAMETER :: eType_NA = 100, eType_PNT = 101,
+     2   eType_LIN1 = 102, eType_LIN2 = 103, eType_TRI3 = 104,
+     3   eType_TRI6 = 105, eType_QUD4 = 106, eType_QUD8 = 107,
+     4   eType_QUD9 = 108, eType_TET4 = 109, eType_TET10 = 110,
+     5   eType_HEX8 = 111, eType_HEX20 = 112, eType_HEX27 = 113,
+     6   eType_WDG = 114, eType_NRB = 115
 !--------------------------------------------------------------------
 !     Types of equations that are included in this solver
 !     Fluid equation (Navier-Stokes), nonlinear structure (pure d), heat
@@ -152,7 +154,7 @@
      4   outGrp_hFlx = 508, outGrp_absV = 509, outGrp_stInv = 510,
      5   outGrp_vortex = 511, outGrp_trac = 512, outGrp_stress = 513,
      6   outGrp_fN = 514, outGrp_fA = 515, outGrp_J = 516, outGrp_F=517,
-     7   outGrp_divV = 518, outGrp_Visc = 519
+     7   outGrp_divV = 518, outGrp_Visc = 519, outGrp_Mises = 520
 !--------------------------------------------------------------------
       INTEGER(KIND=IKIND), PARAMETER :: out_velocity = 599,
      2   out_pressure = 598, out_acceleration = 597,
@@ -162,7 +164,7 @@
      6   out_vortex = 587, out_traction = 586, out_stress = 585,
      7   out_fibDir = 584, out_fibAlign = 583, out_actionPotential =582,
      8   out_jacobian = 581, out_defGrad=580, out_divergence = 579,
-     9   out_viscosity = 578
+     9   out_viscosity = 578, out_mises = 577
 !--------------------------------------------------------------------
 !     Mesher choice for remeshing for moving wall problems
       INTEGER(KIND=IKIND), PARAMETER :: RMSH_TETGEN = 1,

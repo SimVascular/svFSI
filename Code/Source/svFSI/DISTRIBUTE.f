@@ -680,16 +680,20 @@
       IF (flag) THEN
          IF (cm%slv()) ALLOCATE(lBc%gt)
          CALL cm%bcast(lBc%gt%lrmp)
+         CALL cm%bcast(lBc%gt%d)
+         CALL cm%bcast(lBc%gt%n)
+         j = lBc%gt%d
+         i = lBc%gt%n
+         IF (cm%slv()) THEN
+            ALLOCATE(lBc%gt%qi(j))
+            ALLOCATE(lBc%gt%qs(j))
+            ALLOCATE(lBc%gt%r(j,i))
+            ALLOCATE(lBc%gt%i(j,i))
+         END IF
+         CALL cm%bcast(lBc%gt%ti)
+         CALL cm%bcast(lBc%gt%T)
          CALL cm%bcast(lBc%gt%qi)
          CALL cm%bcast(lBc%gt%qs)
-         CALL cm%bcast(lBc%gt%ti)
-         CALL cm%bcast(lBc%gt%n)
-         CALL cm%bcast(lBc%gt%T)
-         j = lBc%gt%n
-         IF (cm%slv()) THEN
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
-         END IF
          CALL cm%bcast(lBc%gt%r)
          CALL cm%bcast(lBc%gt%i)
       END IF
@@ -843,16 +847,20 @@
       IF (flag) THEN
          IF (cm%slv()) ALLOCATE(lBc%gt)
          CALL cm%bcast(lBc%gt%lrmp)
+         CALL cm%bcast(lBc%gt%d)
+         CALL cm%bcast(lBc%gt%n)
+         j = lBc%gt%d
+         i = lBc%gt%n
+         IF (cm%slv()) THEN
+            ALLOCATE(lBc%gt%qi(j))
+            ALLOCATE(lBc%gt%qs(j))
+            ALLOCATE(lBc%gt%r(j,i))
+            ALLOCATE(lBc%gt%i(j,i))
+         END IF
+         CALL cm%bcast(lBc%gt%ti)
+         CALL cm%bcast(lBc%gt%T)
          CALL cm%bcast(lBc%gt%qi)
          CALL cm%bcast(lBc%gt%qs)
-         CALL cm%bcast(lBc%gt%ti)
-         CALL cm%bcast(lBc%gt%n)
-         CALL cm%bcast(lBc%gt%T)
-         j = lBc%gt%n
-         IF (cm%slv()) THEN
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
-         END IF
          CALL cm%bcast(lBc%gt%r)
          CALL cm%bcast(lBc%gt%i)
       END IF
@@ -960,22 +968,24 @@
       flag = ALLOCATED(lBf%bt)
       CALL cm%bcast(flag)
       IF (flag) THEN
-         IF (cm%slv()) ALLOCATE(lBf%bt(lBf%dof))
-         DO i=1, lBf%dof
-            CALL cm%bcast(lBf%bt(i)%lrmp)
-            CALL cm%bcast(lBf%bt(i)%qi)
-            CALL cm%bcast(lBf%bt(i)%qs)
-            CALL cm%bcast(lBf%bt(i)%ti)
-            CALL cm%bcast(lBf%bt(i)%n)
-            CALL cm%bcast(lBf%bt(i)%T)
-            j = lBf%bt(i)%n
-            IF (cm%slv()) THEN
-               ALLOCATE(lBf%bt(i)%r(j))
-               ALLOCATE(lBf%bt(i)%i(j))
-            END IF
-            CALL cm%bcast(lBf%bt(i)%r)
-            CALL cm%bcast(lBf%bt(i)%i)
-         END DO
+         IF (cm%slv()) ALLOCATE(lBf%bt)
+         CALL cm%bcast(lBf%bt%lrmp)
+         CALL cm%bcast(lBf%bt%d)
+         CALL cm%bcast(lBf%bt%n)
+         j = lBf%bt%d
+         i = lBf%bt%n
+         IF (cm%slv()) THEN
+            ALLOCATE(lBf%bt%qi(j))
+            ALLOCATE(lBf%bt%qs(j))
+            ALLOCATE(lBf%bt%r(j,i))
+            ALLOCATE(lBf%bt%i(j,i))
+         END IF
+         CALL cm%bcast(lBf%bt%ti)
+         CALL cm%bcast(lBf%bt%T)
+         CALL cm%bcast(lBf%bt%qi)
+         CALL cm%bcast(lBf%bt%qs)
+         CALL cm%bcast(lBf%bt%r)
+         CALL cm%bcast(lBf%bt%i)
       END IF
 
 !     Communicating moving BF data
@@ -1184,26 +1194,32 @@
 
 !     This is to get eNoNb
          SELECT CASE (lM%eType)
-         CASE(eType_BRK)
-            eNoNb = 4
-         CASE(eType_TET)
+         CASE(eType_TET4)
             eNoNb = 3
+         CASE(eType_TET10)
+            eNoNb = 6
+         CASE(eType_HEX8)
+            eNoNb = 4
+         CASE(eType_HEX20)
+            eNoNb = 8
+         CASE(eType_HEX27)
+            eNoNb = 9
          CASE(eType_WDG)
             eNoNb = 3
-         CASE(eType_TRI)
+         CASE(eType_TRI3)
             eNoNb = 2
-         CASE(eType_BIL)
+         CASE(eType_TRI6)
+            eNoNb = 3
+         CASE(eType_QUD4)
             eNoNb = 2
-         CASE(eType_BIQ)
+         CASE(eType_QUD8)
             eNoNb = 3
-         CASE(eType_LIN)
-            eNoNb = 1
-         CASE(eType_QUD)
-            eNoNb = 1
-         CASE(eType_QTE)
-            eNoNb = 6
-         CASE(eType_QTR)
+         CASE(eType_QUD9)
             eNoNb = 3
+         CASE(eType_LIN1)
+            eNoNb = 1
+         CASE(eType_LIN2)
+            eNoNb = 1
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT

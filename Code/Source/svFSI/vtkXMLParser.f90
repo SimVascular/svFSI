@@ -40,7 +40,7 @@
       use stdParams, only : strL
 
       logical, parameter :: debug = .false.
-       character(len=64), parameter :: b64List = &
+      character(len=64), parameter :: b64List = &
       "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 
       integer(IK), parameter :: nVTKElms=5
@@ -194,7 +194,6 @@
       public :: getVTK_numElemData
       public :: getVTK_elemDataNames
       public :: getVTK_elemData
-
       public :: putVTK_pointData
       public :: putVTK_elemData
 
@@ -206,7 +205,6 @@
       public :: putVTK_imageOrigin
       public :: putVTK_imageSpacing
       public :: putVTK_pieceExtent
-
 
       interface getVTK_pointData
          module procedure getVTK_pointDataIntS, getVTK_pointDataRealS, &
@@ -2061,8 +2059,11 @@
             end if
             if ( trim(vtk%pcAtt(iatt)%dataArr(i)%dName) .eq. &
                "offsets" ) then
-               itmp = vtk%pcAtt(iatt)%dataArr(i)%iarr(2) - &
-                     vtk%pcAtt(iatt)%dataArr(i)%iarr(1)
+               itmp = 0
+               if (vtk%pcAtt(iatt)%dataArr(i)%nelms .gt. 1) then
+                  itmp = vtk%pcAtt(iatt)%dataArr(i)%iarr(2) - &
+                        vtk%pcAtt(iatt)%dataArr(i)%iarr(1)
+               end if
             end if
          end do
 

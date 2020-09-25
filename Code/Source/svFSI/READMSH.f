@@ -133,7 +133,7 @@
          DO iM=1, nMsh
             IF (msh(iM)%lShl) THEN
                IF (msh(iM)%eType.NE.eType_NRB .AND.
-     2             msh(iM)%eType.NE.eType_TRI) THEN
+     2             msh(iM)%eType.NE.eType_TRI3) THEN
                   err = "Shell elements can be either triangles "//
      2               "or C1-NURBS"
                END IF
@@ -153,8 +153,8 @@ c               END IF
 !        Checks for fiber mesh
          DO iM=1, nMsh
             IF (msh(iM)%lFib) THEN
-               IF (msh(iM)%eType.NE.eType_LIN .AND.
-     2             msh(iM)%eType.NE.eType_QUD) THEN
+               IF (msh(iM)%eType.NE.eType_LIN1 .AND.
+     2             msh(iM)%eType.NE.eType_LIN2) THEN
                   err = "Fiber elements can be either linear "//
      2               "or quadratic"
                END IF
@@ -866,7 +866,7 @@ c               END IF
       LOGICAL, INTENT(IN) :: flag
 
       LOGICAL qFlag
-      INTEGER(KIND=IKIND) Ac, b, i, sn(4), e, a, teNoN, eType
+      INTEGER(KIND=IKIND) a, b, e, i, Ac, teNoN, eType, sn(4)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: incNodes(:)
       REAL(KIND=RKIND), ALLOCATABLE :: v(:,:), xl(:,:)
@@ -874,7 +874,6 @@ c               END IF
       ALLOCATE(v(nsd,lM%eNoN), xl(nsd,lM%eNoN))
 
       teNoN = lM%eNoN
-      IF (flag .AND. lM%eType.EQ.eType_BIQ) teNoN = 4
       ALLOCATE (incNodes(lM%gnNo))
       std = " Checking IEN array structure for mesh <"//
      2 TRIM(lM%name)//">"
@@ -895,10 +894,20 @@ c               END IF
      2         " is isolated from the mesh"
          END IF
       END DO
-      IF (lM%eType .EQ. eType_BRK) THEN
-         std = " Make sure nodes in elements are arranged 1-4 on"
+
+!     For higher order elements, it is user responsibility to make
+!     sure node ordering is correct
+      IF (lM%eType .EQ. eType_QUD8 .OR. lM%eType .EQ. eType_QUD9) THEN
+         std = " Make sure corner nodes in elements are arranged 1-4"
+         std = "      anti-clockwise and edge nodes are arranged 5-8"
+         RETURN
+
+      ELSE IF (lM%eType.EQ.eType_HEX8 .OR. lM%eType.EQ.eType_HEX20 .OR.
+     2    lM%eType.EQ.eType_HEX27) THEN
+         std = " Make sure corner nodes in elements are arranged 1-4 on"
          std = "      one face and 5-8 on the opposite face"
          RETURN
+
       END IF
 
       eType = lM%eType
@@ -906,7 +915,7 @@ c               END IF
 !     By default no change
          a = 1; b = 1
          qFlag = .FALSE.
-         IF (eType.EQ.eType_BIL .OR. eType.EQ.eType_BIQ) THEN
+         IF (eType.EQ.eType_QUD4) THEN
             xl     = lM%x(:,lM%gIEN(1:4,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
@@ -959,7 +968,7 @@ c               END IF
 !     Two or more edges are on a straight line
                err = "Element "//e//" is distorted"
             END IF
-         ELSE IF (eType.EQ.eType_TET .OR. eType.EQ.eType_QTE) THEN
+         ELSE IF (eType.EQ.eType_TET4 .OR. eType.EQ.eType_TET10) THEN
             xl     = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
             v(:,2) = xl(:,3) - xl(:,2)
@@ -976,7 +985,7 @@ c               END IF
 !     Two or more edges are on a straight line
                err = "Element "//e//" is distorted"
             END IF
-         ELSE IF (eType.EQ.eType_TRI .OR. eType.EQ.eType_QTR) THEN
+         ELSE IF (eType.EQ.eType_TRI3 .OR. eType.EQ.eType_TRI6) THEN
             IF (nsd .NE. 2) CYCLE
             xl(:,1:3) = lM%x(:,lM%gIEN(:,e))
             v(:,1) = xl(:,2) - xl(:,1)
@@ -995,11 +1004,11 @@ c               END IF
 
          CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
          IF (qFlag) THEN
-            IF (eType .EQ. eType_QTR) THEN
+            IF (eType .EQ. eType_TRI6) THEN
 !              Swap nodes 5 and 6
                a = 5; b = 6
                CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
-            ELSE IF (eType .EQ. eType_QTE) THEN
+            ELSE IF (eType .EQ. eType_TET10) THEN
 !              Swap nodes 6 and 7
                a = 6; b = 7
                CALL SWAP(lM%gIEN(a,e), lM%gIEN(b,e))
@@ -1298,8 +1307,8 @@ c               END IF
 
       REAL(KIND=RKIND), ALLOCATABLE :: Skw(:), xl(:,:), dol(:,:)
 
-      IF (lM%eType .NE. eType_TET .AND.
-     2    lM%eType .NE. eType_TRI) THEN
+      IF (lM%eType .NE. eType_TET4 .AND.
+     2    lM%eType .NE. eType_TRI3) THEN
 c         wrn = " Skewness is computed for TRI and TET elements only"
          RETURN
       END IF
@@ -1366,8 +1375,8 @@ c         wrn = " Skewness is computed for TRI and TET elements only"
 
       REAL(KIND=RKIND), ALLOCATABLE :: AsR(:), xl(:,:), dol(:,:)
 
-      IF (lM%eType .NE. eType_TET .AND.
-     2    lM%eType .NE. eType_TRI) THEN
+      IF (lM%eType .NE. eType_TET4 .AND.
+     2    lM%eType .NE. eType_TRI3) THEN
 c         wrn = "AR is computed for TRI and TET elements only"
          RETURN
       END IF

@@ -42,50 +42,57 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: fid, np
       TYPE(fcType), INTENT(INOUT) :: gt
 
-      INTEGER(KIND=IKIND) i, n
+      INTEGER(KIND=IKIND) i, j, n
       REAL(KIND=RKIND) tmp, kn, ko, s
 
-      REAL(KIND=RKIND), ALLOCATABLE :: t(:), q(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: t(:), q(:,:)
 
-      ALLOCATE (t(np), q(np))
+      ALLOCATE (t(np), q(gt%d,np))
       DO i=1, np
-         READ (fid,*) t(i), q(i)
+         READ (fid,*) t(i), (q(j,i), j=1, gt%d)
       END DO
 
-      gt%ti = t(1)
-      gt%T  = t(np) - t(1)
-      gt%qi = q(1)
-      gt%qs = (q(np) - q(1))/gt%T
+      gt%ti    = t(1)
+      gt%T     = t(np) - t(1)
+      gt%qi(:) = q(:,1)
+      gt%qs(:) = (q(:,np) - q(:,1))/gt%T
 
       DO i=1, np
          t(i) = t(i) - gt%ti
-         q(i) = q(i) - gt%qi - gt%qs*t(i)
+         DO j=1, gt%d
+            q(j,i) = q(j,i) - gt%qi(j) - gt%qs(j)*t(i)
+         END DO
       END DO
 
       DO n=1, gt%n
          tmp = REAL(n-1, KIND=RKIND)
-         gt%r(n) = 0._RKIND
-         gt%i(n) = 0._RKIND
+         gt%r(:,n) = 0._RKIND
+         gt%i(:,n) = 0._RKIND
          DO i=1, np-1
             ko = 2._RKIND*pi*tmp*t(i)/gt%T
             kn = 2._RKIND*pi*tmp*t(i+1)/gt%T
-            s  = (q(i+1) - q(i))/(t(i+1) - t(i))
+            DO j=1, gt%d
+               s = (q(j,i+1) - q(j,i))/(t(i+1) - t(i))
 
-            IF (n .EQ. 1) THEN
-               gt%r(n) = gt%r(n) + 0.5_RKIND*(t(i+1)-t(i))*(q(i+1)+q(i))
-            ELSE
-               gt%r(n) = gt%r(n) + s*(COS(kn) - COS(ko))
-               gt%i(n) = gt%i(n) - s*(SIN(kn) - SIN(ko))
-            END IF
+               IF (n .EQ. 1) THEN
+                  gt%r(j,n) = gt%r(j,n) + 0.5_RKIND*(t(i+1) - t(i))
+     2               * (q(j,i+1) + q(j,i))
+               ELSE
+                  gt%r(j,n) = gt%r(j,n) + s*(COS(kn) - COS(ko))
+                  gt%i(j,n) = gt%i(j,n) - s*(SIN(kn) - SIN(ko))
+               END IF
+            END DO
          END DO
 
          IF (n .EQ. 1) THEN
-            gt%r(n) = gt%r(n)/gt%T
+            gt%r(:,n) = gt%r(:,n)/gt%T
          ELSE
-            gt%r(n) = 0.5_RKIND*gt%r(n)*gt%T/(pi*pi*tmp*tmp)
-            gt%i(n) = 0.5_RKIND*gt%i(n)*gt%T/(pi*pi*tmp*tmp)
+            gt%r(:,n) = 0.5_RKIND*gt%r(:,n)*gt%T/(pi*pi*tmp*tmp)
+            gt%i(:,n) = 0.5_RKIND*gt%i(:,n)*gt%T/(pi*pi*tmp*tmp)
          END IF
       END DO
+
+      DEALLOCATE(t, q)
 
       RETURN
       END SUBROUTINE FFT
@@ -95,9 +102,9 @@
       USE COMMOD
       IMPLICIT NONE
       TYPE(fcType), INTENT(IN) :: gt
-      REAL(KIND=RKIND), INTENT(OUT) :: Y, dY
+      REAL(KIND=RKIND), INTENT(OUT) :: Y(gt%d), dY(gt%d)
 
-      INTEGER(KIND=IKIND) i
+      INTEGER(KIND=IKIND) i, j
       REAL(KIND=RKIND) t, tmp, K, dk
 
       IF (gt%lrmp) THEN
@@ -107,18 +114,25 @@
          ELSE
             t = MIN(t, gt%T)
          END IF
-         Y    = gt%qi + t*gt%qs
-         dY   = gt%qs
+         DO i=1, gt%d
+            Y(i)  = gt%qi(i) + t*gt%qs(i)
+            dY(i) = gt%qs(i)
+         END DO
       ELSE
-         t    = MOD(time - gt%ti, gt%T)
-         tmp  = 2._RKIND*pi/gt%T
-         Y    = gt%qi + t*gt%qs
-         dY   = gt%qs
+         t   = MOD(time - gt%ti, gt%T)
+         tmp = 2._RKIND*pi/gt%T
+         DO j=1, gt%d
+            Y(j)  = gt%qi(j) + t*gt%qs(j)
+            dY(j) = gt%qs(j)
+         END DO
+
          DO i=1, gt%n
             dk = tmp*REAL(i-1, KIND=RKIND)
             K  = t*dk
-            Y  =  Y +  gt%r(i)*COS(K) - gt%i(i)*SIN(K)
-            dY = dY - (gt%r(i)*SIN(K) + gt%i(i)*COS(K))*dk
+            DO j=1, gt%d
+               Y(j)  =  Y(j) +  gt%r(j,i)*COS(K) - gt%i(j,i)*SIN(K)
+               dY(j) = dY(j) - (gt%r(j,i)*SIN(K) + gt%i(j,i)*COS(K))*dk
+            END DO
          END DO
       END IF
 

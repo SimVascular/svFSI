@@ -51,7 +51,7 @@
      2   dl(:,:), bfl(:,:), lR(:,:), lK(:,:,:)
 
       eNoN = lM%eNoN
-      IF (lM%eType .EQ. eType_TRI) eNoN = 2*eNoN
+      IF (lM%eType .EQ. eType_TRI3) eNoN = 2*eNoN
 
 !     SHELLS: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
@@ -89,7 +89,7 @@
             bfl(:,a) = Bf(:,Ac)
          END DO
 
-         IF (lM%eType .EQ. eType_TRI) THEN
+         IF (lM%eType .EQ. eType_TRI3) THEN
 !        Triangles - constant strain, no numerical integration
             CALL SHELLTRI(lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
 

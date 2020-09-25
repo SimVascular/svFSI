@@ -258,7 +258,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) a, Ac, nNo
-      REAL(KIND=RKIND) h, rtmp
+      REAL(KIND=RKIND) h(1), rtmp(1)
 
       REAL(KIND=RKIND), ALLOCATABLE :: hg(:), tmpA(:)
 
@@ -267,7 +267,7 @@
 !     Geting the contribution of Neu BC
       IF (BTEST(lBc%bType,bType_cpl) .OR.
      2    BTEST(lBc%bType,bType_RCR)) THEN
-         h = lBc%g
+         h(1) = lBc%g
       ELSE
          IF (BTEST(lBc%bType,bType_gen)) THEN
 !     Using "hl" as a temporary variable here
@@ -275,9 +275,9 @@
             CALL IGBC(lBc%gm, tmpA, hg)
             DEALLOCATE(hg)
          ELSE IF (BTEST(lBc%bType,bType_res)) THEN
-            h = lBc%r * Integ(lFa, Yn, eq(cEq)%s, eq(cEq)%s+nsd-1)
+            h(1) = lBc%r * Integ(lFa, Yn, eq(cEq)%s, eq(cEq)%s+nsd-1)
          ELSE IF (BTEST(lBc%bType,bType_std)) THEN
-            h = lBc%g
+            h(1) = lBc%g
          ELSE IF (BTEST(lBc%bType,bType_ustd)) THEN
             CALL IFFT(lBc%gt, h, rtmp)
          ELSE
@@ -297,7 +297,7 @@
       ELSE
          DO a=1, nNo
             Ac     = lFa%gN(a)
-            hg(Ac) = -h*lBc%gx(a)
+            hg(Ac) = -h(1)*lBc%gx(a)
          END DO
       END IF
 
@@ -324,7 +324,7 @@
       TYPE(faceType), INTENT(IN) :: lFa
 
       INTEGER(KIND=IKIND) :: a, e, g, Ac, iM, nNo, eNoN, cPhys
-      REAL(KIND=RKIND) :: w, Jac, nV(nsd), h(nsd)
+      REAL(KIND=RKIND) :: w, Jac, nV(nsd), h(nsd), tmp(nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), hl(:,:), hg(:,:),
@@ -345,11 +345,22 @@
             hg(:,Ac) = tmpA(:,a)
          END DO
          DEALLOCATE(tmpA, hl)
+
       ELSE IF (BTEST(lBc%bType,bType_std)) THEN
          DO a=1, nNo
             Ac = lFa%gN(a)
             hg(:,Ac) = lBc%h(:)
          END DO
+
+      ELSE IF (BTEST(lBc%bType,bType_ustd)) THEN
+         IF (lBc%gt%d .NE. nsd) err = " Traction dof not initialized "//
+     2      "properly"
+         CALL IFFT(lBc%gt, h, tmp)
+         DO a=1, nNo
+            Ac = lFa%gN(a)
+            hg(:,Ac) = h(:)
+         END DO
+
       ELSE
          err = "Undefined time dependence for traction BC on face <"//
      2      TRIM(lFa%name)//">"
@@ -1223,8 +1234,8 @@
           IF(.NOT.BTEST(eq(cEq)%bc(iBc)%bType,bType_CMM)) CYCLE
           iFa = eq(cEq)%bc(iBc)%iFa
           iM = eq(cEq)%bc(iBc)%iM
-          IF (msh(iM)%eType .NE. eType_TET .AND.
-     2        msh(iM)%fa(iFa)%eType .NE. eType_TRI) THEN
+          IF (msh(iM)%eType .NE. eType_TET4 .AND.
+     2        msh(iM)%fa(iFa)%eType .NE. eType_TRI3) THEN
               err = "CMM equation is formulated for tetrahedral "//
      2           "elements (volume) and triangular (surface) elements"
           END IF

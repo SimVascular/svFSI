@@ -122,6 +122,7 @@
       CALL getVTK_pointData(vtp, "GlobalNodeID", lFa%gN, iStat)
       IF (iStat .LT. 0) THEN
          DEALLOCATE(lFa%gN)
+         wrn = " Could not find GlobalNodeID in the vtp file"
       ELSE
          DO e=1, lFa%nEl
             DO a=1, lFa%eNoN
@@ -136,6 +137,7 @@
       CALL getVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
       IF (iStat .LT. 0) THEN
          DEALLOCATE(lFa%gE)
+         wrn = " Could not find GlobalElementID in the vtp file"
       ELSE
          lFa%gnEl = lFa%nEl
          ALLOCATE(lFa%gebc(1+lFa%eNoN,lFa%gnEl))
@@ -413,32 +415,34 @@
       REAL(KIND=RKIND), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
      2   lD(tDof,tnNo)
 
-      LOGICAL :: l1, l2, lJac
+      LOGICAL :: lIbl, lD0
       INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
-     2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, ne, iFn, nFn
+     2   nEl, s, l, ie, is, nSh, oGrp, outDof, nOut, cOut, ne, iFn, nFn,
+     3   nOute
       CHARACTER(LEN=stdL) :: fName
       TYPE(dataType) :: d(nMsh)
       TYPE(vtkXMLType) :: vtu
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: outS(:), tmpI(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: tmpV(:,:), tmpVe(:)
-      CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:)
+      CHARACTER(LEN=stdL), ALLOCATABLE :: outNames(:), outNamesE(:)
 
-      lJac = .FALSE.
-      l1 = .FALSE.
+      lIbl = .FALSE.
+      lD0  = .FALSE.
+
       a  = SUM(iblank(:))
       a  = cm%reduce(a)
-      IF (a .GT. 0) l1 = .TRUE.
+      IF (a .GT. 0) lIbl = .TRUE.
 
-      l2 = .FALSE.
       DO iEq=1, nEq
          IF (eq(iEq)%phys .EQ. phys_CMM .AND. ALLOCATED(Dinit)) THEN
-            l2 = .TRUE.
+            lD0 = .TRUE.
             EXIT
          END IF
       END DO
 
       nOut   = 1
+      nOute  = 0
       outDof = nsd
       DO iEq=1, nEq
          DO iOut=1, eq(iEq)%nOutput
@@ -455,27 +459,32 @@
                nOut   = nOut + 1
                outDof = outDof + eq(iEq)%output(iOut)%l
             END IF
+
+            IF (oGrp.EQ.outGrp_J .OR. oGrp.EQ.outGrp_Mises)
+     2         nOute = nOute + 1
          END DO
       END DO
 
 !     iblank array for immersed bodies
-      IF (l1) THEN
+      IF (lIbl) THEN
          nOut   = nOut + 1
          outDof = outDof + 1
       END IF
 
 !     Initial displacements for CMM equation
-      IF (l2) THEN
+      IF (lD0) THEN
          nOut = nOut + 1
          outDof = outDof + nsd
       END IF
 
-      ALLOCATE(outNames(nOut), outS(nOut+1))
+      ALLOCATE(outNames(nOut), outS(nOut+1), outNamesE(nOute))
 
 !     Prepare all solultions in to dataType d
       DO iM=1, nMsh
          IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-         ALLOCATE(d(iM)%x(outDof,msh(iM)%nNo), tmpV(maxnsd,msh(iM)%nNo))
+         ALLOCATE(d(iM)%x(outDof,msh(iM)%nNo))
+         ALLOCATE(d(iM)%xe(nOute,msh(iM)%nEl))
+         ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
          cOut           = 1
          outS(cOut)     = 1
          outS(cOut+1)   = nsd + 1
@@ -485,7 +494,7 @@
             d(iM)%x(1:nsd,a) = x(:,Ac)/msh(iM)%scF
          END DO
 
-         IF (l2) THEN
+         IF (lD0) THEN
             cOut           = cOut + 1
             is             = outS(cOut)
             ie             = is + nsd - 1
@@ -496,6 +505,9 @@
                d(iM)%x(is:ie,a) = Dinit(:,Ac)
             END DO
          END IF
+
+         nOute = 0
+         outNamesE = ""
 
          DO iEq=1, nEq
             DO iOut=1, eq(iEq)%nOutput
@@ -607,18 +619,20 @@
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_J)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-                  ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl),
-     2               d(iM)%xe(1,msh(iM)%nEl))
-                  lJac  = .TRUE.
+                  ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
                   tmpV  = 0._RKIND
                   tmpVe = 0._RKIND
                   CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is,a) = tmpV(1,a)
                   END DO
+
+                  nOute = nOute + 1
+                  outNamesE(nOute) = "E_Jacobian"
                   DO a=1, msh(iM)%nEl
-                     d(iM)%xe(1,a) = tmpVe(a)
+                     d(iM)%xe(nOute,a) = tmpVe(a)
                   END DO
+
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_F)
@@ -630,6 +644,24 @@
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(:,a)
                   END DO
+                  DEALLOCATE(tmpV, tmpVe)
+                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+               CASE (outGrp_Mises)
+                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+                  ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
+                  tmpV  = 0._RKIND
+                  tmpVe = 0._RKIND
+                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
+                  DO a=1, msh(iM)%nNo
+                     d(iM)%x(is,a) = tmpV(1,a)
+                  END DO
+
+                  nOute = nOute + 1
+                  outNamesE(nOute) = "E_VonMises"
+                  DO a=1, msh(iM)%nEl
+                     d(iM)%xe(nOute,a) = tmpVe(a)
+                  END DO
+
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
                CASE (outGrp_divV)
@@ -648,7 +680,7 @@
             END DO
          END DO
 
-         IF (l1) THEN
+         IF (lIbl) THEN
             cOut = cOut + 1
             is   = outS(cOut)
             ie   = is
@@ -666,9 +698,9 @@
       nEl = 0
       DO iM=1, nMsh
          IF (msh(iM)%eType .EQ. eType_NRB) THEN
-            CALL INTNRBDATA(msh(iM), d(iM), outDof)
+            CALL INTNRBDATA(msh(iM), d(iM), outDof, nOute)
          ELSE
-            CALL INTMSHDATA(msh(iM), d(iM), outDof)
+            CALL INTMSHDATA(msh(iM), d(iM), outDof, nOute)
          END IF
          nNo = nNo +  d(iM)%nNo
          nEl = nEl +  d(iM)%nEl
@@ -791,8 +823,8 @@
          DEALLOCATE(tmpI)
       END IF
 
-!     Write element Jacobian if necessary
-      IF (lJac) THEN
+!     Write element Jacobian and von Mises stress if necessary
+      DO l=1, nOute
          ne = ne + 1
          ALLOCATE(tmpVe(nEl))
          tmpVe = 0._RKIND
@@ -805,13 +837,14 @@
                END DO
             END IF
          END DO
-         CALL putVTK_elemData(vtu, 'E_Jacobian', tmpVe, iStat)
-         IF (iStat .LT. 0) err = "VTU file write error (E_Jacobian)"
+         CALL putVTK_elemData(vtu, outNamesE(l), tmpVe, iStat)
+         IF (iStat .LT. 0) err = "VTU file write error ("//
+     2      TRIM(outNamesE(l))//")"
          DEALLOCATE(tmpVe)
-      END IF
+      END DO
 
 !     Write element ghost cells if necessary
-      IF (l1 .OR. l2) THEN
+      IF (lIbl) THEN
          ne = ne + 1
          ALLOCATE(tmpI(1,nEl))
          tmpI = 0
@@ -842,18 +875,18 @@
       END SUBROUTINE WRITEVTUS
 !####################################################################
 !     This routine prepares data array of a regular mesh
-      SUBROUTINE INTMSHDATA(lM, d, outDof)
+      SUBROUTINE INTMSHDATA(lM, d, outDof, nOute)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(dataType), INTENT(INOUT) :: d
-      INTEGER(KIND=IKIND), INTENT(IN) :: outDof
+      INTEGER(KIND=IKIND), INTENT(IN) :: outDof, nOute
 
       INTEGER(KIND=IKIND) :: e, i, ierr, Ec, m
 
-      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), tmpI(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: eJac(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: sCount(:), disps(:), tmpI(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lDe(:,:), gDe(:,:)
 
       d%eNoN    = lM%eNoN
       d%vtkType = lM%vtkType
@@ -877,7 +910,8 @@
          END DO
       END IF
 
-      m = 0
+!     Element variables
+      m = nOute
       IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
          IF (savedOnce) THEN
             m = m + 1
@@ -886,9 +920,12 @@
          END IF
       END IF
       IF (ALLOCATED(d%xe)) THEN
-         m = m + 1
-         ALLOCATE(eJac(lM%nEl))
-         eJac(:) = d%xe(1,:)
+         ALLOCATE(lDe(nOute, lM%nEl))
+         DO e=1, lM%nEl
+            DO i=1, nOute
+               lDe(i,e) = d%xe(i,e)
+            END DO
+         END DO
          DEALLOCATE(d%xe)
       END IF
       IF (ALLOCATED(lM%iGC)) m = m + 1
@@ -906,12 +943,9 @@
      2         lM%eDist, mpint, master, cm%com(), ierr)
 
             IF (cm%mas()) THEN
-               DEALLOCATE(sCount)
-               ALLOCATE(sCount(lM%gnEl))
-               sCount = tmpI(:)
                DO e=1, lM%gnEl
                   Ec = lM%otnIEN(e)
-                  d%xe(e,m) = REAL(sCount(Ec), KIND=RKIND)
+                  d%xe(e,m) = REAL(tmpI(Ec), KIND=RKIND)
                END DO
             END IF
             DEALLOCATE(sCount, tmpI)
@@ -947,25 +981,29 @@
          END IF
       END IF
 
-      IF (ALLOCATED(eJac)) THEN
-         m = m + 1
-         ALLOCATE(sCount(cm%np()))
-         DO i=1, cm%np()
-            sCount(i) = lM%eDist(i) - lM%eDist(i-1)
-         END DO
-         CALL MPI_GATHERV(eJac, lM%nEl, mpreal, d%xe(:,m), sCount,
-     2      lM%eDist, mpreal, master, cm%com(), ierr)
-
-         DEALLOCATE(sCount, eJac)
+      IF (ALLOCATED(lDe)) THEN
          IF (cm%mas()) THEN
-            ALLOCATE(eJac(lM%gnEl))
-            eJac = d%xe(:,m)
+            ALLOCATE(disps(cm%np()), sCount(cm%np()), gDe(nOute,d%nEl))
+            DO i=1, cm%np()
+               disps(i)  = lM%eDist(i-1)*nOute
+               sCount(i) = lM%eDist(i)*nOute - disps(i)
+            END DO
+         ELSE
+            ALLOCATE(disps(0), sCount(0), gDe(0,0))
+         END IF
+         CALL MPI_GATHERV(lDe, nOute*lM%nEl, mpreal, gDe, sCount, disps,
+     2      mpreal, master, cm%com(), ierr)
+
+         IF (cm%mas()) THEN
             DO e=1, lM%gnEl
                Ec = lM%otnIEN(e)
-               d%xe(e,m) = eJac(Ec)
+               DO i=1, nOute
+                  d%xe(e,m+i) = gDe(i,Ec)
+               END DO
             END DO
-            DEALLOCATE(eJac)
          END IF
+         DEALLOCATE(lDe, gDe, sCount, disps)
+         m = m + nOute
       END IF
 
       IF (ALLOCATED(lM%iGC)) THEN
@@ -978,12 +1016,9 @@
      2      lM%eDist, mpint, master, cm%com(), ierr)
 
          IF (cm%mas()) THEN
-            DEALLOCATE(sCount)
-            ALLOCATE(sCount(lM%gnEl))
-            sCount = tmpI(:)
             DO e=1, lM%gnEl
-               Ec = lM%otnien(e)
-               d%xe(e,m) = REAL(sCount(Ec), KIND=RKIND)
+               Ec = lM%otnIEN(e)
+               d%xe(e,m) = REAL(tmpI(Ec), KIND=RKIND)
             END DO
          END IF
          DEALLOCATE(sCount, tmpI)
@@ -992,7 +1027,7 @@
       RETURN
       END SUBROUTINE INTMSHDATA
 !--------------------------------------------------------------------
-!     This routine will interpolates NURBS into a BIL/BRK mesh, so you
+!     This routine will interpolates NURBS into a QUD4/HEX8 mesh, so you
 !     can write it into a VTK file.
       SUBROUTINE INTNRBDATA(lM, d, outDof)
       USE COMMOD

@@ -59,7 +59,7 @@
       TYPE(mshType), INTENT(IN) :: lM
       REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, i, Ac, idof, nNo, eNoN
+      INTEGER(KIND=IKIND) a, e, Ac, idof, nNo, eNoN
       REAL(KIND=RKIND) rtmp
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
@@ -74,14 +74,15 @@
 
       IF (BTEST(lBf%bType, bfType_std)) THEN
          f(:) = lBf%b(:)
+
       ELSE IF (BTEST(lBf%bType,bfType_ustd)) THEN
-         DO i=1, idof
-            CALL IFFT(lBf%bt(i), f(i), rtmp)
-         END DO
+         CALL IFFT(lBf%bt, f, rtmp)
+
       ELSE IF (BTEST(lBf%bType, bfType_gen)) THEN
          ALLOCATE(bfl(idof,nNo), xl(idof,nNo))
          CALL IGBC(lBf%bm, bfl, xl)
          DEALLOCATE(xl)
+
       END IF
 
       ALLOCATE(bfg(idof,tnNo))

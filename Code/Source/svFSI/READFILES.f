@@ -334,7 +334,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 19
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 20
 
       LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
@@ -486,15 +486,18 @@
 
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
-            nDOP = (/2,2,0,0/)
+            nDOP = (/3,3,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
+            outPuts(3) = out_mises
          ELSE
-            nDOP = (/4,1,0,0/)
+            nDOP = (/6,2,0,0/)
             outPuts(1) = out_displacement
-            outPuts(2) = out_velocity
-            outPuts(3) = out_acceleration
-            outPuts(4) = out_integ
+            outPuts(2) = out_mises
+            outPuts(3) = out_velocity
+            outPuts(4) = out_acceleration
+            outPuts(5) = out_integ
+            outPuts(6) = out_jacobian
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -514,21 +517,23 @@
 
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
-            nDOP = (/2,2,0,0/)
+            nDOP = (/3,3,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
+            outPuts(3) = out_mises
          ELSE
-            nDOP = (/10,1,0,0/)
+            nDOP = (/11,2,0,0/)
             outPuts(1)  = out_displacement
-            outPuts(2)  = out_velocity
-            outPuts(3)  = out_acceleration
-            outPuts(4)  = out_stress
-            outPuts(5)  = out_fibDir
-            outPuts(6)  = out_fibAlign
-            outputs(7)  = out_strainInv
-            outPuts(8)  = out_integ
-            outPuts(9)  = out_jacobian
-            outPuts(10) = out_defGrad
+            outPuts(2)  = out_mises
+            outPuts(3)  = out_stress
+            outPuts(4)  = out_velocity
+            outPuts(5)  = out_acceleration
+            outPuts(6)  = out_fibDir
+            outPuts(7)  = out_fibAlign
+            outputs(8)  = out_strainInv
+            outPuts(9)  = out_integ
+            outPuts(10) = out_jacobian
+            outPuts(11) = out_defGrad
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -552,23 +557,25 @@
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) THEN
             err = "Prestress for USTRUCT is not implemented yet"
-            nDOP = (/2,2,0,0/)
+            nDOP = (/3,3,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_stress
+            outPuts(3) = out_mises
          ELSE
-            nDOP = (/12,1,0,0/)
+            nDOP = (/13,2,0,0/)
             outPuts(1)  = out_displacement
-            outPuts(2)  = out_velocity
-            outPuts(3)  = out_pressure
-            outPuts(4)  = out_acceleration
-            outPuts(5)  = out_stress
-            outPuts(6)  = out_fibDir
-            outPuts(7)  = out_fibAlign
-            outPuts(8)  = out_strainInv
-            outPuts(9)  = out_integ
-            outPuts(10) = out_jacobian
-            outPuts(11) = out_defGrad
-            outPuts(12) = out_divergence
+            outPuts(2)  = out_mises
+            outPuts(3)  = out_stress
+            outPuts(4)  = out_velocity
+            outPuts(5)  = out_pressure
+            outPuts(6)  = out_acceleration
+            outPuts(7)  = out_fibDir
+            outPuts(8)  = out_fibAlign
+            outPuts(9)  = out_strainInv
+            outPuts(10) = out_integ
+            outPuts(11) = out_jacobian
+            outPuts(12) = out_defGrad
+            outPuts(13) = out_divergence
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -747,26 +754,27 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/19,3,2,0/)
+         nDOP = (/20,4,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
-         outPuts(4)  = out_energyFlux
-         outPuts(5)  = out_absVelocity
-         outPuts(6)  = out_acceleration
-         outPuts(7)  = out_WSS
-         outPuts(8)  = out_vorticity
-         outPuts(9)  = out_vortex
-         outPuts(10) = out_traction
-         outPuts(11) = out_stress
-         outPuts(12) = out_fibDir
-         outPuts(13) = out_fibAlign
-         outPuts(14) = out_strainInv
-         outPuts(15) = out_integ
-         outPuts(16) = out_jacobian
-         outPuts(17) = out_defGrad
-         outPuts(18) = out_viscosity
-         outPuts(19) = out_divergence
+         outPuts(4)  = out_mises
+         outPuts(5)  = out_energyFlux
+         outPuts(6)  = out_absVelocity
+         outPuts(7)  = out_acceleration
+         outPuts(8)  = out_WSS
+         outPuts(9)  = out_vorticity
+         outPuts(10) = out_vortex
+         outPuts(11) = out_traction
+         outPuts(12) = out_stress
+         outPuts(13) = out_fibDir
+         outPuts(14) = out_fibAlign
+         outPuts(15) = out_strainInv
+         outPuts(16) = out_integ
+         outPuts(17) = out_jacobian
+         outPuts(18) = out_defGrad
+         outPuts(19) = out_viscosity
+         outPuts(20) = out_divergence
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1388,6 +1396,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Viscosity"
+         CASE (out_mises)
+            lEq%output(iOut)%grp  = outGrp_Mises
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "VonMises_stress"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT
@@ -1531,9 +1544,14 @@
          END IF
       CASE ('Unsteady')
          lBc%bType = IBSET(lBc%bType,bType_ustd)
-         IF (BTEST(lBc%bType,bType_trac)) err =
-     2      "For unsteady traction, use general time dependence"
          ALLOCATE(lBc%gt)
+
+         IF (BTEST(lBc%bType,bType_trac)) THEN
+            lBc%gt%d = nsd
+         ELSE
+            lBc%gt%d = 1
+         END IF
+
          lPtr => list%get(fTmp,"Temporal values file path")
          IF (ASSOCIATED(lPtr)) THEN
             ltmp = .FALSE.
@@ -1547,8 +1565,9 @@
             END IF
             lBc%gt%n = j
             IF (lBc%gt%lrmp) lBc%gt%n = 1
-            ALLOCATE(lBc%gt%r(lBc%gt%n))
-            ALLOCATE(lBc%gt%i(lBc%gt%n))
+            ALLOCATE(lBc%gt%qi(lBc%gt%d), lBc%gt%qs(lBc%gt%d))
+            ALLOCATE(lBc%gt%r(lBc%gt%d,lBc%gt%n))
+            ALLOCATE(lBc%gt%i(lBc%gt%d,lBc%gt%n))
             CALL FFT(fid, i, lBc%gt)
             CLOSE(fid)
          ELSE
@@ -1556,17 +1575,18 @@
             IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
      2         "unsteady type BC"
             lBc%gt%lrmp = .FALSE.
+            ALLOCATE(lBc%gt%qi(lBc%gt%d), lBc%gt%qs(lBc%gt%d))
             fid = fTmp%open()
             READ (fid,*) lBc%gt%ti
             READ (fid,*) lBc%gt%T
-            READ (fid,*) lBc%gt%qi
-            READ (fid,*) lBc%gt%qs
-            READ (fid,*) j
-            lBc%gt%n = j
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
-            DO i=1, j
-               READ (fid,*) lBc%gt%r(i), lBc%gt%i(i)
+            READ (fid,*) (lBc%gt%qi(i), i=1, lBc%gt%d)
+            READ (fid,*) (lBc%gt%qs(i), i=1, lBc%gt%d)
+            READ (fid,*) lBc%gt%n
+            ALLOCATE(lBc%gt%r(lBc%gt%d,lBc%gt%n))
+            ALLOCATE(lBc%gt%i(lBc%gt%d,lBc%gt%n))
+            DO j=1, lBc%gt%n
+               READ (fid,*) (lBc%gt%r(i,j), i=1, lBc%gt%d),
+     2            (lBc%gt%i(i,j), i=1, lBc%gt%d)
             END DO
             CLOSE(fid)
          END IF
@@ -2008,41 +2028,45 @@ c     2         "can be applied for Neumann boundaries only"
       CASE ('unsteady')
          lBf%bType = IBSET(lBf%bType,bfType_ustd)
 
-         ALLOCATE(lBf%bt(lBf%dof))
-         flag = .FALSE.
-         lPtr => list%get(flag,"Ramp function")
-         DO a=1, lBf%dof
-            lBf%bt(a)%lrmp = flag
-            lPtr => list%get(ftmp, "Temporal values file path", a)
-            IF (ASSOCIATED(lPtr)) THEN
-               fid = fTmp%open()
-               READ(fid,*) i, j
-               IF (i .LT. 2) THEN
-                  std = "Enter nPnts nFCoef; nPts*(t Q)"
-                  err = "Wrong format in: "//fTmp%fname
-               END IF
-               lBf%bt(a)%n = j
-               ALLOCATE(lBf%bt(a)%r(j))
-               ALLOCATE(lBf%bt(a)%i(j))
-               CALL FFT(fid, i, lBf%bt(1))
-               CLOSE(fid)
-            ELSE
-               lPtr => list%get(fTmp,"Fourier coefficients file path",a)
-               fid = fTmp%open()
-               READ (fid,*) lBf%bt(a)%ti
-               READ (fid,*) lBf%bt(a)%T
-               READ (fid,*) lBf%bt(a)%qi
-               READ (fid,*) lBf%bt(a)%qs
-               READ (fid,*) j
-               lBf%bt(a)%n = j
-               ALLOCATE(lBf%bt(a)%r(j))
-               ALLOCATE(lBf%bt(a)%i(j))
-               DO i=1, j
-                  READ (fid,*) lBf%bt(a)%r(i), lBf%bt(a)%i(i)
-               END DO
-               CLOSE(fid)
+         ALLOCATE(lBf%bt)
+         lBf%bt%d = lBf%dof
+
+         lPtr => list%get(ftmp, "Temporal values file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            flag = .FALSE.
+            lPtr => list%get(flag,"Ramp function")
+            lBf%bt%lrmp = flag
+            fid = fTmp%open()
+            READ(fid,*) i, j
+            IF (i .LT. 2) THEN
+               std = "Enter nPnts nFCoef; nPts*(t Q)"
+               err = "Wrong format in: "//fTmp%fname
             END IF
-         END DO
+            lBf%bt%n = j
+            IF (lBf%bt%lrmp) lBf%bt%n = 1
+            ALLOCATE(lBf%bt%qi(lBf%bt%d), lBf%bt%qs(lBf%bt%d))
+            ALLOCATE(lBf%bt%r(lBf%bt%d,j))
+            ALLOCATE(lBf%bt%i(lBf%bt%d,j))
+            CALL FFT(fid, i, lBf%bt)
+            CLOSE(fid)
+         ELSE
+            lPtr => list%get(fTmp,"Fourier coefficients file path",1)
+            lBf%bt%lrmp = .FALSE.
+            ALLOCATE(lBf%bt%qi(lBf%bt%d), lBf%bt%qs(lBf%bt%d))
+            fid = fTmp%open()
+            READ (fid,*) lBf%bt%ti
+            READ (fid,*) lBf%bt%T
+            READ (fid,*) (lBf%bt%qi(i), i=1, lBf%bt%d)
+            READ (fid,*) (lBf%bt%qs(i), i=1, lBf%bt%d)
+            READ (fid,*) lBf%bt%n
+            ALLOCATE(lBf%bt%r(lBf%bt%d,lBf%bt%n))
+            ALLOCATE(lBf%bt%i(lBf%bt%d,lBf%bt%n))
+            DO j=1, lBf%bt%n
+               READ (fid,*) (lBf%bt%r(i,j), i=1, lBf%bt%d),
+     2            (lBf%bt%i(i,j), i=1, lBf%bt%d)
+            END DO
+            CLOSE(fid)
+         END IF
 
       CASE ('spatial')
          lBf%bType = IBSET(lBf%bType,bfType_spl)

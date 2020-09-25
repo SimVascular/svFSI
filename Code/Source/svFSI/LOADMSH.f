@@ -44,7 +44,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER(KIND=IKIND) :: iFa
+      INTEGER(KIND=IKIND) :: iFa, e, a, Ac
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) :: ftmp
 
@@ -68,6 +68,16 @@
             IF (.NOT.ASSOCIATED(lPtr)) err = "Face file not provided"
             CALL READVTP(lM%fa(iFa), ftmp%fname)
             IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
+            IF (.NOT.ALLOCATED(lM%fa(iFa)%gN)) THEN
+               CALL CALCNBC(lM, lM%fa(iFa))
+               DO e=1, lM%fa(iFa)%nEl
+                  DO a=1, lM%fa(iFa)%eNoN
+                     Ac = lM%fa(iFa)%IEN(a,e)+1
+                     Ac = lM%fa(iFa)%gN(Ac)
+                     lM%fa(iFa)%IEN(a,e) = Ac
+                  END DO
+               END DO
+            END IF
          ELSE
             lPtr => lPBC%get(ftmp,"End nodes face file path")
             IF (.NOT.ASSOCIATED(lPtr)) err =
@@ -537,7 +547,7 @@
             Xtmp(:,a) = lM%x(:,a)
          END DO
          DEALLOCATE (lM%x)
-         IF (lM%eType .EQ. eType_BIQ) THEN
+         IF (lM%eType .EQ. eType_QUD9) THEN
 !     We will start adding intermediate nodes from faces. Here I assume
 !     there is no overlapping between faces
             DO iFa=1, lM%nFa
@@ -626,7 +636,7 @@
       END IF
       IF (b1 .EQ. 0) RETURN
 
-      IF (lM%eType .EQ. eType_BIQ) THEN
+      IF (lM%eType .EQ. eType_QUD9) THEN
          IF (b1.EQ.1 .AND. b2.EQ.2) THEN
             i = 5
          ELSE IF (b1.EQ.2 .AND. b2.EQ.3) THEN

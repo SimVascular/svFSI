@@ -173,9 +173,9 @@
       ALLOCATE(N(tnNo))
       N    = 1._RKIND
       area = Integ(lFa, N)
-      std  = " Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
+      std  = "    Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
       IF (ISZERO(area)) THEN
-         IF (cm%mas()) wrn = "<"//TRIM(lFa%name)//"> area is zero"
+         IF (cm%mas()) wrn = " <"//TRIM(lFa%name)//"> area is zero"
       END IF
       lFa%area = area
       DEALLOCATE(N)
@@ -186,8 +186,9 @@
       sV = 0._RKIND
 
       flag = .FALSE.
-      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_QTR .OR.
-     2    lM%eType.EQ.eType_BIQ .OR. lM%eType.EQ.eType_QTE) THEN
+      IF (lM%eType.EQ.eType_TRI6  .OR. lM%eType.EQ.eType_QUD8  .OR.
+     2    lM%eType.EQ.eType_QUD9  .OR. lM%eType.EQ.eType_TET10 .OR.
+     3    lM%eType.EQ.eType_HEX20 .OR. lM%eType .EQ. eType_HEX27) THEN
          flag =.TRUE.
       END IF
 

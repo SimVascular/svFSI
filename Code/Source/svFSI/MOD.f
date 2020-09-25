@@ -149,18 +149,20 @@
          LOGICAL lrmp
 !        Number of Fourier coefficient
          INTEGER(KIND=IKIND) :: n = 0
+!        No. of dimensions (scalar or vector)
+         INTEGER(KIND=IKIND) :: d
 !        Initial value
-         REAL(KIND=RKIND) qi
+         REAL(KIND=RKIND), ALLOCATABLE :: qi(:)
 !        Time derivative of linear part
-         REAL(KIND=RKIND) qs
+         REAL(KIND=RKIND), ALLOCATABLE :: qs(:)
 !        Period
          REAL(KIND=RKIND) T
 !        Initial time
          REAL(KIND=RKIND) ti
 !        Imaginary part of coefficint
-         REAL(KIND=RKIND), ALLOCATABLE :: i(:)
+         REAL(KIND=RKIND), ALLOCATABLE :: i(:,:)
 !        Real part of coefficint
-         REAL(KIND=RKIND), ALLOCATABLE :: r(:)
+         REAL(KIND=RKIND), ALLOCATABLE :: r(:,:)
       END TYPE fcType
 
 !     Moving boundary data structure (used for general BC)
@@ -235,7 +237,7 @@
 !        Steady but spatially dependant
          REAL(KIND=RKIND), ALLOCATABLE :: bx(:,:)
 !        Time dependant (unsteady imposed value)
-         TYPE(fcType), ALLOCATABLE :: bt(:)
+         TYPE(fcType), ALLOCATABLE :: bt
 !        General (unsteady and spatially dependent combination)
          TYPE(MBType), ALLOCATABLE :: bm
       END TYPE bfType

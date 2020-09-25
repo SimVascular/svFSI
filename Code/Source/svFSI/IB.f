@@ -616,6 +616,7 @@
       CASE ('Unsteady')
          lBc%bType = IBSET(lBc%bType,bType_ustd)
          ALLOCATE(lBc%gt)
+         lBc%gt%d = 1
          lPtr => list%get(fTmp,"Temporal values file path")
          IF (ASSOCIATED(lPtr)) THEN
             ltmp = .FALSE.
@@ -629,8 +630,9 @@
             END IF
             lBc%gt%n = j
             IF (lBc%gt%lrmp) lBc%gt%n = 1
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
+            ALLOCATE(lBc%gt%qi(1), lBc%gt%qs(1))
+            ALLOCATE(lBc%gt%r(1,j))
+            ALLOCATE(lBc%gt%i(1,j))
             CALL FFT(fid, i, lBc%gt)
             CLOSE(fid)
          ELSE
@@ -638,17 +640,18 @@
             IF (.NOT.ASSOCIATED(lPtr)) err = "Undefined inputs for "//
      2         "unsteady type BC"
             lBc%gt%lrmp = .FALSE.
+            ALLOCATE(lBc%gt%qi(1), lBc%gt%qs(1))
             fid = fTmp%open()
             READ (fid,*) lBc%gt%ti
             READ (fid,*) lBc%gt%T
-            READ (fid,*) lBc%gt%qi
-            READ (fid,*) lBc%gt%qs
+            READ (fid,*) lBc%gt%qi(1)
+            READ (fid,*) lBc%gt%qs(1)
             READ (fid,*) j
             lBc%gt%n = j
-            ALLOCATE(lBc%gt%r(j))
-            ALLOCATE(lBc%gt%i(j))
+            ALLOCATE(lBc%gt%r(1,j))
+            ALLOCATE(lBc%gt%i(1,j))
             DO i=1, j
-               READ (fid,*) lBc%gt%r(i), lBc%gt%i(i)
+               READ (fid,*) lBc%gt%r(1,i), lBc%gt%i(1,i)
             END DO
             CLOSE(fid)
          END IF
@@ -1020,8 +1023,9 @@
       ALLOCATE(lFa%nV(nsd,lFa%nNo), sV(nsd,ib%tnNo))
 
       flag = .FALSE.
-      IF (lM%eType.EQ.eType_QUD .OR. lM%eType.EQ.eType_QTR .OR.
-     2    lM%eType.EQ.eType_BIQ .OR. lM%eType.EQ.eType_QTE) THEN
+      IF (lM%eType.EQ.eType_TRI6  .OR. lM%eType.EQ.eType_QUD8  .OR.
+     2    lM%eType.EQ.eType_QUD9  .OR. lM%eType.EQ.eType_TET10 .OR.
+     3    lM%eType.EQ.eType_HEX20 .OR. lM%eType .EQ. eType_HEX27) THEN
          flag =.TRUE.
       END IF
 

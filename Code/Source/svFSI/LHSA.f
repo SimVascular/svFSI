@@ -59,7 +59,7 @@
       uInd = 0
       DO iM=1, nMsh
 !        Treat shell with triangular elements separately
-         IF (shlEq .AND. msh(iM)%eType.EQ.eType_TRI) CYCLE
+         IF (shlEq .AND. msh(iM)%eType.EQ.eType_TRI3) CYCLE
          DO e=1, msh(iM)%nEl
             DO a=1, msh(iM)%eNoN
                rowN = msh(iM)%IEN(a,e)

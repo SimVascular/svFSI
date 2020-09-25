@@ -71,6 +71,19 @@
             END DO
             DEALLOCATE(tmpV, tmpVe)
             ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+         ELSE IF (outGrp .EQ. outGrp_Mises) THEN
+            IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
+            ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
+            tmpV  = 0._RKIND
+            tmpVe = 0._RKIND
+            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, iEq, outGrp)
+            res  = 0._RKIND
+            DO a=1, msh(iM)%nNo
+               Ac = msh(iM)%gN(a)
+               res(1,Ac) = tmpV(1,a)
+            END DO
+            DEALLOCATE(tmpV, tmpVe)
+            ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
          ELSE IF (outGrp .EQ. outGrp_divV) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo))
@@ -501,11 +514,11 @@
       INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd,
      2   nFn
       REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
-     2   ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd), P(nsd,nsd),
-     3   sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+     2   trS, vmises, ed(nstd), ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
+     3   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
-     2   pSl(:), ed(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
+     2   pSl(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -516,7 +529,7 @@
       IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,nFn), pSl(m), ed(m), Nx(nsd,eNoN), N(eNoN), sE(lM%nEl))
+     2   fN(nsd,nFn), pSl(m), Nx(nsd,eNoN), N(eNoN), sE(lM%nEl))
 
       sA   = 0._RKIND
       sF   = 0._RKIND
@@ -563,8 +576,28 @@
             N  = lM%N(:,g)
             Je = Je + w
 
-            ed = 0._RKIND
             F  = MAT_ID(nsd)
+            DO a=1, eNoN
+               IF (nsd .EQ. 3) THEN
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+                  F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
+                  F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
+                  F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
+                  F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+               ELSE
+                  F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
+                  F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
+                  F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
+                  F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+               END IF
+            END DO
+            detF = MAT_DET(F, nsd)
+
+            ed = 0._RKIND
             IF (cPhys .EQ. phys_lElas) THEN
                DO a=1, eNoN
                   IF (nsd .EQ. 3) THEN
@@ -580,29 +613,10 @@
                      ed(3) = ed(3) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
                   END IF
                END DO
-            ELSE
-               DO a=1, eNoN
-                  IF (nsd .EQ. 3) THEN
-                     F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-                     F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-                     F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
-                     F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-                     F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
-                     F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
-                     F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
-                     F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
-                     F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
-                  ELSE
-                     F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-                     F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-                     F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-                     F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
-                  END IF
-               END DO
             END IF
-            detF = MAT_DET(F, nsd)
 
-            IF (outGrp .EQ. outGrp_J) THEN
+            SELECT CASE (outGrp)
+            CASE (outGrp_J)
 !           Jacobian := determinant of deformation gradient tensor
                DO a=1, eNoN
                   Ac       = lM%IEN(a,e)
@@ -611,7 +625,7 @@
                END DO
                sE(e) = sE(e) + w*detF
 
-            ELSE IF (outGrp .EQ. outGrp_stress) THEN
+            CASE (outGrp_stress, outGrp_Mises)
 !           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
                sigma = 0._RKIND
                IF (cPhys .EQ. phys_lElas) THEN
@@ -620,14 +634,20 @@
                      sigma(1,1) = detF + 2._RKIND*mu*ed(1)
                      sigma(2,2) = detF + 2._RKIND*mu*ed(2)
                      sigma(3,3) = detF + 2._RKIND*mu*ed(3)
+
                      sigma(1,2) = mu*ed(4)
                      sigma(1,3) = mu*ed(5)
                      sigma(2,3) = mu*ed(6)
+
+                     sigma(2,1) = sigma(1,2)
+                     sigma(3,1) = sigma(1,3)
+                     sigma(3,2) = sigma(2,3)
                   ELSE
                      detF = lambda*(ed(1) + ed(2))
                      sigma(1,1) = detF + 2._RKIND*mu*ed(1)
                      sigma(2,2) = detF + 2._RKIND*mu*ed(2)
                      sigma(1,2) = mu*ed(3)
+                     sigma(2,1) = sigma(1,2)
                   END IF
 
                ELSE IF (cPhys .EQ. phys_ustruct) THEN
@@ -643,26 +663,42 @@
 
                END IF
 
-               IF (nsd .EQ. 3) THEN
-                  pSl(1) = sigma(1,1)
-                  pSl(2) = sigma(2,2)
-                  pSl(3) = sigma(3,3)
-                  pSl(4) = sigma(1,2)
-                  pSl(5) = sigma(1,3)
-                  pSl(6) = sigma(2,3)
+               IF (outGrp .EQ. outGrp_stress) THEN
+                  IF (nsd .EQ. 3) THEN
+                     pSl(1) = sigma(1,1)
+                     pSl(2) = sigma(2,2)
+                     pSl(3) = sigma(3,3)
+                     pSl(4) = sigma(1,2)
+                     pSl(5) = sigma(1,3)
+                     pSl(6) = sigma(2,3)
+                  ELSE
+                     pSl(1) = sigma(1,1)
+                     pSl(2) = sigma(2,2)
+                     pSl(3) = sigma(1,2)
+                  END IF
+
+                  DO a=1, eNoN
+                     Ac       = lM%IEN(a,e)
+                     sA(Ac)   = sA(Ac)   + w*N(a)
+                     sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
+                  END DO
                ELSE
-                  pSl(1) = sigma(1,1)
-                  pSl(2) = sigma(2,2)
-                  pSl(3) = sigma(1,2)
+!              Von Mises stress
+                  trS = MAT_TRACE(sigma, nsd) / REAL(nsd,KIND=RKIND)
+                  DO l=1, nsd
+                     sigma(l,l) = sigma(l,l) - trS
+                  END DO
+                  vmises = SQRT(MAT_DDOT(sigma, sigma, nsd))
+
+                  DO a=1, eNoN
+                     Ac       = lM%IEN(a,e)
+                     sA(Ac)   = sA(Ac)   + w*N(a)
+                     sF(1,Ac) = sF(1,Ac) + w*N(a)*vmises
+                  END DO
+                  sE(e) = sE(e) + w*vmises
                END IF
 
-               DO a=1, eNoN
-                  Ac       = lM%IEN(a,e)
-                  sA(Ac)   = sA(Ac)   + w*N(a)
-                  sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
-               END DO
-
-            ELSE IF (outGrp .EQ. outGrp_F) THEN
+            CASE (outGrp_F)
 !           Deformation gradient tensor (F)
                ! pSl is used to remap F
                IF (nsd .EQ. 3) THEN
@@ -687,7 +723,7 @@
                   sA(Ac)   = sA(Ac)   + w*N(a)
                   sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
                END DO
-            END IF
+            END SELECT
          END DO
          IF (.NOT.ISZERO(Je)) sE(e) = sE(e)/Je
       END DO

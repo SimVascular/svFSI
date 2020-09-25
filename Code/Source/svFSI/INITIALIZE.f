@@ -175,7 +175,7 @@
                   ALLOCATE(msh(iM)%eIEN(0,0))
                   ALLOCATE(msh(iM)%sbc(msh(iM)%eNoN,msh(iM)%nEl))
                   msh(iM)%sbc = 0
-               ELSE IF (msh(iM)%eType .EQ. eType_TRI) THEN
+               ELSE IF (msh(iM)%eType .EQ. eType_TRI3) THEN
                   CALL SETSHLXIEN(msh(iM))
                END IF
             END IF
