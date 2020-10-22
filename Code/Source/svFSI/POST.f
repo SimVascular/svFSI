@@ -546,8 +546,8 @@
      3       cPhys .NE. phys_lElas) CYCLE
 
          IF (cPhys .EQ. phys_lElas) THEN
-            elM = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
-            nu  = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
+            elM = eq(iEq)%dmn(cDmn)%prop(elasticity_modulus)
+            nu  = eq(iEq)%dmn(cDmn)%prop(poisson_ratio)
             lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
             mu     = 0.5_RKIND*elM/(1._RKIND + nu)
          END IF
@@ -651,14 +651,14 @@
                   END IF
 
                ELSE IF (cPhys .EQ. phys_ustruct) THEN
-                  CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya, S,
+                  CALL GETPK2CCdev(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,
      2               CC, Ja)
                   P = MATMUL(F, S)
                   sigma = MATMUL(P, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
 
                ELSE IF (cPhys .EQ. phys_struct) THEN
-                  CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya, S,CC)
+                  CALL GETPK2CC(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,CC)
                   sigma = S
 
                END IF

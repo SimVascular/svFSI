@@ -1070,6 +1070,7 @@
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
             IF (ISZERO(lEq%dmn(iDmn)%stM%Kpen) .AND.
      2          lEq%dmn(iDmn)%phys .EQ. phys_struct) THEN
+
                err = "Incompressible struct is not allowed. Use "//
      2            "penalty method or ustruct"
             END IF
@@ -2401,16 +2402,18 @@ c     2         "can be applied for Neumann boundaries only"
          IF (incompFlag) err = "Cannot choose stVK model for Poisson "//
      2      "ratio 0.5"
          lDmn%stM%isoType = stIso_stVK
-         lDmn%stM%C10 = lam
-         lDmn%stM%C01 = mu
+         lDmn%stM%C10  = lam
+         lDmn%stM%C01  = mu
+         lDmn%stM%Kpen = kap
          RETURN
 
       CASE ("m-stVK", "modified-stVK",  "modified-stVenantKirchhoff")
          IF (incompFlag) err = "Cannot choose stVK model for Poisson "//
      2      "ratio 0.5"
          lDmn%stM%isoType = stIso_mStVK
-         lDmn%stM%C10 = kap
-         lDmn%stM%C01 = mu
+         lDmn%stM%C10  = kap
+         lDmn%stM%C01  = mu
+         lDmn%stM%Kpen = kap
          RETURN
 
       CASE ("nHK", "nHK91", "neoHookean", "neoHookeanSimo91")

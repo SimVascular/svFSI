@@ -698,7 +698,7 @@
       nEl = 0
       DO iM=1, nMsh
          IF (msh(iM)%eType .EQ. eType_NRB) THEN
-            CALL INTNRBDATA(msh(iM), d(iM), outDof, nOute)
+            CALL INTNRBDATA(msh(iM), d(iM), outDof)
          ELSE
             CALL INTMSHDATA(msh(iM), d(iM), outDof, nOute)
          END IF
@@ -1029,6 +1029,7 @@
 !--------------------------------------------------------------------
 !     This routine will interpolates NURBS into a QUD4/HEX8 mesh, so you
 !     can write it into a VTK file.
+!     TODO: Element data are not written to VTK file for NURBS
       SUBROUTINE INTNRBDATA(lM, d, outDof)
       USE COMMOD
       USE ALLFUN
