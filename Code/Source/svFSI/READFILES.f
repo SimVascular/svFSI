@@ -345,7 +345,8 @@
       TYPE(listType), POINTER :: lPtr, lPBC, lPBF
       TYPE(fileType) fTmp
 
-      lEq%useTLS  = .FALSE.
+      std  = " Reading equation <"//CLR(TRIM(eqName))//">"
+
       lEq%assmTLS = .FALSE.
 
       lPtr => list%get(lEq%coupled,"Coupled")
@@ -886,7 +887,7 @@
             err = "RCR-type BC is allowed for fluid/CMM/FSI eq. only"
          END IF
          cplBC%schm = cplBC_SI
-         IF (lEq%useTLS) THEN
+         IF (lEq%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
             std = " Using explicit RCR coupling with Trilinos LS"
             cplBC%schm = cplBC_E
          END IF
@@ -1096,6 +1097,23 @@
       CHARACTER(LEN=stdL) ctmp
       TYPE(listType), POINTER :: lPtr, lPL
 
+!     LS package
+      lEq%ls%LS_Packg = lSPackg_NATIVE
+      lPL => list%get(ctmp,"LS package")
+      IF (ASSOCIATED(lPL)) THEN
+         CALL TO_LOWER(ctmp)
+         SELECT CASE(TRIM(ctmp))
+         CASE('native')
+            lEq%ls%LS_Packg = lSPackg_NATIVE
+         CASE('hypre')
+            lEq%ls%LS_Packg = lSPackg_HYPRE
+         CASE('trilinos')
+            lEq%ls%LS_Packg = lSPackg_TRILINOS
+         CASE DEFAULT
+            err = TRIM(list%ping("LS package",lPL))//" Undefined type"
+         END SELECT
+      END IF
+
 !     Default LS
       lSolverType = ilsType
       FSILSType   = ilsType
@@ -1125,14 +1143,15 @@
 
 !     Default Preconditioners
       lEq%ls%PREC_Type = PREC_FSILS
-#ifdef WITH_TRILINOS
-      IF (FSILSType .EQ. LS_TYPE_NS) THEN
-         lEq%ls%PREC_Type = PREC_FSILS
-      ELSE
-         lEq%useTLS = .TRUE.
-         lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+      IF (lEq%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
+         IF (FSILSType .EQ. LS_TYPE_NS) THEN
+            lEq%ls%PREC_Type = PREC_FSILS
+         ELSE
+            lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+         END IF
+      ELSE IF (lEq%ls%LS_Packg .EQ. lSPackg_HYPRE) THEN
+         lEq%ls%PREC_Type = PREC_HYPRE_DIAGONAL
       END IF
-#endif
 
       IF (ASSOCIATED(lPL)) THEN
          lPtr => lPL%get(ctmp, "Preconditioner")
@@ -1141,50 +1160,55 @@
             SELECT CASE(TRIM(ctmp))
             CASE('fsils', 'svfsi')
                lEq%ls%PREC_Type = PREC_FSILS
-               lEq%useTLS = .FALSE.
             CASE('rcs', 'row-column-scaling')
                lEq%ls%PREC_Type = PREC_RCS
-               lEq%useTLS = .FALSE.
 #ifdef WITH_TRILINOS
             CASE('trilinos-diagonal')
                lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
             CASE('trilinos-blockjacobi', 'blockjacobi')
                lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
             CASE('trilinos-ilu')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILU
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
             CASE('trilinos-ilut')
                lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
             CASE('trilinos-ic')
                lEq%ls%PREC_Type = PREC_TRILINOS_IC
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
             CASE('trilinos-ict')
                lEq%ls%PREC_Type = PREC_TRILINOS_ICT
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
             CASE ('trilinos-ml')
                lEq%ls%PREC_Type = PREC_TRILINOS_ML
-               lEq%useTLS = .TRUE.
+               lEq%ls%LS_Packg  = lSPackg_TRILINOS
+#endif
+#ifdef WITH_HYPRE
+            CASE('hypre-none')
+               lEq%ls%PREC_Type = PREC_HYPRE_NONE
+               lEq%ls%LS_Packg  = lSPackg_HYPRE
+            CASE('hypre-diagonal')
+               lEq%ls%PREC_Type = PREC_HYPRE_DIAGONAL
+               lEq%ls%LS_Packg  = lSPackg_HYPRE
+            CASE('hypre-amg')
+               lEq%ls%PREC_Type = PREC_HYPRE_AMG
+               lEq%ls%LS_Packg  = lSPackg_HYPRE
+            CASE('hypre-pilut')
+               lEq%ls%PREC_Type = PREC_HYPRE_PILUT
+               lEq%ls%LS_Packg  = lSPackg_HYPRE
+            CASE('hypre-euclid')
+               lEq%ls%PREC_Type = PREC_HYPRE_EUCLID
+               lEq%ls%LS_Packg  = lSPackg_HYPRE
 #endif
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
      2          //" Undefined type"
             END SELECT
-            std = " Using preconditioner: "//TRIM(ctmp)
-         ELSE
-            SELECT CASE (lEq%ls%PREC_Type)
-            CASE (PREC_FSILS)
-               std = " Using preconditioner: fsils"
-            CASE (PREC_TRILINOS_DIAGONAL)
-               std = " Using preconditioner: trilinos-diagonal"
-            CASE DEFAULT
-               err = " Undefined preconditioner"
-            END SELECT
          END IF
 
-         IF (lEq%useTLS) THEN
+         IF (lEq%ls%LS_Packg  .EQ. lSPackg_TRILINOS) THEN
             lPtr => lPL%get(lEq%assmTLS, "Use Trilinos for assembly")
             IF (lEq%assmTLS .AND. ibFlag) err = "Cannnot assemble "//
      2         "immersed bodies using Trilinos"
@@ -1225,6 +1249,62 @@
             lEq%FSILS%GM%sD = lEq%FSILS%RI%sD
          END IF
       END IF
+
+!     Print ls package, ls type and precond type
+      SELECT CASE(lEq%ls%LS_Packg)
+      CASE(lSPackg_NATIVE)
+         std = "    Using linear solver package: Native"
+      CASE(lSPackg_HYPRE)
+         std = "    Using linear solver package: Hypre"
+      CASE(lSPackg_TRILINOS)
+         std = "    Using linear solver package: Trilinos"
+      CASE(lSPackg_NA)
+         err = "    Undefined linear solver package"
+      END SELECT 
+      SELECT CASE(lEq%ls%LS_Type)
+      CASE(lSolver_NS)
+         std = "    Using linear solver: Bi-partitioned"
+      CASE(lSolver_GMRES)
+         std = "    Using linear solver: GMRES"
+      CASE(lSolver_CG)
+         std = "    Using linear solver: CG"
+      CASE(lSolver_BICGS)
+         std = "    Using linear solver: BiCGSTAB"
+      CASE(lSPackg_NA)
+         err = "    Undefined linear solver"
+      END SELECT
+      SELECT CASE(lEq%ls%PREC_Type)
+      CASE(PREC_FSILS)
+         std = "    Using preconditioner: Native-diagonal"
+      CASE(PREC_RCS)
+         std = "    Using preconditioner: Row-column-scaling"
+      CASE(PREC_TRILINOS_DIAGONAL)
+         std = "    Using preconditioner: Trilinos-diagonal"
+      CASE(PREC_TRILINOS_BLOCK_JACOBI)
+         std = "    Using preconditioner: Trilinos-blockjacobi"
+      CASE(PREC_TRILINOS_ILU)
+         std = "    Using preconditioner: Trilinos-ilu"
+      CASE(PREC_TRILINOS_ILUT)
+         std = "    Using preconditioner: Trilinos-ilut"
+      CASE(PREC_TRILINOS_IC)
+         std = "    Using preconditioner: Trilinos-ic"
+      CASE(PREC_TRILINOS_ICT)
+         std = "    Using preconditioner: Trilinos-ict"
+      CASE(PREC_TRILINOS_ML)
+         std = "    Using preconditioner: Trilinos-ml"
+      CASE(PREC_HYPRE_NONE)
+         std = "    Using preconditioner: Hypre-none"
+      CASE(PREC_HYPRE_DIAGONAL)
+         std = "    Using preconditioner: Hypre-diagonal"
+      CASE(PREC_HYPRE_AMG)
+         std = "    Using preconditioner: Hypre-amg"
+      CASE(PREC_HYPRE_PILUT)
+         std = "    Using preconditioner: Hypre-pilut"
+      CASE(PREC_HYPRE_EUCLID)
+         std = "    Using preconditioner: Hypre-euclid"
+      CASE(PREC_NONE)
+         err = "    Undefined preconditioner"
+      END SELECT
 
       RETURN
       END SUBROUTINE READLS
@@ -2318,6 +2398,15 @@ c     2         "can be applied for Neumann boundaries only"
          kap = 0._RKIND
       END IF
 
+!     Default penalty parameter is equal to bulk modulus
+      lDmn%stM%Kpen = kap
+      lPtr => lPD%get(rtmp, "Penalty parameter")
+      IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
+      IF (ISZERO(lDmn%stM%Kpen)) THEN
+         IF (lDmn%phys .EQ. phys_struct) wrn = "Full incompressible "//
+     2      "struct (displacement-based) detected with 0 penalty const"
+      END IF
+
       lSt => lPD%get(ctmp, "Constitutive model")
 
 !     Default: NeoHookean model
@@ -2412,15 +2501,6 @@ c     2         "can be applied for Neumann boundaries only"
       CASE DEFAULT
          lDmn%stM%volType = stVol_ST91
       END SELECT
-
-!     Default penalty parameter is equal to bulk modulus
-      lDmn%stM%Kpen = kap
-      lPtr => lPD%get(rtmp, "Penalty parameter")
-      IF (ASSOCIATED(lPtr)) lDmn%stM%Kpen = rtmp
-      IF (ISZERO(lDmn%stM%Kpen)) THEN
-         IF (lDmn%phys .EQ. phys_struct) wrn = "Full incompressible "//
-     2      "struct (displacement-based) detected with 0 penalty const"
-      END IF
 
       RETURN
       END SUBROUTINE READMATMODEL

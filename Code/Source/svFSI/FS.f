@@ -294,12 +294,15 @@
       SUBROUTINE THOOD_ValRC()
       USE COMMOD
       USE ALLFUN
+#ifdef WITH_HYPRE
+      USE HYPREMOD
+#endif
       IMPLICIT NONE
 
       LOGICAL :: THflag
       INTEGER(KIND=IKIND) :: a, i, c, s, e, Ac, iM
-
       INTEGER, ALLOCATABLE :: eNds(:)
+      REAL(KIND=RKIND) :: flag
 
       IF ((eq(cEq)%phys .NE. phys_stokes) .AND.
      2    (eq(cEq)%phys .NE. phys_fluid)  .AND.
@@ -331,15 +334,27 @@
          DO a=1, tnNo
             IF (eNds(a) .EQ. 1) THEN
                R(nsd+1,a) = 0._RKIND
+
+               ! In HYPRE_COMMU, Val of the same point at different 
+               ! prcessors will be added. This following is done to 
+               ! avoid 1+1 situation in pressure of edge nodes.
+               flag = 1._RKIND
+#ifdef WITH_HYPRE
+               IF ( (eq(cEq)%ls%LS_Packg .EQ. lSPackg_HYPRE) .AND.
+     2              (lhs%map(a) .GT. hp%mynNo) ) THEN
+                  flag = 0._RKIND
+               END IF
+#endif
                s = (nsd+1)*(nsd+1)
                DO i=rowPtr(a), rowPtr(a+1)-1
                   c = colPtr(i)
                   IF (c .EQ. a) THEN
-                     Val(s,i) = 1._RKIND
+                     Val(s,i) = flag
                   ELSE
                      Val(s,i) = 0._RKIND
                   END IF
                END DO
+
             END IF
          END DO
          DEALLOCATE(eNds)

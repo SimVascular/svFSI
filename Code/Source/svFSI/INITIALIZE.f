@@ -38,6 +38,9 @@
       SUBROUTINE INITIALIZE(timeP)
       USE COMMOD
       USE ALLFUN
+#ifdef WITH_HYPRE
+      USE HYPREMOD
+#endif
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(OUT) :: timeP(3)
 
@@ -145,7 +148,7 @@
          eq(iEq)%s     = tDof + 1
          eq(iEq)%e     = tDof + eq(iEq)%dof
          tDof          = eq(iEq)%e
-         IF (eq(iEq)%useTLS) flag = .TRUE.
+         IF (eq(iEq)%ls%LS_Packg .EQ. lSPackg_TRILINOS) flag = .TRUE.
       END DO
 
       ierr = 0
@@ -203,6 +206,9 @@
       IF (resetSim) THEN
          IF (communicator%foC) CALL FSILS_COMMU_FREE(communicator)
          IF (lhs%foC) CALL FSILS_LHS_FREE(lhs)
+#ifdef WITH_HYPRE
+         IF (hp%foC) CALL HYPRE_LHS_FREE()
+#endif
       END IF ! resetSim
 
       dbg = "Calling FSILS_COMMU_CREATE"
@@ -211,6 +217,11 @@
       dbg = "Calling FSILS_LHS_CREATE"
       CALL FSILS_LHS_CREATE(lhs, communicator, gtnNo, tnNo, nnz, ltg,
      2   rowPtr, colPtr, nFacesLS)
+
+#ifdef WITH_HYPRE
+      IF ( ANY(Eq%ls%LS_Packg .EQ. lSPackg_HYPRE) ) 
+     2   CALL HYPRE_LHS_CREATE(communicator, gtnNo, tnNo, ltg)
+#endif
 
 !     Initialize Trilinos data structure
       IF (flag) THEN
@@ -625,6 +636,9 @@
       SUBROUTINE FINALIZE
       USE COMMOD
       USE ALLFUN
+#ifdef WITH_HYPRE
+      USE HYPREMOD
+#endif
       IMPLICIT NONE
 
       INTEGER(KIND=IKIND) iM, iEq
@@ -648,6 +662,10 @@
 
 !     Deallocating sparse matrix structures
       IF(lhs%foc) CALL FSILS_LHS_FREE(lhs)
+#ifdef WITH_HYPRE
+      IF(hp%init) CALL HYPRE_DESTROY()
+      IF(hp%foC)  CALL HYPRE_LHS_FREE()
+#endif
       IF (ALLOCATED(tls)) THEN
          IF (ALLOCATED(tls%W))   DEALLOCATE(tls%W)
          IF (ALLOCATED(tls%R))   DEALLOCATE(tls%R)

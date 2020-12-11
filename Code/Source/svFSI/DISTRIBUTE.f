@@ -511,7 +511,6 @@
       CALL cm%bcast(lEq%nBc)
       CALL cm%bcast(lEq%nBf)
       CALL cm%bcast(lEq%tol)
-      CALL cm%bcast(lEq%useTLS)
       CALL cm%bcast(lEq%assmTLS)
       IF (ibFlag) THEN
          CALL cm%bcast(lEq%nDmnIB)
@@ -534,6 +533,7 @@
       CALL cm%bcast(lEq%FSILS%GM%sD)
       CALL cm%bcast(lEq%FSILS%CG%sD)
 
+      CALL cm%bcast(lEq%ls%LS_Packg)
       CALL cm%bcast(lEq%ls%LS_Type)
       CALL cm%bcast(lEq%ls%PREC_Type)
       CALL cm%bcast(lEq%ls%relTol)

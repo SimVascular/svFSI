@@ -52,7 +52,7 @@
       END IF
 
 #ifdef WITH_TRILINOS
-      IF (lEq%useTLS) THEN
+      IF (lEq%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
          IF (ALLOCATED(tls%W)) THEN
             DEALLOCATE(tls%W, tls%R)
             CALL TRILINOS_LHS_FREE()
@@ -68,21 +68,17 @@
 !####################################################################
       SUBROUTINE LSSOLVE(lEq, incL, res)
       USE COMMOD
+#ifdef WITH_HYPRE
+      USE HYPREMOD
+#endif
       IMPLICIT NONE
       TYPE(eqType), INTENT(INOUT) :: lEq
       INTEGER(KIND=IKIND), INTENT(IN) :: incL(nFacesLS)
       REAL(KIND=RKIND), INTENT(IN) :: res(nFacesLS)
+      REAL(KIND=RKIND), ALLOCATABLE :: Wr(:,:), Wc(:,:)
 
 #ifdef WITH_TRILINOS
       INTEGER(KIND=IKIND) a
-      REAL(KIND=RKIND), ALLOCATABLE :: Wr(:,:), Wc(:,:)
-
-      IF (lEq%useTLS) THEN
-         ALLOCATE(Wr(dof,lhs%nNo), Wc(dof,lhs%nNo))
-         CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
-         CALL PRECONDRCS(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof, 
-     2      Val, R, Wr, Wc)
-      END IF
 
       IF (lEq%assmTLS) THEN
          lEq%FSILS%RI%suc = .FALSE.
@@ -106,7 +102,7 @@
 #ifdef WITH_TRILINOS
       END IF
 
-      IF (lEq%useTLS) THEN
+      IF (lEq%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
          DO a=1, tnNo
             R(:,a) = tls%R(:,lhs%map(a))
          END DO
@@ -146,7 +142,8 @@
          END DO
       END IF
 
-      tls%W = 1._RKIND
+      IF (eq(cEq)%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
+            tls%W = 1._RKIND
       ! DO faIn=1, lhs%nFaces
       !    IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
       !    faDof = MIN(lhs%face(faIn)%dof,dof)
@@ -159,6 +156,7 @@
       !       END DO
       !    END IF
       ! END DO
+      END IF
 
       ALLOCATE(v(dof,tnNo))
       v = 0._RKIND
@@ -178,7 +176,8 @@
       END DO
 
 #ifdef WITH_TRILINOS
-      CALL TRILINOS_BC_CREATE(v, isCoupledBC)
+      IF (eq(cEq)%ls%LS_Packg .EQ. lSPackg_TRILINOS) 
+     2   CALL TRILINOS_BC_CREATE(v, isCoupledBC)
 #endif
       DEALLOCATE(v)
 

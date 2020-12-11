@@ -1372,7 +1372,6 @@
       lEq%nBc     = 0
       lEq%nBcIB   = 0
       lEq%nBf     = 0
-      lEq%useTLS  = .FALSE.
       lEq%assmTLS = .FALSE.
 
       RETURN

@@ -194,7 +194,14 @@
      3   PREC_TRILINOS_BLOCK_JACOBI = 703, PREC_TRILINOS_ILU = 704,
      4   PREC_TRILINOS_ILUT = 705, PREC_TRILINOS_IC = 706,
      5   PREC_TRILINOS_ICT = 707, PREC_TRILINOS_ML = 708,
-     6   PREC_RCS = 709
+     6   PREC_RCS = 709, PREC_HYPRE_NONE = 710,
+     7   PREC_HYPRE_DIAGONAL = 711, PREC_HYPRE_AMG = 712,
+     8   PREC_HYPRE_PILUT = 713, PREC_HYPRE_EUCLID = 715
+!--------------------------------------------------------------------
+!     Solver package definitions
+      INTEGER(KIND=IKIND), PARAMETER :: lSPackg_NA = 720,
+     2   lSPackg_NATIVE = 721, lSPackg_TRILINOS=722,
+     3   lSPackg_HYPRE = 723
 !--------------------------------------------------------------------
 !     Solver definitions
       INTEGER(KIND=IKIND), PARAMETER :: lSolver_NA = 799,

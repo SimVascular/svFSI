@@ -358,10 +358,12 @@
 
 !     Linear system of equations solver type
       TYPE lsType
+!        LS package (Native, Trilinos, Hypre)
+         INTEGER(KIND=IKIND) :: LS_Packg = lSPackg_NA
 !        LS solver                     (IN)
-         INTEGER(KIND=IKIND) LS_type
+         INTEGER(KIND=IKIND) :: LS_Type = lSolver_NA
 !        Preconditioner                (IN)
-         INTEGER(KIND=IKIND) PREC_Type
+         INTEGER(KIND=IKIND) :: PREC_Type = PREC_NONE
 !        Successful solving            (OUT)
          LOGICAL :: suc = .FALSE.
 !        Maximum iterations            (IN)
@@ -572,8 +574,6 @@
          LOGICAL :: coupled = .TRUE.
 !        Satisfied/not satisfied
          LOGICAL ok
-!        Use C++ Trilinos framework for the linear solvers
-         LOGICAL useTLS
 !        Use C++ Trilinos framework for assembly and for linear solvers
          LOGICAL assmTLS
 !        Degrees of freedom
