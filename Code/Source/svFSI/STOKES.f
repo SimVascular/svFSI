@@ -46,7 +46,7 @@
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
       TYPE(fsType) :: fs(2)
 
-      LOGICAL lStab
+      REAL(KIND=RKIND) lStab
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
      2   bfl(:,:), lR(:,:), lK(:,:,:)
@@ -56,9 +56,9 @@
       eNoN = lM%eNoN
 
       IF (lM%nFs .EQ. 1) THEN
-         lStab = .TRUE.
+         lStab = 1._RKIND
       ELSE
-         lStab = .FALSE.
+         lStab = 0._RKIND
       END IF
 
 !     STOKES: dof = nsd+1
@@ -156,6 +156,7 @@
 #ifdef WITH_TRILINOS
          END IF
 #endif
+
       END DO ! e: loop
 
       DEALLOCATE(ptr, xl, al, yl, bfl, lR, lK)
@@ -381,7 +382,7 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: lStab
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
      2   Nq(eNoNq), Nwx(3,eNoNw), Nqx(3,eNoNq), al(tDof,eNoNw),
@@ -435,11 +436,7 @@
       kS = SQRT(kS)
 
 !     kS is an estimate of (he**-2)
-      IF (lStab) THEN
-         tauM = ctM / (2._RKIND*mu*kS)
-      ELSE
-         tauM = 0._RKIND
-      END IF
+      tauM = ctM / (2._RKIND*mu*kS) * lStab
 
 !     Local residue
       rMv(:) = vd(:) + px(:)
@@ -461,16 +458,14 @@
          END DO
       END DO
 
-      IF (lStab) THEN
-         wf = wf * tauM
-         DO b=1, eNoNq
-            DO a=1, eNoNq
-               NxNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
-     2              + Nqx(3,a)*Nqx(3,b)
-               lK(16,a,b) = lK(16,a,b) + wf*NxNx
-            END DO
+      wf = wf * tauM
+      DO b=1, eNoNq
+         DO a=1, eNoNq
+            NxNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
+     2           + Nqx(3,a)*Nqx(3,b)
+            lK(16,a,b) = lK(16,a,b) + wf*NxNx
          END DO
-      END IF
+      END DO
 
       RETURN
       END SUBROUTINE STOKES3D_C
@@ -480,7 +475,7 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: lStab
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
      2   Nq(eNoNq), Nwx(2,eNoNw), Nqx(2,eNoNq), al(tDof,eNoNw),
@@ -526,11 +521,7 @@
       kS = SQRT(kS)
 
 !     kS is an estimate of (he**-2)
-      IF (lStab) THEN
-         tauM = ctM / (2._RKIND*mu*kS)
-      ELSE
-         tauM = 0._RKIND
-      END IF
+      tauM = ctM / (2._RKIND*mu*kS) * lStab
 
 !     Local residue
       rMv(:) = vd(:) + px(:)
@@ -550,15 +541,13 @@
          END DO
       END DO
 
-      IF (lStab) THEN
-         wf = wf * tauM
-         DO b=1, eNoNq
-            DO a=1, eNoNq
-               NxNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
+      wf = wf * tauM
+      DO b=1, eNoNq
+         DO a=1, eNoNq
+            NxNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
                lK(9,a,b) = lK(9,a,b) + wf*NxNx
-            END DO
          END DO
-      END IF
+      END DO
 
       RETURN
       END SUBROUTINE STOKES2D_C

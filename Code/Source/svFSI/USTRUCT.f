@@ -44,7 +44,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      LOGICAL vmsStab
+      REAL(KIND=RKIND) :: vmsStab
       INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
       TYPE(fsType) :: fs(2)
@@ -61,9 +61,9 @@
       IF (nFn .EQ. 0) nFn = 1
 
       IF (lM%nFs .EQ. 1) THEN
-         vmsStab = .TRUE.
+         vmsStab = 1._RKIND
       ELSE
-         vmsStab = .FALSE.
+         vmsStab = 0._RKIND
       END IF
 
 !     USTRUCT: dof = nsd+1
@@ -113,6 +113,8 @@
          ALLOCATE(xql(nsd,fs(2)%eNoN), Nqx(nsd,fs(2)%eNoN))
          xwl(:,:) = xl(:,:)
          xql(:,:) = xl(:,1:fs(2)%eNoN)
+         Nwx      = 0._RKIND
+         Nqx      = 0._RKIND
 
 !        Gauss integration 1
          DO g=1, fs(1)%nG
@@ -182,7 +184,7 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: vmsFlag
+      REAL(KIND=RKIND), INTENT(IN) :: vmsFlag
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(3,eNoNw), al(tDof,eNoNw), yl(tDof,eNoNw), dl(tDof,eNoNw),
@@ -274,7 +276,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, Ja)
 
 !     Compute stabilization parameters
-      IF (vmsFlag) THEN
+      IF (vmsFlag .GT. 0._RKIND+eps) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
@@ -555,7 +557,7 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: vmsFlag
+      REAL(KIND=RKIND), INTENT(IN) :: vmsFlag
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(2,eNoNw), al(tDof,eNoNw), yl(tDof,eNoNw), dl(tDof,eNoNw),
@@ -632,7 +634,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, Ja)
 
 !     Compute stabilization parameters
-      IF (vmsFlag) THEN
+      IF (vmsFlag .GT. 0._RKIND+eps) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
@@ -795,7 +797,7 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: vmsFlag
+      REAL(KIND=RKIND), INTENT(IN) :: vmsFlag
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(3,eNoNw), Nqx(3,eNoNq), al(tDof,eNoNw), yl(tDof,eNoNw),
@@ -884,7 +886,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, 1._RKIND)
 
 !     Compute stabilization parameters
-      IF (vmsFlag) THEN
+      IF (vmsFlag .GT. 0._RKIND+eps) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
@@ -1008,7 +1010,7 @@
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      LOGICAL, INTENT(IN) :: vmsFlag
+      REAL(KIND=RKIND), INTENT(IN) :: vmsFlag
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(2,eNoNw), Nqx(2,eNoNq), al(tDof,eNoNw), yl(tDof,eNoNw),
@@ -1081,7 +1083,7 @@
       CALL GVOLPEN(stModel, p, rho, beta, drho, dbeta, 1._RKIND)
 
 !     Compute stabilization parameters
-      IF (vmsFlag) THEN
+      IF (vmsFlag .GT. 0._RKIND+eps) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
@@ -1524,8 +1526,6 @@
             DEALLOCATE(KU)
          END IF
       END  IF
-
-      CALL THOOD_ValRC()
 
       RETURN
       END SUBROUTINE USTRUCTR
