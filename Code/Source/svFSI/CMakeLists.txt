@@ -96,64 +96,107 @@ if(WITH_TRILINOS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
 
+# Find Hypre package if requested
+if(SV_USE_HYPRE)
+  # HYPRE_DIR is the path to installed Hypre folder.
+  # In linux, it should be defined as an enironment variable
+  # in bash shell.
+  IF(DEFINED ENV{HYPRE_DIR})
+    set(Hypre_FOUND 1)
+  ELSE()
+    set(Hypre_FOUND 0)
+  ENDIF()
+
+  IF(Hypre_FOUND)
+    SET(Hypre_DIR $ENV{HYPRE_DIR})
+    SET(Hypre_INCLUDE_DIRS "${Hypre_DIR}/include")
+    SET(Hypre_LIBRARY_DIRS "${Hypre_DIR}/lib")
+    SET(Hypre_LIBRARIES "${Hypre_DIR}/lib/libHYPRE.a")
+    MESSAGE("\nFound Hypre!  Here are the details: ")
+    MESSAGE("   Hypre_DIR = ${Hypre_DIR}")
+    MESSAGE("   Hypre_LIBRARIES = ${Hypre_LIBRARIES}")
+    MESSAGE("   Hypre_LIBRARY_DIRS = ${Hypre_LIBRARY_DIRS}")
+    MESSAGE("   Hypre_INCLUDE_DIRS = ${Hypre_INCLUDE_DIRS}")
+    MESSAGE("End of Hypre details\n")
+    MESSAGE("Setting WITH_HYPRE to true\n")
+    set(WITH_HYPRE 1)
+  ELSE()
+    MESSAGE(WARNING "Could not find Hypre. Compiling svFSI without Hypre.")
+  ENDIF()
+
+endif()
+
+# add Hypre flags and defines
+if(WITH_HYPRE)
+  ADD_DEFINITIONS(-DWITH_HYPRE)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lHYPRE")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -lHYPRE")
+endif()
+
 # svFSI requires LAPACK
 find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
 
-set(FSRCS TYPEMOD.f
-         UTIL.f
-         COMU.f
-         CHNL.f
-         LIST.f
-         MATFUN.f
-         CEPMOD_AP.f
-         CEPMOD_FN.f
-         CEPMOD_TTP.f
-         CEPMOD_BO.f
-         CEPMOD.f
-         MOD.f
-         ALLFUN.f
-         BAFINI.f
-         BF.f
-         CEP.f
-         CEPION.f
-         CMM.f
-         CONTACT.f
-         DEBUG.f
-         DISTRIBUTE.f
-         EQASSEM.f
-         FFT.f
-         FLUID.f
-         FS.f
-         FSI.f
-         HEATF.f
-         HEATS.f
-         IB.f
-         INITIALIZE.f
-         LELAS.f
-         LHSA.f
-         LOADMSH.f
-         LOADNRB.f
-         LS.f
-         MAIN.f
-         MATMODELS.f
-         MESH.f
-         NN.f
-         NURBS.f
-         OUTPUT.f
-         PIC.f
-         POST.f
-         READFILES.f
-         READMSH.f
-         REMESH.f
-         SETBC.f
-         SHELLS.f
-         STOKES.f
-         STRUCT.f
-         TXT.f
-         USTRUCT.f
-         VTKXML.f)
+set(FSRCS TYPEMOD.f 
+          UTIL.f 
+          COMU.f 
+          CHNL.f 
+          LIST.f 
+          MATFUN.f 
+          CEPMOD_AP.f 
+          CEPMOD_FN.f 
+          CEPMOD_TTP.f 
+          CEPMOD_BO.f 
+          CEPMOD.f 
+          MOD.f 
+          ALLFUN.f 
+          BAFINI.f 
+          BF.f 
+          CEP.f 
+          CEPION.f 
+          CMM.f 
+          CONTACT.f 
+          DEBUG.f 
+          DISTRIBUTE.f 
+          EQASSEM.f )
+
+if (WITH_HYPRE)
+  set(FSRCS ${FSRCS} HYPRE_SOLVE.f)
+endif()
+
+set(FSRCS ${FSRCS}
+          FFT.f 
+          FLUID.f 
+          FS.f 
+          FSI.f 
+          HEATF.f 
+          HEATS.f 
+          IB.f 
+          INITIALIZE.f 
+          LELAS.f 
+          LHSA.f 
+          LOADMSH.f 
+          LOADNRB.f 
+          LS.f 
+          MAIN.f 
+          MATMODELS.f 
+          MESH.f 
+          NN.f 
+          NURBS.f 
+          OUTPUT.f 
+          PIC.f 
+          POST.f 
+          READFILES.f 
+          READMSH.f 
+          REMESH.f 
+          SETBC.f 
+          SHELLS.f 
+          STOKES.f 
+          STRUCT.f 
+          TXT.f 
+          USTRUCT.f 
+          VTKXML.f)
 
 set(F90SRCS vtkComMod.f90
             vtkTypeParams.f90
@@ -174,6 +217,12 @@ if(WITH_TRILINOS)
   include_directories(${Trilinos_INCLUDE_DIRS})
   link_directories(${Trilinos_LIBRARY_DIRS})
   link_directories(${Trilinos_TPL_LIBRARY_DIRS})
+endif()
+
+if(WITH_HYPRE)
+  # Hypre directories and libraries
+  include_directories(${Hypre_INCLUDE_DIRS})
+  link_directories(${Hypre_LIBRARY_DIRS})
 endif()
 
 
@@ -208,4 +257,8 @@ endif()
 
 if(WITH_TRILINOS)
   target_link_libraries(${SV_SVFSI_EXE} ${Trilinos_LIBRARIES} ${Trilinos_TPL_LIBRARIES})
+endif()
+
+if(WITH_HYPRE)
+  target_link_libraries(${SV_SVFSI_EXE} ${Hypre_LIBRARIES})
 endif()
