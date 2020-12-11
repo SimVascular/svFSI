@@ -302,7 +302,9 @@
       INTEGER, ALLOCATABLE :: eNds(:)
 
       IF ((eq(cEq)%phys .NE. phys_stokes) .AND.
-     2    (eq(cEq)%phys .NE. phys_ustruct)) RETURN
+     2    (eq(cEq)%phys .NE. phys_fluid)  .AND.
+     3    (eq(cEq)%phys .NE. phys_ustruct).AND.
+     4    (eq(cEq)%phys .NE. phys_fsi)) RETURN
 
       THflag = .FALSE.
       DO iM=1, nMsh
