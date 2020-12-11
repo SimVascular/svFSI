@@ -46,17 +46,30 @@
 
       INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
+      TYPE(fsType) :: fs(2)
 
+      REAL(KIND=RKIND) :: lStab
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
-     2   bfl(:,:), N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+     2   bfl(:,:), lR(:,:), lK(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xwl(:,:), xql(:,:), Nwx(:,:),
+     2   Nwxx(:,:), Nqx(:,:)
+      INTEGER(KIND=IKIND) :: l
 
       eNoN = lM%eNoN
 
+      IF (lM%nFs .EQ. 1) THEN
+         lStab = 1._RKIND
+      ELSE
+         lStab = 0._RKIND
+      END IF
+
+!     l = 3 if nsd == 2 else 6
+      l = 3*(nsd-1)
+
 !     FLUID: dof = nsd+1
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
-     2   bfl(nsd,eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
-     3   lK(dof*dof,eNoN,eNoN))
+     2   bfl(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
@@ -78,25 +91,81 @@
             bfl(:,a) = Bf(:,Ac)
          END DO
 
-!        Gauss integration
+!        Initialize residue and tangents
          lR = 0._RKIND
          lK = 0._RKIND
-         DO g=1, lM%nG
-            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-               CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+
+!        Set function spaces for velocity and pressure.
+         CALL GETTHOODFS(fs, lM, lStab, 1)
+
+!        Define element coordinates appropriate for function spaces
+         ALLOCATE(xwl(nsd,fs(1)%eNoN), Nwx(nsd,fs(1)%eNoN))
+         ALLOCATE(Nwxx(l,fs(1)%eNoN))
+         ALLOCATE(xql(nsd,fs(2)%eNoN), Nqx(nsd,fs(2)%eNoN))
+         xwl(:,:) = xl(:,:)
+         xql(:,:) = xl(:,1:fs(2)%eNoN)
+         Nwx      = 0._RKIND 
+         Nqx      = 0._RKIND 
+         Nwxx     = 0._RKIND
+
+!        Gauss integration 1
+         DO g=1, fs(1)%nG
+            IF (g.EQ.1 .OR. .NOT.fs(1)%lShpF) THEN
+               CALL GNN(fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g), xwl, Nwx, Jac,
+     2            ksix)
                IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+
+               IF (lStab .LT. 1._RKIND-eps) 
+     2            CALL GNNxx(l, fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g), 
+     3            fs(1)%Nxx(:,:,g), xwl, Nwx, Nwxx)
             END IF
-            w = lM%w(g) * Jac
-            N = lM%N(:,g)
+            w = fs(1)%w(g) * Jac
+
+            IF (g.EQ.1 .OR. .NOT.fs(2)%lShpF) THEN
+               CALL GNN(fs(2)%eNoN, nsd, fs(2)%Nx(:,:,g), xql, Nqx, Jac,
+     2            ksix)
+            END IF
 
             IF (nsd .EQ. 3) THEN
-               CALL FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
-
+               CALL FLUID3D_M(lStab, fs(1)%eNoN, fs(2)%eNoN, w, ksix, 
+     2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, Nwxx, al, yl, 
+     3            bfl, lR, lK)
             ELSE IF (nsd .EQ. 2) THEN
-               CALL FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
-
+               CALL FLUID2D_M(lStab, fs(1)%eNoN, fs(2)%eNoN, w, ksix, 
+     2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, Nwxx, al, yl, 
+     3            bfl, lR, lK)
             END IF
          END DO ! g: loop
+
+!        Set function spaces for velocity and pressure.
+         CALL GETTHOODFS(fs, lM, lStab, 2)
+
+!        Gauss integration 2
+         DO g=1, fs(2)%nG
+            IF (g.EQ.1 .OR. .NOT.fs(1)%lShpF) THEN
+               CALL GNN(fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g), xwl, Nwx, Jac,
+     2            ksix)
+            END IF
+
+            IF (g.EQ.1 .OR. .NOT.fs(2)%lShpF) THEN
+               CALL GNN(fs(2)%eNoN, nsd, fs(2)%Nx(:,:,g), xql, Nqx, Jac,
+     2            ksix)
+               IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
+            END IF
+            w = fs(2)%w(g) * Jac
+
+            IF (nsd .EQ. 3) THEN
+               CALL FLUID3D_C(lStab, fs(1)%eNoN, fs(2)%eNoN, w, ksix,
+     2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, bfl, lR,
+     3            lK)
+            ELSE IF (nsd .EQ. 2) THEN
+               CALL FLUID2D_C(lStab, fs(1)%eNoN, fs(2)%eNoN, w, ksix,
+     2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, bfl, lR,
+     3            lK)
+            END IF
+         END DO ! g: loop
+
+         DEALLOCATE(xwl, xql, Nwx, Nwxx, Nqx)
 
 !        Assembly
 #ifdef WITH_TRILINOS
@@ -110,33 +179,38 @@
 #endif
       END DO ! e: loop
 
-      DEALLOCATE(ptr, xl, al, yl, bfl, N, Nx, lR, lK)
+      DEALLOCATE(ptr, xl, al, yl, bfl, lR, lK)
 
       RETURN
       END SUBROUTINE CONSTRUCT_FLUID
 !####################################################################
-      SUBROUTINE FLUID3D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+      SUBROUTINE FLUID3D_M(lStab, eNoNw, eNoNq, w, ksix, Nw, Nq, Nwx,
+     2   Nqx, Nwxx, al, yl, bfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
-      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(3,eNoN), ksix(3,3)
-      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
+      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
+     2   Nq(eNoNq), Nwx(3,eNoNw), Nqx(3,eNoNq), Nwxx(6,eNoNw), 
+     3   al(tDof,eNoNw), yl(tDof,eNoNw), bfl(3,eNoNw)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
+     2   lK(dof*dof,eNoNw,eNoNw)
 
       REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
 
-      INTEGER(KIND=IKIND) a, b
-      REAL(KIND=RKIND) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3,
-     2  divU, amd, wl, wr, wrl, s, p, u(3), ud(3), px(3), f(3), up(3),
-     3  ua(3), ux(3,3), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(3),
-     4  rM(3,3), NxdNx, nu_s, es(3,3), gam, nu_x, es_x(3,eNoN)
+      INTEGER(KIND=IKIND) :: a, b
+      REAL(KIND=RKIND) :: rho, fb(3), wr, wrl, wl, amd, ud(3), u(3),
+     2   uxx(3), up(3), ux(3,3), p, px(3), es(3,3), gam, es_x(3,eNoNw),
+     3   s, nu, nu_s, nu_x, kU, kS, tauM, tauC, tauB, divU, ua(3),
+     4   rV(3), rM(3,3), T1, T2, NxdNx, udNx(eNoNw), updNx(eNoNw),
+     5   uadNx(eNoNw), sumxx(eNoNw)
 
-      rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
-      f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
-      f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
+!     Define parameters
+      rho   = eq(cEq)%dmn(cDmn)%prop(fluid_density)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
 
       wr   = w*rho
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
@@ -144,45 +218,51 @@
       wrl  = wr*T1
       wl   = w*T1
 
-!     Indices are not selected based on the equation only
-!     because fluid equation always come first
-      p  = 0._RKIND
-      u  = 0._RKIND
-      ud = -f
-      px = 0._RKIND
-      ux = 0._RKIND
-      DO a=1, eNoN
-         p  = p + N(a)*yl(4,a)
+!     Velocity and its gradients, body force
+      u   =  0._RKIND
+      ux  =  0._RKIND
+      uxx = 0._RKIND
+      ud  = -fb
+      DO a=1, eNoNw
+         u(1)    = u(1)  + Nw(a)*yl(1,a)
+         u(2)    = u(2)  + Nw(a)*yl(2,a)
+         u(3)    = u(3)  + Nw(a)*yl(3,a)
 
-         ud(1) = ud(1) + N(a)*(al(1,a)-bfl(1,a))
-         ud(2) = ud(2) + N(a)*(al(2,a)-bfl(2,a))
-         ud(3) = ud(3) + N(a)*(al(3,a)-bfl(3,a))
+         ux(1,1) = ux(1,1) + Nwx(1,a)*yl(1,a)
+         ux(2,1) = ux(2,1) + Nwx(2,a)*yl(1,a)
+         ux(3,1) = ux(3,1) + Nwx(3,a)*yl(1,a)
+         ux(1,2) = ux(1,2) + Nwx(1,a)*yl(2,a)
+         ux(2,2) = ux(2,2) + Nwx(2,a)*yl(2,a)
+         ux(3,2) = ux(3,2) + Nwx(3,a)*yl(2,a)
+         ux(1,3) = ux(1,3) + Nwx(1,a)*yl(3,a)
+         ux(2,3) = ux(2,3) + Nwx(2,a)*yl(3,a)
+         ux(3,3) = ux(3,3) + Nwx(3,a)*yl(3,a)
 
-         px(1) = px(1) + Nx(1,a)*yl(4,a)
-         px(2) = px(2) + Nx(2,a)*yl(4,a)
-         px(3) = px(3) + Nx(3,a)*yl(4,a)
+         sumxx(a)= Nwxx(1,a) + Nwxx(2,a) + Nwxx(3,a)
+         uxx(1)  = uxx(1)  + sumxx(a)*yl(1,a)
+         uxx(2)  = uxx(2)  + sumxx(a)*yl(2,a)
+         uxx(3)  = uxx(3)  + sumxx(a)*yl(3,a)
 
-         u(1) = u(1) + N(a)*yl(1,a)
-         u(2) = u(2) + N(a)*yl(2,a)
-         u(3) = u(3) + N(a)*yl(3,a)
-
-         ux(1,1) = ux(1,1) + Nx(1,a)*yl(1,a)
-         ux(2,1) = ux(2,1) + Nx(2,a)*yl(1,a)
-         ux(3,1) = ux(3,1) + Nx(3,a)*yl(1,a)
-         ux(1,2) = ux(1,2) + Nx(1,a)*yl(2,a)
-         ux(2,2) = ux(2,2) + Nx(2,a)*yl(2,a)
-         ux(3,2) = ux(3,2) + Nx(3,a)*yl(2,a)
-         ux(1,3) = ux(1,3) + Nx(1,a)*yl(3,a)
-         ux(2,3) = ux(2,3) + Nx(2,a)*yl(3,a)
-         ux(3,3) = ux(3,3) + Nx(3,a)*yl(3,a)
+         ud(1)   = ud(1) + Nw(a)*(al(1,a)-bfl(1,a))
+         ud(2)   = ud(2) + Nw(a)*(al(2,a)-bfl(2,a))
+         ud(3)   = ud(3) + Nw(a)*(al(3,a)-bfl(3,a))
       END DO
       IF (mvMsh) THEN
-         DO a=1, eNoN
-            u(1) = u(1) - N(a)*yl(5,a)
-            u(2) = u(2) - N(a)*yl(6,a)
-            u(3) = u(3) - N(a)*yl(7,a)
+         DO a=1, eNoNw
+            u(1) = u(1) - Nw(a)*yl(5,a)
+            u(2) = u(2) - Nw(a)*yl(6,a)
+            u(3) = u(3) - Nw(a)*yl(7,a)
          END DO
       END IF
+!     Pressure
+      p  = 0._RKIND
+      px = 0._RKIND
+      DO a=1, eNoNq
+         p = p + Nq(a)*yl(4,a)
+         px(1) = px(1) + Nqx(1,a)*yl(4,a)
+         px(2) = px(2) + Nqx(2,a)*yl(4,a)
+         px(3) = px(3) + Nqx(3,a)*yl(4,a)
+      END DO
 
 !     Strain rate tensor 2*e_ij := (u_ij + u_ji)
       es(1,1) = ux(1,1) + ux(1,1)
@@ -196,13 +276,13 @@
       es(2,1) = es(1,2)
       es(3,1) = es(1,3)
       es(3,2) = es(2,3)
-
-      DO a=1, eNoN
-        es_x(1,a) = es(1,1)*Nx(1,a) + es(1,2)*Nx(2,a) + es(1,3)*Nx(3,a)
-        es_x(2,a) = es(2,1)*Nx(1,a) + es(2,2)*Nx(2,a) + es(2,3)*Nx(3,a)
-        es_x(3,a) = es(3,1)*Nx(1,a) + es(3,2)*Nx(2,a) + es(3,3)*Nx(3,a)
+    
+      DO a=1, eNoNw
+         es_x(1,a) = es(1,1)*Nwx(1,a)+es(1,2)*Nwx(2,a)+es(1,3)*Nwx(3,a)
+         es_x(2,a) = es(2,1)*Nwx(1,a)+es(2,2)*Nwx(2,a)+es(2,3)*Nwx(3,a)
+         es_x(3,a) = es(3,1)*Nwx(1,a)+es(3,2)*Nwx(2,a)+es(3,3)*Nwx(3,a)
       END DO
-
+ 
 !     Shear-rate := (2*e_ij*e_ij)^.5
       gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
      2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
@@ -220,6 +300,8 @@
       END IF
       s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
 
+!     Stabilization coefficients   
+!     SUPG for both P2P1 and P1P1   
       kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2)
      3   + u(2)*u(2)*ksix(2,2) + u(3)*u(2)*ksix(3,2)
@@ -233,17 +315,17 @@
      5   + ksix(3,3)*ksix(3,3)
 
       tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
-     2   ct(2)*nu_s*nu_s*kS + s*s )
+     2   ct(2)*nu_s*nu_s*kS + s*s ) !* lStab
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
-     2      + u(3)*ux(3,1) + s*u(1))
+     2      + u(3)*ux(3,1) - nu*uxx(1) + s*u(1))
       up(2) = -tauM*(ud(2) + px(2)/rho + u(1)*ux(1,2) + u(2)*ux(2,2)
-     2      + u(3)*ux(3,2) + s*u(2))
+     2      + u(3)*ux(3,2) - nu*uxx(2) + s*u(2))
       up(3) = -tauM*(ud(3) + px(3)/rho + u(1)*ux(1,3) + u(2)*ux(2,3)
-     2      + u(3)*ux(3,3) + s*u(3))
+     2      + u(3)*ux(3,3) - nu*uxx(3) + s*u(3))
 
       tauC = ksix(1,1) + ksix(2,2) + ksix(3,3)
-      tauC = 1._RKIND/tauM/tauC
+      tauC = 1._RKIND/(tauM+eps)/tauC * lStab
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(3)*up(1)*ksix(3,1) + up(1)*up(2)*ksix(1,2)
@@ -252,13 +334,13 @@
      5     + up(3)*up(3)*ksix(3,3)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1._RKIND/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB) * lStab
+      
+      ua(1) = u(1) + up(1) * lStab
+      ua(2) = u(2) + up(2) * lStab
+      ua(3) = u(3) + up(3) * lStab
 
       divU = ux(1,1) + ux(2,2) + ux(3,3)
-
-      ua(1) = u(1) + up(1)
-      ua(2) = u(2) + up(2)
-      ua(3) = u(3) + up(3)
 
       rV(1) = tauB*(up(1)*ux(1,1) + up(2)*ux(2,1) + up(3)*ux(3,1))
       rV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2) + up(3)*ux(3,2))
@@ -283,43 +365,42 @@
       rV(2) = ud(2) + ua(1)*ux(1,2) + ua(2)*(s+ux(2,2)) + ua(3)*ux(3,2)
       rV(3) = ud(3) + ua(1)*ux(1,3) + ua(2)*ux(2,3) + ua(3)*(s+ux(3,3))
 
-      DO a=1, eNoN
-         udNx(a)  = u(1)*Nx(1,a)  + u(2)*Nx(2,a)  + u(3)*Nx(3,a)
-         updNx(a) = up(1)*Nx(1,a) + up(2)*Nx(2,a) + up(3)*Nx(3,a)
-         uadNx(a) = updNx(a) + udNx(a)
+!     Local residue
+      DO a=1, eNoNw
+         udNx(a)  = u(1)*Nwx(1,a)  + u(2)*Nwx(2,a)  + u(3)*Nwx(3,a)
+         updNx(a) = up(1)*Nwx(1,a) + up(2)*Nwx(2,a) + up(3)*Nwx(3,a)
+         uadNx(a) = updNx(a) * lStab + udNx(a)
 
-         lR(1,a) = lR(1,a) + wr*(rV(1)*N(a) + rM(1,1)*Nx(1,a)
-     2      + rM(1,2)*Nx(2,a) + rM(1,3)*Nx(3,a))
+         lR(1,a) = lR(1,a) + wr*(rV(1)*Nw(a) + rM(1,1)*Nwx(1,a)
+     2      + rM(1,2)*Nwx(2,a) + rM(1,3)*Nwx(3,a))
 
-         lR(2,a) = lR(2,a) + wr*(rV(2)*N(a) + rM(2,1)*Nx(1,a)
-     2      + rM(2,2)*Nx(2,a) + rM(2,3)*Nx(3,a))
+         lR(2,a) = lR(2,a) + wr*(rV(2)*Nw(a) + rM(2,1)*Nwx(1,a)
+     2      + rM(2,2)*Nwx(2,a) + rM(2,3)*Nwx(3,a))
 
-         lR(3,a) = lR(3,a) + wr*(rV(3)*N(a) + rM(3,1)*Nx(1,a)
-     2      + rM(3,2)*Nx(2,a) + rM(3,3)*Nx(3,a))
-
-         lR(4,a) = lR(4,a) + w*(N(a)*divU - updNx(a))
+         lR(3,a) = lR(3,a) + wr*(rV(3)*Nw(a) + rM(3,1)*Nwx(1,a)
+     2      + rM(3,2)*Nwx(2,a) + rM(3,3)*Nwx(3,a))
       END DO
 
-      DO a=1, eNoN
-         DO b=1, eNoN
-            rM(1,1) = Nx(1,a)*Nx(1,b)
-            rM(2,1) = Nx(2,a)*Nx(1,b)
-            rM(3,1) = Nx(3,a)*Nx(1,b)
-            rM(1,2) = Nx(1,a)*Nx(2,b)
-            rM(2,2) = Nx(2,a)*Nx(2,b)
-            rM(3,2) = Nx(3,a)*Nx(2,b)
-            rM(1,3) = Nx(1,a)*Nx(3,b)
-            rM(2,3) = Nx(2,a)*Nx(3,b)
-            rM(3,3) = Nx(3,a)*Nx(3,b)
+!     Tangent (stiffness) matrices
+      DO b=1, eNoNw
+         DO a=1, eNoNw
+            rM(1,1) = Nwx(1,a)*Nwx(1,b)
+            rM(2,1) = Nwx(2,a)*Nwx(1,b)
+            rM(3,1) = Nwx(3,a)*Nwx(1,b)
+            rM(1,2) = Nwx(1,a)*Nwx(2,b)
+            rM(2,2) = Nwx(2,a)*Nwx(2,b)
+            rM(3,2) = Nwx(3,a)*Nwx(2,b)
+            rM(1,3) = Nwx(1,a)*Nwx(3,b)
+            rM(2,3) = Nwx(2,a)*Nwx(3,b)
+            rM(3,3) = Nwx(3,a)*Nwx(3,b)
 
-            NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
+            NxdNx = Nwx(1,a)*Nwx(1,b) + Nwx(2,a)*Nwx(2,b) + 
+     2              Nwx(3,a)*Nwx(3,b)
 
             T1 = nu*NxdNx + tauB*updNx(a)*updNx(b)
-     2         + N(a)*((s+amd)*N(b) + uadNx(b))
-     3         + tauM*uadNx(a)*(udNx(b) + (s+amd)*N(b))
+     2         + Nw(a)*((s+amd)*Nw(b) + uadNx(b))
+     3         + tauM*uadNx(a)*(udNx(b) + (s+amd)*Nw(b) - nu*sumxx(b))
 
-            T2 = tauM*udNx(a)
-            T3 = tauM*(amd*N(b) + udNx(b))
 !           dM/dU
             lK(1,a,b)  = lK(1,a,b)  + wrl*((nu + tauC)*rM(1,1) + T1 +
      2         nu_x*es_x(1,a)*es_x(1,b))
@@ -342,43 +423,48 @@
             lK(11,a,b) = lK(11,a,b) + wrl*((nu + tauC)*rM(3,3) + T1 +
      2         nu_x*es_x(3,a)*es_x(3,b))
 
+         END DO 
+      END DO
+
+      DO b=1, eNoNq
+         DO a=1, eNoNw
+            T2 = tauM*uadNx(a)
 !           dM/dP
-            lK(4,a,b)  = lK(4,a,b)  - wl*(Nx(1,a)*N(b) - Nx(1,b)*T2)
-            lK(8,a,b)  = lK(8,a,b)  - wl*(Nx(2,a)*N(b) - Nx(2,b)*T2)
-            lK(12,a,b) = lK(12,a,b) - wl*(Nx(3,a)*N(b) - Nx(3,b)*T2)
-!           dC/dU
-            lK(13,a,b) = lK(13,a,b) + wl*(Nx(1,b)*N(a) + Nx(1,a)*T3)
-            lK(14,a,b) = lK(14,a,b) + wl*(Nx(2,b)*N(a) + Nx(2,a)*T3)
-            lK(15,a,b) = lK(15,a,b) + wl*(Nx(3,b)*N(a) + Nx(3,a)*T3)
-!           dC/dP
-            lK(16,a,b) = lK(16,a,b) + wl*(tauM*NxdNx)/rho
+            lK(4,a,b)  = lK(4,a,b)  - wl*(Nwx(1,a)*Nq(b) - Nqx(1,b)*T2)
+            lK(8,a,b)  = lK(8,a,b)  - wl*(Nwx(2,a)*Nq(b) - Nqx(2,b)*T2)
+            lK(12,a,b) = lK(12,a,b) - wl*(Nwx(3,a)*Nq(b) - Nqx(3,b)*T2)
          END DO
       END DO
 
       RETURN
-      END SUBROUTINE FLUID3D
+      END SUBROUTINE FLUID3D_M
 !--------------------------------------------------------------------
-      SUBROUTINE FLUID2D(eNoN, w, N, Nx, al, yl, bfl, ksix, lR, lK)
+      SUBROUTINE FLUID2D_M(lStab, eNoNw, eNoNq, w, ksix, Nw, Nq, Nwx,
+     2   Nqx, Nwxx, al, yl, bfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
-      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
-     2   al(tDof,eNoN), yl(tDof,eNoN), bfl(2,eNoN), ksix(2,2)
-      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
+      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
+     2   Nq(eNoNq), Nwx(2,eNoNw), Nqx(2,eNoNq), Nwxx(3,eNoNw), 
+     3   al(tDof,eNoNw), yl(tDof,eNoNw), bfl(2,eNoNw)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
+     2   lK(dof*dof,eNoNw,eNoNw)
 
       REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
 
-      INTEGER(KIND=IKIND) a, b
-      REAL(KIND=RKIND) tauM, tauC, tauB, kS, kU, nu, rho, T1, T2, T3,
-     2  divU, amd, wl, wr, wrl, s, p, u(2), ud(2), px(2), f(2), up(2),
-     3  ua(2), ux(2,2), udNx(eNoN), updNx(eNoN), uadNx(eNoN), rV(2),
-     4  rM(2,2), NxdNx, nu_s, es(2,2), gam, nu_x, es_x(2,eNoN)
+      INTEGER(KIND=IKIND) :: a, b
+      REAL(KIND=RKIND) :: rho, fb(2), wr, wrl, wl, amd, ud(2), u(2),
+     2   uxx(2), up(2), ux(2,2), p, px(2), es(2,2), gam, es_x(2,eNoNw),
+     3   s, nu, nu_s, nu_x, kU, kS, tauM, tauC, tauB, divU, ua(2),
+     4   rV(2), rM(2,2), T1, T2, NxdNx, udNx(eNoNw), updNx(eNoNw),
+     5   uadNx(eNoNw), sumxx(eNoNw)
 
-      rho  = eq(cEq)%dmn(cDmn)%prop(fluid_density)
-      f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
-      f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+!     Define parameters
+      rho   = eq(cEq)%dmn(cDmn)%prop(fluid_density)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
 
       wr   = w*rho
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
@@ -386,36 +472,44 @@
       wrl  = wr*T1
       wl   = w*T1
 
-!     Indices are not selected based on the equation only
-!     because fluid equation always come first
-      p  = 0._RKIND
-      u  = 0._RKIND
-      ud = -f
-      px = 0._RKIND
-      ux = 0._RKIND
-      DO a=1, eNoN
-         p = p + N(a)*yl(3,a)
+!     Velocity and its gradients, body force
+      u   =  0._RKIND
+      ux  =  0._RKIND
+      uxx =  0._RKIND
+      ud  = -fb
+      DO a=1, eNoNw
 
-         ud(1) = ud(1) + N(a)*(al(1,a)-bfl(1,a))
-         ud(2) = ud(2) + N(a)*(al(2,a)-bfl(2,a))
+         u(1)    = u(1) + Nw(a)*yl(1,a)
+         u(2)    = u(2) + Nw(a)*yl(2,a)
 
-         px(1) = px(1) + Nx(1,a)*yl(3,a)
-         px(2) = px(2) + Nx(2,a)*yl(3,a)
+         ux(1,1) = ux(1,1) + Nwx(1,a)*yl(1,a)
+         ux(2,1) = ux(2,1) + Nwx(2,a)*yl(1,a)
+         ux(1,2) = ux(1,2) + Nwx(1,a)*yl(2,a)
+         ux(2,2) = ux(2,2) + Nwx(2,a)*yl(2,a)
 
-         u(1) = u(1) + N(a)*yl(1,a)
-         u(2) = u(2) + N(a)*yl(2,a)
+         sumxx(a)= Nwxx(1,a) + Nwxx(2,a)
+         uxx(1)  = uxx(1)  + sumxx(a)*yl(1,a)
+         uxx(2)  = uxx(2)  + sumxx(a)*yl(2,a)         
 
-         ux(1,1) = ux(1,1) + Nx(1,a)*yl(1,a)
-         ux(2,1) = ux(2,1) + Nx(2,a)*yl(1,a)
-         ux(1,2) = ux(1,2) + Nx(1,a)*yl(2,a)
-         ux(2,2) = ux(2,2) + Nx(2,a)*yl(2,a)
+         ud(1)   = ud(1) + Nw(a)*(al(1,a)-bfl(1,a))
+         ud(2)   = ud(2) + Nw(a)*(al(2,a)-bfl(2,a))
       END DO
       IF (mvMsh) THEN
-         DO a=1, eNoN
-            u(1) = u(1) - N(a)*yl(4,a)
-            u(2) = u(2) - N(a)*yl(5,a)
+         DO a=1, eNoNw
+            u(1) = u(1) - Nw(a)*yl(4,a)
+            u(2) = u(2) - Nw(a)*yl(5,a)
          END DO
       END IF
+
+!     Pressure
+      p  = 0._RKIND
+      px = 0._RKIND
+      DO a=1, eNoNq
+         p = p + Nq(a)*yl(3,a)
+
+         px(1) = px(1) + Nqx(1,a)*yl(3,a)
+         px(2) = px(2) + Nqx(2,a)*yl(3,a)
+      END DO
 
 !     Strain rate tensor 2*e_ij := (u_ij + u_ji)
       es(1,1) = ux(1,1) + ux(1,1)
@@ -424,9 +518,9 @@
       es(1,2) = ux(1,2) + ux(2,1)
       es(2,1) = es(1,2)
 
-      DO a=1, eNoN
-        es_x(1,a) = es(1,1)*Nx(1,a) + es(1,2)*Nx(2,a)
-        es_x(2,a) = es(2,1)*Nx(1,a) + es(2,2)*Nx(2,a)
+      DO a=1, eNoNw
+        es_x(1,a) = es(1,1)*Nwx(1,a) + es(1,2)*Nwx(2,a)
+        es_x(2,a) = es(2,1)*Nwx(1,a) + es(2,2)*Nwx(2,a)
       END DO
 
 !     Shear-rate := (2*e_ij*e_ij)^.5
@@ -445,6 +539,8 @@
       END IF
       s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
 
+!     Stabilization coefficients
+!     SUPG for both P2P1 and P1P1         
       kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
      2   + u(1)*u(2)*ksix(1,2) + u(2)*u(2)*ksix(2,2)
 
@@ -452,26 +548,26 @@
      2   + ksix(1,2)*ksix(1,2) + ksix(2,2)*ksix(2,2)
 
       tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
-     2   ct(2)*nu_s*nu_s*kS + s*s )
+     2   ct(2)*nu_s*nu_s*kS + s*s ) !* lStab
 
       up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
-     2      + s*u(1))
+     2      - nu*uxx(1) + s*u(1))
       up(2) = -tauM*(ud(2) + px(2)/rho + u(1)*ux(1,2) + u(2)*ux(2,2)
-     2      + s*u(2))
+     2      - nu*uxx(2) + s*u(2))
 
       tauC = ksix(1,1) + ksix(2,2)
-      tauC = 1._RKIND/tauM/tauC
+      tauC = 1._RKIND/(tauM+eps)/tauC * lStab
 
       tauB = up(1)*up(1)*ksix(1,1) + up(2)*up(1)*ksix(2,1)
      2     + up(1)*up(2)*ksix(1,2) + up(2)*up(2)*ksix(2,2)
 
       IF (ISZERO(tauB)) tauB = eps
-      tauB = 1._RKIND/SQRT(tauB)
+      tauB = 1._RKIND/SQRT(tauB) * lStab
+
+      ua(1) = u(1) + up(1) * lStab
+      ua(2) = u(2) + up(2) * lStab
 
       divU = ux(1,1) + ux(2,2)
-
-      ua(1) = u(1) + up(1)
-      ua(2) = u(2) + up(2)
 
       rV(1) = tauB*(up(1)*ux(1,1) + up(2)*ux(2,1))
       rV(2) = tauB*(up(1)*ux(1,2) + up(2)*ux(2,2))
@@ -487,35 +583,33 @@
       rV(1) = ud(1) + ua(1)*(s + ux(1,1)) + ua(2)*ux(2,1)
       rV(2) = ud(2) + ua(1)*ux(1,2) + ua(2)*(s + ux(2,2))
 
-      DO a=1, eNoN
-         udNx(a)  = u(1)*Nx(1,a)  + u(2)*Nx(2,a)
-         updNx(a) = up(1)*Nx(1,a) + up(2)*Nx(2,a)
-         uadNx(a) = updNx(a) + udNx(a)
+!     Local residue
+      DO a=1, eNoNw
+         udNx(a)  = u(1)*Nwx(1,a)  + u(2)*Nwx(2,a)
+         updNx(a) = up(1)*Nwx(1,a) + up(2)*Nwx(2,a)
+         uadNx(a) = updNx(a) * lStab + udNx(a)
 
-         lR(1,a) = lR(1,a) + wr*(rV(1)*N(a) + rM(1,1)*Nx(1,a)
-     2      + rM(1,2)*Nx(2,a))
+         lR(1,a) = lR(1,a) + wr*(rV(1)*Nw(a) + rM(1,1)*Nwx(1,a)
+     2      + rM(1,2)*Nwx(2,a))
 
-         lR(2,a) = lR(2,a) + wr*(rV(2)*N(a) + rM(2,1)*Nx(1,a)
-     2      + rM(2,2)*Nx(2,a))
+         lR(2,a) = lR(2,a) + wr*(rV(2)*Nw(a) + rM(2,1)*Nwx(1,a)
+     2      + rM(2,2)*Nwx(2,a))
 
-         lR(3,a) = lR(3,a) + w*(N(a)*divU - updNx(a))
       END DO
 
-      DO a=1, eNoN
-         DO b=1, eNoN
-            rM(1,1) = Nx(1,a)*Nx(1,b)
-            rM(2,1) = Nx(2,a)*Nx(1,b)
-            rM(1,2) = Nx(1,a)*Nx(2,b)
-            rM(2,2) = Nx(2,a)*Nx(2,b)
+!     Tangent (stiffness) matrices
+      DO b=1, eNoNw
+         DO a=1, eNoNw
+            rM(1,1) = Nwx(1,a)*Nwx(1,b)
+            rM(2,1) = Nwx(2,a)*Nwx(1,b)
+            rM(1,2) = Nwx(1,a)*Nwx(2,b)
+            rM(2,2) = Nwx(2,a)*Nwx(2,b)
 
-            NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)
+            NxdNx = Nwx(1,a)*Nwx(1,b) + Nwx(2,a)*Nwx(2,b)
 
             T1 = nu*NxdNx + tauB*updNx(a)*updNx(b)
-     2         + N(a)*((s+amd)*N(b) + uadNx(b))
-     3         + tauM*uadNx(a)*(udNx(b) + (s+amd)*N(b))
-
-            T2 = tauM*udNx(a)
-            T3 = tauM*(amd*N(b) + udNx(b))
+     2         + Nw(a)*((s+amd)*Nw(b) + uadNx(b))
+     3         + tauM*uadNx(a)*(udNx(b) + (s+amd)*Nw(b) - nu*sumxx(b))
 
 !           dM/dU
             lK(1,a,b)  = lK(1,a,b) + wrl*((nu + tauC)*rM(1,1) + T1 +
@@ -527,22 +621,301 @@
      2         nu_x*es_x(2,a)*es_x(1,b))
             lK(5,a,b)  = lK(5,a,b) + wrl*((nu + tauC)*rM(2,2) + T1 +
      2         nu_x*es_x(2,a)*es_x(2,b))
+         END DO 
+      END DO
 
+      DO b=1, eNoNq
+         DO a=1, eNoNw
+            T2 = tauM*uadNx(a)
 !           dM/dP
-            lK(3,a,b)  = lK(3,a,b) - wl*(Nx(1,a)*N(b) - Nx(1,b)*T2)
-            lK(6,a,b)  = lK(6,a,b) - wl*(Nx(2,a)*N(b) - Nx(2,b)*T2)
-
-!           dC/dU
-            lK(7,a,b) = lK(7,a,b)  + wl*(Nx(1,b)*N(a) + Nx(1,a)*T3)
-            lK(8,a,b) = lK(8,a,b)  + wl*(Nx(2,b)*N(a) + Nx(2,a)*T3)
-
-!           dC/dP
-            lK(9,a,b) = lK(9,a,b)  + wl*tauM*NxdNx/rho
+            lK(3,a,b)  = lK(3,a,b) - wl*(Nwx(1,a)*Nq(b) - Nqx(1,b)*T2)
+            lK(6,a,b)  = lK(6,a,b) - wl*(Nwx(2,a)*Nq(b) - Nqx(2,b)*T2)
          END DO
       END DO
 
       RETURN
-      END SUBROUTINE FLUID2D
+      END SUBROUTINE FLUID2D_M
+!####################################################################
+      SUBROUTINE FLUID3D_C(lStab, eNoNw, eNoNq, w, ksix, Nw, Nq, Nwx,
+     2   Nqx, al, yl, bfl, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
+      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
+     2   Nq(eNoNq), Nwx(3,eNoNw), Nqx(3,eNoNq), al(tDof,eNoNw),
+     3   yl(tDof,eNoNw), bfl(3,eNoNw)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
+     2   lK(dof*dof,eNoNw,eNoNw)
+
+      REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
+
+      INTEGER(KIND=IKIND) :: a, b
+      REAL(KIND=RKIND) :: rho, fb(3), wl, amd, ud(3), u(3), 
+     2   up(3), ux(3,3), px(3), es(3,3), gam, s, nu, nu_s,
+     3   nu_x, kU, kS, tauM, divU, T1, NxdNx, updNx
+
+!     Define parameters
+      rho   = eq(cEq)%dmn(cDmn)%prop(fluid_density)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
+
+      T1   = eq(cEq)%af*eq(cEq)%gam*dt
+      amd  = eq(cEq)%am/T1
+      wl   = w*T1
+
+!     Velocity and its gradients, body force
+      u  =  0._RKIND
+      ux =  0._RKIND
+      ud = -fb
+      DO a=1, eNoNw
+         u(1)    = u(1)  + Nw(a)*yl(1,a)
+         u(2)    = u(2)  + Nw(a)*yl(2,a)
+         u(3)    = u(3)  + Nw(a)*yl(3,a)
+
+         ux(1,1) = ux(1,1) + Nwx(1,a)*yl(1,a)
+         ux(2,1) = ux(2,1) + Nwx(2,a)*yl(1,a)
+         ux(3,1) = ux(3,1) + Nwx(3,a)*yl(1,a)
+         ux(1,2) = ux(1,2) + Nwx(1,a)*yl(2,a)
+         ux(2,2) = ux(2,2) + Nwx(2,a)*yl(2,a)
+         ux(3,2) = ux(3,2) + Nwx(3,a)*yl(2,a)
+         ux(1,3) = ux(1,3) + Nwx(1,a)*yl(3,a)
+         ux(2,3) = ux(2,3) + Nwx(2,a)*yl(3,a)
+         ux(3,3) = ux(3,3) + Nwx(3,a)*yl(3,a)
+
+         ud(1)   = ud(1) + Nw(a)*(al(1,a)-bfl(1,a))
+         ud(2)   = ud(2) + Nw(a)*(al(2,a)-bfl(2,a))
+         ud(3)   = ud(3) + Nw(a)*(al(3,a)-bfl(3,a))
+      END DO
+      IF (mvMsh) THEN
+         DO a=1, eNoNw
+            u(1) = u(1) - Nw(a)*yl(5,a)
+            u(2) = u(2) - Nw(a)*yl(6,a)
+            u(3) = u(3) - Nw(a)*yl(7,a)
+         END DO
+      END IF
+
+!     Pressure
+      px = 0._RKIND
+      DO a=1, eNoNq
+         px(1) = px(1) + Nqx(1,a)*yl(4,a)
+         px(2) = px(2) + Nqx(2,a)*yl(4,a)
+         px(3) = px(3) + Nqx(3,a)*yl(4,a)
+      END DO
+
+!     Strain rate tensor 2*e_ij := (u_ij + u_ji)
+      es(1,1) = ux(1,1) + ux(1,1)
+      es(2,2) = ux(2,2) + ux(2,2)
+      es(3,3) = ux(3,3) + ux(3,3)
+
+      es(1,2) = ux(1,2) + ux(2,1)
+      es(1,3) = ux(1,3) + ux(3,1)
+      es(2,3) = ux(2,3) + ux(3,2)
+
+      es(2,1) = es(1,2)
+      es(3,1) = es(1,3)
+      es(3,2) = es(2,3)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(1,3)*es(1,3) +
+     2      es(2,1)*es(2,1) + es(2,2)*es(2,2) + es(2,3)*es(2,3) +
+     3      es(3,1)*es(3,1) + es(3,2)*es(3,2) + es(3,3)*es(3,3)
+      gam = SQRT(0.5_RKIND*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
+      nu   = nu/rho
+      nu_s = nu_s/rho
+      IF (ISZERO(gam)) THEN
+         nu_x = 0._RKIND
+      ELSE
+         nu_x = nu_x/rho/gam
+      END IF
+      s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
+
+!     Stabilization coefficients      
+      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
+     2   + u(3)*u(1)*ksix(3,1) + u(1)*u(2)*ksix(1,2)
+     3   + u(2)*u(2)*ksix(2,2) + u(3)*u(2)*ksix(3,2)
+     4   + u(1)*u(3)*ksix(1,3) + u(2)*u(3)*ksix(2,3)
+     5   + u(3)*u(3)*ksix(3,3)
+
+      kS = ksix(1,1)*ksix(1,1) + ksix(2,1)*ksix(2,1)
+     2   + ksix(3,1)*ksix(3,1) + ksix(1,2)*ksix(1,2)
+     3   + ksix(2,2)*ksix(2,2) + ksix(3,2)*ksix(3,2)
+     4   + ksix(1,3)*ksix(1,3) + ksix(2,3)*ksix(2,3)
+     5   + ksix(3,3)*ksix(3,3)
+
+      tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
+     2       ct(2)*nu_s*nu_s*kS + s*s ) * lStab
+
+      up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
+     2      + u(3)*ux(3,1) + s*u(1))
+      up(2) = -tauM*(ud(2) + px(2)/rho + u(1)*ux(1,2) + u(2)*ux(2,2)
+     2      + u(3)*ux(3,2) + s*u(2))
+      up(3) = -tauM*(ud(3) + px(3)/rho + u(1)*ux(1,3) + u(2)*ux(2,3)
+     2      + u(3)*ux(3,3) + s*u(3))
+
+      divU = ux(1,1) + ux(2,2) + ux(3,3)
+
+!     Local residue
+      DO a=1, eNoNq
+         updNx   = up(1)*Nqx(1,a) + up(2)*Nqx(2,a) + up(3)*Nqx(3,a)
+         lR(4,a) = lR(4,a) + w*(Nq(a)*divU - updNx)
+      END DO
+
+!     Tangent (stiffness) matrices
+      DO b=1, eNoNw
+         T1 = tauM*(amd*Nw(b) + u(1)*Nwx(1,b) + u(2)*Nwx(2,b) + 
+     2      u(3)*Nwx(3,b))
+         DO a=1, eNoNq
+!           dC/dU
+            lK(13,a,b) = lK(13,a,b) + wl*(Nwx(1,b)*Nq(a) + Nqx(1,a)*T1)
+            lK(14,a,b) = lK(14,a,b) + wl*(Nwx(2,b)*Nq(a) + Nqx(2,a)*T1)
+            lK(15,a,b) = lK(15,a,b) + wl*(Nwx(3,b)*Nq(a) + Nqx(3,a)*T1)
+         END DO 
+      END DO
+
+      DO b=1, eNoNq
+         DO a=1, eNoNq
+            NxdNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b) + 
+     2              Nqx(3,a)*Nqx(3,b)
+!           dC/dP
+            lK(16,a,b) = lK(16,a,b) + wl*tauM*NxdNx/rho
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE FLUID3D_C
+!--------------------------------------------------------------------
+      SUBROUTINE FLUID2D_C(lStab, eNoNw, eNoNq, w, ksix, Nw, Nq, Nwx,
+     2   Nqx, al, yl, bfl, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
+      REAL(KIND=RKIND), INTENT(IN) :: w, ksix(nsd,nsd), Nw(eNoNw),
+     2   Nq(eNoNq), Nwx(2,eNoNw), Nqx(2,eNoNq), al(tDof,eNoNw),
+     3   yl(tDof,eNoNw), bfl(2,eNoNw)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
+     2   lK(dof*dof,eNoNw,eNoNw)
+
+      REAL(KIND=RKIND), PARAMETER :: ct(2) = (/1._RKIND, 36._RKIND/)
+
+      INTEGER(KIND=IKIND) :: a, b
+      REAL(KIND=RKIND) :: rho, fb(2), wl, amd, ud(2), u(2), 
+     2   up(2), ux(2,2), px(2), es(2,2), gam, s, nu, nu_s, 
+     3   nu_x, kU, kS, tauM, divU, T1, NxdNx, updNx
+
+!     Define parameters
+      rho   = eq(cEq)%dmn(cDmn)%prop(fluid_density)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      
+      T1   = eq(cEq)%af*eq(cEq)%gam*dt
+      amd  = eq(cEq)%am/T1
+      wl   = w*T1
+
+!     Velocity and its gradients, body force
+      u  =  0._RKIND
+      ux =  0._RKIND
+      ud = -fb
+      DO a=1, eNoNw
+
+         u(1)    = u(1) + Nw(a)*yl(1,a)
+         u(2)    = u(2) + Nw(a)*yl(2,a)
+
+         ux(1,1) = ux(1,1) + Nwx(1,a)*yl(1,a)
+         ux(2,1) = ux(2,1) + Nwx(2,a)*yl(1,a)
+         ux(1,2) = ux(1,2) + Nwx(1,a)*yl(2,a)
+         ux(2,2) = ux(2,2) + Nwx(2,a)*yl(2,a)
+
+         ud(1)   = ud(1) + Nw(a)*(al(1,a)-bfl(1,a))
+         ud(2)   = ud(2) + Nw(a)*(al(2,a)-bfl(2,a))
+      END DO
+      IF (mvMsh) THEN
+         DO a=1, eNoNw
+            u(1) = u(1) - Nw(a)*yl(4,a)
+            u(2) = u(2) - Nw(a)*yl(5,a)
+         END DO
+      END IF
+
+!     Pressure
+      px = 0._RKIND
+      DO a=1, eNoNq
+         px(1) = px(1) + Nqx(1,a)*yl(3,a)
+         px(2) = px(2) + Nqx(2,a)*yl(3,a)
+      END DO
+
+!     Strain rate tensor 2*e_ij := (u_ij + u_ji)
+      es(1,1) = ux(1,1) + ux(1,1)
+      es(2,2) = ux(2,2) + ux(2,2)
+
+      es(1,2) = ux(1,2) + ux(2,1)
+      es(2,1) = es(1,2)
+
+!     Shear-rate := (2*e_ij*e_ij)^.5
+      gam = es(1,1)*es(1,1) + es(1,2)*es(1,2) + es(2,1)*es(2,1)
+     2    + es(2,2)*es(2,2)
+      gam = SQRT(0.5_RKIND*gam)
+
+!     Compute viscosity based on shear-rate and chosen viscosity model
+      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, nu, nu_s, nu_x)
+      nu   = nu/rho
+      nu_s = nu_s/rho
+      IF (ISZERO(gam)) THEN
+         nu_x = 0._RKIND
+      ELSE
+         nu_x = nu_x/rho/gam
+      END IF
+      s  = nu/eq(cEq)%dmn(cDmn)%prop(permeability)
+
+!     Stabilization coefficients      
+      kU = u(1)*u(1)*ksix(1,1) + u(2)*u(1)*ksix(2,1)
+     2   + u(1)*u(2)*ksix(1,2) + u(2)*u(2)*ksix(2,2)
+
+      kS = ksix(1,1)*ksix(1,1) + ksix(2,1)*ksix(2,1)
+     2   + ksix(1,2)*ksix(1,2) + ksix(2,2)*ksix(2,2)
+
+      tauM = 1._RKIND / SQRT( (2._RKIND*ct(1)/dt)**2._RKIND + kU +
+     2       ct(2)*nu_s*nu_s*kS + s*s ) * lStab
+
+      up(1) = -tauM*(ud(1) + px(1)/rho + u(1)*ux(1,1) + u(2)*ux(2,1)
+     2      + s*u(1))
+      up(2) = -tauM*(ud(2) + px(2)/rho + u(1)*ux(1,2) + u(2)*ux(2,2)
+     2      + s*u(2))
+      
+      divU = ux(1,1) + ux(2,2)
+
+!     Local residue
+      DO a=1, eNoNq
+         updNx   = up(1)*Nqx(1,a) + up(2)*Nqx(2,a)
+         lR(3,a) = lR(3,a) + w*(Nq(a)*divU - updNx)
+      END DO
+
+!     Tangent (stiffness) matrices
+      DO b=1, eNoNw
+         T1 = tauM*(amd*Nw(b) + u(1)*Nwx(1,b) + u(2)*Nwx(2,b))
+         DO a = 1, eNoNq
+!           dC/dU
+            lK(7,a,b) = lK(7,a,b) + wl*(Nwx(1,b)*Nq(a) + Nqx(1,a)*T1)
+            lK(8,a,b) = lK(8,a,b) + wl*(Nwx(2,b)*Nq(a) + Nqx(2,a)*T1)
+         END DO 
+      END DO 
+
+      DO b = 1, eNoNq
+         DO a = 1, eNoNq
+            NxdNx = Nqx(1,a)*Nqx(1,b) + Nqx(2,a)*Nqx(2,b)
+!           dC/dP
+            lK(9,a,b) = lK(9,a,b) + wl*tauM*NxdNx/rho
+         END DO 
+      END DO 
+
+      RETURN
+      END SUBROUTINE FLUID2D_C
 !####################################################################
       PURE SUBROUTINE BFLUID(eNoN, w, N, y, h, nV, lR, lK)
       USE COMMOD

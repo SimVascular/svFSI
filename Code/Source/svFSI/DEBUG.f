@@ -291,3 +291,54 @@
       RETURN
       END SUBROUTINE DEBUGVALR
 !####################################################################
+!     This subroutine assembels the element stiffness matrix into the
+!     global stiffness matrix STIFF, only works for serial code
+      SUBROUTINE OUTPUTVALR(lVal, lR, Prefix)
+      USE TYPEMOD
+      USE COMMOD
+      IMPLICIT NONE
+
+      REAL(KIND=RKIND), INTENT(IN) :: lVal(dof*dof,lhs%nnz), 
+     2   lR(dof,lhs%nNo)
+      CHARACTER(LEN=*), INTENT(IN) :: Prefix
+
+      INTEGER(KIND=IKIND) ptr, rowN, colN, left, right, fid
+      INTEGER(KIND=IKIND) iref, jref, recLn_K, recLn_R
+      REAL(KIND=RKIND) :: STIFF(dof*tnNo,dof*tnNo)
+      REAL(KIND=RKIND) :: RR(dof*tnNo)
+      INQUIRE(IOLENGTH=recLn_K) STIFF
+      INQUIRE(IOLENGTH=recLn_R) RR
+
+      PRINT *, "dof=", dof 
+      PRINT *, "tnNo=", tnNo
+
+!     Write stiffness matrix in binary
+      STIFF = 0._RKIND
+      DO rowN=1, tnNo
+         iref = dof*(rowN-1)
+         left  = rowPtr(rowN)
+         right = rowPtr(rowN+1) - 1
+         DO ptr=left, right
+            colN = colPtr(ptr)
+            jref = dof*(colN-1)
+            STIFF((iref+1):(iref+dof),(jref+1):(jref+dof)) = 
+     2          TRANSPOSE(RESHAPE(lVal(:,ptr),(/dof,dof/)))
+         END DO
+      END DO
+      fid = 59999
+      OPEN(UNIT=fid,FILE=TRIM(Prefix)//'_K.bin',STATUS='replace',
+     2     FORM='unformatted',ACCESS='direct',recl=recLn_K)    
+      WRITE(fid,rec=1) STIFF
+      CLOSE(fid)
+
+!     Write right hand side in binary 
+      RR = RESHAPE(lR,(/dof*tnNo/))
+      fid = 59999
+      OPEN(UNIT=fid,FILE=TRIM(Prefix)//'_R.bin',STATUS='replace',
+     2     FORM='unformatted',ACCESS='direct',recl=recLn_R)    
+      WRITE(fid,rec=1) RR
+      CLOSE(fid)
+
+      RETURN
+      END SUBROUTINE OUTPUTVALR
+!####################################################################

@@ -66,6 +66,12 @@
 
 !     Sets Taylor-Hood basis if invoked by user (fluid, ustruct, FSI)
       IF (lM%nFs .EQ. 2) THEN
+!        Second order derivative for vector function space
+         DO g=1, lM%fs(1)%nG
+            CALL GETGNNxx(lM%fs(1)%eNoN, lM%fs(1)%eType, 
+     2                    lM%fs(1)%Nxx(:,:,g))
+         END DO
+
 !        Select Taylor-Hood element
          CALL SETTHOODFS(lM%fs(2), lM%fs(1)%eType)
 
@@ -154,7 +160,9 @@
       ALLOCATE(fs%w(nG), fs%xi(insd,nG), fs%xib(2,nsd), fs%N(eNoN,nG),
      2   fs%Nb(2,eNoN), fs%Nx(insd,eNoN,nG))
 
-      IF (fs%eType .EQ. eType_NRB) THEN
+      IF ((fs%eType .EQ. eType_NRB) .OR. 
+     2    (fs%eType .EQ. eType_QTR) .OR.
+     3    (fs%eType .EQ. eType_QTE)) THEN
          IF (insd .EQ. 1) THEN
             ALLOCATE(fs%Nxx(1,eNoN,nG))
          ELSE IF (insd .EQ. 2) THEN
@@ -212,14 +220,14 @@
       IMPLICIT NONE
       TYPE(fsType), INTENT(OUT) :: fs(2)
       TYPE(mshType), INTENT(IN) :: lM
-      LOGICAL, INTENT(IN) :: lStab
+      REAL(KIND=RKIND), INTENT(IN) :: lStab
       INTEGER, INTENT(IN) :: iOpt
 
       INTEGER i, g
 
       CALL DESTROY(fs(1))
       CALL DESTROY(fs(2))
-      IF (lStab) THEN
+      IF (lStab .GT. 0._RKIND+eps) THEN
          DO i=1, 2
             fs(i)%nG    = lM%fs(1)%nG
             fs(i)%eType = lM%fs(1)%eType
@@ -238,10 +246,11 @@
             fs(1)%lShpF = lM%fs(1)%lShpF
             fs(1)%eNoN  = lM%fs(1)%eNoN
             CALL ALLOCFS(fs(1), nsd)
-            fs(1)%w  = lM%fs(1)%w
-            fs(1)%xi = lM%fs(1)%xi
-            fs(1)%N  = lM%fs(1)%N
-            fs(1)%Nx = lM%fs(1)%Nx
+            fs(1)%w   = lM%fs(1)%w
+            fs(1)%xi  = lM%fs(1)%xi
+            fs(1)%N   = lM%fs(1)%N
+            fs(1)%Nx  = lM%fs(1)%Nx
+            fs(1)%Nxx = lM%fs(1)%Nxx
 
             fs(2)%nG    = lM%fs(1)%nG
             fs(2)%eType = lM%fs(2)%eType
