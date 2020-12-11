@@ -88,7 +88,7 @@
      4      lEq%FSILS%RI%reltol, lEq%FSILS%RI%mItr, lEq%FSILS%RI%sD,
      5      lEq%ls%PREC_Type, lEq%assmTLS)
 
-      ELSE IF(lEq%useTLS) THEN
+      ELSE IF(lEq%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
          CALL TRILINOS_GLOBAL_SOLVE(Val, R, tls%R, tls%W,
      2      lEq%FSILS%RI%fNorm, lEq%FSILS%RI%iNorm, lEq%FSILS%RI%itr,
      3      lEq%FSILS%RI%callD, lEq%FSILS%RI%dB, lEq%FSILS%RI%suc,
@@ -97,8 +97,43 @@
 
       ELSE
 #endif
+
+#ifdef WITH_HYPRE
+      IF (lEq%ls%LS_Packg .EQ. lSPackg_HYPRE) THEN
+         ! RCS preconditioner
+         ALLOCATE(Wr(dof,hp%mynNo), Wc(dof,gtnNo))
+         CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
+         IF ((dof .NE. hp%dof) .OR. (.NOT. hp%init)) THEN
+            ! Hypre initialization
+            CALL HYPRE_DOFSPARSE(dof, gtnNo, lhs%commu%comm)
+            CALL HYPRE_INITIALIZE(dof, hp%ilower, hp%mynNo, 
+     2          lhs%commu%comm)
+            hp%init = .TRUE.
+         END IF
+         CALL HYPRE_COMMU(Val,R)
+         CALL HYPRE_PRECONDRCS(lhs, hp%rowPtr, hp%colPtr, hp%diagPtr,
+     2    hp%mynNo, gtnNo, hp%nnz, dof, hp%Val, hp%R, hp%ltg, Wr, Wc)
+         CALL HYPRE_PRE_SOLVE(dof, lhs%commu, lEq%FSILS%RI)
+         CALL HYPRE_SOLVE(lVal, lR, dof, hp%nnz, hp%mynNo, hp%ilower,
+     2      lrowPtr, lcolPtr, lhs%commu%comm, lhs%commu%task,
+     3      lEq%FSILS%RI%fNorm, lEq%FSILS%RI%iNorm, lEq%FSILS%RI%itr,
+     4      lEq%ls%LS_Type, lEq%ls%PREC_Type, lEq%FSILS%RI%suc,
+     5      lEq%ls%mItr, lEq%ls%sD)
+
+         CALL HYPRE_POST_SOLVE(Wc,R,lEq%FSILS%RI)
+
+         DEALLOCATE(Wr, Wc)
+      
+      ELSE
+#endif
+
          CALL FSILS_SOLVE(lhs, lEq%FSILS, dof, R, Val,
      2      lEq%ls%PREC_Type, incL=incL, res=res)
+
+#ifdef WITH_HYPRE
+      END IF
+#endif  
+
 #ifdef WITH_TRILINOS
       END IF
 
