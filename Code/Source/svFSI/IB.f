@@ -287,6 +287,7 @@
 
       lPtr => lIBs%get(ctmp, "Method")
       IF (ASSOCIATED(lPtr)) THEN
+         CALL TO_UPPER(ctmp)
          SELECT CASE (ctmp)
          CASE ("SSM")
             ib%mthd = ibMthd_SSM
@@ -354,6 +355,7 @@
 
 !        IB Equation being solved: shell/struct/lElas
          lPtr => lPD%get(ctmp, "Equation", 1)
+         CALL TO_LOWER(ctmp)
          propL = prop_NA
          SELECT CASE(TRIM(ctmp))
          CASE("shell")
@@ -538,12 +540,13 @@
       nOut = list%srch("Output (IB)")
       DO iOut=1, nOut
          lPO => list%get(ctmp,"Output (IB)",iOut)
+         CALL TO_LOWER(ctmp)
          SELECT CASE(TRIM(ctmp))
-         CASE("Spatial")
+         CASE("spatial")
             j = 1
-         CASE("B_INT")
+         CASE("b_int")
             j = 2
-         CASE("V_INT")
+         CASE("v_int")
             j = 3
          CASE DEFAULT
             j = -1
@@ -618,10 +621,11 @@
 
 !     Reading the type: Dir/Neu
       lPtr => list%get(ctmp,"Type")
+      CALL TO_LOWER(ctmp)
       SELECT CASE (ctmp)
-      CASE ("Dirichlet","Dir")
+      CASE ("dirichlet","dir")
          lBc%bType = IBSET(lBc%bType,bType_Dir)
-      CASE ("Neumann","Neu")
+      CASE ("neumann","neu")
          lBc%bType = IBSET(lBc%bType,bType_Neu)
       CASE DEFAULT
          err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
@@ -653,21 +657,22 @@
 !     NURBS elements
       lPtr => list%get(ctmp,"Shell BC type")
       IF (ASSOCIATED(lPtr)) THEN
+         CALL TO_LOWER(ctmp)
          SELECT CASE (ctmp)
-         CASE ("Fixed", "fixed", "Clamped", "clamped")
+         CASE ("fixed", "clamped")
             lBc%bType = IBSET(lBc%bType,bType_fix)
             IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Fixed BC "//
      2         "can be applied for Dirichlet boundaries only"
-         CASE ("Hinged", "hinged")
+         CASE ("hinged")
             lBc%bType = IBSET(lBc%bType,bType_hing)
             IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Hinged BC "//
      2         "can be applied for Dirichlet boundaries only"
-         CASE ("Free", "free")
+         CASE ("free")
             lBc%bType = IBSET(lBc%bType,bType_free)
             IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Free BC "//
      2         "can be applied for Neumann boundaries only"
 !       Symm BC needs to be verified
-c         CASE ("Symm", "symm", "Symmetric", "symmetric")
+c         CASE ("symm", "symmetric")
 c            lBc%bType = IBSET(lBc%bType,bType_symm)
 c            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Symm BC "//
 c     2         "can be applied for Neumann boundaries only"
@@ -680,13 +685,14 @@ c     2         "can be applied for Neumann boundaries only"
       ALLOCATE(lBc%eDrn(nsd))
       lBc%eDrn = 0
       lPtr => list%get(lBc%eDrn,"Effective direction")
-      ctmp = "Steady"
+      ctmp = "steady"
       lPtr => list%get(ctmp,"Time dependence")
+      CALL TO_LOWER(ctmp)
       SELECT CASE (ctmp)
-      CASE ('Steady')
+      CASE ('steady')
          lBc%bType = IBSET(lBc%bType,bType_std)
          lPtr => list%get(lBc%g,"Value",1)
-      CASE ('Unsteady')
+      CASE ('unsteady')
          lBc%bType = IBSET(lBc%bType,bType_ustd)
          ALLOCATE(lBc%gt)
          lPtr => list%get(fTmp,"Temporal values file path")
@@ -718,11 +724,11 @@ c     2         "can be applied for Neumann boundaries only"
             END DO
             CLOSE(fid)
          END IF
-      CASE ('Coupled')
+      CASE ('coupled')
          err = " Cannot apply Coupled BCs for immersed bodies"
-      CASE ('Resistance')
+      CASE ('resistance')
          err = " Cannot apply Resistance BCs for immersed bodies"
-      CASE ('General')
+      CASE ('general')
          lBc%bType = IBSET(lBc%bType,bType_gen)
          lPtr =>list%get(fTmp,"Temporal and spatial values file path",1)
          fid = fTmp%open()
@@ -813,16 +819,17 @@ c     2         "can be applied for Neumann boundaries only"
       IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_impD)
 
 !     Reading the spatial profile: flat/para/ud
-      ctmp = "Flat"
+      ctmp = "flat"
       lPtr => list%get(ctmp,"Profile")
+      CALL TO_LOWER(ctmp)
       SELECT CASE (ctmp)
-      CASE ('Flat')
+      CASE ('flat')
          lBc%bType = IBSET(lBc%bType,bType_flat)
-      CASE ('Parabolic')
+      CASE ('parabolic')
          IF (iFa .EQ. 0) err = "Parabolic profile not yet set up for "//
      2      "immersed shells"
          lBc%bType = IBSET(lBc%bType,bType_para)
-      CASE ('User_defined')
+      CASE ('user_defined')
          lBc%bType = IBSET(lBc%bType,bType_ud)
          lPtr => list%get(fTmp,"Spatial profile file path",1)
          fid = fTmp%open()

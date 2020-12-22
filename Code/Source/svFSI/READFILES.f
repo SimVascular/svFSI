@@ -233,6 +233,7 @@
       DO iEq=1, nEq
 !     This is pointing to an equation list
          lPtr => list%get(ctmp,"Add equation",iEq)
+         CALL TO_LOWER(ctmp)
          CALL READEQ(eq(iEq), lPtr, ctmp)
          IF (ibFlag) THEN
             IF (eq(iEq)%phys .EQ. phys_fluid .OR.
@@ -252,6 +253,7 @@
          IF (eq(iEq)%phys .EQ. phys_FSI) THEN
             IF (iEq .NE. 1) err = "FSI equation must come first"
             lPtr => list%get(ctmp,"Add equation",2)
+            CALL TO_LOWER(ctmp)
             IF (ctmp .NE. "mesh") err = "mesh equation"//
      2         " has to be specified after FSI equation"
          END IF
@@ -265,8 +267,9 @@
      2         "More than one mesh is needed to apply contact model"
          END IF
          lPtr => list%get(ctmp,"Add equation",1)
+         CALL TO_LOWER(ctmp)
          IF (eq(iEq)%phys .EQ. phys_heatF) THEN
-            IF (ctmp.NE."fluid" .AND. ctmp.NE."FSI") THEN
+            IF (ctmp.NE."fluid" .AND. ctmp.NE."fsi") THEN
                err = "heatF equation has to be specified after"//
      2            " fluid/FSI equation"
             END IF
@@ -364,6 +367,7 @@
             lPBC => list%get(ctmp,"Couple to cplBC")
          END IF
          IF (ASSOCIATED(lPBC)) THEN
+            CALL TO_UPPER(ctmp)
             SELECT CASE(ctmp)
             CASE('N')
                cplBC%schm = cplBC_NA
@@ -448,7 +452,7 @@
          CALL READLS(lSolver_NS, lEq, list)
 
 !     HEAT FLUID advection diffusion solver -------------------------
-      CASE ('heatF', 'dyeTransport', 'scalarTransport', 'AD')
+      CASE ('heatf', 'dyetransport', 'scalartransport', 'ad')
          lEq%phys = phys_heatF
 
          propL(1,1) = conductivity
@@ -462,7 +466,7 @@
          CALL READLS(lSolver_GMRES, lEq, list)
 
 !     HEAT SOLID Laplac equation solver------------------------------
-      CASE ('heatS', 'laplace', 'poisson')
+      CASE ('heats', 'laplace', 'poisson')
          lEq%phys = phys_heatS
 
          propL(1,1) = conductivity
@@ -477,7 +481,7 @@
          CALL READLS(lSolver_GMRES, lEq, list)
 
 !     LINEAR ELASTICITY equation solver------------------------------
-      CASE ('lElas')
+      CASE ('lelas')
          lEq%phys = phys_lElas
 
          propL(1,1) = solid_density
@@ -610,7 +614,7 @@
          CALL READLS(lSolver_CG, lEq, list)
 
 !     COUPLED MOMENTUM FLUID STRUCTURE INTERACTION equation solver---
-      CASE ('CMM')
+      CASE ('cmm')
          IF (nsd .NE. 3) err = "CMM eq. is not implemented for 2D "//
      2      "domains"
          lEq%phys = phys_CMM
@@ -705,7 +709,7 @@
          CALL READLS(lSolver_GMRES, lEq, list)
 
 !     FLUID STRUCTURE INTERACTION equation solver---------------------
-      CASE ('FSI')
+      CASE ('fsi')
          lEq%phys = phys_FSI
          mvMsh    = .TRUE.
          lPtr => list%get(THflag, "Use Taylor-Hood type basis")
@@ -798,7 +802,7 @@
 
 !     Basset-Boussinesq-Oseen equation solver------------------------
 !     Cardiac Electro-Physiology equation----------------------------
-      CASE ('CEP')
+      CASE ('cep')
          lEq%phys = phys_CEP
          cepEq    = .TRUE.
 
@@ -1158,53 +1162,105 @@
          IF (ASSOCIATED(lPtr)) THEN
             CALL TO_LOWER(ctmp)
             SELECT CASE(TRIM(ctmp))
-            CASE('fsils', 'svfsi')
-               lEq%ls%PREC_Type = PREC_FSILS
+            CASE('diagonal','diag','fsils','svfsi')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  lEq%ls%PREC_Type = PREC_FSILS
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
+               CASE(lSPackg_HYPRE)
+                  lEq%ls%PREC_Type = PREC_HYPRE_DIAGONAL
+               END SELECT
             CASE('rcs', 'row-column-scaling')
-               lEq%ls%PREC_Type = PREC_RCS
-#ifdef WITH_TRILINOS
-            CASE('trilinos-diagonal')
-               lEq%ls%PREC_Type = PREC_TRILINOS_DIAGONAL
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-            CASE('trilinos-blockjacobi', 'blockjacobi')
-               lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-            CASE('trilinos-ilu')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ILU
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-            CASE('trilinos-ilut')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-            CASE('trilinos-ic')
-               lEq%ls%PREC_Type = PREC_TRILINOS_IC
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-            CASE('trilinos-ict')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ICT
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-            CASE ('trilinos-ml')
-               lEq%ls%PREC_Type = PREC_TRILINOS_ML
-               lEq%ls%LS_Packg  = lSPackg_TRILINOS
-#endif
-#ifdef WITH_HYPRE
-            CASE('hypre-none')
-               lEq%ls%PREC_Type = PREC_HYPRE_NONE
-               lEq%ls%LS_Packg  = lSPackg_HYPRE
-            CASE('hypre-diagonal')
-               lEq%ls%PREC_Type = PREC_HYPRE_DIAGONAL
-               lEq%ls%LS_Packg  = lSPackg_HYPRE
-            CASE('hypre-amg')
-               lEq%ls%PREC_Type = PREC_HYPRE_AMG
-               lEq%ls%LS_Packg  = lSPackg_HYPRE
-            CASE('hypre-pilut')
-               lEq%ls%PREC_Type = PREC_HYPRE_PILUT
-               lEq%ls%LS_Packg  = lSPackg_HYPRE
-            CASE('hypre-euclid')
-               lEq%ls%PREC_Type = PREC_HYPRE_EUCLID
-               lEq%ls%LS_Packg  = lSPackg_HYPRE
-#endif
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  lEq%ls%PREC_Type = PREC_RCS
+               CASE(lSPackg_TRILINOS)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Native."
+               CASE(lSPackg_HYPRE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Native." 
+               END SELECT
+            CASE('blockjacobi')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos."  
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_BLOCK_JACOBI
+               CASE(lSPackg_HYPRE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos." 
+               END SELECT
+            CASE('ilu')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2               //TRIM(ctmp)//" only avaiable in Hypre/Trilinos."  
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_ILU
+               CASE(lSPackg_HYPRE)
+                  lEq%ls%PREC_Type = PREC_HYPRE_EUCLID
+               END SELECT
+            CASE('ilut')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos."  
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_ILUT
+               CASE(lSPackg_HYPRE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos." 
+               END SELECT
+            CASE('ic')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos."  
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_IC
+               CASE(lSPackg_HYPRE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos." 
+               END SELECT
+            CASE('ict')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos."  
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_ICT
+               CASE(lSPackg_HYPRE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos." 
+               END SELECT
+            CASE('ml')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos."  
+               CASE(lSPackg_TRILINOS)
+                  lEq%ls%PREC_Type = PREC_TRILINOS_ML
+               CASE(lSPackg_HYPRE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Trilinos." 
+               END SELECT
+            CASE('amg')
+               SELECT CASE(lEq%ls%LS_Packg)
+               CASE(lSPackg_NATIVE)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Hypre."  
+               CASE(lSPackg_TRILINOS)
+                  err = TRIM(list%ping("Preconditioner",lPtr))
+     2                     //TRIM(ctmp)//" only avaiable in Hypre."  
+               CASE(lSPackg_HYPRE)
+                  lEq%ls%PREC_Type = PREC_HYPRE_AMG
+               END SELECT
             CASE DEFAULT
                err = TRIM(list%ping("Preconditioner",lPtr))
-     2          //" Undefined type"
+     2                  //TRIM(ctmp)//" Undefined type"               
             END SELECT
          END IF
 
@@ -1459,14 +1515,15 @@
       nOut = list%srch("Output")
       DO iOut=1, nOut
          lPO => list%get(ctmp,"Output",iOut)
+         CALL TO_LOWER(ctmp)
          SELECT CASE(TRIM(ctmp))
-         CASE("Spatial")
+         CASE("spatial")
             j = 1
-         CASE("B_INT", "Boundary_integral")
+         CASE("b_int", "boundary_integral")
             j = 2
-         CASE("V_INT", "Volume_integral")
+         CASE("v_int", "volume_integral")
             j = 3
-         CASE ("Alias")
+         CASE ("alias")
             CYCLE
          CASE DEFAULT
             j = -1
@@ -1485,8 +1542,9 @@
 !     Read any alias names for outputs
       DO iOut=1, nOut
          lPO => list%get(ctmp,"Output",iOut)
+         CALL TO_LOWER(ctmp)
          SELECT CASE (TRIM(ctmp))
-         CASE ("Alias")
+         CASE ("alias")
             DO i=1, lEq%nOutput
                lPtr => lPO%get(stmp, TRIM(lEq%output(i)%name))
                IF (ASSOCIATED(lPtr)) lEq%output(i)%name = TRIM(stmp)
@@ -1521,14 +1579,15 @@
 
 !     Reading the type: Dir/Neu/Per
       lPtr => list%get(ctmp,"Type")
+      CALL TO_LOWER(ctmp)
       SELECT CASE (ctmp)
-      CASE ("Dirichlet","Dir")
+      CASE ("dirichlet","dir")
          lBc%bType = IBSET(lBc%bType,bType_Dir)
-      CASE ("Neumann","Neu")
+      CASE ("neumann","neu")
          lBc%bType = IBSET(lBc%bType,bType_Neu)
          IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
      2      lBc%bType = IBSET(lBc%bType,bType_bfs)
-      CASE ("Traction","Trac")
+      CASE ("traction","trac")
          lBc%bType = IBSET(lBc%bType,bType_trac)
 
          lPtr => list%get(fTmp, "Traction values file path")
@@ -1559,10 +1618,10 @@
             lBc%weakDir = .FALSE.
             RETURN
          END IF
-      CASE ("Robin", "Rbn")
+      CASE ("robin", "rbn")
          lBc%bType = IBSET(lBc%bType,bType_Robin)
          lBc%bType = IBSET(lBc%bType,bType_Neu)
-      CASE ("Coupled Momentum","CMM")
+      CASE ("coupled momentum","cmm")
          lBc%bType = IBSET(lBc%bType,bType_CMM)
       CASE DEFAULT
          err = TRIM(list%ping("Type",lPtr))//" Unexpected BC type"
@@ -1576,10 +1635,11 @@
       lBc%eDrn = 0
       lPtr => list%get(lBc%eDrn,"Effective direction")
 
-      ctmp = "Steady"
+      ctmp = "steady"
       lPtr => list%get(ctmp,"Time dependence")
+      CALL TO_LOWER(ctmp)
       SELECT CASE (ctmp)
-      CASE ('Steady')
+      CASE ('steady')
          lBc%bType = IBSET(lBc%bType,bType_std)
          IF (BTEST(lBc%bType, bType_trac)) THEN
             lBc%h = 0._RKIND
@@ -1588,7 +1648,7 @@
             lBc%g = 0._RKIND
             lPtr => list%get(lBc%g,"Value")
          END IF
-      CASE ('Unsteady')
+      CASE ('unsteady')
          lBc%bType = IBSET(lBc%bType,bType_ustd)
          IF (BTEST(lBc%bType,bType_trac)) err =
      2      "For unsteady traction, use general time dependence"
@@ -1629,7 +1689,7 @@
             END DO
             CLOSE(fid)
          END IF
-      CASE ('Coupled')
+      CASE ('coupled')
          lBc%bType = IBSET(lBc%bType,bType_cpl)
          cplBC%nFa = cplBC%nFa + 1
          lBc%cplBcPtr = cplBC%nFa
@@ -1637,7 +1697,7 @@
             err = "'Couple to cplBC' must be specified before"//
      2         " using Coupled BC"
          END IF
-      CASE ('Resistance')
+      CASE ('resistance')
          lBc%bType = IBSET(lBc%bType,bType_res)
          IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Resistance"//
      2      " is only defined for Neu BC"
@@ -1650,7 +1710,7 @@
          END IF
 
          lPtr => list%get(lBc%r,"Value",1)
-      CASE ('RCR', 'Windkessel')
+      CASE ('rcr', 'windkessel')
          lBc%bType = IBSET(lBc%bType, bType_RCR)
          IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "RCR BC is only"//
      2      " defined for Neu BC"
@@ -1670,7 +1730,7 @@
      2      "RCR cannot be used in conjunction with cplBC."
          cplBC%nFa = cplBC%nFa + 1
          lBc%cplBcPtr = cplBC%nFa
-      CASE ('General')
+      CASE ('general')
          iM  = lBc%iM
          iFa = lBc%iFa
          lBc%bType = IBSET(lBc%bType,bType_gen)
@@ -1770,14 +1830,15 @@
       IF (ltmp) lBc%bType = IBSET(lBc%bType,bType_impD)
 
 !     Reading the spatial profile: flat/para/ud
-      ctmp = "Flat"
+      ctmp = "flat"
       lPtr => list%get(ctmp,"Profile")
+      CALL TO_LOWER(ctmp)
       SELECT CASE (ctmp)
-      CASE ('Flat')
+      CASE ('flat')
          lBc%bType = IBSET(lBc%bType,bType_flat)
-      CASE ('Parabolic')
+      CASE ('parabolic')
          lBc%bType = IBSET(lBc%bType,bType_para)
-      CASE ('User_defined')
+      CASE ('user_defined')
          lBc%bType = IBSET(lBc%bType,bType_ud)
          lPtr => list%get(fTmp,"Spatial profile file path",1)
          fid = fTmp%open()
@@ -1835,21 +1896,22 @@
 !     NURBS elements
       lPtr => list%get(ctmp,"Shell BC type")
       IF (ASSOCIATED(lPtr)) THEN
+         CALL TO_LOWER(ctmp)
          SELECT CASE (ctmp)
-         CASE ("Fixed", "fixed", "Clamped", "clamped")
+         CASE ("fixed", "clamped")
             lBc%bType = IBSET(lBc%bType,bType_fix)
             IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Fixed BC "//
      2         "can be applied for Dirichlet boundaries only"
-         CASE ("Hinged", "hinged")
+         CASE ("hinged")
             lBc%bType = IBSET(lBc%bType,bType_hing)
             IF (.NOT.BTEST(lBc%bType,bType_Dir)) err = "Hinged BC "//
      2         "can be applied for Dirichlet boundaries only"
-         CASE ("Free", "free")
+         CASE ("free")
             lBc%bType = IBSET(lBc%bType,bType_free)
             IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Free BC "//
      2         "can be applied for Neumann boundaries only"
 !        Symm BC needs to be verified
-c         CASE ("Symm", "symm", "Symmetric", "symmetric")
+c         CASE ("symm", "symmetric")
 c            lBc%bType = IBSET(lBc%bType,bType_symm)
 c            IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Symm BC "//
 c     2         "can be applied for Neumann boundaries only"
@@ -2176,10 +2238,11 @@ c     2         "can be applied for Neumann boundaries only"
 
       lPR => list%get(ctmp,"Remesher")
       IF (ASSOCIATED(lPR)) THEN
+         CALL TO_LOWER(ctmp)
          SELECT CASE(TRIM(ctmp))
-         CASE('Tetgen')
+         CASE('tetgen')
             rmsh%method = RMSH_TETGEN
-         CASE('Meshsim')
+         CASE('meshsim')
             rmsh%method = RMSH_MESHSIM
          CASE DEFAULT
             err = TRIM(list%ping("Remesher",lPR))//" Undefined"

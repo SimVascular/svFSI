@@ -439,6 +439,7 @@ c               END IF
          lPM => list%get(ctmp, "Contact model")
          IF (ASSOCIATED(lPM)) THEN
             iCntct = .TRUE.
+            CALL TO_LOWER(ctmp)
             SELECT CASE (TRIM(ctmp))
             CASE ("penalty")
                cntctM%cType = cntctM_penalty

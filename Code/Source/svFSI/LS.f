@@ -142,7 +142,6 @@
             R(:,a) = tls%R(:,lhs%map(a))
          END DO
          R = Wc*R
-         DEALLOCATE(Wr,Wc)
       END IF
 #endif
 
