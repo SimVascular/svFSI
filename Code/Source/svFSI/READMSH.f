@@ -856,14 +856,12 @@ c               END IF
       RETURN
       END SUBROUTINE READFIBNFF
 !####################################################################
-!     Check the mesh. If this is flag=nonL=.true., then we only check first 4 nodes
-!     of IEN array
-      SUBROUTINE CHECKIEN(lM, flag)
+!     Check the mesh IEN structure and ordering
+      SUBROUTINE CHECKIEN(lM)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
-      LOGICAL, INTENT(IN) :: flag
 
       LOGICAL qFlag
       INTEGER(KIND=IKIND) a, b, e, i, Ac, teNoN, eType, sn(4)

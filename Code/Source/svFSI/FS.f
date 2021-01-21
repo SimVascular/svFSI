@@ -41,7 +41,7 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER(KIND=IKIND) g, insd
+      INTEGER(KIND=IKIND) insd
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -71,18 +71,8 @@
 !        Select Taylor-Hood element
          CALL SETTHOODFS(lM%fs(2), lM%fs(1)%eType)
 
-!        Allocate arrays
-         CALL ALLOCFS(lM%fs(2), insd)
-
-!        Get Gauss points and shape functions
-         CALL GETGIP(insd, lM%fs(2)%eType, lM%fs(2)%nG, lM%fs(2)%w,
-     2      lM%fs(2)%xi)
-         DO g=1, lM%fs(2)%nG
-            CALL GETGNN(insd, lM%fs(2)%eType, lM%fs(2)%eNoN,
-     2         lM%fs(2)%xi(:,g), lM%fs(2)%N(:,g), lM%fs(2)%Nx(:,:,g))
-         END DO
-         CALL GETNNBNDS(lM%fs(2)%eType, lM%fs(2)%eNoN, lM%fs(2)%xib,
-     2      lM%fs(2)%Nb)
+!        Initialize the function space
+         CALL INITFS(lM%fs(2), insd)
       END IF
 
       RETURN
@@ -142,6 +132,28 @@
 
       RETURN
       END SUBROUTINE INITFSFACE
+!--------------------------------------------------------------------
+      SUBROUTINE INITFS(fs, insd)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(fsType), INTENT(INOUT) :: fs
+      INTEGER(KIND=IKIND), INTENT(IN) :: insd
+
+      INTEGER g
+
+!     Allocate arrays
+      CALL ALLOCFS(fs, insd)
+
+!     Get Gauss points and shape functions
+      CALL GETGIP(insd, fs%eType, fs%nG, fs%w, fs%xi)
+      DO g=1, fs%nG
+         CALL GETGNN(insd, fs%eType, fs%eNoN, fs%xi(:,g), fs%N(:,g),
+     2      fs%Nx(:,:,g))
+      END DO
+      CALL GETNNBNDS(fs%eType, fs%eNoN, fs%xib, fs%Nb)
+
+      RETURN
+      END SUBROUTINE INITFS
 !--------------------------------------------------------------------
 !     Allocates arrays within the function space type. Assumes that
 !     fs%eNoN and fs%nG are already defined
