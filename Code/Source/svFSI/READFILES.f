@@ -334,7 +334,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 20
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 22
 
       LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
@@ -431,15 +431,16 @@
          nDOP = (/11,2,3,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
-         outPuts(3)  = out_energyFlux
-         outPuts(4)  = out_acceleration
-         outPuts(5)  = out_WSS
-         outPuts(6)  = out_vorticity
+         outPuts(3)  = out_WSS
+
+         outPuts(4)  = out_traction
+         outPuts(5)  = out_vorticity
+         outPuts(6)  = out_vortex
          outPuts(7)  = out_strainInv
-         outPuts(8)  = out_vortex
-         outPuts(9)  = out_traction
-         outPuts(10) = out_viscosity
-         outPuts(11) = out_divergence
+         outPuts(8)  = out_energyFlux
+         outPuts(9)  = out_viscosity
+         outPuts(10) = out_divergence
+         outPuts(11) = out_acceleration
 
          CALL READLS(lSolver_NS, lEq, list)
 
@@ -485,20 +486,20 @@
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
+
          IF (pstEq) THEN
             nDOP = (/3,3,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_stress
-            outPuts(3) = out_mises
          ELSE
-            nDOP = (/6,2,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_mises
-            outPuts(3) = out_velocity
-            outPuts(4) = out_acceleration
-            outPuts(5) = out_integ
-            outPuts(6) = out_jacobian
+            nDOP = (/8,2,0,0/)
          END IF
+         outPuts(1) = out_displacement
+         outPuts(2) = out_mises
+         outPuts(3) = out_stress
+         outPuts(4) = out_strain
+         outPuts(5) = out_velocity
+         outPuts(6) = out_acceleration
+         outPuts(7) = out_integ
+         outPuts(8) = out_jacobian
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -516,25 +517,24 @@
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
+
          IF (pstEq) THEN
             nDOP = (/3,3,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_stress
-            outPuts(3) = out_mises
          ELSE
-            nDOP = (/11,2,0,0/)
-            outPuts(1)  = out_displacement
-            outPuts(2)  = out_mises
-            outPuts(3)  = out_stress
-            outPuts(4)  = out_velocity
-            outPuts(5)  = out_acceleration
-            outPuts(6)  = out_fibDir
-            outPuts(7)  = out_fibAlign
-            outputs(8)  = out_strainInv
-            outPuts(9)  = out_integ
-            outPuts(10) = out_jacobian
-            outPuts(11) = out_defGrad
+            nDOP = (/12,2,0,0/)
          END IF
+         outPuts(1)  = out_displacement
+         outPuts(2)  = out_mises
+         outPuts(3)  = out_stress
+         outPuts(4)  = out_cauchy
+         outPuts(5)  = out_strain
+         outPuts(6)  = out_jacobian
+         outPuts(7)  = out_defGrad
+         outPuts(8)  = out_integ
+         outPuts(9)  = out_fibDir
+         outPuts(10) = out_fibAlign
+         outPuts(11) = out_velocity
+         outPuts(12) = out_acceleration
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -555,28 +555,23 @@
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
-         IF (pstEq) THEN
-            err = "Prestress for USTRUCT is not implemented yet"
-            nDOP = (/3,3,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_stress
-            outPuts(3) = out_mises
-         ELSE
-            nDOP = (/13,2,0,0/)
-            outPuts(1)  = out_displacement
-            outPuts(2)  = out_mises
-            outPuts(3)  = out_stress
-            outPuts(4)  = out_velocity
-            outPuts(5)  = out_pressure
-            outPuts(6)  = out_acceleration
-            outPuts(7)  = out_fibDir
-            outPuts(8)  = out_fibAlign
-            outPuts(9)  = out_strainInv
-            outPuts(10) = out_integ
-            outPuts(11) = out_jacobian
-            outPuts(12) = out_defGrad
-            outPuts(13) = out_divergence
-         END IF
+         IF (pstEq) err = "Prestress for USTRUCT is not implemented yet"
+
+         nDOP = (/14,2,0,0/)
+         outPuts(1)  = out_displacement
+         outPuts(2)  = out_mises
+         outPuts(3)  = out_stress
+         outPuts(4)  = out_cauchy
+         outPuts(5)  = out_strain
+         outPuts(6)  = out_jacobian
+         outPuts(7)  = out_defGrad
+         outPuts(8)  = out_integ
+         outPuts(9)  = out_fibDir
+         outPuts(10) = out_fibAlign
+         outPuts(11) = out_velocity
+         outPuts(12) = out_pressure
+         outPuts(13) = out_acceleration
+         outPuts(14) = out_divergence
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -598,17 +593,12 @@
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
-         IF (pstEq) THEN
-            err = "Prestress for SHELLS is not implemented yet"
-            nDOP = (/2,2,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_stress
-         ELSE
-            nDOP = (/3,1,0,0/)
-            outPuts(1) = out_displacement
-            outPuts(2) = out_velocity
-            outPuts(3) = out_integ
-         END IF
+         IF (pstEq) err = "Prestress for SHELLS is not implemented yet"
+
+         nDOP = (/3,1,0,0/)
+         outPuts(1) = out_displacement
+         outPuts(2) = out_velocity
+         outPuts(3) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -672,18 +662,19 @@
                propL(7,1) = elasticity_modulus
             END IF
 
-            nDOP = (/11,4,3,0/)
+            nDOP = (/12,4,3,0/)
             outPuts(1)  = out_velocity
             outPuts(2)  = out_pressure
             outPuts(3)  = out_WSS
             outPuts(4)  = out_displacement
             outPuts(5)  = out_energyFlux
-            outPuts(6)  = out_acceleration
+            outPuts(6)  = out_traction
             outPuts(7)  = out_vorticity
             outPuts(8)  = out_vortex
             outPuts(9)  = out_strainInv
             outPuts(10) = out_viscosity
             outPuts(11) = out_divergence
+            outPuts(12) = out_acceleration
          ELSE
             propL(1,1) = poisson_ratio
             IF (.NOT.cmmVarWall) THEN
@@ -754,27 +745,32 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/20,4,2,0/)
+         nDOP = (/22,4,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
          outPuts(4)  = out_mises
-         outPuts(5)  = out_energyFlux
-         outPuts(6)  = out_absVelocity
-         outPuts(7)  = out_acceleration
-         outPuts(8)  = out_WSS
-         outPuts(9)  = out_vorticity
-         outPuts(10) = out_vortex
-         outPuts(11) = out_traction
-         outPuts(12) = out_stress
-         outPuts(13) = out_fibDir
-         outPuts(14) = out_fibAlign
-         outPuts(15) = out_strainInv
-         outPuts(16) = out_integ
-         outPuts(17) = out_jacobian
-         outPuts(18) = out_defGrad
-         outPuts(19) = out_viscosity
-         outPuts(20) = out_divergence
+
+         outPuts(5)  = out_WSS
+         outPuts(6)  = out_traction
+         outPuts(7)  = out_vorticity
+         outPuts(8)  = out_vortex
+         outPuts(9)  = out_strainInv
+         outPuts(10) = out_energyFlux
+         outPuts(11) = out_viscosity
+         outPuts(12) = out_absVelocity
+
+         outPuts(13) = out_stress
+         outPuts(14) = out_cauchy
+         outPuts(15) = out_strain
+         outPuts(16) = out_jacobian
+         outPuts(17) = out_defGrad
+         outPuts(18) = out_integ
+         outPuts(19) = out_fibDir
+         outPuts(20) = out_fibAlign
+
+         outPuts(21) = out_divergence
+         outPuts(22) = out_acceleration
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -821,7 +817,7 @@
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/1,1,0,0/)
-         outPuts(1) = out_actionPotential
+         outPuts(1) = out_voltage
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -835,14 +831,15 @@
          IF (nsd .EQ. 3) propL(4,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/7,2,3,0/)
+         nDOP = (/8,2,3,0/)
          outPuts(1) = out_velocity
          outPuts(2) = out_pressure
          outPuts(3) = out_WSS
          outPuts(4) = out_vorticity
          outPuts(5) = out_traction
-         outPuts(6) = out_viscosity
-         outPuts(7) = out_divergence
+         outPuts(6) = out_strainInv
+         outPuts(7) = out_viscosity
+         outPuts(8) = out_divergence
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -1293,31 +1290,26 @@
             lEq%output(iOut)%o    = nsd
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Pressure"
-         CASE (out_acceleration)
-            lEq%output(iOut)%grp  = outGrp_A
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nsd
-            lEq%output(iOut)%name = "Acceleration"
          CASE (out_temperature)
             lEq%output(iOut)%grp  = outGrp_Y
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Temperature"
+         CASE (out_voltage)
+            lEq%output(iOut)%grp  = outGrp_Y
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Action_potential"
+         CASE (out_acceleration)
+            lEq%output(iOut)%grp  = outGrp_A
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Acceleration"
          CASE (out_displacement)
             lEq%output(iOut)%grp  = outGrp_D
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Displacement"
-         CASE (out_WSS)
-            lEq%output(iOut)%grp  = outGrp_WSS
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = maxnsd
-            lEq%output(iOut)%name = "WSS"
-         CASE (out_vorticity)
-            lEq%output(iOut)%grp  = outGrp_vort
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = maxnsd
-            lEq%output(iOut)%name = "Vorticity"
          CASE (out_integ)
             lEq%output(iOut)%grp  = outGrp_I
             lEq%output(iOut)%o    = 0
@@ -1327,6 +1319,31 @@
             ELSE
                lEq%output(iOut)%name = "Volume"
             END IF
+         CASE (out_WSS)
+            lEq%output(iOut)%grp  = outGrp_WSS
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = maxnsd
+            lEq%output(iOut)%name = "WSS"
+         CASE (out_traction)
+            lEq%output(iOut)%grp  = outGrp_trac
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Traction"
+         CASE (out_vorticity)
+            lEq%output(iOut)%grp  = outGrp_vort
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = maxnsd
+            lEq%output(iOut)%name = "Vorticity"
+         CASE (out_vortex)
+            lEq%output(iOut)%grp  = outGrp_vortex
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Vortex"
+         CASE (out_strainInv)
+            lEq%output(iOut)%grp  = outGrp_stInv
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsd
+            lEq%output(iOut)%name = "Strain_invariants"
          CASE (out_energyFlux)
             lEq%output(iOut)%grp  = outGrp_eFlx
             lEq%output(iOut)%o    = 0
@@ -1337,31 +1354,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Heat_flux"
-         CASE (out_strainInv)
-            lEq%output(iOut)%grp  = outGrp_stInv
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nsd
-            lEq%output(iOut)%name = "Strain_invariants"
          CASE (out_absVelocity)
             lEq%output(iOut)%grp  = outGrp_absV
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd
             lEq%output(iOut)%name = "Absolute_velocity"
-         CASE (out_vortex)
-            lEq%output(iOut)%grp  = outGrp_vortex
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = 1
-            lEq%output(iOut)%name = "Vortex"
-         CASE (out_traction)
-            lEq%output(iOut)%grp  = outGrp_trac
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nsd
-            lEq%output(iOut)%name = "Traction"
-         CASE (out_stress)
-            lEq%output(iOut)%grp  = outGrp_stress
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nstd
-            lEq%output(iOut)%name = "Stress"
          CASE (out_fibDir)
             lEq%output(iOut)%grp  = outGrp_fN
             lEq%output(iOut)%o    = 0
@@ -1372,11 +1369,21 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Fiber_alignment"
-         CASE (out_actionPotential)
-            lEq%output(iOut)%grp  = outGrp_Y
+         CASE (out_stress)
+            lEq%output(iOut)%grp  = outGrp_stress
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%name = "Stress"
+         CASE (out_cauchy)
+            lEq%output(iOut)%grp  = outGrp_cauchy
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%name = "Cauchy_stress"
+         CASE (out_mises)
+            lEq%output(iOut)%grp  = outGrp_mises
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
-            lEq%output(iOut)%name = "Action_potential"
+            lEq%output(iOut)%name = "VonMises_stress"
          CASE (out_jacobian)
             lEq%output(iOut)%grp  = outGrp_J
             lEq%output(iOut)%o    = 0
@@ -1386,7 +1393,12 @@
             lEq%output(iOut)%grp  = outGrp_F
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsd*nsd
-            lEq%output(iOut)%name = "Deformation_gradient"
+            lEq%output(iOut)%name = "Def_grad"
+         CASE (out_strain)
+            lEq%output(iOut)%grp  = outGrp_strain
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%name = "Strain"
          CASE (out_divergence)
             lEq%output(iOut)%grp  = outGrp_divV
             lEq%output(iOut)%o    = 0
@@ -1397,11 +1409,6 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Viscosity"
-         CASE (out_mises)
-            lEq%output(iOut)%grp  = outGrp_Mises
-            lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = 1
-            lEq%output(iOut)%name = "VonMises_stress"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT

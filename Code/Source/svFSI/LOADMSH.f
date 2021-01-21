@@ -53,7 +53,7 @@
       CALL READVTU(lM, ftmp%fname)
 
       CALL SELECTELE(lM)
-      IF (ichckIEN) CALL CHECKIEN(lM, .FALSE.)
+      IF (ichckIEN) CALL CHECKIEN(lM)
 
       lM%nFa = list%srch("Add face")
       IF (lM%lFib .AND. lM%nFa.GT.1) err =
@@ -183,7 +183,7 @@
 
 !     Satisfying right-handed property for the internal elements and
 !     making sure everything is compatible
-      IF (ichckIEN) CALL CHECKIEN(lM, .FALSE.)
+      IF (ichckIEN) CALL CHECKIEN(lM)
 
 !     Reading faces names and setting the required parameters
       lM%nFa = list%srch("Add face")
@@ -537,7 +537,7 @@
 
 !     Satisfying right-handed property for the internal elements and
 !     making sure everything is compatible
-      IF (ichckIEN) CALL CHECKIEN(lM, nonL)
+      IF (ichckIEN) CALL CHECKIEN(lM)
 
 !     Adding intermediate nodes to the elements
       IF (nonL) THEN

@@ -527,64 +527,45 @@
                SELECT CASE (oGrp)
                   CASE (outGrp_NA)
                   err = "Undefined output grp in VTK"
+
                CASE (outGrp_A)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
                      d(iM)%x(is:ie,a) = lA(s:e,Ac)
                   END DO
+
                CASE (outGrp_Y)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
                      d(iM)%x(is:ie,a) = lY(s:e,Ac)
                   END DO
+
                CASE (outGrp_D)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
                      d(iM)%x(is:ie,a) = lD(s:e,Ac)/msh(iM)%scF
                   END DO
-               CASE (outGrp_WSS)
+
+               CASE (outGrp_WSS, outGrp_trac)
                   CALL BPOST(msh(iM), tmpV, lY, lD, oGrp)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
-               CASE (outGrp_trac)
-                  CALL BPOST(msh(iM), tmpV, lY, lD, oGrp)
-                  DO a=1, msh(iM)%nNo
-                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
-                  END DO
-               CASE (outGrp_stress)
-                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-                  ALLOCATE(tmpV(nstd,msh(iM)%nNo))
-                  tmpV = 0._RKIND
-                  IF (pstEq) THEN
-                     DO a=1, msh(iM)%nNo
-                        Ac = msh(iM)%gN(a)
-                        tmpV(:,a) = pS0(:,Ac)
-                     END DO
-                  END IF
-                  IF (.NOT.cmmInit) THEN
-                     ALLOCATE(tmpVe(msh(iM)%nEl))
-                     tmpVe = 0._RKIND
-                     CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
-                     DEALLOCATE(tmpVe)
-                  END IF
-                  DO a=1, msh(iM)%nNo
-                     d(iM)%x(is:ie,a) = tmpV(:,a)
-                  END DO
-                  DEALLOCATE(tmpV)
-                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+
                CASE (outGrp_vort, outGrp_eFlx, outGrp_hFlx,
      2            outGrp_stInv, outGrp_vortex, outGrp_Visc)
                   CALL POST(msh(iM), tmpV, lY, lD, oGrp, iEq)
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
+
                CASE (outGrp_absV)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
                      d(iM)%x(is:ie,a) = lY(1:nsd,Ac)
      2                                - lY(nsd+2:2*nsd+1,Ac)
                   END DO
+
                CASE (outGrp_fN)
                   cOut = cOut - 1
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
@@ -606,6 +587,7 @@
                   END DO
                   DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+
                CASE (outGrp_fA)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
@@ -617,53 +599,58 @@
                   END DO
                   DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
-               CASE (outGrp_J)
+
+               CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
                   tmpV  = 0._RKIND
                   tmpVe = 0._RKIND
-                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
+                  IF (pstEq) THEN
+                     DO a=1, msh(iM)%nNo
+                        Ac = msh(iM)%gN(a)
+                        tmpV(:,a) = pS0(:,Ac)
+                     END DO
+                  END IF
+
+                  IF (.NOT.cmmInit) CALL TPOST(msh(iM), l, tmpV, tmpVe,
+     2               lD, lY, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
-                     d(iM)%x(is,a) = tmpV(1,a)
+                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
 
-                  nOute = nOute + 1
-                  outNamesE(nOute) = "E_Jacobian"
-                  DO a=1, msh(iM)%nEl
-                     d(iM)%xe(nOute,a) = tmpVe(a)
-                  END DO
+                  IF (oGrp .EQ. outGrp_mises) THEN
+                     nOute = nOute + 1
+                     outNamesE(nOute) = "E_VonMises"
+                     DO a=1, msh(iM)%nEl
+                        d(iM)%xe(nOute,a) = tmpVe(a)
+                     END DO
+                  END IF
 
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
-               CASE (outGrp_F)
+
+               CASE (outGrp_J, outGrp_F, outGrp_strain)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
                   tmpV  = 0._RKIND
                   tmpVe = 0._RKIND
-                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
+
+                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, lY, iEq, oGrp)
                   DO a=1, msh(iM)%nNo
-                     d(iM)%x(is:ie,a) = tmpV(:,a)
-                  END DO
-                  DEALLOCATE(tmpV, tmpVe)
-                  ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
-               CASE (outGrp_Mises)
-                  IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-                  ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
-                  tmpV  = 0._RKIND
-                  tmpVe = 0._RKIND
-                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, iEq, oGrp)
-                  DO a=1, msh(iM)%nNo
-                     d(iM)%x(is,a) = tmpV(1,a)
+                     d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
 
-                  nOute = nOute + 1
-                  outNamesE(nOute) = "E_VonMises"
-                  DO a=1, msh(iM)%nEl
-                     d(iM)%xe(nOute,a) = tmpVe(a)
-                  END DO
+                  IF (oGrp .EQ. outGrp_J) THEN
+                     nOute = nOute + 1
+                     outNamesE(nOute) = "E_Jacobian"
+                     DO a=1, msh(iM)%nEl
+                        d(iM)%xe(nOute,a) = tmpVe(a)
+                     END DO
+                  END IF
 
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+
                CASE (outGrp_divV)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))

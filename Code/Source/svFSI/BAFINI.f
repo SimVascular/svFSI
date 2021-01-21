@@ -214,13 +214,7 @@
 !        order basis could lead to spurious errors
          CALL SETTHOODFS(fs, lM%eType)
          CALL SETTHOODFS(fsb, lFa%eType)
-         CALL ALLOCFS(fs, nsd)
-         CALL GETGIP(nsd, fs%eType, fs%nG, fs%w, fs%xi)
-         DO g=1, fs%nG
-            CALL GETGNN(nsd, fs%eType, fs%eNoN, fs%xi(:,g), fs%N(:,g),
-     2         fs%Nx(:,:,g))
-         END DO
-         CALL GETNNBNDS(fs%eType, fs%eNoN, fs%xib, fs%Nb)
+         CALL INITFS(fs, nsd)
 
          xi0 = 0._RKIND
          DO g=1, fs%nG

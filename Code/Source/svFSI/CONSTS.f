@@ -145,26 +145,30 @@
      3   bfType_spl = 5, bfType_gen = 6
 !--------------------------------------------------------------------
 !     Possible senarios for the output, followed by the possible outputs
-!     Undefined output, extract it from A, extract it from Y, extract it
-!     from D, calculate WSS, calculate vorticity, energy flux, heat
-!     flux, absolute velocity (for FSI)
+!     Undefined output, extract from A, extract from Y, extract from D,
+!     simple integral, WSS, traction, vorticity, vortex (lambda_ci),
+!     strain invariants (fluid), energy flux, heat flux, absolute
+!     velocity (for FSI), fiber directions, fiber alignment, 2nd Piola-
+!     Kirchhoff stress, Cauchy stress, von Mises stress, Jacobian,
+!     Def. grad. tensor, Green strain, divergence of velocity, viscosity
       INTEGER(KIND=IKIND), PARAMETER :: outGrp_NA = 500, outGrp_A = 501,
-     2   outGrp_Y = 502, outGrp_D = 503, outGrp_I = 504,
-     3   outGrp_WSS = 505, outGrp_vort = 506, outGrp_eFlx = 507,
-     4   outGrp_hFlx = 508, outGrp_absV = 509, outGrp_stInv = 510,
-     5   outGrp_vortex = 511, outGrp_trac = 512, outGrp_stress = 513,
-     6   outGrp_fN = 514, outGrp_fA = 515, outGrp_J = 516, outGrp_F=517,
-     7   outGrp_divV = 518, outGrp_Visc = 519, outGrp_Mises = 520
+     2   outGrp_Y = 502, outGrp_D = 503, outGrp_I = 504, outGrp_WSS =
+     3   505, outGrp_trac = 506, outGrp_vort = 507, outGrp_vortex = 508,
+     4   outGrp_stInv = 509, outGrp_eFlx = 510, outGrp_hFlx = 511,
+     5   outGrp_absV = 512, outGrp_fN = 513, outGrp_fA = 514,
+     6   outGrp_stress = 515, outGrp_cauchy = 516, outGrp_mises = 517,
+     7   outGrp_J = 518, outGrp_F = 519, outGrp_strain = 520,
+     8   outGrp_divV = 521, outGrp_Visc = 522
 !--------------------------------------------------------------------
       INTEGER(KIND=IKIND), PARAMETER :: out_velocity = 599,
-     2   out_pressure = 598, out_acceleration = 597,
-     3   out_temperature = 596, out_WSS = 595, out_vorticity = 594,
-     4   out_displacement = 593, out_integ = 592, out_energyFlux = 591,
-     5   out_heatFlux = 590, out_strainInv = 589, out_absVelocity = 588,
-     6   out_vortex = 587, out_traction = 586, out_stress = 585,
-     7   out_fibDir = 584, out_fibAlign = 583, out_actionPotential =582,
-     8   out_jacobian = 581, out_defGrad=580, out_divergence = 579,
-     9   out_viscosity = 578, out_mises = 577
+     2   out_pressure = 598, out_temperature = 597, out_voltage = 596,
+     3   out_acceleration = 595, out_displacement = 594, out_integ =593,
+     4   out_WSS = 592, out_traction = 591, out_vorticity = 590,
+     5   out_vortex = 589, out_strainInv = 588, out_energyFlux = 587,
+     6   out_heatFlux = 586, out_absVelocity = 585, out_fibDir = 584,
+     7   out_fibAlign = 583, out_stress = 582, out_cauchy = 581,
+     8   out_mises = 580, out_jacobian = 579, out_defGrad = 578,
+     9   out_strain = 577, out_divergence = 576, out_viscosity = 575
 !--------------------------------------------------------------------
 !     Mesher choice for remeshing for moving wall problems
       INTEGER(KIND=IKIND), PARAMETER :: RMSH_TETGEN = 1,

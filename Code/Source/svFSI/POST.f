@@ -58,12 +58,13 @@
                Ac = msh(iM)%gN(a)
                res(:,Ac) = tmpV(:,a)
             END DO
+
          ELSE IF (outGrp .EQ. outGrp_J) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
             tmpV  = 0._RKIND
             tmpVe = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, iEq, outGrp)
+            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq, outGrp)
             res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
@@ -71,12 +72,13 @@
             END DO
             DEALLOCATE(tmpV, tmpVe)
             ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
-         ELSE IF (outGrp .EQ. outGrp_Mises) THEN
+
+         ELSE IF (outGrp .EQ. outGrp_mises) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
             tmpV  = 0._RKIND
             tmpVe = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, iEq, outGrp)
+            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq, outGrp)
             res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
@@ -84,6 +86,7 @@
             END DO
             DEALLOCATE(tmpV, tmpVe)
             ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+
          ELSE IF (outGrp .EQ. outGrp_divV) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo))
@@ -96,6 +99,7 @@
             END DO
             DEALLOCATE(tmpV)
             ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
+
          ELSE
             CALL POST(msh(iM), tmpV, lY, lD, outGrp, iEq)
             DO a=1, msh(iM)%nNo
@@ -501,7 +505,7 @@
       END SUBROUTINE BPOST
 !####################################################################
 !     Routine for post processing stress tensor
-      SUBROUTINE TPOST(lM, m, res, resE, lD, iEq, outGrp)
+      SUBROUTINE TPOST(lM, m, res, resE, lD, lY, iEq, outGrp)
       USE COMMOD
       USE ALLFUN
       USE MATFUN
@@ -509,18 +513,21 @@
       TYPE(mshType), INTENT(INOUT) :: lM
       INTEGER(KIND=IKIND), INTENT(IN) :: m, iEq, outGrp
       REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
-      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo), lY(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, l, cPhys, insd,
+      LOGICAL flag
+      INTEGER(KIND=IKIND) a, e, g, Ac, i, j, k, l, cPhys, insd,
      2   nFn
       REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
-     2   trS, vmises, ed(nstd), ksix(nsd,nsd), F(nsd,nsd), S(nsd,nsd),
-     3   P(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+     2   p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nstd),
+     3   Im(nsd,nsd), F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd),
+     4   S(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      TYPE(fsType) :: fs
 
-      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
-     2   pSl(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
+      INTEGER, ALLOCATABLE :: eNds(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), yl(:,:),
+     2   fN(:,:), resl(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
 
-      eNoN = lM%eNoN
       dof  = eq(iEq)%dof
       i    = eq(iEq)%s
       j    = i + 1
@@ -528,8 +535,27 @@
       nFn  = lM%nFn
       IF (nFn .EQ. 0) nFn = 1
 
-      ALLOCATE (sA(tnNo), sF(m,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,nFn), pSl(m), Nx(nsd,eNoN), N(eNoN), sE(lM%nEl))
+!     For higher order elements, we lower the order of shape functions
+!     to compute the quantities at corner nodes of elements. We then
+!     use these lower order shape functions to interpolate the values
+!     at edge nodes and elements centers (if applicable)
+      flag = .FALSE.
+      IF (lM%eType.EQ.eType_TRI6  .OR. lM%eType.EQ.eType_QUD8  .OR.
+     2    lM%eType.EQ.eType_QUD9  .OR. lM%eType.EQ.eType_TET10 .OR.
+     3    lM%eType.EQ.eType_HEX20 .OR. lM%eType .EQ. eType_HEX27) THEN
+         flag =.TRUE.
+         CALL SETTHOODFS(fs, lM%eType)
+      ELSE
+         fs%eType = lM%eType
+         fs%lShpF = lM%lShpF
+         fs%eNoN  = lM%eNoN
+         fs%nG    = lM%nG
+      END IF
+      CALL INITFS(fs, nsd)
+
+      ALLOCATE (sA(tnNo), sF(m,tnNo), sE(lM%nEl), xl(nsd,fs%eNoN),
+     2   dl(tDof,fs%eNoN), yl(tDof,fs%eNoN), fN(nsd,nFn), resl(m),
+     3   Nx(nsd,fs%eNoN), N(fs%eNoN))
 
       sA   = 0._RKIND
       sF   = 0._RKIND
@@ -561,23 +587,27 @@
             END DO
          END IF
 
-         DO a=1, eNoN
+         dl = 0._RKIND
+         yl = 0._RKIND
+         DO a=1, fs%eNoN
             Ac      = lM%IEN(a,e)
             xl(:,a) = x(:,Ac)
             dl(:,a) = lD(:,Ac)
+            yl(:,a) = lY(:,Ac)
          END DO
 
          Je = 0._RKIND
-         DO g=1, lM%nG
-            IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
-               CALL GNN(eNoN, insd, lM%Nx(:,:,g), xl, Nx, Jac, ksix)
+         DO g=1, fs%nG
+            IF (g.EQ.1 .OR. .NOT.fs%lShpF) THEN
+               CALL GNN(fs%eNoN, insd, fs%Nx(:,:,g), xl, Nx, Jac, Im)
             END IF
-            w  = lM%w(g)*Jac
-            N  = lM%N(:,g)
+            w  = fs%w(g)*Jac
+            N  = fs%N(:,g)
             Je = Je + w
 
-            F  = MAT_ID(nsd)
-            DO a=1, eNoN
+            Im = MAT_ID(nsd)
+            F  = Im
+            DO a=1, fs%eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
                   F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
@@ -599,7 +629,7 @@
 
             ed = 0._RKIND
             IF (cPhys .EQ. phys_lElas) THEN
-               DO a=1, eNoN
+               DO a=1, fs%eNoN
                   IF (nsd .EQ. 3) THEN
                      ed(1) = ed(1) + Nx(1,a)*dl(i,a)
                      ed(2) = ed(2) + Nx(2,a)*dl(j,a)
@@ -618,15 +648,51 @@
             SELECT CASE (outGrp)
             CASE (outGrp_J)
 !           Jacobian := determinant of deformation gradient tensor
-               DO a=1, eNoN
-                  Ac       = lM%IEN(a,e)
-                  sA(Ac)   = sA(Ac)   + w*N(a)
-                  sF(1,Ac) = sF(1,Ac) + w*N(a)*detF
-               END DO
-               sE(e) = sE(e) + w*detF
+               resl(1) = detF
+               sE(e)   = sE(e) + w*detF
 
-            CASE (outGrp_stress, outGrp_Mises)
-!           2nd Piola-Kirchhoff (S) and material stiffness (CC) tensors
+            CASE (outGrp_F)
+!           Deformation gradient tensor (F)
+               IF (nsd .EQ. 3) THEN
+                  resl(1) = F(1,1)
+                  resl(2) = F(1,2)
+                  resl(3) = F(1,3)
+                  resl(4) = F(2,1)
+                  resl(5) = F(2,2)
+                  resl(6) = F(2,3)
+                  resl(7) = F(3,1)
+                  resl(8) = F(3,2)
+                  resl(9) = F(3,3)
+               ELSE
+                  resl(1) = F(1,1)
+                  resl(2) = F(1,2)
+                  resl(3) = F(2,1)
+                  resl(4) = F(2,2)
+               END IF
+
+            CASE (outGrp_strain)
+!           Green-Lagrange strain tensor
+               IF (cPhys .EQ. phys_lElas) THEN
+                  resl(:) = ed(:)
+               ELSE
+                  C  = MATMUL(TRANSPOSE(F), F)
+                  Eg = 0.5_RKIND * (C - Im)
+                  ! resl is used to remap Eg
+                  IF (nsd .EQ. 3) THEN
+                     resl(1) = Eg(1,1)
+                     resl(2) = Eg(2,2)
+                     resl(3) = Eg(3,3)
+                     resl(4) = Eg(1,2)
+                     resl(5) = Eg(1,3)
+                     resl(6) = Eg(2,3)
+                  ELSE
+                     resl(1) = Eg(1,1)
+                     resl(2) = Eg(2,2)
+                     resl(3) = Eg(1,2)
+                  END IF
+               END IF
+
+            CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
                sigma = 0._RKIND
                IF (cPhys .EQ. phys_lElas) THEN
                   IF (nsd .EQ. 3) THEN
@@ -651,82 +717,82 @@
                   END IF
 
                ELSE IF (cPhys .EQ. phys_ustruct) THEN
+                  p = 0._RKIND
+                  DO a=1, fs%eNoN
+                     p = p + N(a)*yl(k+1,a)
+                  END DO
+                  p = (-p)*detF
+
                   CALL GETPK2CCdev(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,
      2               CC, Ja)
-                  P = MATMUL(F, S)
-                  sigma = MATMUL(P, TRANSPOSE(F))
+
+                  C  = MATMUL(TRANSPOSE(F), F)
+                  S  = S + p*MAT_INV(C, nsd)
+
+                  P1 = MATMUL(F, S)
+                  sigma = MATMUL(P1, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
 
                ELSE IF (cPhys .EQ. phys_struct) THEN
                   CALL GETPK2CC(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,CC)
-                  sigma = S
+                  P1 = MATMUL(F, S)
+                  sigma = MATMUL(P1, TRANSPOSE(F))
+                  IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
 
                END IF
 
+!              2nd Piola-Kirchhoff stress tensor
                IF (outGrp .EQ. outGrp_stress) THEN
                   IF (nsd .EQ. 3) THEN
-                     pSl(1) = sigma(1,1)
-                     pSl(2) = sigma(2,2)
-                     pSl(3) = sigma(3,3)
-                     pSl(4) = sigma(1,2)
-                     pSl(5) = sigma(1,3)
-                     pSl(6) = sigma(2,3)
+                     resl(1) = S(1,1)
+                     resl(2) = S(2,2)
+                     resl(3) = S(3,3)
+                     resl(4) = S(1,2)
+                     resl(5) = S(1,3)
+                     resl(6) = S(2,3)
                   ELSE
-                     pSl(1) = sigma(1,1)
-                     pSl(2) = sigma(2,2)
-                     pSl(3) = sigma(1,2)
+                     resl(1) = S(1,1)
+                     resl(2) = S(2,2)
+                     resl(3) = S(1,2)
                   END IF
 
-                  DO a=1, eNoN
-                     Ac       = lM%IEN(a,e)
-                     sA(Ac)   = sA(Ac)   + w*N(a)
-                     sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
-                  END DO
-               ELSE
+!              Cauchy stress tensor
+               ELSE IF (outGrp .EQ. outGrp_cauchy) THEN
+                  IF (nsd .EQ. 3) THEN
+                     resl(1) = sigma(1,1)
+                     resl(2) = sigma(2,2)
+                     resl(3) = sigma(3,3)
+                     resl(4) = sigma(1,2)
+                     resl(5) = sigma(1,3)
+                     resl(6) = sigma(2,3)
+                  ELSE
+                     resl(1) = sigma(1,1)
+                     resl(2) = sigma(2,2)
+                     resl(3) = sigma(1,2)
+                  END IF
+
 !              Von Mises stress
+               ELSE IF (outGrp .EQ. outGrp_mises) THEN
                   trS = MAT_TRACE(sigma, nsd) / REAL(nsd,KIND=RKIND)
                   DO l=1, nsd
                      sigma(l,l) = sigma(l,l) - trS
                   END DO
-                  vmises = SQRT(MAT_DDOT(sigma, sigma, nsd))
-
-                  DO a=1, eNoN
-                     Ac       = lM%IEN(a,e)
-                     sA(Ac)   = sA(Ac)   + w*N(a)
-                     sF(1,Ac) = sF(1,Ac) + w*N(a)*vmises
-                  END DO
-                  sE(e) = sE(e) + w*vmises
+                  vmises  = SQRT(MAT_DDOT(sigma, sigma, nsd))
+                  resl(1) = vmises
+                  sE(e)   = sE(e) + w*vmises
                END IF
 
-            CASE (outGrp_F)
-!           Deformation gradient tensor (F)
-               ! pSl is used to remap F
-               IF (nsd .EQ. 3) THEN
-                  pSl(1) = F(1,1)
-                  pSl(2) = F(1,2)
-                  pSl(3) = F(1,3)
-                  pSl(4) = F(2,1)
-                  pSl(5) = F(2,2)
-                  pSl(6) = F(2,3)
-                  pSl(7) = F(3,1)
-                  pSl(8) = F(3,2)
-                  pSl(9) = F(3,3)
-               ELSE
-                  pSl(1) = F(1,1)
-                  pSl(2) = F(1,2)
-                  pSl(3) = F(2,1)
-                  pSl(4) = F(2,2)
-               END IF
-
-               DO a=1, eNoN
-                  Ac       = lM%IEN(a,e)
-                  sA(Ac)   = sA(Ac)   + w*N(a)
-                  sF(:,Ac) = sF(:,Ac) + w*N(a)*pSl(:)
-               END DO
             END SELECT
+
+            DO a=1, fs%eNoN
+               Ac       = lM%IEN(a,e)
+               sA(Ac)   = sA(Ac)   + w*N(a)
+               sF(:,Ac) = sF(:,Ac) + w*N(a)*resl(:)
+            END DO
          END DO
          IF (.NOT.ISZERO(Je)) sE(e) = sE(e)/Je
       END DO
+      resE(:) = sE(:)
 
       CALL COMMU(sF)
       CALL COMMU(sA)
@@ -738,9 +804,79 @@
          ENDIF
       END DO
 
-      resE(:) = sE(:)
+!     For higher order elements, values are interpolated at the edge
+!     nodes and element centers using values computed at corners and
+!     low-order shape functions
+      IF (flag) THEN
+         sF = 0._RKIND
+         sA = 0._RKIND
 
-      DEALLOCATE (sA, sF, sE, xl, dl, fN, pSl, N, Nx)
+         xi0 = 0._RKIND
+         DO g=1, fs%nG
+            xi0 = xi0 + fs%xi(:,g)
+         END DO
+         xi0 = xi0 / REAL(fs%nG, KIND=RKIND)
+
+         DEALLOCATE(yl)
+         ALLOCATE(yl(m,fs%eNoN), eNds(tnNo))
+         eNds = 0
+         DO e=1, lM%nEl
+            cDmn  = DOMAIN(lM, iEq, e)
+            cPhys = eq(iEq)%dmn(cDmn)%phys
+            IF (cPhys .NE. phys_struct .AND.
+     2          cPhys .NE. phys_ustruct .AND.
+     3          cPhys .NE. phys_lElas) CYCLE
+
+            yl = 0._RKIND
+            DO a=1, fs%eNoN
+               Ac      = lM%IEN(a,e)
+               xl(:,a) = x(:,Ac)
+               yl(:,a) = res(:,lM%lN(Ac))
+            END DO
+
+            Je = 0._RKIND
+            DO g=1, fs%nG
+               IF (g.EQ.1 .OR. .NOT.fs%lShpF) THEN
+                  CALL GNN(fs%eNoN, insd, fs%Nx(:,:,g), xl, Nx, Jac, Im)
+               END IF
+               Je = Je + fs%w(g)*Jac
+            END DO
+
+            DO a=fs%eNoN+1, lM%eNoN
+               Ac = lM%IEN(a,e)
+               xp = x(:,Ac)
+
+               xi = xi0
+               CALL GETNNX(fs%eType, fs%eNoN, xl, fs%xib, fs%Nb, xp, xi,
+     2            N, Nx)
+
+!           Note that index `i' is reset here
+               resl(:) = 0._RKIND
+               DO i=1, fs%eNoN
+                  resl(:) = resl(:) + N(i)*yl(:,i)
+               END DO
+
+               IF (eNds(Ac) .EQ. 0) eNds(Ac) = 1
+               sF(:,Ac) = sF(:,Ac) + resl(:)*Je
+               sA(Ac)   = sA(Ac)   + Je
+            END DO
+         END DO
+
+         CALL COMMU(sF)
+         CALL COMMU(sA)
+
+         DO a=1, lM%nNo
+            Ac = lM%gN(a)
+            IF (eNds(Ac).EQ.1 .AND. .NOT.ISZERO(sA(Ac))) THEN
+               res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
+            END IF
+         END DO
+
+         DEALLOCATE(eNds)
+      END IF
+
+      DEALLOCATE (sA, sF, sE, xl, dl, yl, fN, resl, N, Nx)
+      CALL DESTROY(fs)
 
       RETURN
       END SUBROUTINE TPOST
