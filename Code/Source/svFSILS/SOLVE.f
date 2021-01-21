@@ -48,7 +48,7 @@
 !     the solution is returned
 !--------------------------------------------------------------------
 
-      SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, prec, isS,
+      SUBROUTINE FSILS_SOLVE (lhs, ls, dof, Ri, Val, prec,
      &     incL, res)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
@@ -56,7 +56,6 @@
       INTEGER(KIND=LSIP), INTENT(IN) :: dof, prec
       REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
       REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
-      LOGICAL, INTENT(IN), OPTIONAL :: isS(lhs%nNo)
       INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
       REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
 

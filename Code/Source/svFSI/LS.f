@@ -80,6 +80,9 @@
 #ifdef WITH_TRILINOS
       INTEGER(KIND=IKIND) a
 
+      IF ((eq(cEq)%ls%LS_Packg .EQ. lSPackg_TRILINOS)) 
+     2   CALL INIT_DIR_AND_COUPNEU_BC(incL, res)
+
       IF (lEq%assmTLS) THEN
          lEq%FSILS%RI%suc = .FALSE.
          CALL TRILINOS_SOLVE(tls%R, tls%W, lEq%FSILS%RI%fNorm,
@@ -141,7 +144,6 @@
          DO a=1, tnNo
             R(:,a) = tls%R(:,lhs%map(a))
          END DO
-         R = Wc*R
       END IF
 #endif
 
@@ -177,19 +179,19 @@
       END IF
 
       IF (eq(cEq)%ls%LS_Packg .EQ. lSPackg_TRILINOS) THEN
-            tls%W = 1._RKIND
-      ! DO faIn=1, lhs%nFaces
-      !    IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
-      !    faDof = MIN(lhs%face(faIn)%dof,dof)
-      !    IF (lhs%face(faIn)%bGrp .EQ. BC_TYPE_Dir) THEN
-      !       DO a=1, lhs%face(faIn)%nNo
-      !          Ac = lhs%face(faIn)%glob(a)
-      !          DO i=1, faDof
-      !             tls%W(i,Ac) = tls%W(i,Ac) * lhs%face(faIn)%val(i,a)
-      !          END DO
-      !       END DO
-      !    END IF
-      ! END DO
+         tls%W = 1._RKIND
+         DO faIn=1, lhs%nFaces
+            IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
+            faDof = MIN(lhs%face(faIn)%dof,dof)
+            IF (lhs%face(faIn)%bGrp .EQ. BC_TYPE_Dir) THEN
+               DO a=1, lhs%face(faIn)%nNo
+                  Ac = lhs%face(faIn)%glob(a)
+                  DO i=1, faDof
+                     tls%W(i,Ac) = tls%W(i,Ac) * lhs%face(faIn)%val(i,a)
+                  END DO
+               END DO
+            END IF
+         END DO
       END IF
 
       ALLOCATE(v(dof,tnNo))
