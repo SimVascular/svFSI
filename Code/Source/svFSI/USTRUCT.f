@@ -193,9 +193,9 @@
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b
       REAL(KIND=RKIND) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p,
      2   pd, F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, ya_g, Ja,
-     3   Siso(3,3), CCiso(3,3,3,3), tauM, tauC, rC, rCl, Dm(6,6),
-     4   Pdev(3,3), Bm(6,3,eNoNw), DBm(6,3), NxFi(3,eNoNw), VxFi(3,3),
-     5   VxNx(3,eNoNw), BtDB, NxSNx, T1, T2, T3, Ku
+     3   Siso(3,3), Dm(6,6), tauM, tauC, rC, rCl, Pdev(3,3), DBm(6,3),
+     4   Bm(6,3,eNoNw), NxFi(3,eNoNw), VxFi(3,3), VxNx(3,eNoNw), BtDB,
+     5   NxSNx, T1, T2, T3, Ku
 
 !     Define parameters
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -264,9 +264,8 @@
       END DO
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
-!     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, CCiso,
-     2   Ja)
+!     isochoric elasticity tensor in Voigt notation (Dm)
+      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, Dm,Ja)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
@@ -284,40 +283,6 @@
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
-
-!     Convert to Voigt Notation
-      Dm(1,1) = CCiso(1,1,1,1)
-      Dm(1,2) = CCiso(1,1,2,2)
-      Dm(1,3) = CCiso(1,1,3,3)
-      Dm(1,4) = CCiso(1,1,1,2)
-      Dm(1,5) = CCiso(1,1,2,3)
-      Dm(1,6) = CCiso(1,1,3,1)
-
-      Dm(2,2) = CCiso(2,2,2,2)
-      Dm(2,3) = CCiso(2,2,3,3)
-      Dm(2,4) = CCiso(2,2,1,2)
-      Dm(2,5) = CCiso(2,2,2,3)
-      Dm(2,6) = CCiso(2,2,3,1)
-
-      Dm(3,3) = CCiso(3,3,3,3)
-      Dm(3,4) = CCiso(3,3,1,2)
-      Dm(3,5) = CCiso(3,3,2,3)
-      Dm(3,6) = CCiso(3,3,3,1)
-
-      Dm(4,4) = CCiso(1,2,1,2)
-      Dm(4,5) = CCiso(1,2,2,3)
-      Dm(4,6) = CCiso(1,2,3,1)
-
-      Dm(5,5) = CCiso(2,3,2,3)
-      Dm(5,6) = CCiso(2,3,3,1)
-
-      Dm(6,6) = CCiso(3,1,3,1)
-
-      DO a=2, 6
-         DO b=1, a-1
-            Dm(a,b) = Dm(b,a)
-         END DO
-      END DO
 
       DO a=1, eNoNw
          Bm(1,1,a) = Nwx(1,a)*F(1,1)
@@ -564,9 +529,9 @@
       INTEGER(KIND=IKIND) :: i, j, k, a, b
       REAL(KIND=RKIND) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p,
      2   pd, F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, ya_g, Ja,
-     3   Siso(2,2), CCiso(2,2,2,2), tauM, tauC, rC, rCl, Dm(3,3),
-     4   Pdev(2,2), Bm(3,2,eNoNw), DBm(3,2), NxFi(2,eNoNw), VxFi(2,2),
-     5   VxNx(2,eNoNw), BtDB, NxSNx, T1, T2, T3, Ku
+     3   Siso(2,2), Dm(3,3), tauM, tauC, rC, rCl, Pdev(2,2), DBm(3,2),
+     4   Bm(3,2,eNoNw), NxFi(2,eNoNw), VxFi(2,2), VxNx(2,eNoNw), BtDB,
+     5   NxSNx, T1, T2, T3, Ku
 
 !     Define parameters
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
@@ -620,9 +585,8 @@
       END DO
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
-!     elasticity tensor (CCiso)
-      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, CCiso,
-     2   Ja)
+!     isochoric elasticity tensor in Voigt notation (Dm)
+      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, Dm,Ja)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
@@ -640,20 +604,6 @@
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
-
-!     Convert to Voigt Notation
-      Dm(1,1) = CCiso(1,1,1,1)
-      Dm(1,2) = CCiso(1,1,2,2)
-      Dm(1,3) = CCiso(1,1,1,2)
-
-      Dm(2,2) = CCiso(2,2,2,2)
-      Dm(2,3) = CCiso(2,2,1,2)
-
-      Dm(3,3) = CCiso(1,2,1,2)
-
-      Dm(2,1) = Dm(1,2)
-      Dm(3,1) = Dm(1,3)
-      Dm(3,2) = Dm(2,3)
 
       DO a=1, eNoNw
          Bm(1,1,a) = Nwx(1,a)*F(1,1)

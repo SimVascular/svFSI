@@ -57,7 +57,7 @@
 
 !     MESH: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), dl(tDof,eNoN),
-     2   dol(nsd,eNoN), bfl(nsd,eNoN), pS0l(nstd,eNoN), pSl(nstd),
+     2   dol(nsd,eNoN), bfl(nsd,eNoN), pS0l(nsymd,eNoN), pSl(nsymd),
      3   N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
 !     Start and end DOF

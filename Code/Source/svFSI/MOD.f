@@ -874,7 +874,7 @@
 !     Restart Time Step
       INTEGER(KIND=IKIND) rsTS
 !     Number of stress values to be stored
-      INTEGER(KIND=IKIND) nstd
+      INTEGER(KIND=IKIND) nsymd
 
 !     REAL VARIABLES
 !     Time step size

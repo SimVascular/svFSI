@@ -3984,8 +3984,8 @@ c      END DO
 
 !     Solid domain parameters
       REAL(KIND=RKIND) rho_s, mu_s, bta_s, drho_s, dbta_s, tauM_s,
-     2   tauC_s, rC, rCd, ud(3), vp_s(3), F(3,3), S(3,3), CC(3,3,3,3),
-     3   Sgm(3,3)
+     2   tauC_s, rC, rCd, ud(3), vp_s(3), F(3,3), S(3,3), Sgm(3,3),
+     3   Dm(6,6)
 
       iEq     = ib%cEq
       iDmn    = ib%cDmn
@@ -4115,11 +4115,11 @@ c      END DO
 
 !     Solid internal stresses and stabilization parameters
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-!        2nd Piola-Kirchhoff stress (S) and material stiffness (CC)
-!        Note that S = Siso + Svol. For incompressible solids, Svol = 0
-!        For compressible solids, Svol = J*p*Cinv where p is computed
-!        based on the dilational penalty model
-         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, CC)
+!        2nd Piola-Kirchhoff stress (S) and material stiffness in Voigt
+!        notation (Dm). Note that S = Siso + Svol. For incompressible
+!        solids, Svol = 0. For compressible solids, Svol = J*p*Cinv
+!        where p is computed based on the dilational penalty model
+         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, Dm)
 
 !        Jacobian scaling for rho_s for compressible solids
          IF (.NOT.ISZERO(eq(iEq)%dmnIB(iDmn)%stM%Kpen))
@@ -4135,9 +4135,10 @@ c      END DO
          rC     = 0._RKIND
 
       ELSE IF (ib%mthd .EQ. ibMthd_FEIBs) THEN
-!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness (CC)
+!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness in
+!        Voigt notation
          CALL GETPK2CCdev(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S,
-     2      CC, rtmp)
+     2      Dm, rtmp)
 
 !        Compute rho and beta depending on the volumetric penalty model
          CALL GVOLPEN(eq(iEq)%dmnIB(iDmn), p, rho_s, bta_s, drho_s,
@@ -4351,8 +4352,8 @@ c      END DO
 
 !     Solid domain parameters
       REAL(KIND=RKIND) rho_s, mu_s, bta_s, drho_s, dbta_s, tauM_s,
-     2   tauC_s, rC, rCd, ud(2), vp_s(2), F(2,2), S(2,2), CC(2,2,2,2),
-     3   Sgm(2,2)
+     2   tauC_s, rC, rCd, ud(2), vp_s(2), F(2,2), S(2,2), Sgm(2,2),
+     3   Dm(3,3)
 
       iEq     = ib%cEq
       iDmn    = ib%cDmn
@@ -4450,11 +4451,11 @@ c      END DO
       CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
 
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-!        2nd Piola-Kirchhoff stress (S) and material stiffness (CC)
-!        Note that S = Siso + Svol. For incompressible solids, Svol = 0
-!        For compressible solids, Svol = J*p*Cinv where p is computed
-!        based on the dilational penalty model
-         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, CC)
+!        2nd Piola-Kirchhoff stress (S) and material stiffness in Voigt
+!        notation (Dm). Note that S = Siso + Svol. For incompressible
+!        solids, Svol = 0. For compressible solids, Svol = J*p*Cinv
+!        where p is computed based on the dilational penalty model
+         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, Dm)
 
 !        Jacobian scaling for rho_s for compressible solids
          IF (.NOT.ISZERO(eq(iEq)%dmnIB(iDmn)%stM%Kpen))
@@ -4470,9 +4471,10 @@ c      END DO
          rC     = 0._RKIND
 
       ELSE IF (ib%mthd .EQ. ibMthd_FEIBs) THEN
-!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness (CC)
+!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness in
+!        Voigt notation (Dm)
          CALL GETPK2CCdev(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S,
-     2      CC, rtmp)
+     2      Dm, rtmp)
 
 !        Compute rho and beta depending on the volumetric penalty model
          CALL GVOLPEN(eq(iEq)%dmnIB(iDmn), p, rho_s, bta_s, drho_s,
@@ -4613,8 +4615,7 @@ c      END DO
 
       INTEGER(KIND=IKIND) a, b, iEq, iDmn
       REAL(KIND=RKIND) wl, afm, Jac, rtmp, Fi(3,3), F(3,3), Nbx(3,eNoN),
-     2   S(3,3), CC(3,3,3,3), Dm(6,6), Bm(6,3,eNoN), DBm(6,3), BtDB,
-     3   NxSNx
+     2   S(3,3), Dm(6,6), Bm(6,3,eNoN), DBm(6,3), BtDB, NxSNx
 
       iEq     = ib%cEq
       iDmn    = ib%cDmn
@@ -4653,52 +4654,19 @@ c      END DO
 
 !     Solid internal stresses and stabilization parameters
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-!        2nd Piola-Kirchhoff stress (S) and material stiffness (CC)
-!        Note that S = Siso + Svol. For incompressible solids, Svol = 0
-!        For compressible solids, Svol = J*p*Cinv where p is computed
-!        based on the dilational penalty model
-         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, CC)
+!        2nd Piola-Kirchhoff stress (S) and material stiffness in Voigt
+!        notation (Dm). Note that S = Siso + Svol. For incompressible
+!        solids, Svol = 0. For compressible solids, Svol = J*p*Cinv
+!        where p is computed based on the dilational penalty model
+         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, Dm)
 
       ELSE IF (ib%mthd .EQ. ibMthd_FEIBs) THEN
-!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness (CC)
+!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness in
+!        Voigt notation (Dm)
          CALL GETPK2CCdev(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S,
-     2      CC, rtmp)
+     2      Dm, rtmp)
 
       END IF
-
-!     Convert to Voigt Notation
-      Dm(1,1) = CC(1,1,1,1)
-      Dm(1,2) = CC(1,1,2,2)
-      Dm(1,3) = CC(1,1,3,3)
-      Dm(1,4) = CC(1,1,1,2)
-      Dm(1,5) = CC(1,1,2,3)
-      Dm(1,6) = CC(1,1,3,1)
-
-      Dm(2,2) = CC(2,2,2,2)
-      Dm(2,3) = CC(2,2,3,3)
-      Dm(2,4) = CC(2,2,1,2)
-      Dm(2,5) = CC(2,2,2,3)
-      Dm(2,6) = CC(2,2,3,1)
-
-      Dm(3,3) = CC(3,3,3,3)
-      Dm(3,4) = CC(3,3,1,2)
-      Dm(3,5) = CC(3,3,2,3)
-      Dm(3,6) = CC(3,3,3,1)
-
-      Dm(4,4) = CC(1,2,1,2)
-      Dm(4,5) = CC(1,2,2,3)
-      Dm(4,6) = CC(1,2,3,1)
-
-      Dm(5,5) = CC(2,3,2,3)
-      Dm(5,6) = CC(2,3,3,1)
-
-      Dm(6,6) = CC(3,1,3,1)
-
-      DO a=2, 6
-         DO b=1, a-1
-            Dm(a,b) = Dm(b,a)
-         END DO
-      END DO
 
       DO a=1, eNoN
          Bm(1,1,a) = Nbx(1,a)*F(1,1)
@@ -4828,8 +4796,7 @@ c      END DO
 
       INTEGER(KIND=IKIND) a, b, iEq, iDmn
       REAL(KIND=RKIND) wl, afm, Jac, rtmp, Fi(2,2), F(2,2), Nbx(2,eNoN),
-     2   S(2,2), CC(2,2,2,2), Dm(3,3), Bm(3,2,eNoN), DBm(3,2), BtDB,
-     3   NxSNx
+     2   S(2,2), Dm(3,3), Bm(3,2,eNoN), DBm(3,2), BtDB, NxSNx
 
       iEq     = ib%cEq
       iDmn    = ib%cDmn
@@ -4860,32 +4827,19 @@ c      END DO
 
 !     Solid internal stresses and stabilization parameters
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
-!        2nd Piola-Kirchhoff stress (S) and material stiffness (CC)
-!        Note that S = Siso + Svol. For incompressible solids, Svol = 0
-!        For compressible solids, Svol = J*p*Cinv where p is computed
-!        based on the dilational penalty model
-         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, CC)
+!        2nd Piola-Kirchhoff stress (S) and material stiffness in Voigt
+!        notation (Dm). Note that S = Siso + Svol. For incompressible
+!        solids, Svol = 0. For compressible solids, Svol = J*p*Cinv
+!        where p is computed based on the dilational penalty model
+         CALL GETPK2CC(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S, Dm)
 
       ELSE IF (ib%mthd .EQ. ibMthd_FEIBs) THEN
-!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness (CC)
+!        Isochoric 2nd Piola-Kirchhoff stress (Siso) and stiffness in
+!        Voigt notation (Dm)
          CALL GETPK2CCdev(eq(iEq)%dmnIB(iDmn), F, nFn, fN, 0._RKIND, S,
-     2      CC, rtmp)
+     2      Dm, rtmp)
 
       END IF
-
-!     Convert to Voigt Notation
-      Dm(1,1) = CC(1,1,1,1)
-      Dm(1,2) = CC(1,1,2,2)
-      Dm(1,3) = CC(1,1,1,2)
-
-      Dm(2,2) = CC(2,2,2,2)
-      Dm(2,3) = CC(2,2,1,2)
-
-      Dm(3,3) = CC(1,2,1,2)
-
-      Dm(2,1) = Dm(1,2)
-      Dm(3,1) = Dm(1,3)
-      Dm(3,2) = Dm(2,3)
 
       DO a=1, eNoN
          Bm(1,1,a) = Nbx(1,a)*F(1,1)
