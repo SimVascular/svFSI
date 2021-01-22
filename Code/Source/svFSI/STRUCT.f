@@ -58,8 +58,8 @@
 
 !     STRUCT: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nstd,eNoN),
-     3   pSl(nstd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
+     3   pSl(nsymd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
      4   lK(dof*dof,eNoN,eNoN))
 
 !     Loop over all elements of mesh
@@ -159,7 +159,7 @@
       INTEGER(KIND=IKIND) :: a, b, i, j, k
       REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3),
      2   NxSNx, BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3),
-     3   Bm(6,3,eNoN), CC(3,3,3,3), S0(3,3)
+     3   Bm(6,3,eNoN), S0(3,3)
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -209,8 +209,9 @@
       S0(3,1) = S0(1,3)
       S0(3,2) = S0(2,3)
 
-!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, CC)
+!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
+!     Voigt notationa (Dm)
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
 
 !     Prestress
       pSl(1) = S(1,1)
@@ -226,40 +227,6 @@
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
-
-!     Convert to Voigt Notation
-      Dm(1,1) = CC(1,1,1,1)
-      Dm(1,2) = CC(1,1,2,2)
-      Dm(1,3) = CC(1,1,3,3)
-      Dm(1,4) = CC(1,1,1,2)
-      Dm(1,5) = CC(1,1,2,3)
-      Dm(1,6) = CC(1,1,3,1)
-
-      Dm(2,2) = CC(2,2,2,2)
-      Dm(2,3) = CC(2,2,3,3)
-      Dm(2,4) = CC(2,2,1,2)
-      Dm(2,5) = CC(2,2,2,3)
-      Dm(2,6) = CC(2,2,3,1)
-
-      Dm(3,3) = CC(3,3,3,3)
-      Dm(3,4) = CC(3,3,1,2)
-      Dm(3,5) = CC(3,3,2,3)
-      Dm(3,6) = CC(3,3,3,1)
-
-      Dm(4,4) = CC(1,2,1,2)
-      Dm(4,5) = CC(1,2,2,3)
-      Dm(4,6) = CC(1,2,3,1)
-
-      Dm(5,5) = CC(2,3,2,3)
-      Dm(5,6) = CC(2,3,3,1)
-
-      Dm(6,6) = CC(3,1,3,1)
-
-      DO a=2, 6
-         DO b=1, a-1
-            Dm(a,b) = Dm(b,a)
-         END DO
-      END DO
 
       DO a=1, eNoN
          Bm(1,1,a) = Nx(1,a)*F(1,1)
@@ -374,7 +341,7 @@
       INTEGER(KIND=IKIND) :: a, b, i, j
       REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(2), ud(2),
      2   NxSNx, BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2),
-     3   Bm(3,2,eNoN), CC(2,2,2,2), S0(2,2)
+     3   Bm(3,2,eNoN), S0(2,2)
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -410,8 +377,9 @@
       END DO
       S0(2,1) = S0(1,2)
 
-!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor (CC)
-      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, CC)
+!     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
+!     Voigt notation
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
 
 !     Prestress
       pSl(1) = S(1,1)
@@ -424,20 +392,6 @@
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
-
-!     Convert to Voigt Notation
-      Dm(1,1) = CC(1,1,1,1)
-      Dm(1,2) = CC(1,1,2,2)
-      Dm(1,3) = CC(1,1,1,2)
-
-      Dm(2,2) = CC(2,2,2,2)
-      Dm(2,3) = CC(2,2,1,2)
-
-      Dm(3,3) = CC(1,2,1,2)
-
-      Dm(2,1) = Dm(1,2)
-      Dm(3,1) = Dm(1,3)
-      Dm(3,2) = Dm(2,3)
 
       DO a=1, eNoN
          Bm(1,1,a) = Nx(1,a)*F(1,1)

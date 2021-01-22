@@ -519,9 +519,9 @@
       INTEGER(KIND=IKIND) a, e, g, Ac, i, j, k, l, cPhys, insd,
      2   nFn
       REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
-     2   p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nstd),
+     2   p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nsymd),
      3   Im(nsd,nsd), F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd),
-     4   S(nsd,nsd), sigma(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd)
       TYPE(fsType) :: fs
 
       INTEGER, ALLOCATABLE :: eNds(:)
@@ -724,7 +724,7 @@
                   p = (-p)*detF
 
                   CALL GETPK2CCdev(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,
-     2               CC, Ja)
+     2               Dm, Ja)
 
                   C  = MATMUL(TRANSPOSE(F), F)
                   S  = S + p*MAT_INV(C, nsd)
@@ -734,7 +734,7 @@
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
 
                ELSE IF (cPhys .EQ. phys_struct) THEN
-                  CALL GETPK2CC(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,CC)
+                  CALL GETPK2CC(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,Dm)
                   P1 = MATMUL(F, S)
                   sigma = MATMUL(P1, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF

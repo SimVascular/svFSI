@@ -57,8 +57,8 @@
       IF (nFn .EQ. 0) nFn = 1
 
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nstd,eNoN),
-     3   pSl(nstd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
+     3   pSl(nsymd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
      3   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
 
 !     Loop over all elements of mesh

@@ -53,7 +53,7 @@
 
 !     LELAS: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), dl(tDof,eNoN),
-     2   bfl(nsd,eNoN), pS0l(nstd,eNoN), pSl(nstd), N(eNoN),
+     2   bfl(nsd,eNoN), pS0l(nsymd,eNoN), pSl(nsymd), N(eNoN),
      3   Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
 !     Loop over all elements of mesh

@@ -152,7 +152,7 @@
 !     Calculating the record length
       i = 2*tDof
       IF (dFlag) i = 3*tDof
-      IF (pstEq) i = i + nstd
+      IF (pstEq) i = i + nsymd
       IF (sstEq) i = i + nsd
       IF (cepEq) THEN
          i = i + nXion
@@ -233,7 +233,7 @@
       IF (pstEq) THEN
          IF (ALLOCATED(pS0)) err = "Prestress already allocated. "//
      2      "Correction needed"
-         ALLOCATE(pS0(nstd,tnNo), pSn(nstd,tnNo), pSa(tnNo))
+         ALLOCATE(pS0(nsymd,tnNo), pSn(nsymd,tnNo), pSa(tnNo))
          pS0 = 0._RKIND
          pSn = 0._RKIND
          pSa = 0._RKIND

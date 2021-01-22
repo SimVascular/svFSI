@@ -164,8 +164,7 @@
 
          lPtr => list%get(nsd,"Number of spatial dimensions",
      2      1,ll=2,ul=3)
-         nstd = 6
-         IF (nsd .EQ. 2) nstd = 3
+         nsymd = 3*(nsd-1)
 
          lPtr => list%get(nTs,"Number of time steps",1,ll=1)
          lPtr => list%get(startTS,"Starting time step",ll=0)
@@ -488,18 +487,21 @@
          lPtr => list%get(pstEq, "Prestress")
 
          IF (pstEq) THEN
-            nDOP = (/3,3,0,0/)
+            nDOP = (/3,2,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_stress
+            outPuts(3)  = out_strain
          ELSE
             nDOP = (/8,2,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_mises
+            outPuts(3) = out_stress
+            outPuts(4) = out_strain
+            outPuts(5) = out_velocity
+            outPuts(6) = out_acceleration
+            outPuts(7) = out_integ
+            outPuts(8) = out_jacobian
          END IF
-         outPuts(1) = out_displacement
-         outPuts(2) = out_mises
-         outPuts(3) = out_stress
-         outPuts(4) = out_strain
-         outPuts(5) = out_velocity
-         outPuts(6) = out_acceleration
-         outPuts(7) = out_integ
-         outPuts(8) = out_jacobian
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -519,22 +521,26 @@
          lPtr => list%get(pstEq, "Prestress")
 
          IF (pstEq) THEN
-            nDOP = (/3,3,0,0/)
+            nDOP = (/4,2,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_stress
+            outPuts(3)  = out_cauchy
+            outPuts(4)  = out_strain
          ELSE
             nDOP = (/12,2,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_mises
+            outPuts(3)  = out_stress
+            outPuts(4)  = out_cauchy
+            outPuts(5)  = out_strain
+            outPuts(6)  = out_jacobian
+            outPuts(7)  = out_defGrad
+            outPuts(8)  = out_integ
+            outPuts(9)  = out_fibDir
+            outPuts(10) = out_fibAlign
+            outPuts(11) = out_velocity
+            outPuts(12) = out_acceleration
          END IF
-         outPuts(1)  = out_displacement
-         outPuts(2)  = out_mises
-         outPuts(3)  = out_stress
-         outPuts(4)  = out_cauchy
-         outPuts(5)  = out_strain
-         outPuts(6)  = out_jacobian
-         outPuts(7)  = out_defGrad
-         outPuts(8)  = out_integ
-         outPuts(9)  = out_fibDir
-         outPuts(10) = out_fibAlign
-         outPuts(11) = out_velocity
-         outPuts(12) = out_acceleration
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -1372,12 +1378,12 @@
          CASE (out_stress)
             lEq%output(iOut)%grp  = outGrp_stress
             lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%l    = nsymd
             lEq%output(iOut)%name = "Stress"
          CASE (out_cauchy)
             lEq%output(iOut)%grp  = outGrp_cauchy
             lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%l    = nsymd
             lEq%output(iOut)%name = "Cauchy_stress"
          CASE (out_mises)
             lEq%output(iOut)%grp  = outGrp_mises
@@ -1397,7 +1403,7 @@
          CASE (out_strain)
             lEq%output(iOut)%grp  = outGrp_strain
             lEq%output(iOut)%o    = 0
-            lEq%output(iOut)%l    = nstd
+            lEq%output(iOut)%l    = nsymd
             lEq%output(iOut)%name = "Strain"
          CASE (out_divergence)
             lEq%output(iOut)%grp  = outGrp_divV
@@ -1932,12 +1938,12 @@ c     2         "can be applied for Neumann boundaries only"
                iM  = lBc%iM
                iFa = lBc%iFa
                IF (.NOT.ALLOCATED(msh(iM)%fa(iFa)%x)) THEN
-                  ALLOCATE(msh(iM)%fa(iFa)%x(nstd,msh(iM)%fa(iFa)%nNo))
+                  ALLOCATE(msh(iM)%fa(iFa)%x(nsymd,msh(iM)%fa(iFa)%nNo))
                   msh(iM)%fa(iFa)%x = 0._RKIND
                END IF
-               CALL READVTPPDATA(msh(iM)%fa(iFa), cTmp, "Stress",nstd,1)
+               CALL READVTPPDATA(msh(iM)%fa(iFa),cTmp,"Stress",nsymd,1)
                IF (.NOT.ALLOCATED(pS0)) THEN
-                  ALLOCATE(pS0(nstd,gtnNo))
+                  ALLOCATE(pS0(nsymd,gtnNo))
                   pS0 = 0._RKIND
                END IF
                DO a=1, msh(iM)%fa(iFa)%nNo

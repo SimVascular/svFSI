@@ -38,26 +38,29 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, CC)
+      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, Dm)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
-      REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd)
+      REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd)
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
      2   Inv4, Inv6, Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
      3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
-     3   PP(nsd,nsd,nsd,nsd)
+     3   PP(nsd,nsd,nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
 !     Guccione, HGO/HO model
       REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, Hff(nsd,nsd),
      4   Hss(nsd,nsd), Sfs(nsd,nsd,6), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
+
+      S    = 0._RKIND
+      Dm   = 0._RKIND
 
 !     Some preliminaries
       stM  = lDmn%stM
@@ -106,7 +109,6 @@
 
          S  = g1*trE*IDm + g2*E
          CC = g1*TEN_DYADPROD(IDm, IDm, nsd) + g2*TEN_IDs(nsd)
-         RETURN
 
 !     modified St.Venant-Kirchhoff
       CASE (stIso_mStVK)
@@ -116,7 +118,6 @@
          S  = g1*LOG(J)*Ci + g2*(C-IDm)
          CC = g1 * ( -2._RKIND*LOG(J)*TEN_SYMMPROD(Ci, Ci, nsd) +
      2      TEN_DYADPROD(Ci, Ci, nsd) ) + 2._RKIND*g2*TEN_IDs(nsd)
-         RETURN
 
 !     NeoHookean model
       CASE (stIso_nHook)
@@ -131,7 +132,6 @@
          S  = S + p*J*Ci
          CC = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2         (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
-         RETURN
 
 !     Mooney-Rivlin model
       CASE (stIso_MR)
@@ -155,7 +155,6 @@
          S   = S + p*J*Ci
          CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
-         RETURN
 
 !     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
 !     the anisotropic fiber-based strain-energy terms
@@ -202,7 +201,6 @@
          S   = S + p*J*Ci
          CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
-         RETURN
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
@@ -271,7 +269,6 @@
          S   = S + p*J*Ci
          CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
-         RETURN
 
 !     HO (Holzapfel-Ogden) model for myocardium (2009)
       CASE (stIso_HO)
@@ -344,11 +341,12 @@
             CC  = TEN_DDOT_2412(CCb, CC, nsd)
          END IF
 
-         RETURN
-
       CASE DEFAULT
          err = "Undefined material constitutive model"
       END SELECT
+
+!     Convert to Voigt Notation
+      CALL CCTOVOIGT(CC, Dm)
 
       RETURN
       END SUBROUTINE GETPK2CC
@@ -382,20 +380,20 @@
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, ya, S, CC, Ja)
+      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, ya, S, Dm, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
-      REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), CC(nsd,nsd,nsd,nsd),
-     2   Ja
+      REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd), Ja
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,
      2   Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
-     3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd)
+     3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
+     4   CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
       ! Guccione !
       REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
@@ -404,6 +402,9 @@
      2   Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
+
+      S    = 0._RKIND
+      Dm   = 0._RKIND
 
 !     Some preliminaries
       stM  = lDmn%stM
@@ -446,7 +447,6 @@
      2        1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
      3      - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                   TEN_DYADPROD(S, Ci, nsd) )
-         RETURN
 
 !     Mooney-Rivlin model
       CASE (stIso_MR)
@@ -468,7 +468,6 @@
      2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
      3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
-         RETURN
 
 !     HGO (Holzapfel-Gasser-Ogden) model with additive splitting of
 !     the anisotropic fiber-based strain-energy terms
@@ -513,7 +512,6 @@
      2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
      3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
-         RETURN
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
@@ -655,11 +653,12 @@
             CC  = TEN_DDOT_2412(CCb, CC, nsd)
          END IF
 
-         RETURN
-
       CASE DEFAULT
          err = "Undefined isochoric material constitutive model"
       END SELECT
+
+!     Convert to Voigt Notation
+      CALL CCTOVOIGT(CC, Dm)
 
       RETURN
       END SUBROUTINE GETPK2CCdev
@@ -749,6 +748,68 @@
 
       RETURN
       END SUBROUTINE GETTAU
+!--------------------------------------------------------------------
+!     Convert elasticity tensor to Voigt notation
+      SUBROUTINE CCTOVOIGT(CC, Dm)
+      USE COMMOD, ONLY : RKIND, nsd, nsymd
+      IMPLICIT NONE
+      REAL(KIND=RKIND), INTENT(IN) :: CC(nsd,nsd,nsd,nsd)
+      REAL(KIND=RKIND), INTENT(INOUT) :: Dm(nsymd,nsymd)
+
+      INTEGER i, j
+
+      IF (nsd .EQ. 3) THEN
+         Dm(1,1) = CC(1,1,1,1)
+         Dm(1,2) = CC(1,1,2,2)
+         Dm(1,3) = CC(1,1,3,3)
+         Dm(1,4) = CC(1,1,1,2)
+         Dm(1,5) = CC(1,1,2,3)
+         Dm(1,6) = CC(1,1,3,1)
+
+         Dm(2,2) = CC(2,2,2,2)
+         Dm(2,3) = CC(2,2,3,3)
+         Dm(2,4) = CC(2,2,1,2)
+         Dm(2,5) = CC(2,2,2,3)
+         Dm(2,6) = CC(2,2,3,1)
+
+         Dm(3,3) = CC(3,3,3,3)
+         Dm(3,4) = CC(3,3,1,2)
+         Dm(3,5) = CC(3,3,2,3)
+         Dm(3,6) = CC(3,3,3,1)
+
+         Dm(4,4) = CC(1,2,1,2)
+         Dm(4,5) = CC(1,2,2,3)
+         Dm(4,6) = CC(1,2,3,1)
+
+         Dm(5,5) = CC(2,3,2,3)
+         Dm(5,6) = CC(2,3,3,1)
+
+         Dm(6,6) = CC(3,1,3,1)
+
+         DO i=2, 6
+            DO j=1, i-1
+               Dm(i,j) = Dm(j,i)
+            END DO
+         END DO
+
+      ELSE IF (nsd .EQ. 2) THEN
+         Dm(1,1) = CC(1,1,1,1)
+         Dm(1,2) = CC(1,1,2,2)
+         Dm(1,3) = CC(1,1,1,2)
+
+         Dm(2,2) = CC(2,2,2,2)
+         Dm(2,3) = CC(2,2,1,2)
+
+         Dm(3,3) = CC(1,2,1,2)
+
+         Dm(2,1) = Dm(1,2)
+         Dm(3,1) = Dm(1,3)
+         Dm(3,2) = Dm(2,3)
+
+      END IF
+
+      RETURN
+      END SUBROUTINE CCTOVOIGT
 !####################################################################
 !     Compute active stress for electromechanics
       SUBROUTINE ACTVSTRESS(Tact, nfd, fl, S)

@@ -163,7 +163,7 @@
 
 !     Sending data from read by master in READFILES to slaves
       IF (.NOT.resetSim) THEN
-         CALL cm%bcast(nstd)
+         CALL cm%bcast(nsymd)
          CALL cm%bcast(stopTrigName)
          CALL cm%bcast(iniFilePath)
          CALL cm%bcast(stFileName)
@@ -245,13 +245,13 @@
       CALL cm%bcast(flag)
       IF (flag) THEN
          IF (cm%mas()) THEN
-            ALLOCATE(tmpX(nstd,gtnNo))
+            ALLOCATE(tmpX(nsymd,gtnNo))
             tmpX = pS0
             DEALLOCATE(pS0)
          ELSE
             ALLOCATE(tmpX(0,0))
          END IF
-         ALLOCATE(pS0(nstd,tnNo))
+         ALLOCATE(pS0(nsymd,tnNo))
          pS0 = LOCAL(tmpX)
          DEALLOCATE(tmpX)
       END IF

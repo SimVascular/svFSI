@@ -390,13 +390,13 @@ c               END IF
                err = "Prestress is currently not allowed with remeshing"
             END IF
             flag = .TRUE.
-            ALLOCATE(msh(iM)%x(nstd,msh(iM)%gnNo))
+            ALLOCATE(msh(iM)%x(nsymd,msh(iM)%gnNo))
             msh(iM)%x = 0._RKIND
-            CALL READVTUPDATA(msh(iM), cTmp, "Stress", nstd, 1)
+            CALL READVTUPDATA(msh(iM), cTmp, "Stress", nsymd, 1)
          END IF
       END DO
       IF (flag) THEN
-         ALLOCATE(pS0(nstd,gtnNo))
+         ALLOCATE(pS0(nsymd,gtnNo))
          pS0 = 0._RKIND
          DO iM=1, nMsh
             IF (.NOT.ALLOCATED(msh(iM)%x)) CYCLE
