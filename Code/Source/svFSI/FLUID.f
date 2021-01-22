@@ -307,7 +307,7 @@
      2         + rho*( N(a)*(amd*N(b) + uaNx(b))
      3         + rho*tauM*uaNx(a)*(uNx(b) + amd*N(b)) )
 
-            T2 = rho*tauM*uNx(a)
+            T2 = rho*tauM*uaNx(a)
 
             T3 = rho*tauM*(amd*N(b) + uNx(b))
 
@@ -502,7 +502,7 @@
      2         + rho*( N(a)*(amd*N(b) + uaNx(b))
      3         + rho*tauM*uaNx(a)*(uNx(b) + amd*N(b)) )
 
-            T2 = rho*tauM*uNx(a)
+            T2 = rho*tauM*uaNx(a)
 
             T3 = rho*tauM*(amd*N(b) + uNx(b))
 
