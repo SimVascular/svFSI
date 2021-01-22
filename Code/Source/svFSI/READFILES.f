@@ -487,18 +487,21 @@
          lPtr => list%get(pstEq, "Prestress")
 
          IF (pstEq) THEN
-            nDOP = (/3,3,0,0/)
+            nDOP = (/3,2,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_stress
+            outPuts(3)  = out_strain
          ELSE
             nDOP = (/8,2,0,0/)
+            outPuts(1) = out_displacement
+            outPuts(2) = out_mises
+            outPuts(3) = out_stress
+            outPuts(4) = out_strain
+            outPuts(5) = out_velocity
+            outPuts(6) = out_acceleration
+            outPuts(7) = out_integ
+            outPuts(8) = out_jacobian
          END IF
-         outPuts(1) = out_displacement
-         outPuts(2) = out_mises
-         outPuts(3) = out_stress
-         outPuts(4) = out_strain
-         outPuts(5) = out_velocity
-         outPuts(6) = out_acceleration
-         outPuts(7) = out_integ
-         outPuts(8) = out_jacobian
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -518,22 +521,26 @@
          lPtr => list%get(pstEq, "Prestress")
 
          IF (pstEq) THEN
-            nDOP = (/3,3,0,0/)
+            nDOP = (/4,2,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_stress
+            outPuts(3)  = out_cauchy
+            outPuts(4)  = out_strain
          ELSE
             nDOP = (/12,2,0,0/)
+            outPuts(1)  = out_displacement
+            outPuts(2)  = out_mises
+            outPuts(3)  = out_stress
+            outPuts(4)  = out_cauchy
+            outPuts(5)  = out_strain
+            outPuts(6)  = out_jacobian
+            outPuts(7)  = out_defGrad
+            outPuts(8)  = out_integ
+            outPuts(9)  = out_fibDir
+            outPuts(10) = out_fibAlign
+            outPuts(11) = out_velocity
+            outPuts(12) = out_acceleration
          END IF
-         outPuts(1)  = out_displacement
-         outPuts(2)  = out_mises
-         outPuts(3)  = out_stress
-         outPuts(4)  = out_cauchy
-         outPuts(5)  = out_strain
-         outPuts(6)  = out_jacobian
-         outPuts(7)  = out_defGrad
-         outPuts(8)  = out_integ
-         outPuts(9)  = out_fibDir
-         outPuts(10) = out_fibAlign
-         outPuts(11) = out_velocity
-         outPuts(12) = out_acceleration
 
          CALL READLS(lSolver_CG, lEq, list)
 
