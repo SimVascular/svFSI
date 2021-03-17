@@ -249,7 +249,7 @@
 
       LOGICAL ierr
 
-      CALL MPI_ABORT(cm, MPI_ERR_OTHER, ierr)
+      CALL MPI_ABORT(cm%com(), MPI_ERR_OTHER, ierr)
 
       RETURN
       END SUBROUTINE FSTOP
