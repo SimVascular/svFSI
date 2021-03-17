@@ -34,7 +34,7 @@ include_directories(${SV_SOURCE_DIR}/ThirdParty/tetgen/simvascular_tetgen)
 include_directories(${MPI_C_INCLUDE_PATH})
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-  set(CMAKE_Fortran_FLAGS "-cpp -pthread")
+  set(CMAKE_Fortran_FLAGS "-cpp -pthread -std=legacy")
 else()
   # nothing for now
   # may need to set for intel compiler or others
