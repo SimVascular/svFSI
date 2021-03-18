@@ -323,10 +323,8 @@
          CC  = TEN_DDOT(CCb, PP, nsd)
          CC  = TEN_TRANSPOSE(CC, nsd)
          CC  = TEN_DDOT(PP, CC, nsd)
-         CC  = CC + 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
-     2              1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
-     3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
-     4                         TEN_DYADPROD(S, Ci, nsd) )
+         CC  = CC - (2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
+     2                           TEN_DYADPROD(S, Ci, nsd) )
 
          S   = S + p*J*Ci
          CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
