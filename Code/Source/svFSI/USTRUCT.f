@@ -272,7 +272,7 @@
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
-         CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
+         CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND
@@ -593,7 +593,7 @@
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
-         CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
+         CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND
@@ -829,7 +829,7 @@
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
-         CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
+         CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND
@@ -1024,7 +1024,7 @@
 
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
-         CALL GETTAU(eq(cEq)%dmn(cDmn), Je, tauM, tauC)
+         CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND

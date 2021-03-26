@@ -53,9 +53,11 @@
      3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
      3   PP(nsd,nsd,nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
-!     Guccione, HGO/HO model
+!     Guccione
+      REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
+!     HGO/HO model
       REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, Hff(nsd,nsd),
-     4   Hss(nsd,nsd), Sfs(nsd,nsd,6), Hfs(nsd,nsd)
+     4   Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
 
@@ -210,54 +212,53 @@
          E = 0.5_RKIND * (J2d*C - Idm)
 
 !        Transform into local orthogonal coordinate system
-         Hff(1,:) = fl(:,1)
-         Hff(2,:) = fl(:,2)
-         Hff(3,:) = CROSS(fl)
+         Rm(:,1) = fl(:,1)
+         Rm(:,2) = fl(:,2)
+         Rm(:,3) = CROSS(fl)
 
 !        Project E to local orthogocal coordinate system
-         E = MATMUL(E, TRANSPOSE(Hff))
-         E = MATMUL(Hff, E)
+         Es = MATMUL(E, Rm)
+         Es = MATMUL(TRANSPOSE(Rm), Es)
 
          g1 = stM%bff
          g2 = stM%bss
          g3 = stM%bfs
 
-!        Fiber stiffness contribution to Siso := (dE*_MN / dE_IJ)
-!        - Voigt notation
-         Sfs(:,:,:) = 0._RKIND
-         Sfs(:,:,1) = MAT_DYADPROD(Hff(1,:), Hff(1,:), nsd)
-         Sfs(:,:,2) = MAT_DYADPROD(Hff(2,:), Hff(2,:), nsd)
-         Sfs(:,:,3) = MAT_DYADPROD(Hff(3,:), Hff(3,:), nsd)
-         Sfs(:,:,4) = MAT_SYMMPROD(Hff(1,:), Hff(2,:), nsd)
-         Sfs(:,:,5) = MAT_SYMMPROD(Hff(1,:), Hff(3,:), nsd)
-         Sfs(:,:,6) = MAT_SYMMPROD(Hff(2,:), Hff(3,:), nsd)
+         QQ = g1 * Es(1,1)*Es(1,1) +
+     2        g2 *(Es(2,2)*Es(2,2) + Es(3,3)*Es(3,3)  +
+     3             Es(2,3)*Es(2,3) + Es(3,2)*Es(3,2)) +
+     4        g3 *(Es(1,2)*Es(1,2) + Es(2,1)*Es(2,1)  +
+     5             Es(1,3)*Es(1,3) + Es(3,1)*Es(3,1))
 
-         Eff = g1* E(1,1)*E(1,1) +
-     2         g2*(E(2,2)*E(2,2) + E(3,3)*E(3,3)  +
-     3             E(2,3)*E(2,3) + E(3,2)*E(3,2)) +
-     4         g3*(E(1,2)*E(1,2) + E(2,1)*E(2,1)  +
-     5             E(1,3)*E(1,3) + E(3,1)*E(3,1))
+         r2 = stM%C10 * EXP(QQ)
 
-         Hss = g1*E(1,1)*Sfs(:,:,1)
-         Hss = Hss + g2*(E(2,2)*Sfs(:,:,2) + E(3,3)*Sfs(:,:,3) +
-     2      (E(2,3) + E(3,2))*Sfs(:,:,6))
-         Hss = Hss + g3*( (E(1,2) + E(2,1))*Sfs(:,:,4) +
-     2                    (E(1,3) + E(3,1))*Sfs(:,:,5) )
+!        Fiber stiffness contribution := (dE*_ab / dE_IJ)
+         RmRm(:,:,1) = MAT_DYADPROD(Rm(:,1), Rm(:,1), nsd)
+         RmRm(:,:,2) = MAT_DYADPROD(Rm(:,2), Rm(:,2), nsd)
+         RmRm(:,:,3) = MAT_DYADPROD(Rm(:,3), Rm(:,3), nsd)
 
-         r2  = stM%C10 * EXP(Eff)
-         Sb  = r2 * Hss
+         RmRm(:,:,4) = MAT_SYMMPROD(Rm(:,1), Rm(:,2), nsd)
+         RmRm(:,:,5) = MAT_SYMMPROD(Rm(:,2), Rm(:,3), nsd)
+         RmRm(:,:,6) = MAT_SYMMPROD(Rm(:,3), Rm(:,1), nsd)
+
+         Sb = g1*Es(1,1)*RmRm(:,:,1) + g2*(Es(2,2)*RmRm(:,:,2) +
+     2      Es(3,3)*RmRm(:,:,3) + 2._RKIND*Es(2,3)*RmRm(:,:,5)) +
+     4      2._RKIND*g3*(Es(1,2)*RmRm(:,:,4) + Es(1,3)*RmRm(:,:,6))
+
+         CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
+         Sb  = Sb * r2
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
          r2  = r2*J4d
-         CCb = r2 * ( 2._RKIND*TEN_DYADPROD(Hss, Hss, nsd) +
-     2      g1* TEN_DYADPROD(Sfs(:,:,1), Sfs(:,:,1), nsd)  +
-     3      g2*(TEN_DYADPROD(Sfs(:,:,2), Sfs(:,:,2), nsd)  +
-     4          TEN_DYADPROD(Sfs(:,:,3), Sfs(:,:,3), nsd)  +
-     5      2._RKIND*TEN_DYADPROD(Sfs(:,:,6), Sfs(:,:,6), nsd)) +
-     6      g3*(TEN_DYADPROD(Sfs(:,:,4), Sfs(:,:,4), nsd)  +
-     7          TEN_DYADPROD(Sfs(:,:,5), Sfs(:,:,5), nsd))*2._RKIND )
+         CCb = r2*(CCb + g1*TEN_DYADPROD(RmRm(:,:,1), RmRm(:,:,1), nsd)
+     2       + g2*(TEN_DYADPROD(RmRm(:,:,2), RmRm(:,:,2), nsd)
+     3       + TEN_DYADPROD(RmRm(:,:,3), RmRm(:,:,3), nsd)
+     4       + TEN_DYADPROD(RmRm(:,:,5), RmRm(:,:,5), nsd)*2._RKIND)
+     5       + 2._RKIND*g3*(TEN_DYADPROD(RmRm(:,:,4), RmRm(:,:,4), nsd)
+     6       + TEN_DYADPROD(RmRm(:,:,6), RmRm(:,:,6), nsd)))
+
 
          PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
@@ -396,7 +397,7 @@
      4   CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
       ! Guccione !
-      REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd)
+      REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
       ! HGO, HO !
       REAL(KIND=RKIND) :: kap, Eff, Ess, Efs, Hff(nsd,nsd),
      2   Hss(nsd,nsd), Hfs(nsd,nsd)
@@ -521,9 +522,9 @@
          E = 0.5_RKIND * (J2d*C - Idm)
 
 !        Transform into local orthogonal coordinate system
-         Rm(1,:) = fl(:,1)
-         Rm(2,:) = fl(:,2)
-         Rm(3,:) = CROSS(fl)
+         Rm(:,1) = fl(:,1)
+         Rm(:,2) = fl(:,2)
+         Rm(:,3) = CROSS(fl)
 
 !        Project E to local orthogocal coordinate system
          Es = MATMUL(E, Rm)
@@ -541,41 +542,32 @@
 
          r2 = stM%C10 * EXP(QQ)
 
-         Sb(1,1) = g1*r2*E(1,1)
-         Sb(2,2) = g2*r2*E(2,2)
-         Sb(3,3) = g2*r2*E(3,3)
-         Sb(2,3) = g2*r2*E(2,3)
-         Sb(1,2) = g3*r2*E(1,2)
-         Sb(1,3) = g3*r2*E(1,3)
+!        Fiber stiffness contribution := (dE*_ab / dE_IJ)
+         RmRm(:,:,1) = MAT_DYADPROD(Rm(:,1), Rm(:,1), nsd)
+         RmRm(:,:,2) = MAT_DYADPROD(Rm(:,2), Rm(:,2), nsd)
+         RmRm(:,:,3) = MAT_DYADPROD(Rm(:,3), Rm(:,3), nsd)
 
-         Sb(2,1) = Sb(1,2)
-         Sb(3,1) = Sb(1,3)
-         Sb(3,2) = Sb(2,3)
+         RmRm(:,:,4) = MAT_SYMMPROD(Rm(:,1), Rm(:,2), nsd)
+         RmRm(:,:,5) = MAT_SYMMPROD(Rm(:,2), Rm(:,3), nsd)
+         RmRm(:,:,6) = MAT_SYMMPROD(Rm(:,3), Rm(:,1), nsd)
+
+         Sb = g1*Es(1,1)*RmRm(:,:,1) + g2*(Es(2,2)*RmRm(:,:,2) +
+     2      Es(3,3)*RmRm(:,:,3) + 2._RKIND*Es(2,3)*RmRm(:,:,5)) +
+     4      2._RKIND*g3*(Es(1,2)*RmRm(:,:,4) + Es(1,3)*RmRm(:,:,6))
+
+         CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
+         Sb  = Sb * r2
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
          r2  = r2*J4d
-         CCb = 0._RKIND
-         CCb(1,1,1,1) = g1 * r2
-
-         CCb(2,2,2,2) = g2 * r2
-         CCb(3,3,3,3) = CCb(2,2,2,2)
-
-         CCb(2,3,2,3) = 0.5_RKIND * g2 * r2
-         CCb(3,2,2,3) = CCb(2,3,2,3)
-         CCb(2,3,3,2) = CCb(2,3,2,3)
-         CCb(3,2,3,2) = CCb(2,3,2,3)
-
-         CCb(1,2,1,2) = 0.5_RKIND * g3 * r2
-         CCb(2,1,1,2) = CCb(1,2,1,2)
-         CCb(1,2,2,1) = CCb(1,2,1,2)
-         CCb(2,1,2,1) = CCb(1,2,1,2)
-
-         CCb(1,3,1,3) = 0.5_RKIND * g3 * r2
-         CCb(3,1,1,3) = CCb(1,3,1,3)
-         CCb(1,3,3,1) = CCb(1,3,1,3)
-         CCb(3,1,3,1) = CCb(1,3,1,3)
+         CCb = r2*(CCb + g1*TEN_DYADPROD(RmRm(:,:,1), RmRm(:,:,1), nsd)
+     2       + g2*(TEN_DYADPROD(RmRm(:,:,2), RmRm(:,:,2), nsd)
+     3       + TEN_DYADPROD(RmRm(:,:,3), RmRm(:,:,3), nsd)
+     4       + TEN_DYADPROD(RmRm(:,:,5), RmRm(:,:,5), nsd)*2._RKIND)
+     5       + 2._RKIND*g3*(TEN_DYADPROD(RmRm(:,:,4), RmRm(:,:,4), nsd)
+     6       + TEN_DYADPROD(RmRm(:,:,6), RmRm(:,:,6), nsd)))
 
          PP  = TEN_IDs(nsd) - (1._RKIND/nd) * TEN_DYADPROD(Ci, C, nsd)
          CC  = TEN_DDOT(CCb, PP, nsd)
@@ -718,33 +710,33 @@
       END SUBROUTINE GVOLPEN
 !--------------------------------------------------------------------
 !     Compute stabilization parameters tauM and tauC
-      SUBROUTINE GETTAU(lDmn, Je, tauM, tauC)
+      SUBROUTINE GETTAU(lDmn, detF, Je, tauM, tauC)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
-      REAL(KIND=RKIND), INTENT(IN)  :: Je
+      REAL(KIND=RKIND), INTENT(IN)  :: detF, Je
       REAL(KIND=RKIND), INTENT(OUT) :: tauM, tauC
 
-      REAL(KIND=RKIND) :: ctM, ctC, he, rho, Em, nu, mu, lam, c
+      REAL(KIND=RKIND) :: ctM, ctC, he, rho0, Em, nu, mu, lam, c
 
-      he  = 0.5_RKIND * Je**(1._RKIND/REAL(nsd, KIND=RKIND))
-      rho = lDmn%prop(solid_density)
-      Em  = lDmn%prop(elasticity_modulus)
-      nu  = lDmn%prop(poisson_ratio)
-      ctM = lDmn%prop(ctau_M)
-      ctC = lDmn%prop(ctau_C)
+      he   = 0.5_RKIND * Je**(1._RKIND/REAL(nsd, KIND=RKIND))
+      rho0 = lDmn%prop(solid_density)
+      Em   = lDmn%prop(elasticity_modulus)
+      nu   = lDmn%prop(poisson_ratio)
+      ctM  = lDmn%prop(ctau_M)
+      ctC  = lDmn%prop(ctau_C)
 
-      mu  = 0.5_RKIND*Em / (1._RKIND + nu)
+      mu   = 0.5_RKIND*Em / (1._RKIND + nu)
       IF (ISZERO(nu-0.5_RKIND)) THEN
-         c = SQRT(mu / rho)
+         c = SQRT(mu / rho0)
       ELSE
          lam = 2._RKIND*mu*nu / (1._RKIND-2._RKIND*nu)
-         c = SQRT((lam + 2._RKIND*mu)/rho)
+         c = SQRT((lam + 2._RKIND*mu)/rho0)
       END IF
 
-      tauM = ctM * he / c / rho
-      tauC = ctC * he * c * rho
+      tauM = ctM * (he/c) * (detF/rho0)
+      tauC = ctC * (he*c) * (rho0/detF)
 
       RETURN
       END SUBROUTINE GETTAU

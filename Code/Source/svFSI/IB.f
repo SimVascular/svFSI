@@ -4145,7 +4145,7 @@ c      END DO
      2      dbta_s, 1._RKIND)
 
 !        Compute stabilization parameters
-         CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
+         CALL GETTAU(eq(iEq)%dmnIB(iDmn), Jac, Je, tauM_s, tauC_s)
 
 !        Momentum and continuity stabilization
          vp_s(1) = -tauM_s*(rho_s*(vd(1) + vVx(1)) + px(1))
@@ -4481,7 +4481,7 @@ c      END DO
      2      dbta_s, 1._RKIND)
 
 !        Compute stabilization parameters
-         CALL GETTAU(eq(iEq)%dmnIB(iDmn), Je, tauM_s, tauC_s)
+         CALL GETTAU(eq(iEq)%dmnIB(iDmn), Jac, Je, tauM_s, tauC_s)
 
 !        Momentum and continuity stabilization
          vp_s(1) = -tauM_s*(rho_s*(vd(1) + vVx(1)) + px(1))
