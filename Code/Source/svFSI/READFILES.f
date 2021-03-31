@@ -811,9 +811,9 @@
             cem%cpld = .TRUE.
             CALL TO_LOWER(ctmp)
             SELECT CASE (TRIM(ctmp))
-            CASE ("active stress")
+            CASE ("active stress", "active_stress")
                cem%aStress = .TRUE.
-            CASE ("active strain")
+            CASE ("active strain", "active_strain")
                cem%aStrain = .TRUE.
             CASE DEFAULT
                err = "Undefined coupling for cardiac electromechanics"

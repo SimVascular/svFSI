@@ -200,14 +200,14 @@
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
          S0(3,3) = S0(3,3) + N(a)*pS0l(3,a)
          S0(1,2) = S0(1,2) + N(a)*pS0l(4,a)
-         S0(1,3) = S0(1,3) + N(a)*pS0l(5,a)
-         S0(2,3) = S0(2,3) + N(a)*pS0l(6,a)
+         S0(2,3) = S0(2,3) + N(a)*pS0l(5,a)
+         S0(3,1) = S0(3,1) + N(a)*pS0l(6,a)
 
          ya_g    = ya_g + N(a)*ya_l(a)
       END DO
       S0(2,1) = S0(1,2)
-      S0(3,1) = S0(1,3)
       S0(3,2) = S0(2,3)
+      S0(1,3) = S0(3,1)
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notationa (Dm)
@@ -218,8 +218,8 @@
       pSl(2) = S(2,2)
       pSl(3) = S(3,3)
       pSl(4) = S(1,2)
-      pSl(5) = S(1,3)
-      pSl(6) = S(2,3)
+      pSl(5) = S(2,3)
+      pSl(6) = S(3,1)
       S = S + S0
 
 !     Active stress - electromechanics
