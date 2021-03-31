@@ -170,8 +170,8 @@
          ed(2) = ed(2) + Nx(2,a)*dl(j,a)
          ed(3) = ed(3) + Nx(3,a)*dl(k,a)
          ed(4) = ed(4) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
-         ed(5) = ed(5) + Nx(3,a)*dl(i,a) + Nx(1,a)*dl(k,a)
-         ed(6) = ed(6) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+         ed(5) = ed(5) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+         ed(6) = ed(6) + Nx(1,a)*dl(k,a) + Nx(3,a)*dl(i,a)
 
          S0(1) = S0(1) + N(a)*pS0l(1,a)
          S0(2) = S0(2) + N(a)*pS0l(2,a)
@@ -187,8 +187,8 @@
       S(2) = divD + 2._RKIND*mu*ed(2)
       S(3) = divD + 2._RKIND*mu*ed(3)
       S(4) = mu*ed(4)  ! 2*eps_12
-      S(5) = mu*ed(5)  ! 2*eps_13
-      S(6) = mu*ed(6)  ! 2*eps_23
+      S(5) = mu*ed(5)  ! 2*eps_23
+      S(6) = mu*ed(6)  ! 2*eps_13
       pSl  = S
 
 !     Add prestress contribution
@@ -196,13 +196,13 @@
 
       DO a=1, eNoN
          lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + Nx(1,a)*S(1) +
-     2      Nx(2,a)*S(4) + Nx(3,a)*S(5))
+     2      Nx(2,a)*S(4) + Nx(3,a)*S(6))
 
          lR(2,a) = lR(2,a) + w*(rho*N(a)*ud(2) + Nx(1,a)*S(4) +
-     2      Nx(2,a)*S(2) + Nx(3,a)*S(6))
+     2      Nx(2,a)*S(2) + Nx(3,a)*S(5))
 
-         lR(3,a) = lR(3,a) + w*(rho*N(a)*ud(3) + Nx(1,a)*S(5) +
-     2      Nx(2,a)*S(6) + Nx(3,a)*S(3))
+         lR(3,a) = lR(3,a) + w*(rho*N(a)*ud(3) + Nx(1,a)*S(6) +
+     2      Nx(2,a)*S(5) + Nx(3,a)*S(3))
 
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)

@@ -635,8 +635,8 @@
                      ed(2) = ed(2) + Nx(2,a)*dl(j,a)
                      ed(3) = ed(3) + Nx(3,a)*dl(k,a)
                      ed(4) = ed(4) + Nx(2,a)*dl(i,a) + Nx(1,a)*dl(j,a)
-                     ed(5) = ed(5) + Nx(3,a)*dl(i,a) + Nx(1,a)*dl(k,a)
-                     ed(6) = ed(6) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+                     ed(5) = ed(5) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
+                     ed(6) = ed(6) + Nx(1,a)*dl(k,a) + Nx(3,a)*dl(i,a)
                   ELSE
                      ed(1) = ed(1) + Nx(1,a)*dl(i,a)
                      ed(2) = ed(2) + Nx(2,a)*dl(j,a)
@@ -683,8 +683,8 @@
                      resl(2) = Eg(2,2)
                      resl(3) = Eg(3,3)
                      resl(4) = Eg(1,2)
-                     resl(5) = Eg(1,3)
-                     resl(6) = Eg(2,3)
+                     resl(5) = Eg(2,3)
+                     resl(6) = Eg(3,1)
                   ELSE
                      resl(1) = Eg(1,1)
                      resl(2) = Eg(2,2)
@@ -702,12 +702,12 @@
                      sigma(3,3) = detF + 2._RKIND*mu*ed(3)
 
                      sigma(1,2) = mu*ed(4)
-                     sigma(1,3) = mu*ed(5)
-                     sigma(2,3) = mu*ed(6)
+                     sigma(2,3) = mu*ed(5)
+                     sigma(3,1) = mu*ed(6)
 
                      sigma(2,1) = sigma(1,2)
-                     sigma(3,1) = sigma(1,3)
                      sigma(3,2) = sigma(2,3)
+                     sigma(1,3) = sigma(3,1)
                   ELSE
                      detF = lambda*(ed(1) + ed(2))
                      sigma(1,1) = detF + 2._RKIND*mu*ed(1)
@@ -748,8 +748,8 @@
                      resl(2) = S(2,2)
                      resl(3) = S(3,3)
                      resl(4) = S(1,2)
-                     resl(5) = S(1,3)
-                     resl(6) = S(2,3)
+                     resl(5) = S(2,3)
+                     resl(6) = S(3,1)
                   ELSE
                      resl(1) = S(1,1)
                      resl(2) = S(2,2)
@@ -763,8 +763,8 @@
                      resl(2) = sigma(2,2)
                      resl(3) = sigma(3,3)
                      resl(4) = sigma(1,2)
-                     resl(5) = sigma(1,3)
-                     resl(6) = sigma(2,3)
+                     resl(5) = sigma(2,3)
+                     resl(6) = sigma(3,1)
                   ELSE
                      resl(1) = sigma(1,1)
                      resl(2) = sigma(2,2)
