@@ -141,6 +141,8 @@
          REAL(KIND=RKIND) :: Rd = 0._RKIND
 !        Distal pressure
          REAL(KIND=RKIND) :: Pd = 0._RKIND
+!        Initial value
+         REAL(KIND=RKIND) :: Xo = 0._RKIND
       END TYPE rcrType
 
 !     Fourier coefficients that are used to specify unsteady BCs
@@ -452,6 +454,8 @@
          LOGICAL :: coupled = .FALSE.
 !        Whether to use genBC
          LOGICAL :: useGenBC = .FALSE.
+!        Whether to initialize RCR from flow data
+         LOGICAL :: initRCR = .FALSE.
 !        Number of coupled faces
          INTEGER(KIND=IKIND) :: nFa = 0
 !        Number of unknowns in the 0D domain

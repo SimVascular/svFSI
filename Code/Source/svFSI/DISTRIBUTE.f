@@ -357,6 +357,7 @@
          IF (.NOT.ALLOCATED(cplBC%xo)) ALLOCATE(cplBC%xo(cplBC%nX))
          IF (cplBC%nX .NE. 0) CALL cm%bcast(cplBC%xo)
       END IF
+      CALL cm%bcast(cplBC%initRCR)
 
       DO iM=1, nMsh
          CALL DESTROY(tMs(iM))
@@ -672,6 +673,7 @@
          CALL cm%bcast(lBc%RCR%C)
          CALL cm%bcast(lBC%RCR%Rd)
          CALL cm%bcast(lBC%RCR%Pd)
+         CALL cm%bcast(lBC%RCR%Xo)
       END IF
 
 !     Communicating time-dependent BC data

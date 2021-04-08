@@ -73,10 +73,12 @@
                   END IF
                ELSE
                   OPEN(fid, FILE=cplBC%saveName, POSITION='APPEND')
+                  WRITE(fid,'(ES14.6E2)',ADVANCE='NO') cplBC%xp(1)
                   DO i=1, cplBC%nX
-                     WRITE(fid,'(ES14.6E2)',ADVANCE='NO') cplBC%xo(i)
+                     WRITE(fid,'(2(X,ES14.6E2))',ADVANCE='NO')
+     2                  cplBC%xn(i), cplBC%fa(i)%y
                   END DO
-                  DO i=1, cplBC%nXp
+                  DO i=2, cplBC%nXp
                      WRITE(fid,'(ES14.6E2)',ADVANCE='NO') cplBC%xp(i)
                   END DO
                   WRITE(fid,*)

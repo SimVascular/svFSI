@@ -92,11 +92,13 @@
                   cplBC%fa(i)%RCR%C  = eq(iEq)%bc(iBc)%RCR%C
                   cplBC%fa(i)%RCR%Rd = eq(iEq)%bc(iBc)%RCR%Rd
                   cplBC%fa(i)%RCR%Pd = eq(iEq)%bc(iBc)%RCR%Pd
+                  cplBC%fa(i)%RCR%Xo = eq(iEq)%bc(iBc)%RCR%Xo
                ELSE
                   err = "Not a compatible cplBC_type"
                END IF
             END IF
          END DO
+         IF (.NOT.stFileFlag) CALL RCRINIT()
          IF (cplBC%useGenBC) CALL genBC_Integ_X('I')
          IF (cplBC%schm .NE. cplBC_E) CALL CALCDERCPLBC()
       END IF

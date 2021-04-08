@@ -1140,6 +1140,38 @@
       RETURN
       END SUBROUTINE cplBC_Integ_X
 !--------------------------------------------------------------------
+!     Initialize RCR variables (Xo) from flow field or using user-
+!     provided input. This subroutine is called only when the simulation
+!     is not restarted.
+      SUBROUTINE RCRINIT()
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), PARAMETER :: iEq = 1
+
+      INTEGER(KIND=IKIND) iBc, iFa, iM, ptr
+      REAL(KIND=RKIND) :: area, Qo, Po
+
+      DO iBc=1, eq(iEq)%nBc
+         iFa = eq(iEq)%bc(iBc)%iFa
+         iM  = eq(iEq)%bc(iBc)%iM
+         ptr = eq(iEq)%bc(iBc)%cplBCptr
+         IF (.NOT.BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) CYCLE
+         IF (ptr .NE. 0) THEN
+            IF (cplBC%initRCR) THEN
+               area = msh(iM)%fa(iFa)%area
+               Qo = Integ(msh(iM)%fa(iFa), Yo, 1, nsd)
+               Po = Integ(msh(iM)%fa(iFa), Yo, nsd+1)  / area
+               cplBC%xo(ptr) = Po - (Qo * cplBC%fa(ptr)%RCR%Rp)
+            ELSE
+               cplBC%xo(ptr) = cplBC%fa(ptr)%RCR%Xo
+            END IF
+         END IF
+      END DO
+
+      RETURN
+      END SUBROUTINE RCRINIT
+!--------------------------------------------------------------------
       SUBROUTINE RCR_Integ_X(istat)
       USE TYPEMOD
       USE COMMOD, ONLY : dt, time, cplBC
