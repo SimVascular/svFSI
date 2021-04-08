@@ -279,7 +279,11 @@
                IF (flag) THEN
                   CALL INITFROMBIN(fTmp, timeP)
                ELSE
-                  IF (cm%mas()) wrn = TRIM(fTmp)//" can not be opened"
+                  IF (cm%mas()) THEN
+                     wrn = TRIM(fTmp)//" can not be opened. "//
+     2                  "Resetting restart flag to false"
+                  END IF
+                  stFileFlag = .FALSE.
                   CALL ZEROINIT(timeP)
                END IF
                IF (rmsh%isReqd) THEN

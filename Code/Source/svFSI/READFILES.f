@@ -904,6 +904,7 @@
          cplBC%xo = 0._RKIND
          cplBC%xp = 0._RKIND
          cplBC%saveName = TRIM(appPath)//"RCR.dat"
+         lPtr => list%get(cplBC%initRCR, "Initialize RCR from flow")
       END IF
 !--------------------------------------------------------------------
 !     Searching for body forces
@@ -1640,6 +1641,7 @@
          lBc%RCR%C  = RCR(2)
          lBc%RCR%Rd = RCR(3)
          lPtr => list%get(lBc%RCR%Pd, "Distal pressure")
+         lPtr => list%get(lBc%RCR%Xo, "Initial pressure")
 
          IF (cplBC%schm.NE.cplBC_NA .OR. ALLOCATED(cplBC%xo)) err =
      2      "RCR cannot be used in conjunction with cplBC."
