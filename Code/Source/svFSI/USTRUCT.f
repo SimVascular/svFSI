@@ -278,9 +278,6 @@
          tauC = 0._RKIND
       END IF
 
-!     Active stress from electromechanics
-      IF (cem%aStress) CALL ACTVSTRSdev(ya_g, F, nFn, fN, Siso)
-
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)
 
@@ -598,9 +595,6 @@
          tauM = 0._RKIND
          tauC = 0._RKIND
       END IF
-
-!     Active stress from electromechanics
-      IF (cem%aStress) CALL ACTVSTRSdev(ya_g, F, nFn, fN, Siso)
 
 !     Deviatoric 1st Piola-Kirchhoff tensor (P)
       Pdev = MATMUL(F, Siso)

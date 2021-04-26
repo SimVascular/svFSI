@@ -1049,6 +1049,7 @@
       CALL cm%bcast(lStM%afs)
       CALL cm%bcast(lStM%bfs)
       CALL cm%bcast(lStM%kap)
+      CALL cm%bcast(lStM%Tf)
 
       RETURN
       END SUBROUTINE DIST_MATCONSTS

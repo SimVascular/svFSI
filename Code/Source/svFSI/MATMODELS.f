@@ -49,7 +49,7 @@
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
-     2   Inv4, Inv6, Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
+     2   Inv4, Inv6, Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
      3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
      3   PP(nsd,nsd,nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
@@ -68,8 +68,12 @@
       stM  = lDmn%stM
       nd   = REAL(nsd, KIND=RKIND)
       Kp   = stM%Kpen
+      Tfa  = stM%Tf
 
-!     Electromechanics coupling based on active strain
+!     Electromechanics coupling - active stress
+      IF (cem%aStress) Tfa = Tfa + ya
+
+!     Electromechanics coupling - active strain
       Fe   = F
       Fa   = MAT_ID(nsd)
       Fai  = Fa
@@ -126,6 +130,9 @@
          g1 = 2._RKIND * stM%C10
          Sb = g1*IDm
 
+!        Fiber reinforcement/active stress
+         Sb = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+
          r1 = g1*Inv1/nd
          S  = J2d*Sb - r1*Ci
          CC = (-2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
@@ -140,6 +147,9 @@
          g1  = 2._RKIND * (stM%C10 + Inv1*stM%C01)
          g2  = -2._RKIND * stM%C01
          Sb  = g1*IDm + g2*J2d*C
+
+!        Fiber reinforcement/active stress
+         Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
          g1  = 4._RKIND*J4d* stM%C01
          CCb = g1 * (TEN_DYADPROD(IDm, IDm, nsd) - TEN_IDs(nsd))
@@ -179,6 +189,9 @@
          g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
+
+!        Fiber reinforcement/active stress
+         Sb   = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
          g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
      2      EXP(stM%bff*Eff*Eff)
@@ -248,6 +261,9 @@
          CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
          Sb  = Sb * r2
 
+!        Fiber reinforcement/active stress
+         Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
@@ -296,7 +312,10 @@
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
          IF (Eff .GT. 0._RKIND) THEN
-             g1  = 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+!            Fiber reinforcement/active stress
+             g1  = Tfa
+
+             g1  = g1 + 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
              Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
              Sb  = Sb + g1*Hff
 
@@ -390,7 +409,7 @@
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,
-     2   Inv8, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
+     2   Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
      3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
      4   CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3
@@ -408,8 +427,12 @@
 !     Some preliminaries
       stM  = lDmn%stM
       nd   = REAL(nsd, KIND=RKIND)
+      Tfa  = stM%Tf
 
-!     Electromechanics coupling based on active strain
+!     Electromechanics coupling - active stress
+      IF (cem%aStress) Tfa = Tfa + ya
+
+!     Electromechanics coupling - active strain
       Fe   = F
       Fa   = MAT_ID(nsd)
       Fai  = Fa
@@ -440,6 +463,9 @@
          g1 = 2._RKIND * stM%C10
          Sb = g1*IDm
 
+!        Fiber reinforcement/active stress
+         Sb = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+
          r1 = g1*Inv1/nd
          S  = J2d*Sb - r1*Ci
          CC = 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
@@ -452,6 +478,9 @@
          g1  = 2._RKIND * (stM%C10 + Inv1*stM%C01)
          g2  = -2._RKIND * stM%C01
          Sb  = g1*IDm + g2*J2d*C
+
+!        Fiber reinforcement/active stress
+         Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
          g1  = 4._RKIND*J4d* stM%C01
          CCb = g1 * (TEN_DYADPROD(IDm, IDm, nsd) - TEN_IDs(nsd))
@@ -489,6 +518,9 @@
          g2   = stM%aff * Eff * EXP(stM%bff*Eff*Eff)
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
+
+!        Fiber reinforcement/active stress
+         Sb   = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
          g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
      2      EXP(stM%bff*Eff*Eff)
@@ -556,6 +588,9 @@
          CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
          Sb  = Sb * r2
 
+!        Fiber reinforcement/active stress
+         Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
 
@@ -601,7 +636,10 @@
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
          IF (Eff .GT. 0._RKIND) THEN
-             g1  = 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+!            Fiber reinforcement/active stress
+             g1  = Tfa
+
+             g1  = g1 + 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
              Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
              Sb  = Sb + g1*Hff
 
@@ -800,48 +838,6 @@
 
       RETURN
       END SUBROUTINE CCTOVOIGT
-!####################################################################
-!     Compute active stress for electromechanics
-      SUBROUTINE ACTVSTRESS(Tact, nfd, fl, S)
-      USE MATFUN
-      USE COMMOD
-      IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: Tact, fl(nsd,nfd)
-      REAL(KIND=RKIND), INTENT(INOUT) :: S(nsd,nsd)
-
-      S = S + Tact*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
-
-      RETURN
-      END SUBROUTINE ACTVSTRESS
-!--------------------------------------------------------------------
-!     Compute deviatoric component of active stress for electromechanics
-      SUBROUTINE ACTVSTRSdev(Tact, F, nfd, fl, S)
-      USE MATFUN
-      USE COMMOD
-      IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: Tact, F(nsd,nsd), fl(nsd,nfd)
-      REAL(KIND=RKIND), INTENT(INOUT) :: S(nsd,nsd)
-
-      REAL(KIND=RKIND) :: nd, J, J2d, IDm(nsd,nsd), C(nsd,nsd),
-     2   Ci(nsd,nsd), Sb(nsd,nsd), r1
-
-      nd  = REAL(nsd, KIND=RKIND)
-      J   = MAT_DET(F, nsd)
-      J2d = J**(-2._RKIND/nd)
-
-      IDm = MAT_ID(nsd)
-      C   = MATMUL(TRANSPOSE(F), F)
-      Ci  = MAT_INV(C, nsd)
-
-      Sb  = Tact * MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
-
-      r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
-      S   = S + J2d*Sb - r1*Ci
-
-      RETURN
-      END SUBROUTINE ACTVSTRSdev
 !####################################################################
 !     Compute active component of deformation gradient tensor for
 !     electromechanics coupling based on active strain formulation

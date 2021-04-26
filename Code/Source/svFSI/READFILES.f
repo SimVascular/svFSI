@@ -2477,6 +2477,11 @@ c     2         "can be applied for Neumann boundaries only"
          err = "Undefined constitutive model used"
       END SELECT
 
+!     Fiber reinforcement stress
+      lDmn%stM%Tf = 0._RKIND
+      lPtr => lPD%get(rtmp, "Fiber reinforcement stress")
+      IF (ASSOCIATED(lPtr)) lDmn%stM%Tf = rtmp
+
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")
       IF (.NOT.ASSOCIATED(lPtr)) wrn =

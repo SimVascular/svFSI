@@ -115,6 +115,8 @@
          REAL(KIND=RKIND) :: bfs = 0._RKIND
 !        Collagen fiber dispersion parameter (Holzapfel model)
          REAL(KIND=RKIND) :: kap = 0._RKIND
+!        Fiber reinforcement stress
+         REAL(KIND=RKIND) :: Tf
       END TYPE stModelType
 
       TYPE viscModelType
