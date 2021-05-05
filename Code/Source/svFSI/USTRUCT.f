@@ -113,6 +113,8 @@
          ALLOCATE(xql(nsd,fs(2)%eNoN), Nqx(nsd,fs(2)%eNoN))
          xwl(:,:) = xl(:,:)
          xql(:,:) = xl(:,1:fs(2)%eNoN)
+         Nwx      = 0._RKIND
+         Nqx      = 0._RKIND
 
 !        Gauss integration 1
          DO g=1, fs(1)%nG
@@ -1466,8 +1468,6 @@
             DEALLOCATE(KU)
          END IF
       END  IF
-
-      CALL THOOD_ValRC()
 
       RETURN
       END SUBROUTINE USTRUCTR
