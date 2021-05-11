@@ -98,6 +98,7 @@
       IF (lM%lFib) insd = 0
 
       lFa%nFs = lM%nFs
+      IF (ALLOCATED(lFa%fs)) DEALLOCATE(lFa%fs)
       ALLOCATE(lFa%fs(lFa%nFs))
 
 !     The first set of basis is inherited directly from face basis
