@@ -1355,7 +1355,7 @@
             std = TRIM(sepLine)
             std = " "//CLR("<< BIN ---> VTK >>")//"    "//TRIM(fName)
             CALL INITFROMBIN(fName, rtmp)
-            CALL WRITEVTUS(Ao, Yo, Do)
+            CALL WRITEVTUS(Ao, Yo, Do, .FALSE.)
          END IF
       END DO
       std = TRIM(sepLine)

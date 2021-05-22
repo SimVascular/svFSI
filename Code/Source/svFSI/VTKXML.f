@@ -182,7 +182,7 @@
             l = eq(iEq)%output(iOut)%l
             s = eq(iEq)%s + eq(iEq)%output(iOut)%o
             e = s + l - 1
-            varName = eq(iEq)%sym//"_"//TRIM(eq(iEq)%output(iOut)%name)
+            varName = TRIM(eq(iEq)%output(iOut)%name)
 
             oGrp = eq(iEq)%output(iOut)%grp
             SELECT CASE(oGrp)
@@ -407,13 +407,14 @@
       RETURN
       END SUBROUTINE WRITEVTP
 !--------------------------------------------------------------------
-      SUBROUTINE WRITEVTUS(lA, lY, lD)
+      SUBROUTINE WRITEVTUS(lA, lY, lD, lAve)
       USE COMMOD
       USE ALLFUN
       USE vtkXMLMod
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: lA(tDof,tnNo), lY(tDof,tnNo),
      2   lD(tDof,tnNo)
+      LOGICAL, INTENT(IN) :: lAve
 
       LOGICAL :: lIbl, lD0
       INTEGER(KIND=IKIND) :: iStat, iEq, iOut, iM, a, e, Ac, Ec, nNo,
@@ -578,8 +579,8 @@
                      is   = outS(cOut)
                      ie   = is + l - 1
                      outS(cOut+1)   = ie + 1
-                     outNames(cOut) = eq(iEq)%sym//"_"//
-     2                  TRIM(eq(iEq)%output(iOut)%name)//STR(iFn)
+                     outNames(cOut) = TRIM(eq(iEq)%output(iOut)%name)//
+     2                  STR(iFn)
                      DO a=1, msh(iM)%nNo
                         d(iM)%x(is:ie,a) =
      2                     tmpV((iFn-1)*nsd+1:iFn*nsd,a)
@@ -701,7 +702,7 @@
       ALLOCATE(tmpV(maxnsd, nNo))
 
 !     Writing to vtu file (master only)
-      IF (cTS .GE. 1000) THEN
+      IF (cTS.GE.1000 .OR. lAve) THEN
          fName = STR(cTS)
       ELSE
          WRITE(fName,'(I3.3)') cTS
@@ -1301,7 +1302,7 @@
       fName = saveName
       saveName = TRIM(saveName)//"_ave_"//STR(fTS)//"_"//
      2   STR(saveIncr)
-      CALL WRITEVTUS(Ag, Yg, Dg)
+      CALL WRITEVTUS(Ag, Yg, Dg, .TRUE.)
       saveName = fName
 
       RETURN

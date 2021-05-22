@@ -251,7 +251,7 @@
             l3 = cTS .GE. saveATS
             IF (l2 .AND. l3) THEN
                CALL OUTRESULT(timeP, 3, iEqOld)
-               CALL WRITEVTUS(An, Yn, Dn)
+               CALL WRITEVTUS(An, Yn, Dn, .FALSE.)
                IF (ibFlag) CALL IB_WRITEVTUS(ib%Yb, ib%Ubo)
             ELSE
                CALL OUTRESULT(timeP, 2, iEqOld)
