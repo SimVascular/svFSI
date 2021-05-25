@@ -92,61 +92,6 @@
          REAL(KIND=RKIND), ALLOCATABLE :: xi(:)
       END TYPE bsType
 
-      TYPE stModelType
-!        Type of constitutive model (volumetric) for struct/FSI
-         INTEGER(KIND=IKIND) :: volType = stVol_NA
-!        Penalty parameter
-         REAL(KIND=RKIND) :: Kpen = 0._RKIND
-!        Type of constitutive model (isochoric) for struct/FSI
-         INTEGER(KIND=IKIND) :: isoType = stIso_NA
-!        Parameters specific to the constitutive model (isochoric)
-!        NeoHookean model (C10 = mu/2)
-         REAL(KIND=RKIND) :: C10 = 0._RKIND
-!        Mooney-Rivlin model (C10, C01)
-         REAL(KIND=RKIND) :: C01 = 0._RKIND
-!        Holzapfel model(a, b, aff, bff, ass, bss, afs, bfs, kap)
-         REAL(KIND=RKIND) :: a   = 0._RKIND
-         REAL(KIND=RKIND) :: b   = 0._RKIND
-         REAL(KIND=RKIND) :: aff = 0._RKIND
-         REAL(KIND=RKIND) :: bff = 0._RKIND
-         REAL(KIND=RKIND) :: ass = 0._RKIND
-         REAL(KIND=RKIND) :: bss = 0._RKIND
-         REAL(KIND=RKIND) :: afs = 0._RKIND
-         REAL(KIND=RKIND) :: bfs = 0._RKIND
-!        Collagen fiber dispersion parameter (Holzapfel model)
-         REAL(KIND=RKIND) :: kap = 0._RKIND
-!        Fiber reinforcement stress
-         REAL(KIND=RKIND) :: Tf
-      END TYPE stModelType
-
-      TYPE viscModelType
-!        Type of constitutive model for fluid viscosity
-         INTEGER(KIND=IKIND) :: viscType = viscType_NA
-!        Limiting zero shear-rate viscosity value
-         REAL(KIND=RKIND) :: mu_o = 0._RKIND
-!        Limiting high shear-rate viscosity (asymptotic) value
-         REAL(KIND=RKIND) :: mu_i = 0._RKIND
-!        Strain-rate tensor multiplier
-         REAL(KIND=RKIND) :: lam = 0._RKIND
-!        Strain-rate tensor exponent
-         REAL(KIND=RKIND) :: a = 0._RKIND
-!        Power-law exponent
-         REAL(KIND=RKIND) :: n = 0._RKIND
-      END TYPE viscModelType
-
-      TYPE rcrType
-!        Proximal resistance
-         REAL(KIND=RKIND) :: Rp = 0._RKIND
-!        Capacitance
-         REAL(KIND=RKIND) :: C  = 0._RKIND
-!        Distance resistance
-         REAL(KIND=RKIND) :: Rd = 0._RKIND
-!        Distal pressure
-         REAL(KIND=RKIND) :: Pd = 0._RKIND
-!        Initial value
-         REAL(KIND=RKIND) :: Xo = 0._RKIND
-      END TYPE rcrType
-
 !     Fourier coefficients that are used to specify unsteady BCs
       TYPE fcType
 !        If this is a ramp function
@@ -182,6 +127,19 @@
 !     Displacements at each direction, location, and time point
          REAL(KIND=RKIND), ALLOCATABLE :: d(:,:,:)
       END TYPE MBType
+
+      TYPE rcrType
+!        Proximal resistance
+         REAL(KIND=RKIND) :: Rp = 0._RKIND
+!        Capacitance
+         REAL(KIND=RKIND) :: C  = 0._RKIND
+!        Distance resistance
+         REAL(KIND=RKIND) :: Rd = 0._RKIND
+!        Distal pressure
+         REAL(KIND=RKIND) :: Pd = 0._RKIND
+!        Initial value
+         REAL(KIND=RKIND) :: Xo = 0._RKIND
+      END TYPE rcrType
 
 !     Boundary condition data type
       TYPE bcType
@@ -246,8 +204,62 @@
          TYPE(MBType), ALLOCATABLE :: bm
       END TYPE bfType
 
+!     Fiber stress type
+      TYPE fibStrsType
+!        Type of fiber stress
+         INTEGER(KIND=IKIND) :: fType = 0
+!        Constant steady value
+         REAL(KIND=8) :: g = 0._RKIND
+!        Unsteady time-dependent values
+         TYPE(fcType) :: gt
+      END TYPE fibStrsType
+
+!     Structural domain type
+      TYPE stModelType
+!        Type of constitutive model (volumetric) for struct/FSI
+         INTEGER(KIND=IKIND) :: volType = stVol_NA
+!        Penalty parameter
+         REAL(KIND=RKIND) :: Kpen = 0._RKIND
+!        Type of constitutive model (isochoric) for struct/FSI
+         INTEGER(KIND=IKIND) :: isoType = stIso_NA
+!        Parameters specific to the constitutive model (isochoric)
+!        NeoHookean model (C10 = mu/2)
+         REAL(KIND=RKIND) :: C10 = 0._RKIND
+!        Mooney-Rivlin model (C10, C01)
+         REAL(KIND=RKIND) :: C01 = 0._RKIND
+!        Holzapfel model(a, b, aff, bff, ass, bss, afs, bfs, kap)
+         REAL(KIND=RKIND) :: a   = 0._RKIND
+         REAL(KIND=RKIND) :: b   = 0._RKIND
+         REAL(KIND=RKIND) :: aff = 0._RKIND
+         REAL(KIND=RKIND) :: bff = 0._RKIND
+         REAL(KIND=RKIND) :: ass = 0._RKIND
+         REAL(KIND=RKIND) :: bss = 0._RKIND
+         REAL(KIND=RKIND) :: afs = 0._RKIND
+         REAL(KIND=RKIND) :: bfs = 0._RKIND
+!        Collagen fiber dispersion parameter (Holzapfel model)
+         REAL(KIND=RKIND) :: kap = 0._RKIND
+!        Fiber reinforcement stress
+         TYPE(fibStrsType) :: Tf
+      END TYPE stModelType
+
+!     Fluid viscosity model type
+      TYPE viscModelType
+!        Type of constitutive model for fluid viscosity
+         INTEGER(KIND=IKIND) :: viscType = viscType_NA
+!        Limiting zero shear-rate viscosity value
+         REAL(KIND=RKIND) :: mu_o = 0._RKIND
+!        Limiting high shear-rate viscosity (asymptotic) value
+         REAL(KIND=RKIND) :: mu_i = 0._RKIND
+!        Strain-rate tensor multiplier
+         REAL(KIND=RKIND) :: lam = 0._RKIND
+!        Strain-rate tensor exponent
+         REAL(KIND=RKIND) :: a = 0._RKIND
+!        Power-law exponent
+         REAL(KIND=RKIND) :: n = 0._RKIND
+      END TYPE viscModelType
+
 !     Domain type is to keep track with element belong to which domain
-!     and also different hysical quantities
+!     and also different physical quantities
       TYPE dmnType
 !        The domain ID. Default includes entire domain
          INTEGER(KIND=IKIND) :: Id = -1

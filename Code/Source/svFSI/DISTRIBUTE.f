@@ -1035,6 +1035,8 @@
       IMPLICIT NONE
       TYPE(stModelType), INTENT(INOUT) :: lStM
 
+      INTEGER(KIND=IKIND) i, j
+
       CALL cm%bcast(lStM%volType)
       CALL cm%bcast(lStM%Kpen)
       CALL cm%bcast(lStM%isoType)
@@ -1049,7 +1051,30 @@
       CALL cm%bcast(lStM%afs)
       CALL cm%bcast(lStM%bfs)
       CALL cm%bcast(lStM%kap)
-      CALL cm%bcast(lStM%Tf)
+
+!     Distribute fiber stress
+      CALL cm%bcast(lStM%Tf%fType)
+      IF (BTEST(lStM%Tf%fType, bType_std)) THEN
+         CALL cm%bcast(lStM%Tf%g)
+      ELSE IF (BTEST(lStM%Tf%fType, bType_ustd)) THEN
+         CALL cm%bcast(lStM%Tf%gt%lrmp)
+         CALL cm%bcast(lStM%Tf%gt%d)
+         CALL cm%bcast(lStM%Tf%gt%n)
+         j = lStM%Tf%gt%d
+         i = lStM%Tf%gt%n
+         IF (cm%slv()) THEN
+            ALLOCATE(lStM%Tf%gt%qi(j))
+            ALLOCATE(lStM%Tf%gt%qs(j))
+            ALLOCATE(lStM%Tf%gt%r(j,i))
+            ALLOCATE(lStM%Tf%gt%i(j,i))
+         END IF
+         CALL cm%bcast(lStM%Tf%gt%ti)
+         CALL cm%bcast(lStM%Tf%gt%T)
+         CALL cm%bcast(lStM%Tf%gt%qi)
+         CALL cm%bcast(lStM%Tf%gt%qs)
+         CALL cm%bcast(lStM%Tf%gt%r)
+         CALL cm%bcast(lStM%Tf%gt%i)
+      END IF
 
       RETURN
       END SUBROUTINE DIST_MATCONSTS

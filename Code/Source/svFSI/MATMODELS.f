@@ -68,7 +68,9 @@
       stM  = lDmn%stM
       nd   = REAL(nsd, KIND=RKIND)
       Kp   = stM%Kpen
-      Tfa  = stM%Tf
+
+!     Fiber-reinforced stress
+      CALL GETFIBSTRESS(stM%Tf, Tfa)
 
 !     Electromechanics coupling - active stress
       IF (cem%aStress) Tfa = Tfa + ya
@@ -427,7 +429,9 @@
 !     Some preliminaries
       stM  = lDmn%stM
       nd   = REAL(nsd, KIND=RKIND)
-      Tfa  = stM%Tf
+
+!     Fiber-reinforced stress
+      CALL GETFIBSTRESS(stM%Tf, Tfa)
 
 !     Electromechanics coupling - active stress
       IF (cem%aStress) Tfa = Tfa + ya
@@ -776,7 +780,7 @@
 
       RETURN
       END SUBROUTINE GETTAU
-!--------------------------------------------------------------------
+!####################################################################
 !     Convert elasticity tensor to Voigt notation
       SUBROUTINE CCTOVOIGT(CC, Dm)
       USE COMMOD, ONLY : RKIND, nsd, nsymd
@@ -838,6 +842,25 @@
 
       RETURN
       END SUBROUTINE CCTOVOIGT
+!####################################################################
+!     Compute additional fiber-reinforcement stress
+      SUBROUTINE GETFIBSTRESS(Tfl, g)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(fibStrsType), INTENT(IN) :: Tfl
+      REAL(KIND=RKIND), INTENT(OUT) :: g
+
+      REAL(KIND=RKIND) rtmp
+
+      g = 0._RKIND
+      IF (BTEST(Tfl%fType, bType_std)) THEN
+         g = Tfl%g
+      ELSE IF (BTEST(Tfl%fType, bType_ustd)) THEN
+         CALL IFFT(Tfl%gt, g, rtmp)
+      END IF
+
+      RETURN
+      END SUBROUTINE GETFIBSTRESS
 !####################################################################
 !     Compute active component of deformation gradient tensor for
 !     electromechanics coupling based on active strain formulation
