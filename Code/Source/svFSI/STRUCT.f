@@ -222,9 +222,6 @@
       pSl(6) = S(3,1)
       S = S + S0
 
-!     Active stress - electromechanics
-      IF (cem%aStress) CALL ACTVSTRESS(ya_g, nFn, fN, S)
-
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)
 
@@ -386,9 +383,6 @@
       pSl(2) = S(2,2)
       pSl(3) = S(1,2)
       S = S + S0
-
-!     Active stress - electromechanics
-      IF (cem%aStress) CALL ACTVSTRESS(ya_g, nFn, fN, S)
 
 !     1st Piola-Kirchhoff tensor (P)
       P = MATMUL(F, S)

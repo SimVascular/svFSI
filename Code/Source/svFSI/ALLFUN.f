@@ -1297,6 +1297,13 @@
       lDmn%stM%afs     = 0._RKIND
       lDmn%stM%bfs     = 0._RKIND
 
+      lDmn%stM%Tf%g     = 0._RKIND
+      lDmn%stM%Tf%fType = 0
+      IF (ALLOCATED(lDmn%stM%Tf%gt%qi)) DEALLOCATE(lDmn%stM%Tf%gt%qi)
+      IF (ALLOCATED(lDmn%stM%Tf%gt%qs)) DEALLOCATE(lDmn%stM%Tf%gt%qs)
+      IF (ALLOCATED(lDmn%stM%Tf%gt%r))  DEALLOCATE(lDmn%stM%Tf%gt%r)
+      IF (ALLOCATED(lDmn%stM%Tf%gt%i))  DEALLOCATE(lDmn%stM%Tf%gt%i)
+
       ! lDmn%cep
       lDmn%cep%cepType  = cepModel_NA
       lDmn%cep%Diso     = 0._RKIND

@@ -2374,10 +2374,13 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(dmnType), INTENT(INOUT) :: lDmn
       TYPE(listType), INTENT(INOUT) :: lPD
 
-      LOGICAL incompFlag
+      LOGICAL incompFlag, ltmp
+      INTEGER(KIND=IKIND) fid, i, j
       REAL(KIND=RKIND) :: E, nu, lam, mu, kap, rtmp
       CHARACTER(LEN=stdL) ctmp
-      TYPE(listType), POINTER :: lPtr, lSt
+
+      TYPE(listType), POINTER :: lPtr, lSt, lFib
+      TYPE(fileType) fTmp
 
 !     Domain properties: elasticity modulus, poisson ratio
       E   = lDmn%prop(elasticity_modulus)
@@ -2476,6 +2479,42 @@ c     2         "can be applied for Neumann boundaries only"
       CASE DEFAULT
          err = "Undefined constitutive model used"
       END SELECT
+
+!     Fiber reinforcement stress
+      lFib => lPD%get(ctmp, "Fiber reinforcement stress")
+      IF (ASSOCIATED(lFib)) THEN
+         CALL TO_LOWER(ctmp)
+         SELECT CASE (TRIM(ctmp))
+         CASE ("steady")
+            lDmn%stM%Tf%fType = IBSET(lDmn%stM%Tf%fType, bType_std)
+            lPtr => lFib%get(lDmn%stM%Tf%g, "Value")
+
+         CASE ("unsteady")
+            lDmn%stM%Tf%fType = IBSET(lDmn%stM%Tf%fType, bType_ustd)
+            lPtr => lFib%get(fTmp, "Temporal values file path")
+            lTmp = .FALSE.
+            lPtr => lFib%get(ltmp, "Ramp function")
+            lDmn%stM%Tf%gt%lrmp = lTmp
+            fid = fTmp%open()
+            READ(fid,*) i, j
+            IF (i .LT. 2) THEN
+               std = "Enter nPts nFCoef; nPts*(t Q)"
+               err = "Wrong format in: "//fTmp%fname
+            END IF
+            lDmn%stM%Tf%gt%d = 1
+            lDmn%stM%Tf%gt%n = j
+            IF (lDmn%stM%Tf%gt%lrmp) lDmn%stM%Tf%gt%n = 1
+            ALLOCATE(lDmn%stM%Tf%gt%qi(lDmn%stM%Tf%gt%d),
+     2         lDmn%stM%Tf%gt%qs(lDmn%stM%Tf%gt%d),
+     3         lDmn%stM%Tf%gt%r(lDmn%stM%Tf%gt%d,lDmn%stM%Tf%gt%n),
+     4         lDmn%stM%Tf%gt%i(lDmn%stM%Tf%gt%d,lDmn%stM%Tf%gt%n))
+            CALL FFT(fid, i, lDmn%stM%Tf%gt)
+            CLOSE(fid)
+
+         CASE DEFAULT
+            err = "Undefined type of fiber reinforcement stress"
+         END SELECT
+      END IF
 
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")
