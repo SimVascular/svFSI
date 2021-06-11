@@ -54,40 +54,40 @@ MPI run can be initiated through
 
 ## Features
 
-`svFSI` provides the capability to model a variety of physics, such as heat transfer, convection, fluid, structure and electrophysiology. It also provides options for each physics to cater to the users' diverse needs.
+`svFSI` provides the capability to model a variety of physics, such as heat transfer, convection, fluid, structure and electrophysiology. It also provides options for each physics to cater to the users' diverse needs. In the following tables, *Abbreviation* refers to the variable name in the source code, and users can use global search tool such as `grep` to locate the implementations in the code; *Full name* refers to the name of the model; *Input keyword* refers to the phrase in the input file that can invoke such model.
 
 1. Available isochoric constitutive models for the structure equation
-   | *Abbreviation* | *Full name*                     |
-   | -------------- | ------------------------------- |
-   | stIso\_StVK    | Saint Venant-Kirchhoff          |
-   | stIso\_mStVK   | modified Saint Venant-Kirchhoff |
-   | stIso\_nHook   | Neo-Hookean model               |
-   | stIso\_MR      | Mooney-Rivlin model             |
-   | stIso\_HGO     | Holzapfel-Gasser-Ogden model    |
-   | stIso\_Gucci   | Guccione model                  |
-   | stIso\_HO      | Holzapfel-Ogden model           |
+   | *Abbreviation* | *Full name*                     | *Input keyword*                                         |
+   | -------------- | ------------------------------- | ------------------------------------------------------- |
+   | stIso\_StVK    | Saint Venant-Kirchhoff          | "stVK", "stVenantKirchhoff"                             |
+   | stIso\_mStVK   | modified Saint Venant-Kirchhoff | "m-stVK", "modified-stVK", "modified-stVenantKirchhoff" |
+   | stIso\_nHook   | Neo-Hookean model               | "nHK", "nHK91", "neoHookean", "neoHookeanSimo91"        |
+   | stIso\_MR      | Mooney-Rivlin model             | "MR", "Mooney-Rivlin"                                   |
+   | stIso\_HGO     | Holzapfel-Gasser-Ogden model    | "HGO"                                                   |
+   | stIso\_Gucci   | Guccione model                  | "Guccione", "Gucci"                                     |
+   | stIso\_HO      | Holzapfel-Ogden model           | "HO", "Holzapfel"                                       |
 
 2. Available volumetric constitutive models for the structure equation
-   | *Abbreviation* | *Full name*         |
-   | -------------- | ------------------- |
-   | stVol\_Quad    | Quadratic model     |
-   | stVol\_ST91    | Simo-Taylor91 model |
-   | stVol\_M94     | Miehe94 model       |
+   | *Abbreviation* | *Full name*         | *Input keyword*                          |
+   | -------------- | ------------------- | ---------------------------------------- |
+   | stVol\_Quad    | Quadratic model     | "quad", "Quad", "quadratic", "Quadratic" |
+   | stVol\_ST91    | Simo-Taylor91 model | "ST91", "Simo-Taylor91"                  |
+   | stVol\_M94     | Miehe94 model       | "M94", "Miehe94"                         |
 
 3. Available constitutive models for the fluid equation
-   | *Abbreviation*  | *Full name*                          |
-   | --------------- | ------------------------------------ |
-   | viscType\_Const | Constant viscosity (Newtonian model) |
-   | viscType\_CY    | Carreau-Yasuda non-Newtonian model   |
-   | viscType\_Cass  | Cassons non-Newtonian model          |
+   | *Abbreviation*  | *Full name*                          | *Input keyword*                  |
+   | --------------- | ------------------------------------ | -------------------------------- |
+   | viscType\_Const | Constant viscosity (Newtonian model) | "constant", "const", "newtonian" |
+   | viscType\_CY    | Carreau-Yasuda non-Newtonian model   | "carreau-yasuda", "cy"           |
+   | viscType\_Cass  | Cassons non-Newtonian model          | "cassons", "cass"                |
 
 4. Available cardiac electrophysiology models
-   | *Abbreviation* | *Full name*                      |
-   | -------------- | -------------------------------- |
-   | cepModel\_AP   | Aliev-Panfilov model             |
-   | cepModel\_BO   | Bueno-Orovio-Cherry-Fenton model |
-   | cepModel\_FN   | Fitzhugh-Nagumo model            |
-   | cepModel\_TTP  | tenTusscher-Panfilov model       |
+   | *Abbreviation* | *Full name*                      | *Input keyword*               |
+   | -------------- | -------------------------------- | ----------------------------- |
+   | cepModel\_AP   | Aliev-Panfilov model             | "ap", "aliev-panfilov"        |
+   | cepModel\_BO   | Bueno-Orovio-Cherry-Fenton model | "bo", "bueno-orovio"          |
+   | cepModel\_FN   | Fitzhugh-Nagumo model            | "fn", "fitzhugh-nagumo"       |
+   | cepModel\_TTP  | tenTusscher-Panfilov model       | "ttp", "tentusscher-panfilov" |
 
 ## Additional Resource
 More details can be found here: https://simvascular.github.io/docssvFSI.html
