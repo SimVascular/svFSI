@@ -13,6 +13,8 @@ The following packages are required to build and use `svFSI`.
    - blas & lapack
    - trilinos (optional)
 
+On Ubuntu, most of the dependencies can be downloaded using `apt`. On OSX, you may use `brew` to install the dependencies.
+
 ## Quick Build
 
 Prebuild executables for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188). Users are recommended to build from the source code to access the most recent features and bug fixes. A short build instruction is provided here for Linux system.
@@ -31,6 +33,8 @@ Prebuild executables for Ubuntu and MacOS are available for download from [SimTK
    make 
    ```
    Successful build will generate a solver binary, called `svFSI` in the following directory `Build/svFSI-build/bin`.
+
+   See INSTALL.md for detailed platform-specific instructions to install `svFSI`.
 
 ## Build With Trilinos
 

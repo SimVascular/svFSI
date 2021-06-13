@@ -1,12 +1,3 @@
-#     Copyright, 2013
-#     Mahdi Esmaily Moghadam
-
-#     Modified by
-#     Chi Zhu
-
-#     This program is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #--------------------------------------------------------------------
 #  This is an input file to initialize svFSI.
 #  
@@ -78,7 +69,7 @@ Increment in saving VTK files:         5           [1 - inf)         [DEFAULT: 1
 Save averaged results:                 t           [f/t]             [DEFAULT: f]
 Start averaging from zero:             t           [f/t]             [DEFAULT: f]
 Save results in folder:                foldername  [DEFAULT: *-procs]
-Spectral radius of infinite time step: 0.2         [0.0 - 1.0]       [DEFAULT: 0.2]
+Spectral radius of infinite time step: 0.5         [0.0 - 1.0]       [DEFAULT: 0.2]
 Searched file name to trigger stop:    STOP_SIM                      [DEFAULT: STOP_SIM]
 Check IEN order:                       t           [f/t]             [DEFAULT: t]
 Simulation requires remeshing:         f           [f/t]             [DEFAULT: f]
