@@ -1,0 +1,276 @@
+#--------------------------------------------------------------------
+#  This is an input file to initialize svFSI.
+#  
+#  This file is basically a scripting code that set values to 
+#  specific parameters. If the parameters that is going to be set is 
+#  a single value parameter, you need to use a single line that is 
+#  structured as follows. First part, which is the part before ":", 
+#  is the keyword to the parameter and second part, which is the part
+#  after ":", is the value. E.g.:
+#  
+#  This is a keyword with value: 1.3
+#
+#  There are five type of values, 1-logical (ture/false) 2-integer 
+#  3-real 4-name (string/character) and 4-paths.
+#  Each parameter has range or should be selected from available 
+#  choices. If a range is required, it is shown by brackets and a 
+#  dash, e.g. [0.0-inf] denotes a real number between 0.0 and 
+#  infinity. In the case that there are limited choices, those 
+#  choices are separated by slash /, e.g. [0/1] means either 0 or 
+#  1 must be selected. If there is no restriction on the selection, 
+#  no brackets are used. 
+#  For logical true, either False, 0, F, f, false, False can be used.
+#  For logical true, either True, 1, T, t, True, true can be used.
+#  For real numbers, following formates are accepted: 10.0, 1.e1, 1.D1
+#  For pathes, you may have multiple of them with similar keywork. 
+#  mupfes will use the first path that points to a file. 
+#  You may add comments, have space before keywords or after ":", and 
+#  character after numbers or names, but not paths. 
+#
+#  If the values to be set are a part of a bigger entity, you need 
+#  to use "{" and "}" to mark the scope of that entity. E.g.:
+
+#   Domain: 1 { 
+#      Density:             0.1      [epsilon - inf]
+#      Poisson ratio:       0.35     [0.0 - (0.5-epsilon)]
+#   }
+#  
+#  In this example, "Domain" is keyword (e.i. entity to be specified) 
+#  and "1" refers to first "Domain". Within this entity, "Density" 
+#  is set to "0.1" and "Poisson ratio" is set to "0.35".
+#
+#  Note that the order of lines doesn't matter within each blocks 
+#  enclosed by "{" and "}". If a keyword doesn't have a default value,
+#  it has to be specified by the user. For the optional arguments, 
+#  default value is shown. This is a demo and doesn't contain a 
+#  complete list of parameters that can be specified. Please refer 
+#  to examples or READFILES.f for a more 
+#  complete set of available options.
+#
+#--------------------------------------------------------------------
+
+#######################################
+#  General parameters
+Number of spatial dimensions:          2           [2/3]
+Number of time steps:                  1000        [1 - inf)
+Starting time step:                    0           [0 - inf) [DEFAULT 0] ????
+Time step size:                        0.001       (0 - inf)
+Number of initialization time steps:   10          (0 - inf)         [DEFAULT: 0]
+Continue previous simulation:          f           [f/t]
+Restart file name:                     stFile.bin                    [DEFAULT: stFile.bin]
+Overwrite restart file:                t           [f/t]             [DEFAULT: f]
+Increment in saving restart files:     10          [1 - inf)         [DEFAULT: saveIncr/[10]]
+Convert BIN to VTK format:             f           [t/f]             [DEFAULT: f]
+Simulation initialization file path:   result001.vtu 
+Save results to VTK format:            t           [f/t]
+Name prefix of saved VTK files:        result
+Start saving after time step:          20          [1 - inf)         [DEFAULT: 1]
+Increment in saving VTK files:         5           [1 - inf)         [DEFAULT: 10]
+Save averaged results:                 t           [f/t]             [DEFAULT: f]
+Start averaging from zero:             t           [f/t]             [DEFAULT: f]
+Save results in folder:                foldername  [DEFAULT: *-procs]
+Spectral radius of infinite time step: 0.5         [0.0 - 1.0]       [DEFAULT: 0.2]
+Searched file name to trigger stop:    STOP_SIM                      [DEFAULT: STOP_SIM]
+Check IEN order:                       t           [f/t]             [DEFAULT: t]
+Simulation requires remeshing:         f           [f/t]             [DEFAULT: f]
+Colorful terminal output:              t           [f/t]             [DEFAULT: t]
+Colorful terminal output:              t           [f/t]             [DEFAULT: t]
+Use separator in the history file:     t           [f/t]             [DEFAULT: f]
+Verbose:                               t           [f/t]             [DEFAULT: t]
+Warning:                               t           [f/t]             [DEFAULT: t]
+Debug:                                 f           [f/t]             [DEFAULT: f]
+
+#######################################
+# Here is the mesh reading section, currently supports vtu format 
+# (recommended), foo.msh or coordinate+connectivity+ebc files
+Add mesh: mesh_from_vtu {
+   Mesh file path:      ./Mesh/mesh-complete.mesh.vtu
+   Add face: lv {
+      Face file path:   ./Mesh/mesh-surfaces/lv.vtp
+   }
+   Add face: mitral {
+      Face file path:   ./Mesh/mesh-surfaces/mitral.vtp
+   }
+   Add face: aorta {
+      Face file path:   ./Mesh/mesh-surfaces/aorta.vtp
+   }
+   Domain:              1
+   Mesh scale factor:   0.1
+}
+
+Add mesh: NRB_msh {
+   Mesh scale factor:                  10.0        (0 - inf)         [DEFAULT: 1.0]
+   NURBS data file path:               ./MESH/nrb.msh
+   Domain:                             3           [0 - 32)
+
+   Set direction: 1 {
+      Number of knot insertion:        10
+      Inserted knots repetition:       1                             [DEFAULT: 1]
+      Number of Gauss points:          1                             [DEFAULT: p+1]
+      Number of sample points:         3                             [DEFAULT: p+1]
+      Start face name:                 left_face                     [DEFAULT: <X,Y,Z>N_<mesh_name>]
+      End face name:                   right_face                    [DEFAULT: <X,Y,Z>P_<mesh_name>]
+   }
+   
+}
+Add projection: XN_NRB_msh {
+   Project from face:                  XP_NRB_msh
+}
+
+Add mesh: msh_from_gambit_file {
+   Gambit mesh file path:              ./MESH/rect.msh
+   Convert elements to biquadratic elements: t     [f/t]             [DEFAULT: f]
+   Set domain: solid {
+      Domain:                          1           [0 - 32)
+   }
+}
+
+Add mesh: msh_from_connectivity_coordinates {
+   Coordinates file path:              ./MESH/rectangle/rect.coordinates
+   Connectivity file path:             ./MESH/rectangle/rect.connectivity
+   Domain file path:                   ./MESH/rectangle/duct.tag
+
+   Add face: inlet {
+      vtk file path:                   ./MESH/rectangle/mesh-surfaces/inlet.vtk
+   }
+   Add face: wall  {
+      Connectivity file (ebc) path:    ./MESH/rectangle/mesh-surfaces/wall.ebc
+   }
+
+   Add face: perFace {
+      Connectivity file (ebc) path:    ./MESH/rectangle/mesh-surfaces/perFace.ebc
+   }
+}
+
+#######################################
+# Here are equations 
+
+Add equation: FSI  [FSI/fluid/lElas/ustruct/struct/shell/CMM/heatS/heatF/CEP/stokes/mesh]
+{
+   Coupled:                      1        [f/t]             [DEFAULT: t]
+   Min iterations:               1        [1 - inf)         [DEFAULT: 1]
+   Max iterations:               5        [1 - inf)         [DEFAULT: 5]
+   Tolerance:                    1e-3     [0.0 - inf)       [DEFAULT: 1e64]
+   Use Taylor-Hood type basis:   f        [f/t]             [DEFAULT: f]
+
+   Domain: 0 {
+      Equation: fluid
+      Density:             0.04     (0 - inf)
+      Viscosity:           1.06     [0.0 - inf)
+      Backflow stabilization coefficient: 0.1 [0.0 - inf) [DEFAULT: 0.2]
+   }
+   Domain: 1 { 
+      Equation: struct
+      Density:             0.1      (epsilon - inf)
+      Elasticity modulus:  2.5e6    (epsilon - inf)
+      Poisson ratio:       0.35     [0.0 - 0.5)
+   }
+
+# Remsher setting, currently only supports Tetgen.
+   Remesher: Tetgen { 
+      Max edge size:                mesh_from_vtu { val: 2.5 }
+      Min dihedral angle:           10
+      Max radius ratio:             1.3
+      Remesh frequency:             1
+      Frequency for copying data:   1
+   }
+ 
+# Linear solver parameters
+# Options and defaults are: 
+# NS     fluid
+# GMRES  heatF, heatS, and FSI 
+# CG     lElas, mesh, and struct 
+# BICG
+   LS type: NS                      
+   { 
+      Max iterations:       10      [1 - inf)         [DEFAULT: 10 for NS, 1 for GMRES, 1000 for CG, 500 for BICG]
+      NS-GM max iterations: 3       [1 - inf)         [DEFAULT: 1]
+      NS-CG max iterations: 500     [1 - inf)         [DEFAULT: 500]
+      Tolerance:            1D-1    (0 - 1.0)         [DEFAULT: 0.4 for NS, 0.1 for the GMRES and 0.01 for CG and BICG]
+      NS-GM tolerance:      1D-2    (0 - 1.0)         [DEFAULT: 0.01]
+      NS-CG tolerance:      1D-2    (0 - 1.0)         [DEFAULT: 0.2]
+      
+      Absolute tolerance:   1D-12   (0 - 1.0)         [DEFAULT: 1e-10]
+      Krylov space dimension: 50    [1 - inf)         [DEFAULT: 200]
+   }
+
+
+#  Couplig to the cplBC, options are N: none; I: implicit; SI: semi-implicit; E: explicit   
+   Couple to cplBC: SI {            [N/I/SI/E] 
+      Number of unknowns:  1
+      Unknowns initialization file path: ./foo.ini
+      File name for saving unknowns: LPN.dat          [DEFAULT: LPN.dat]
+      File name for 0D-3D communication: 0D-3D.tmp    [DEFAULT: .CPLBC_0D_3D.tmp]
+      0D code file path:   ./cplBC.exe
+   }
+
+#  Option for Output depends on the equation, here is the list for each equation:
+#  FSI: Velocity/Pressure/Displacement/Acceleration/WSS
+#  fluid/stokes: Velocity/Pressure/Acceleration/WSS
+#  lElas/struct/ustruct/mesh: Velocity/Displacement/Acceleration
+#  heatS/heatF: Temperature
+#  CEP: Action_potential
+   Output: Spatial {
+      Pressure:     t
+      Displacement: f
+      Velocity:     t
+      Acceleration: t
+   }
+   Output: B_INT {
+      Velocity:     t
+      Pressure:     t
+      Energy_flux:  t
+   }
+   Output: V_INT {
+      Velocity:     t
+      Pressure:     t 
+   }
+
+#  For FSI simulation, both FSI and mesh equations will output
+#  a displacement variable. Alias function can be used to distinguish them.
+   Output: Alias {
+      Displacement: FS_Displacement
+   }
+
+   Add BC: inlet
+   {
+      Type: Neumann 
+      Time dependence: Steady                      [Steady/Unsteady/Resistance/General/Coupled] [DEFAULT: Steady]
+#  If Steady or Resistance is defined     
+      Value: 0.0
+#  If Unsteady is defined one of the two following lines is necessary
+      Temporal values file path:  foo.dat
+      Fourier coefficients file path: foo.dat
+#  If General is defined:
+      Temporal and spatial values file path: foo.dat
+      Profile: Flat                                [Flat/Parabolic/User_defined/D_dependent] [DEFAULT: Flat]
+#  If User_defined is used:
+      Spatial profile file path: foo.dat
+      Zero out perimeter: f                        [f/t]         [DEFAULT: t for Dirichlet and f for Neumann]
+      Impose flux: f                               [f/t]         [DEFAULT: f]
+      Impose on state variable integral: t         [f/t]         [DEFAULT: t for struct/lElas/mesh and f for the rest]
+      Effective direction: (0,0,1)                 
+   }
+
+   Add BC: perFace
+   {
+# If periodic BC is specifed, it would be applied to all equations
+      Type: Periodic
+# Only required entery:
+      Nodal correspondence file path: ./MESH/rectangle/perBC.dat
+   }
+}
+
+Add equation: mesh
+{
+   Tolerance:           1e-3
+   Output: Spatial { 
+      Displacement:     t
+   }
+   Poisson ratio:       0.35     [0 - 0.5)
+   
+   Add BC: wall {
+      Type:             Dirichlet
+      Value:            0.0 
+   }
+}

@@ -58,15 +58,19 @@ For more detailed instructions, please refer INSTALL.md.
 
 `svFSI` requires a plain-text input file to specify simulation parameters. The syntax of the input file can be found [here](https://sites.google.com/site/memt63/tools/MUPFES/mupfes-scripting).
 
-A master template is provided in the current repository, [svFSI.inp](./svFSI.inp). Users are also recommended to go through the input files in the [examples](https://github.com/SimVascular/svFSI-Tests) and modify them for their needs.
+A master template is provided in the current repository, [svFSI_master.inp](./svFSI_master.inp). Users are also recommended to go through the input files in the [examples](https://github.com/SimVascular/svFSI-Tests) and modify them for their needs.
 
-MPI run can be initiated through
-   ```bash
-   mpiexec -np <number of MPI processes>  <Path to Build>/svFSI-build/bin/svFSI <Path to input file>
-   ```
+An MPI-based run can be initiated through
+```bash
+mpiexec -np <number of MPI processes>  <Path to Build>/svFSI-build/bin/svFSI <Path to input file>
+```
 ## Features
 
-`svFSI` provides the capability to model a variety of physics, such as elastodyanmics, heat transfer, convection, fluid, structure and electrophysiology. It also provides multiple options for each physics to cater to the users' diverse needs. In the following tables, *Abbreviation* refers to the variable name in the source code, and users can use global search tool such as `grep` to locate the implementations in the code; *Full name* refers to the name of the model; *Input keyword* refers to the phrase in the input file that can invoke such model.
+`svFSI` provides the capability to model a variety of physics including unsteady diffusion, linear and nonlinear elastodyanmics, convective heat transfer, fluid flows and fluid-structure-interaction (FSI), and cardiac electrophysiology. As the code is modular, the users are provided with a choice to couple these physics depending on their needs. We strongly recommend users to browse through the examples provided in the GitHub repository [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests) to get a detailed insight into the capability of the code.
+
+Below, we provide a list of the available choice of constitutive models for different types of equations being solved. Users are also encouraged to implement new constitutive models. Users may use global search tool such as `grep` to locate the implementations of the available constitutive models in the code using the abbreviated names below. 
+
+*Abbreviation* refers to the variable name in the source code; *Full name* refers to the generic name of the model; *Input keyword* refers to the phrase in the input file that can invoke such model.
 
 1. Available isochoric constitutive models for the structure equation
    | *Abbreviation* | *Full name*                     | *Input keyword*                                         |
@@ -103,12 +107,13 @@ MPI run can be initiated through
 
 ## Additional Resource
 More details can be found here:
-- FSI: https://simvascular.github.io/docssvFSI.html
-- Cardiac mechanics modeling:  https://simvascular.github.io/docsCardiacMechanicsModeling.html
-- Eletrophysiology: https://simvascular.github.io/docsElectrophysiology.html
+- Fluid-Structure Interaction (FSI): https://simvascular.github.io/docssvFSI.html
+- SimCardio: http://simvascular.github.io/docsSimCardio.html
+- Cardiac electrophysiology modeling: http://simvascular.github.io/docsSimCardio.html#cep-modeling
+- Cardiac mechanics modeling:  http://simvascular.github.io/docsSimCardio.html#mechanics-modeling
 
 ## License
-`svFSI` is published under BSD 3-Clause License. Details are included in each source code file.
+`svFSI` is published under the BSD 3-Clause License. Details are included in each source code file.
 
 ## Citation
 In preparation.
