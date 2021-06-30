@@ -906,6 +906,14 @@ c               END IF
          std = "      one face and 5-8 on the opposite face"
          RETURN
 
+      ELSE IF (lM%eType.EQ.eType_TET10) THEN
+         std = " Make sure the element conforms with vtk requirement:"//
+     2   "https://vtk.org/wp-content/uploads/2015/04/file-formats.pdf"
+
+      ELSE IF (lM%eType.EQ.eType_TRI6) THEN
+         std = " Make sure the element conforms with vtk requirement:"//
+     2   "https://vtk.org/wp-content/uploads/2015/04/file-formats.pdf"
+
       END IF
 
       eType = lM%eType

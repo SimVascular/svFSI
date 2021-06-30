@@ -61,8 +61,8 @@
 
       INTEGER(KIND=LSIP) nReq, i, j, k, ierr, stat(mpsts*lhs%nReq)
 
-      REAL(KIND=LSRP), ALLOCATABLE :: sB(:,:,:), rB(:,:,:), sReq(:),    &
-     &   rReq(:)
+      REAL(KIND=LSRP), ALLOCATABLE :: sB(:,:,:), rB(:,:,:)
+      INTEGER(KIND=LSIP), ALLOCATABLE :: sReq(:), rReq(:)
 
       IF (lhs%commu%nTasks .EQ. 1) RETURN
 
@@ -109,7 +109,8 @@
 
       INTEGER(KIND=LSIP) nReq, i, j, k, ierr, stat(mpsts*lhs%nReq)
 
-      REAL(KIND=LSRP), ALLOCATABLE :: sB(:,:), rB(:,:), sReq(:), rReq(:)
+      REAL(KIND=LSRP), ALLOCATABLE :: sB(:,:), rB(:,:)
+      INTEGER(KIND=LSIP), ALLOCATABLE :: sReq(:), rReq(:)
 
       IF (lhs%commu%nTasks .EQ. 1) RETURN
 

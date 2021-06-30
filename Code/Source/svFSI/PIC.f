@@ -198,7 +198,9 @@
       END IF
 
       IF ((eq(cEq)%phys .EQ. phys_ustruct) .OR.
-     2    (eq(cEq)%phys .EQ. phys_stokes)) THEN
+     2    (eq(cEq)%phys .EQ. phys_stokes)  .OR.
+     3    (eq(cEq)%phys .EQ. phys_fluid)   .OR.
+     4    (eq(cEq)%phys .EQ. phys_fsi)) THEN
          CALL PICETH()
       END IF
 
@@ -330,7 +332,9 @@
          DO e=1, msh(iM)%nEl
             cDmn = DOMAIN(msh(iM), cEq, e)
             IF ((eq(cEq)%dmn(cDmn)%phys .NE. phys_ustruct) .AND.
-     2          (eq(cEq)%dmn(cDmn)%phys .NE. phys_stokes)) CYCLE
+     2          (eq(cEq)%dmn(cDmn)%phys .NE. phys_stokes)  .AND. 
+     3          (eq(cEq)%dmn(cDmn)%phys .NE. phys_fluid)   .AND.
+     4          (eq(cEq)%dmn(cDmn)%phys .NE. phys_fsi)) CYCLE
 
             DO a=1, eNoN
                Ac = msh(iM)%IEN(a,e)

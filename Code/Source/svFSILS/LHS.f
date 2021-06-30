@@ -131,9 +131,9 @@
          gtlPtr(Ac) = a
       END DO
 
-!     First including the nodes that belong to processors with higher ID
-!     then including the nodes shared by lower processors IDs. shnNo is
-!     counter for lower ID and mynNo is counter for higher ID
+!     Including the nodes shared by processors with higher ID at the end,
+!     and including the nodes shared by lower processors IDs at the front.
+!     shnNo is counter for lower ID and mynNo is counter for higher ID
       lhs%mynNo = nNo
       lhs%shnNo = 0
       DO i=nTasks, 1, -1
@@ -236,7 +236,7 @@
       END DO
       ALLOCATE(lhs%cS(lhs%nReq))
 !     Now that we know which processor is communicating to which, we can
-!     setup the handels and structures
+!     setup the handles and structures
       j = 0
       DO i=1, nTasks
          a = disp(i)
@@ -291,201 +291,6 @@
 
       RETURN
       END SUBROUTINE FSILS_LHS_CREATE
-!####################################################################
-      SUBROUTINE external_LHS_CREATE(lhs, commu, gnNo, nNo, gNodes,     &
-     &   nFaces)
-      INCLUDE "FSILS_STD.h"
-      TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      TYPE(FSILS_commuType), INTENT(IN) :: commu
-      INTEGER(KIND=LSIP), INTENT(IN) :: gnNo, nNo
-      INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
-      INTEGER(KIND=LSIP), INTENT(IN) :: nFaces
-
-      INTEGER(KIND=LSIP) ip, i, j, a, Ac, ai, nTasks, tF, maxnNo, ierr, &
-     &   comm, stat(mpsts)
-
-      INTEGER(KIND=LSIP), ALLOCATABLE :: aNodes(:,:), gtlPtr(:), ltg(:),&
-     &   part(:), sCount(:), disp(:)
-
-      IF (lhs%foC) THEN
-         PRINT *, "FSILS: LHS is not free You may use FSILS_LHS_FREE",  &
-     &      " to free this structure"
-         STOP "FSILS: FATAL ERROR"
-      END IF
-
-      lhs%foC    = .TRUE.
-      lhs%gnNo   = gnNo
-      lhs%nNo    = nNo
-      lhs%nnz    = 0
-      lhs%commu  = commu
-      lhs%nFaces = nFaces
-
-      nTasks = commu%nTasks
-      comm   = commu%comm
-      tF     = commu%tF
-
-      ALLOCATE (lhs%map(nNo), lhs%face(nFaces))
-
-      CALL MPI_ALLREDUCE (nNo, maxnNo, 1, mpint, MPI_MAX, comm, ierr)
-
-      ALLOCATE(aNodes(maxnNo,nTasks), part(maxnNo), sCount(nTasks),     &
-     &   disp(nTasks), gtlPtr(gnNo), ltg(nNo))
-
-      part = 0
-      part(1:nNo) = gNodes
-
-      DO i=1, nTasks
-         disp(i)   = (i-1)*maxnNo
-         sCount(i) = maxnNo
-      END DO
-      CALL MPI_ALLGATHERV(part, maxnNo, mpint, aNodes, sCount, disp,    &
-     &   mpint, comm, ierr)
-
-      gtlPtr = 0
-      DO a=1, nNo
-         Ac = gNodes(a)
-         gtlPtr(Ac) = a
-      END DO
-
-!     First including the nodes that belong to processors with higher ID
-!     then including the nodes shared by lower processors IDs. shnNo is
-!     counter for lower ID and mynNo is counter for higher ID
-      lhs%mynNo = nNo
-      lhs%shnNo = 0
-      DO i=nTasks, 1, -1
-!     Will include local nodes later
-         IF (i .EQ. tF) CYCLE
-         DO a=1, maxnNo
-!     Global node number in processor i at location a
-            Ac = aNodes(a,i)
-!     Exit if this is the last node
-            IF (Ac .EQ. 0) EXIT
-!     Corresponding local node in current processor
-            ai = gtlPtr(Ac)
-            IF (ai .NE. 0) THEN
-!     If this node has not been included already
-               IF (aNodes(ai,tF) .NE. 0) THEN
-                  IF (i .LT. tF) THEN
-!     If the processor ID is lower, it is appended to the beginning
-                     lhs%shnNo = lhs%shnNo + 1
-                     ltg(lhs%shnNo) = Ac
-                  ELSE
-!     If the processor ID is higher, it is appended to the end
-                     ltg(lhs%mynNo) = Ac
-                     lhs%mynNo = lhs%mynNo - 1
-                  END IF
-                  aNodes(ai,tF) = 0
-               END IF
-            END IF
-         END DO
-      END DO
-!     Now including the local nodes that are left behind
-      j = lhs%shnNo + 1
-      DO a=1, nNo
-         Ac = aNodes(a,tF)
-!     If this node has not been included already
-         IF (Ac .NE. 0) THEN
-            ltg(j) = Ac
-            j = j + 1
-         END IF
-      END DO
-      IF (j .NE. lhs%mynNo+1) THEN
-         PRINT *, "FSILS: Unexpected behavior", j, lhs%mynNo
-         CALL MPI_FINALIZE(ierr)
-         STOP "FSILS: FATAL ERROR"
-      END IF
-
-!     Having the new ltg pointer, map is constructed
-      gtlPtr = 0
-      DO a=1, nNo
-         Ac = ltg(a)
-         gtlPtr(Ac) = a
-      END DO
-      DO a=1, nNo
-         Ac = gNodes(a)
-         lhs%map(a) = gtlPtr(Ac)
-      END DO
-
-!     Constructing the communication data structure based on the ltg
-      part(1:nNo) = ltg
-      CALL MPI_ALLGATHERV(part, maxnNo, mpint, aNodes, sCount, disp,    &
-     &   mpint, comm, ierr)
-
-!     This variable keeps track of number of shared nodes
-      disp = 0
-      lhs%nReq = 0
-      DO i=1, nTasks
-         IF (i .EQ. tF) CYCLE
-         DO a=1, maxnNo
-!     Global node number in processor i at location a
-            Ac = aNodes(a,i)
-!     Exit if this is the last node
-            IF (Ac .EQ. 0) EXIT
-!     Corresponding local node in current processor
-            ai = gtlPtr(Ac)
-            IF (ai .NE. 0) THEN
-               disp(i) = disp(i) + 1
-            END IF
-         END DO
-         IF (disp(i) .NE. 0) lhs%nReq = lhs%nReq + 1
-      END DO
-      ALLOCATE(lhs%cS(lhs%nReq))
-!     Now that we know which processor is communicating to which, we can
-!     setup the handels and structures
-      j = 0
-      DO i=1, nTasks
-         a = disp(i)
-         IF (a .NE. 0) THEN
-            j = j + 1
-            lhs%cS(j)%iP = i
-            lhs%cS(j)%n = a
-            ALLOCATE(lhs%cS(j)%ptr(a))
-         END IF
-      END DO
-
-!     Order of nodes in ptr is based on the node order in porcessor
-!     with higher ID. ptr is calculated for tF+1:nTasks and will be
-!     sent over.
-      DO i=1, lhs%nReq
-         iP = lhs%cS(i)%iP
-         IF (iP .LT. tF) THEN
-            CALL MPI_RECV(lhs%cS(i)%ptr, lhs%cS(i)%n, mpint, iP-1, 1,   &
-     &         comm, stat, ierr)
-
-            DO j=1, lhs%cS(i)%n
-               lhs%cS(i)%ptr(j) = gtlPtr(lhs%cS(i)%ptr(j))
-            END DO
-         ELSE
-!     This is a counter for the shared nodes
-            j = 0
-            DO a=1, maxnNo
-!     Global node number in processor i at location a
-               Ac = aNodes(a,iP)
-!     Exit if this is the last node
-               IF (Ac .EQ. 0) EXIT
-!     Corresponding local node in current processor
-               ai = gtlPtr(Ac)
-               IF (ai .NE. 0) THEN
-                  j = j + 1
-!     Just for now global node ID is used. Later on this will be changed
-!     to make sure nodes corresponds to each other on both processors
-!     and then will be transformed to local node IDs
-                  lhs%cS(i)%ptr(j) = Ac
-               END IF
-            END DO
-            CALL MPI_SEND(lhs%cS(i)%ptr, lhs%cS(i)%n, mpint, iP-1, 1,   &
-     &         comm, stat, ierr)
-
-            DO j=1, lhs%cS(i)%n
-               lhs%cS(i)%ptr(j) = gtlPtr(lhs%cS(i)%ptr(j))
-            END DO
-         END IF
-      END DO
-
-      DEALLOCATE(aNodes, part, gtlPtr, sCount, disp, ltg)
-
-      RETURN
-      END SUBROUTINE external_LHS_CREATE
 !####################################################################
       SUBROUTINE FSILS_LHS_FREE(lhs)
       INCLUDE "FSILS_STD.h"

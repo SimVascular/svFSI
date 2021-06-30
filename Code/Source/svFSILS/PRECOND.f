@@ -121,13 +121,13 @@
       END DO
 
 !     Pre-multipling K with W: K = W*K
-      CALL PREMUL(lhs, rowPtr, dof, Val, W)
+      CALL PREMUL(rowPtr, lhs%nNo, lhs%nnz, dof, Val, W)
 
 !     Multipling R with W: R = W*R
       R = W*R
 
 !     Now post-multipling K by W: K = K*W
-      CALL POSMUL(lhs, rowPtr, colPtr, dof, Val, W)
+      CALL POSMUL(rowPtr, colPtr, lhs%nNo, lhs%nnz, dof, Val, W)
 
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
@@ -147,7 +147,7 @@
 !--------------------------------------------------------------------
 !     Row and column preconditioner, to precondition both LHS and RHS.
 !--------------------------------------------------------------------
-      SUBROUTINE PRECONDRNC(lhs, rowPtr, colPtr, diagPtr, dof, Val, R, 
+      SUBROUTINE PRECONDRCS(lhs, rowPtr, colPtr, diagPtr, dof, Val, R, 
      2   W1, W2)
 
       INCLUDE "FSILS_STD.h"
@@ -194,9 +194,9 @@
       Wr = Wr/ABS(Wr)
       Wr = (Wr + ABS(Wr))*0.5_LSRP
       ! Kill the row and column corresponding to Dirichlet BC
-      CALL PREMUL(lhs, rowPtr, dof, Val, Wr)
+      CALL PREMUL(rowPtr, lhs%nNo, lhs%nnz, dof, Val, Wr)
       R = Wr*R
-      CALL POSMUL(lhs, rowPtr, colPtr, dof, Val, Wr)
+      CALL POSMUL(rowPtr, colPtr, lhs%nNo, lhs%nnz, dof, Val, Wr)
       ! Set diagnal term to one
       SELECT CASE (dof)
       CASE (1)
@@ -230,7 +230,7 @@
             d = diagPtr(Ac)
             DO i=1, dof
                Val(i*dof-dof+i,d) = Wr(i,Ac)*(Val(i*dof-dof+i,d)
-     2                            -1._LSRP) + 1._LSRP
+     2                            - 1._LSRP) + 1._LSRP
             END DO
          END DO
       END SELECT
@@ -244,7 +244,7 @@
          iter = iter + 1
          IF (iter .GE. maxiter) THEN 
             PRINT *, "Warning: maximum iteration number reached"//
-     2            "@ SUBROUTINE PRECONDRNC."
+     2            "@ SUBROUTINE PRECONDRCS."
             PRINT *, MAXVAL(Wr), MAXVAL(Wc)
             flag = .False.
          END IF
@@ -327,18 +327,18 @@
 
          CALL FSILS_COMMUV(lhs, dof, Wr)
          CALL FSILS_COMMUV(lhs, dof, Wc)
+
+         IF (MAXVAL(ABS(1._LSRP - Wr)) .LT. tol .AND. 
+     2       MAXVAL(ABS(1._LSRP - Wc)) .LT. tol) flag = .False.
          
          Wr = 1._LSRP/SQRT(Wr)
          Wc = 1._LSRP/SQRT(Wc)
 
-         CALL PREMUL(lhs, rowPtr, dof, Val, Wr)
-         CALL POSMUL(lhs, rowPtr, colPtr, dof, Val, Wc)
+         CALL PREMUL(rowPtr, lhs%nNo, lhs%nnz, dof, Val, Wr)
+         CALL POSMUL(rowPtr, colPtr, lhs%nNo, lhs%nnz, dof, Val, Wc)
 
          W1 = W1*Wr
          W2 = W2*Wc
-
-         IF (ABS( 1._LSRP - MAXVAL(Wr) ) .LT. tol .AND. 
-     2       ABS( 1._LSRP - MAXVAL(Wc) ) .LT. tol) flag = .False.
 
          IF (lhs%commu%nTasks .GT. 1) THEN 
             CALL MPI_ALLGATHER(flag, 1, mplog, gflag, 1, mplog, 
@@ -365,24 +365,21 @@
    !    END DO
 
       RETURN
-      END SUBROUTINE PRECONDRNC
+      END SUBROUTINE PRECONDRCS
 
 !--------------------------------------------------------------------
 !     Pre-multipling Val with W: Val = W*Val
-      SUBROUTINE PREMUL(lhs, rowPtr, dof, Val, W)
+      SUBROUTINE PREMUL(rowPtr, nNo, nnz, dof, Val, W)
 
       INCLUDE "FSILS_STD.h"
 
-      TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo)
-      INTEGER(KIND=LSIP), INTENT(IN) :: dof
-      REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
-      REAL(KIND=LSRP), INTENT(IN) :: W(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo, nnz, dof
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,nNo)
+      REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,nnz)
+      REAL(KIND=LSRP), INTENT(IN) :: W(dof,nNo)
 
-      INTEGER(KIND=LSIP) nNo, i, j, a, b, Ac
+      INTEGER(KIND=LSIP) i, j, a, b, Ac
       
-      nNo = lhs%nNo
-
       SELECT CASE (dof)
       CASE (1)
          DO Ac=1, nNo
@@ -430,21 +427,18 @@
 
 !--------------------------------------------------------------------
 !     Post-multipling Val by W: Val = Val*W
-      SUBROUTINE POSMUL(lhs, rowPtr, colPtr, dof, Val, W)
+      SUBROUTINE POSMUL(rowPtr, colPtr, nNo, nnz, dof, Val, W)
 
       INCLUDE "FSILS_STD.h"
 
-      TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
-      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,lhs%nNo),
-     2                                  colPtr(lhs%nnz)
-      INTEGER(KIND=LSIP), INTENT(IN) :: dof
-      REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
-      REAL(KIND=LSRP), INTENT(IN) :: W(dof,lhs%nNo)
+      INTEGER(KIND=LSIP), INTENT(IN) :: nNo, nnz, dof
+      INTEGER(KIND=LSIP), INTENT(IN) :: rowPtr(2,nNo),
+     2                                  colPtr(nnz)
+      REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,nnz)
+      REAL(KIND=LSRP), INTENT(IN) :: W(dof,nNo)
 
-      INTEGER(KIND=LSIP) nNo, i, j, a, b, Ac
+      INTEGER(KIND=LSIP) i, j, a, b, Ac
       
-      nNo = lhs%nNo
-
       SELECT CASE (dof)
       CASE (1)
          DO Ac=1, nNo
