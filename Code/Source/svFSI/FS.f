@@ -41,7 +41,7 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER(KIND=IKIND) insd
+      INTEGER(KIND=IKIND) insd, g
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -68,6 +68,12 @@
 
 !     Sets Taylor-Hood basis if invoked by user (fluid, ustruct, FSI)
       IF (lM%nFs .EQ. 2) THEN
+!        Second order derivative for vector function space
+         DO g=1, lM%fs(1)%nG
+            CALL GETGNNxx(lM%fs(1)%eNoN, lM%fs(1)%eType, 
+     2                    lM%fs(1)%Nxx(:,:,g))
+         END DO
+
 !        Select Taylor-Hood element
          CALL SETTHOODFS(lM%fs(2), lM%fs(1)%eType)
 
@@ -92,6 +98,7 @@
       IF (lM%lFib) insd = 0
 
       lFa%nFs = lM%nFs
+      IF (ALLOCATED(lFa%fs)) DEALLOCATE(lFa%fs)
       ALLOCATE(lFa%fs(lFa%nFs))
 
 !     The first set of basis is inherited directly from face basis
@@ -171,7 +178,9 @@
       ALLOCATE(fs%w(nG), fs%xi(insd,nG), fs%xib(2,nsd), fs%N(eNoN,nG),
      2   fs%Nb(2,eNoN), fs%Nx(insd,eNoN,nG))
 
-      IF (fs%eType .EQ. eType_NRB) THEN
+      IF ((fs%eType .EQ. eType_NRB  ) .OR. 
+     2    (fs%eType .EQ. eType_TRI6 ) .OR.
+     3    (fs%eType .EQ. eType_TET10)) THEN
          IF (insd .EQ. 1) THEN
             ALLOCATE(fs%Nxx(1,eNoN,nG))
          ELSE IF (insd .EQ. 2) THEN
@@ -273,10 +282,11 @@
             fs(1)%lShpF = lM%fs(1)%lShpF
             fs(1)%eNoN  = lM%fs(1)%eNoN
             CALL ALLOCFS(fs(1), nsd)
-            fs(1)%w  = lM%fs(1)%w
-            fs(1)%xi = lM%fs(1)%xi
-            fs(1)%N  = lM%fs(1)%N
-            fs(1)%Nx = lM%fs(1)%Nx
+            fs(1)%w   = lM%fs(1)%w
+            fs(1)%xi  = lM%fs(1)%xi
+            fs(1)%N   = lM%fs(1)%N
+            fs(1)%Nx  = lM%fs(1)%Nx
+            fs(1)%Nxx = lM%fs(1)%Nxx
 
             fs(2)%nG    = lM%fs(1)%nG
             fs(2)%eType = lM%fs(2)%eType
@@ -328,7 +338,9 @@
       INTEGER, ALLOCATABLE :: eNds(:)
 
       IF ((eq(cEq)%phys .NE. phys_stokes) .AND.
-     2    (eq(cEq)%phys .NE. phys_ustruct)) RETURN
+     2    (eq(cEq)%phys .NE. phys_fluid)  .AND.
+     3    (eq(cEq)%phys .NE. phys_ustruct).AND.
+     4    (eq(cEq)%phys .NE. phys_fsi)) RETURN
 
       THflag = .FALSE.
       DO iM=1, nMsh
