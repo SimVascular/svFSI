@@ -48,7 +48,7 @@ In most cases, users can proceed to build `svFSI` following the [Quick Build](#q
 
 `svFSI` requires a plain-text input file to specify simulation parameters. The syntax of the input file can be found [here](https://sites.google.com/site/memt63/tools/MUPFES/mupfes-scripting).
 
-A master template is provided in the current repository, [svFSI.inp](./svFSI.inp). Users are also recommended to go through the input files in the [examples](https://github.com/SimVascular/svFSI-Tests) and modify them for their needs.
+A master template is provided in the current repository, [svFSI_master.inp](./svFSI_master.inp). Users are also recommended to go through the input files in the [examples](https://github.com/SimVascular/svFSI-Tests) and modify them for their needs.
 
 MPI run can be initiated through
    ```bash
@@ -94,8 +94,9 @@ MPI run can be initiated through
 ## Additional Resource
 More details can be found here:
 - FSI: https://simvascular.github.io/docssvFSI.html
-- Cardiac mechanics modeling:  https://simvascular.github.io/docsCardiacMechanicsModeling.html
-- Eletrophysiology: https://simvascular.github.io/docsElectrophysiology.html
+- Cardiac mechanics modeling: https://simvascular.github.io/docsSimCardio.html#mechanics-modeling
+- Eletrophysiology: https://simvascular.github.io/docsSimCardio.html#cep-modeling
+- Prescribed-motion LV modeling: https://simvascular.github.io/docsSimCardio.html#automatic-cardiac-modeling
 
 ## License
 `svFSI` is published under BSD 3-Clause License. Details are included in each source code file.

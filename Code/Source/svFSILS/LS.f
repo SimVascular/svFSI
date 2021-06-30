@@ -74,8 +74,8 @@
             ls%RI%mItr = 10
             ls%GM%mItr = 2
             ls%CG%mItr = 500
-            ls%RI%sD   = 100
             ls%GM%sD   = 100
+            ls%RI%sD   = 100
          CASE (LS_TYPE_GMRES)
             ls%RI%relTol = 0.1_LSRP
             ls%RI%mItr   = 4
