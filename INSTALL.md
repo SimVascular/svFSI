@@ -1,4 +1,137 @@
-## Compile `svFSI` on OSX
+## =================================================================
+## svFSI on Ubuntu 18.04
+
+### Download svFSI
+
+`svFSI` source can be downloaded from GitHub at:
+https://github.com/SimVascular/svFSI
+
+### Dependencies
+Dependencies for `svFSI` include:
+
+- C, Fortran compilers (gcc/gfortran, icc/ifort,..)
+- MPI (mpich, openmpi, intel MPI,..)
+- CMake
+- LAPACK and BLAS
+- Trilinos (optional)
+
+Please refer to [`INSTALL-DEPS.md`](./INSTALL-DEPS.md) for more information on installing dependencies.
+
+Recommended folder structure:
+
+```bash
+mkdir svFSI
+cd svFSI
+git clone git@github.com:SimVascular/svFSI.git
+mv svFSI src
+mkdir build
+cd build
+```
+
+This structure creates a separate directory for `svFSI` git repository `src` and a separate `build` folder where `svFSI` is compiled.
+
+### Build environment:
+
+Ubuntu 18.04
+gcc/g++/gfortran 7.5.0
+mpich 3.4.0
+cmake 3.20.5
+lapack/blas 3.9.1
+
+Trilinos & its dependencies:
+    boost 1.66.0
+    hdf5 1.10.4
+    hypre 2.22.0
+    trilinos 13.01
+
+### Build with Trilinos (optional)
+
+To compile `svFSI` with Trilinos, the following changes need to be made to the file, `Code/CMake/SimVascularOptions.cmake`
+
+```bash
+option(SV_USE_TRILINOS "Use Trilinos Library with svFSI" ON)
+```
+
+Further, a `CMAKE_PREFIX_PATH` should be provided as command line argument pointing to the Trilinos library as,
+
+```bash
+ccmake -DCMAKE_PREFIX_PATH:PATH=$(TRILINOS_DIR)/lib/cmake/Trilinos <path_to_svFSI_source>
+```
+
+where `TRILINOS_DIR` should be replaced by the path to the Trilinos installation directory such as `/opt/trilinos/13.01/gnu-mpich`
+
+### Compiler flags for performance
+
+To build `svFSI` for performance, the following CMake options may be used,
+
+```bash
+CMAKE_BUILD_TYPE:STRING = "RELEASE"
+SV_BUILD_TYPE:STRING = "REEASE"
+CMAKE_C_FLAGS:STRING = "-O3 -DNDEBUG -march=native"
+CMAKE_CXX_FLAGS:STRING = "-O3 -DNDEBUG -march=native"
+```
+
+The CMake Fortran flags for `svFSI` are hard-coded. So it is the user's responsibility to use optimized flags depending on the compiler environment. These changes need to be made in the source code as,
+
+open file `Code/Source/svFSI/CMakeLists.txt` and modify `CMAKE_Fortran_FLAGS` as,
+
+```bash
+  set(CMAKE_Fortran_FLAGS "-O3 -DNDEBUG -march=native")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
+```
+
+and for the linear solver `svFSILS`, modify `CMAKE_Fortran_FLAGS` in the file `Code/Source/svFSILS/CMakeLists.txt` as,
+
+```bash
+  set(CMAKE_Fortran_FLAGS "-O3 -DNDEBUG -march=native")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
+```
+
+Note that the option `std=legacy` is used for more recent versions of gcc (version >= 10).
+
+### Additional CMake Settings
+
+Occasionally, C and CXX compilers may be wrongly identified by the CMake system used for `svFSI`. By default, the C compiler used is `/usr/bin/cc` and the CXX compiler is `/usr/bin/c++`. However, depending on the modules loaded on HPC or one's local compiler environment, these may not be pointing to the desired compilers such as those wrapped by mpicc or mpicxx.
+
+In such situations, we recommend providing the correct C and CXX compilers using the CMake variables as,
+
+```bash
+ccmake -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++  <path_to_svFSI_source>
+```
+
+### CMake Configuration:
+
+An example CMake command for compiling `svFSI` with Trilinos is given below:
+
+```bash
+    cmake                                                           \
+    -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc                            \
+    -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++                          \
+    -DCMAKE_PREFIX_PATH:PATH=$(TRILINOS_DIR)/lib/cmake/Trilinos     \
+    -DCMAKE_BUILD_TYPE:STRING="Release"                             \
+    -DCMAKE_C_FLAGS:STRING="-O3 -DNDEBUG -march=native"             \
+    -DCMAKE_CXX_FLAGS:STRING="-O3 -DNDEBUG -march=native"           \
+    -DSV_BUILD_TYPE_DIR:STRING="Release"             \
+    <../svFSI_src>
+```
+
+Note that `-march` flag could be chosen depending on the processor. A variety of options are available for Intel and AMD processors at,
+
+https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
+
+Finally, run `make` for compiling `svFSI`.
+
+If the compilation proceeds successfully, a binary file is created in `svFSI-build/bin/svFSI`.
+
+You may quickly run an `ldd` to check if all the required libraries are available such as,
+
+```bash
+ldd svFSI-build/bin/svFSI
+```
+The code will not run if any library is not found. A wrapper script is also available in `svFSI-build/mysvFSI` which sets environmental variables.
+
+## =================================================================
+## `svFSI` on Mac OSX
 
 Follow the steps below to install `svFSI` on Mac.
 
@@ -81,6 +214,4 @@ cd build
 ccmake ../
 make
 ```
-
-Enjoy!
-
+## =================================================================

@@ -470,7 +470,7 @@
          outPuts(1) = out_temperature
          outPuts(2) = out_heatFlux
 
-         CALL READLS(lSolver_GMRES, lEq, list)
+         CALL READLS(lSolver_CG, lEq, list)
 
 !     LINEAR ELASTICITY equation solver------------------------------
       CASE ('lElas')
@@ -579,7 +579,7 @@
          outPuts(13) = out_acceleration
          outPuts(14) = out_divergence
 
-         CALL READLS(lSolver_CG, lEq, list)
+         CALL READLS(lSolver_GMRES, lEq, list)
 
 !     Nonlinear SHELL mechanics solver --------
       CASE ('shell')
@@ -825,7 +825,7 @@
          nDOP = (/1,1,0,0/)
          outPuts(1) = out_voltage
 
-         CALL READLS(lSolver_GMRES, lEq, list)
+         CALL READLS(lSolver_CG, lEq, list)
 
       CASE ('stokes')
          lEq%phys = phys_stokes
@@ -847,7 +847,7 @@
          outPuts(7) = out_viscosity
          outPuts(8) = out_divergence
 
-         CALL READLS(lSolver_CG, lEq, list)
+         CALL READLS(lSolver_GMRES, lEq, list)
 
       CASE DEFAULT
          err = "Equation type "//TRIM(eqName)//" is not defined"
@@ -2181,6 +2181,8 @@ c     2         "can be applied for Neumann boundaries only"
             rmsh%method = RMSH_TETGEN
          CASE('Meshsim')
             rmsh%method = RMSH_MESHSIM
+            err = "Meshsim is not supported for remeshing. "//
+     2         "Use Tetgen instead."
          CASE DEFAULT
             err = TRIM(list%ping("Remesher",lPR))//" Undefined"
          END SELECT
@@ -2193,7 +2195,7 @@ c     2         "can be applied for Neumann boundaries only"
          ALLOCATE(rmsh%maxEdgeSize(nMsh))
          rmsh%maxEdgeSize(:) = 0.5_RKIND
          rmsh%minDihedAng = 10._RKIND
-         rmsh%maxRadRatio = 0.5_RKIND
+         rmsh%maxRadRatio = 1.15_RKIND
          rmsh%freq = 100
          rmsh%cpVar = 10
 
