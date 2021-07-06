@@ -15,7 +15,7 @@ Dependencies for `svFSI` include:
 - LAPACK and BLAS
 - Trilinos (optional)
 
-Please refer to INSTALL-DEPS.md for more information on installing dependencies.
+Please refer to [`INSTALL-DEPS.md`](./INSTALL-DEPS.md) for more information on installing dependencies.
 
 Recommended folder structure:
 
@@ -44,7 +44,7 @@ Trilinos & its dependencies:
     hypre 2.22.0
     trilinos 13.01
 
-### Invoke Trilinos (optional)
+### Build with Trilinos (optional)
 
 To compile `svFSI` with Trilinos, the following changes need to be made to the file, `Code/CMake/SimVascularOptions.cmake`
 
@@ -119,7 +119,7 @@ Note that `-march` flag could be chosen depending on the processor. A variety of
 
 https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 
-Finally, run `make` for compiling `svFSI`. 
+Finally, run `make` for compiling `svFSI`.
 
 If the compilation proceeds successfully, a binary file is created in `svFSI-build/bin/svFSI`.
 
@@ -131,7 +131,7 @@ ldd svFSI-build/bin/svFSI
 The code will not run if any library is not found. A wrapper script is also available in `svFSI-build/mysvFSI` which sets environmental variables.
 
 ## =================================================================
-## Compile `svFSI` on OSX
+## `svFSI` on Mac OSX
 
 Follow the steps below to install `svFSI` on Mac.
 

@@ -28,7 +28,7 @@ cd cmake-3.20.5
 mkdir build
 cd build/
 ../bootstrap  --prefix=/opt/cmake/3.20.5
-make 
+make
 sudo make install
 ```
 
@@ -47,7 +47,7 @@ tar -zxvf mpich-3.4.2.tar.gz
 mkdir build
 cd build/
 ../mpich-3.4.2/configure  --prefix=/opt/mpich/3.4.2 --enable-fast=O3,ndebug --without-timing  --without-mpit-pvars  --with-device=ch3:nemesis
-make 
+make
 sudo make install
 ```
 
@@ -66,7 +66,7 @@ tar -zxvf openmpi-4.1.1.tar.gz
 mkdir build
 cd build/
 ../openmpi-4.1.1/configure --prefix=/opt/openmpi/4.1.1 --enable-static
-make 
+make
 sudo make install
 ```
 
@@ -91,7 +91,7 @@ ccmake -DCMAKE_PREFIX_PATH:PATH=/opt/netlib/lapack/3.9.1/shared \
    -DBUILD_SHARED_LIBS:BOOL=ON \
    -DBUILD_DEPRECATED:BOOL=ON \
    ../lapack-3.9.1
-make 
+make
 sudo make install
 ```
 
@@ -115,7 +115,7 @@ ccmake -DCMAKE_PREFIX_PATH:PATH=/opt/netlib/lapack/3.9.1/static \
    -DCMAKE_Fortran_FLAGS:STRING="-O3 -DNDEBUG -march=native -frecursive" \
    -DBUILD_DEPRECATED:BOOL=ON \
    ../lapack-3.9.1
-make 
+make
 sudo make install
 ```
 
@@ -141,7 +141,7 @@ cd boost_1_66_0
 sudo ./b2 install
 ```
 
-# =================================================================
+## =================================================================
 ## HDF5
 
 HDF5 installed version: hdf5-1.10.4.tar.gz
@@ -176,11 +176,131 @@ sudo make install
 ```
 
 ## =================================================================
+## MUMPS
+
+MUMPS installed version: MUMPS_5.4.0.tar.gz
+Downloaded via http://mumps.enseeiht.fr/index.php?page=dwnld
+
+### Unpack
+
+Unpack the tar ball and set folder structure:
+
+```bash
+sudo mkdir -p /opt/mumps/5.4.0
+tar -zxvf MUMPS_5.4.0.tar.gz
+cd MUMPS_5.4.0
+```
+
+### Prepare Makefile.inc
+
+Copy a template Makefile.inc to the src/ directory as,
+
+```bash
+cp Make.inc/Makefile.debian.PAR ./Makefile.inc
+```
+
+Modify the variables in Makefile.inc according to the local environment, libraries, etc. For e.g., we use the following settings for parallel build of MUMPS with metis, scotch, lapack, blas, scalapack, and mpich:
+
+```bash
+#
+#  This file is part of MUMPS 5.4.0, released
+#  on Tue Apr 13 15:26:30 UTC 2021
+#
+# These settings for an Ubuntu PC with custom-built packages :
+# metis (parmetis), scotch (ptscotch), lapack, blas, scalapack, mpich, gfortran
+
+# Begin orderings
+SCOTCHDIR  = /opt/scotch/6.1.0
+ISCOTCH    = -I/opt/scotch/6.1.0/include
+LSCOTCH    = -L$(SCOTCHDIR)/lib -lptesmumps -lptscotch -lptscotcherr -lscotch
+
+PORDDIR    = $(topdir)/PORD
+IPORD      = -I$(PORDDIR)/include
+LPORDDIR   = $(PORDDIR)/lib
+LPORD      = -L$(LPORDDIR) -lpord
+
+METISDIR   = /opt/metis/5.1.0
+PMETISDIR  = /opt/parmetis/4.0.3
+IMETIS     = -I$(PMETISDIR)/include -I$(METISDIR)/include
+LMETIS     = -L$(PMETISDIR)/lib -lparmetis -L$(METISDIR)/lib -lmetis
+
+# Corresponding variables reused later
+ORDERINGSF = -Dscotch -Dmetis -Dpord -Dptscotch -Dparmetis
+ORDERINGSC = $(ORDERINGSF)
+
+LORDERINGS  = $(LMETIS) $(LPORD) $(LSCOTCH)
+IORDERINGSF = $(ISCOTCH)
+IORDERINGSC = $(IMETIS) $(IPORD) $(ISCOTCH)
+# End orderings
+################################################################################
+
+PLAT    =
+LIBEXT  = .a
+OUTC    = -o
+OUTF    = -o
+RM      = /bin/rm -f
+CC      = mpicc
+FC      = mpif90
+FL      = mpif90
+AR      = ar vr
+RANLIB  = ranlib
+LAPACK  = /opt/netlib/lapack/3.9.1/static/lib/liblapack.a
+SCALAP  = /opt/netlib/scalapack/2.1.0/libscalapack.a
+
+INCPAR = -I/opt/mpich/3.4.2/include
+
+LIBPAR = $(SCALAP) $(LAPACK) -L/opt/mpich/3.4.2/lib -lfmpich -lmpich -lmpi
+
+INCSEQ = -I$(topdir)/libseq
+LIBSEQ  = $(LAPACK) -L$(topdir)/libseq -lmpiseq
+
+LIBBLAS = /opt/netlib/lapack/3.9.1/static/lib/libblas.a
+LIBOTHERS = -lpthread
+
+#Preprocessor defs for calling Fortran from C (-DAdd_ or -DAdd__ or -DUPPER)
+CDEFS   = -DAdd_
+
+#Begin Optimized options
+OPTF    = -O3 -DNDEBUG -march=native -fopenmp
+OPTL    = -O3 -DNDEBUG -march=native -fopenmp
+OPTC    = -O3 -DNDEBUG -march=native -fopenmp
+#End Optimized options
+
+INCS = $(INCPAR)
+LIBS = $(LIBPAR)
+LIBSEQNEEDED =
+```
+
+### Compile
+
+```bash
+make all
+```
+
+### Build shared libraries to link with Trilinos
+
+To build shared libraries of MUMPS, the following steps may help:
+
+- Add the "-fPIC" option to your compiler options in Makefile.inc
+- Run `make clean` and recompile all MUMPS source files, to build the MUMPS ".a" libraries
+- Run something like `ld -shared -o libdmumps.so libdmumps.a` to create a shared library "libdmumps.so".
+- Repeat the last step for all the static libraries in lib/ folder to create the corresponding shared libraries.
+
+
+### Copy to the destination folder
+
+Copy `include`, `lib` and `examples` to the destination folder.
+
+```bash
+sudo cp -r include/ lib/ examples/ /opt/mumps/5.4.0
+```
+
+## =================================================================
 ## Trilinos
 
 Trilinos installed version: Trilinos-trilinos-release-13-0-1.tar.gz
 
-Downloaded from 
+Downloaded from
 https://github.com/trilinos/Trilinos/releases/tag/trilinos-release-13-0-1
 
 Trilinos preconfiguration steps include:
@@ -216,20 +336,23 @@ FCFLAGS = -O3 -march=native
     -DTrilinos_VERBOSE_CONFIGURE=OFF                 \
     -DTPL_ENABLE_Boost:BOOL=ON                       \
     -DTPL_ENABLE_BLAS:BOOL=ON                        \
-    -DTPL_ENABLE_HDF5:BOOL=ON                       \
+    -DTPL_ENABLE_HDF5:BOOL=ON                        \
         -DHDF5_INCLUDE_DIRS:PATH=<PATH TO HDF5 INSTALL INCLUDE DIR> \
-        -DHDF5_LIBRARY_DIRS:PATH=<PATH TO HDF5 INSTALL LIB DIR>    \
+        -DHDF5_LIBRARY_DIRS:PATH=<PATH TO HDF5 INSTALL LIB DIR>     \
     -DTPL_ENABLE_HYPRE:BOOL=ON                       \
     -DTPL_ENABLE_LAPACK:BOOL=ON                      \
     -DTPL_ENABLE_MPI=ON                              \
-        -DMPI_USE_COMPILER_WRAPPERS=ON                  \
-        -DMPI_C_COMPILER:PATH="${MPI_BIN}/mpicc"          \
+        -DMPI_USE_COMPILER_WRAPPERS=ON                        \
+        -DMPI_C_COMPILER:PATH="${MPI_BIN}/mpicc"              \
         -DMPI_CXX_COMPILER:PATH="${MPI_BIN}/mpic++"           \
         -DMPI_Fortran_COMPILER:PATH="${MPI_BIN}/mpif77"       \
         -DCMAKE_C_COMPILER:PATH="${MPI_BIN}/mpicc"            \
         -DCMAKE_CXX_COMPILER:PATH="${MPI_BIN}/mpic++"         \
         -DCMAKE_Fortran_COMPILER:PATH="${MPI_BIN}/mpif77"     \
-        -DMPI_BASE_DIR="${MPI_DIR}"
+        -DMPI_BASE_DIR="${MPI_DIR}"                  \
+    -DTPL_ENABLE_MUMPS:BOOL=ON                       \
+        -DMUMPS_INCLUDE_DIRS:PATH=<PATH TO MUMPS INSTALL INCLUDE DIR> \
+        -DMUMPS_LIBRARY_DIRS:PATH=<PATH TO MUMPS INSTALL LIB DIR>    \
     -DBUILD_SHARED_LIBS=ON                           \
     -DCMAKE_VERBOSE_MAKEFILE=OFF                     \
     -DCMAKE_BUILD_TYPE=RELEASE                       \
@@ -240,7 +363,7 @@ FCFLAGS = -O3 -march=native
 Finally, compile and install
 
 ```bash
-make -j 4
+make -j <num_processes>
 sudo make install
 ```
 

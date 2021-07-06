@@ -13,44 +13,44 @@ The following packages are required to build and use `svFSI`.
    - blas & lapack
    - trilinos (optional)
 
-On Ubuntu, most of the dependencies can be downloaded using `apt-get`. On Mac OSX, you may use `brew` to install the dependencies.
+On Ubuntu, most of the dependencies can be downloaded using `apt-get`. On Mac OSX, the dependencies may be installed using `brew`.
 
 ## Quick Build
 
-Precompiled binaries for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188). 
+Precompiled binaries for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188).
 
-Users are recommended to build from the source code to access the most recent features and bug fixes. A short build instruction is provided here for Linux system.
+Users are recommended to build from the source code to access the most recent features and bug fixes. Instructions for quick build is provided here for a Linux/Mac OS system.
 
 1. Clone or download the current repository.
 2. Create a `build` directory
    ```bash
-   cd svFSI && mkdir build && cd build 
+   cd svFSI && mkdir build && cd build
    ```
 3. Initiate the CMake terminal interface to generate makefiles.
    ```bash
    ccmake ..
    ```
-4. This will automatically search for compilers. Follow instructions if necessary. Press “c” to configure repeatedly until CMake parameters no longer change and CMake presents the option “g” for generation. Press “g” to create makefiles and exit. Run `make` in the build directory:
+4. This will automatically search for compilers. Follow instructions if necessary. Press “c” to configure repeatedly until CMake parameters no longer change and CMake presents the option “g” to generate. Press “g” to create makefiles and exit. Run `make` in the build directory:
    ```bash
-   make 
+   make
    ```
    Successful build will generate a solver binary, called `svFSI` in the following directory `build/svFSI-build/bin`.
 
-   For more advanced users, please refer INSTALL.md for detailed platform-specific instructions to install `svFSI`.
+   For more advanced users, please refer [`INSTALL.md`](./INSTALL.md) for detailed platform-specific instructions to install `svFSI`.
 
 ## Build With Trilinos
 
-`svFSI` also supports build with [Trilinos](https://github.com/trilinos/Trilinos). Users can build Trilinos locally following its [online documentation](https://docs.trilinos.org/files/TrilinosBuildReference.html). 
+`svFSI` also supports compilation with [Trilinos](https://github.com/trilinos/Trilinos). Users can build Trilinos locally following its [online documentation](https://docs.trilinos.org/files/TrilinosBuildReference.html).
 
-The recommended Trilinos third-party libraries (TPLs) include Boost, BLAS, HDF5, HYPRE, LAPACK, and MPI. The required Trilinos packages are Amesos, AztecOO, Epetra, EpetraEXT, Ifpack, ML, MueLU, ROL, Sacado, Teuchos, and Zoltan. 
+The recommended Trilinos third-party libraries (TPLs) include Boost, BLAS, HDF5, HYPRE, LAPACK, MPI, and MUMPS. The required Trilinos packages are Amesos, AztecOO, Epetra, EpetraEXT, Ifpack, ML, MueLU, ROL, Sacado, Teuchos, and Zoltan.
 
 To enable Trilinos in `svFSI`, users need to turn on the option `SV_USE_TRILINOS` located in the file [`Code/CMake/SimVascularOptions.cmake`](./Code/CMake/SimVascularOptions.cmake) as,
 
 ```bash
 option(SV_USE_TRILINOS "Use Trilinos Library with svFSI" ON)
-``` 
+```
 
-In most cases, users can proceed to build `svFSI` following the [Quick Build](#quick-build), and CMake should be able to locate Trilinos automatically through `find_package`. In case the automatic way fails, users can also specify the path to Trilinos through `ccmake -DCMAKE_PREFIX_PATH:PATH="<Path to Trilinos>/lib/cmake/Trilinos;<Path to other package"`.
+In most cases, users can proceed to build `svFSI` following the [Quick Build](#quick-build), and CMake should be able to locate Trilinos automatically through `find_package`. In case the automatic way fails, users can also specify the path to Trilinos through `ccmake -DCMAKE_PREFIX_PATH:PATH="<Path to Trilinos>/lib/cmake/Trilinos;<Path to other package>;"`.
 
 For more detailed instructions, please refer INSTALL.md.
 
@@ -68,7 +68,7 @@ mpiexec -np <number of MPI processes>  <Path to Build>/svFSI-build/bin/svFSI <Pa
 
 `svFSI` provides the capability to model a variety of physics including unsteady diffusion, linear and nonlinear elastodyanmics, convective heat transfer, fluid flows and fluid-structure-interaction (FSI), and cardiac electrophysiology. As the code is modular, the users are provided with a choice to couple these physics depending on their needs. We strongly recommend users to browse through the examples provided in the GitHub repository [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests) to get a detailed insight into the capability of the code.
 
-Below, we provide a list of the available choice of constitutive models for different types of equations being solved. Users are also encouraged to implement new constitutive models. Users may use global search tool such as `grep` to locate the implementations of the available constitutive models in the code using the abbreviated names below. 
+Below, we provide a list of the available choice of constitutive models for different types of equations being solved. Users are also encouraged to implement new constitutive models. Users may use global search tool such as `grep` to locate the implementations of the available constitutive models in the code using the abbreviated names below.
 
 *Abbreviation* refers to the variable name in the source code; *Full name* refers to the generic name of the model; *Input keyword* refers to the phrase in the input file that can invoke such model.
 
