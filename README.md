@@ -111,6 +111,7 @@ More details can be found here:
 - SimCardio: http://simvascular.github.io/docsSimCardio.html
 - Cardiac electrophysiology modeling: http://simvascular.github.io/docsSimCardio.html#cep-modeling
 - Cardiac mechanics modeling:  http://simvascular.github.io/docsSimCardio.html#mechanics-modeling
+- Prescribed-motion LV modeling: https://simvascular.github.io/docsSimCardio.html#automatic-cardiac-modeling
 
 ## License
 `svFSI` is published under the BSD 3-Clause License. Details are included in each source code file.
