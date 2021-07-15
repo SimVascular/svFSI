@@ -66,11 +66,11 @@
          lM%fs(1)%Nx  = lM%Nx
       END IF
 
-!     Sets Taylor-Hood basis if invoked by user (fluid, ustruct, FSI)
+!     Sets Taylor-Hood basis (fluid, stokes, ustruct, FSI)
       IF (lM%nFs .EQ. 2) THEN
 !        Second order derivative for vector function space
          DO g=1, lM%fs(1)%nG
-            CALL GETGNNxx(lM%fs(1)%eNoN, lM%fs(1)%eType, 
+            CALL GETGNNxx(lM%fs(1)%eNoN, lM%fs(1)%eType,
      2                    lM%fs(1)%Nxx(:,:,g))
          END DO
 
@@ -178,9 +178,9 @@
       ALLOCATE(fs%w(nG), fs%xi(insd,nG), fs%xib(2,nsd), fs%N(eNoN,nG),
      2   fs%Nb(2,eNoN), fs%Nx(insd,eNoN,nG))
 
-      IF ((fs%eType .EQ. eType_NRB  ) .OR. 
-     2    (fs%eType .EQ. eType_TRI6 ) .OR.
-     3    (fs%eType .EQ. eType_TET10)) THEN
+      IF ( (fs%eType .EQ. eType_NRB  )   .OR.
+     2     (fs%eType .EQ. eType_TRI6 )   .OR.
+     3     (fs%eType .EQ. eType_TET10) ) THEN
          IF (insd .EQ. 1) THEN
             ALLOCATE(fs%Nxx(1,eNoN,nG))
          ELSE IF (insd .EQ. 2) THEN
@@ -209,13 +209,13 @@
 
       CASE (eType_HEX20)
          fs%eType = eType_HEX8
-         fs%lShpF = .TRUE.
+         fs%lShpF = .FALSE.
          fs%eNoN  = 8
          fs%nG    = 8
 
       CASE (eType_HEX27)
          fs%eType = eType_HEX8
-         fs%lShpF = .TRUE.
+         fs%lShpF = .FALSE.
          fs%eNoN  = 8
          fs%nG    = 8
 
@@ -270,10 +270,12 @@
             fs(i)%lShpF = lM%fs(1)%lShpF
             fs(i)%eNoN  = lM%fs(1)%eNoN
             CALL ALLOCFS(fs(i), nsd)
-            fs(i)%w  = lM%fs(1)%w
-            fs(i)%xi = lM%fs(1)%xi
-            fs(i)%N  = lM%fs(1)%N
-            fs(i)%Nx = lM%fs(1)%Nx
+            fs(i)%w   = lM%fs(1)%w
+            fs(i)%xi  = lM%fs(1)%xi
+            fs(i)%N   = lM%fs(1)%N
+            fs(i)%Nx  = lM%fs(1)%Nx
+            fs(i)%xib = lM%fs(1)%xib
+            fs(i)%Nb  = lM%fs(1)%Nb
          END DO
       ELSE
          IF (iOpt .EQ. 1) THEN
@@ -282,11 +284,13 @@
             fs(1)%lShpF = lM%fs(1)%lShpF
             fs(1)%eNoN  = lM%fs(1)%eNoN
             CALL ALLOCFS(fs(1), nsd)
-            fs(1)%w   = lM%fs(1)%w
-            fs(1)%xi  = lM%fs(1)%xi
-            fs(1)%N   = lM%fs(1)%N
-            fs(1)%Nx  = lM%fs(1)%Nx
-            fs(1)%Nxx = lM%fs(1)%Nxx
+            fs(1)%w    = lM%fs(1)%w
+            fs(1)%xi   = lM%fs(1)%xi
+            fs(1)%N    = lM%fs(1)%N
+            fs(1)%Nx   = lM%fs(1)%Nx
+            fs(1)%Nxx  = lM%fs(1)%Nxx
+            fs(1)%xib  = lM%fs(1)%xib
+            fs(1)%Nb   = lM%fs(1)%Nb
 
             fs(2)%nG    = lM%fs(1)%nG
             fs(2)%eType = lM%fs(2)%eType
@@ -299,16 +303,20 @@
                CALL GETGNN(nsd, fs(2)%eType, fs(2)%eNoN, fs(2)%xi(:,g),
      2            fs(2)%N(:,g), fs(2)%Nx(:,:,g))
             END DO
+            CALL GETNNBNDS(fs(2)%eType, fs(2)%eNoN, fs(2)%xib, fs(2)%Nb)
+
          ELSE IF (iOpt .EQ. 2) THEN
             fs(2)%nG    = lM%fs(2)%nG
             fs(2)%eType = lM%fs(2)%eType
             fs(2)%lShpF = lM%fs(2)%lShpF
             fs(2)%eNoN  = lM%fs(2)%eNoN
             CALL ALLOCFS(fs(2), nsd)
-            fs(2)%w  = lM%fs(2)%w
-            fs(2)%xi = lM%fs(2)%xi
-            fs(2)%N  = lM%fs(2)%N
-            fs(2)%Nx = lM%fs(2)%Nx
+            fs(2)%w   = lM%fs(2)%w
+            fs(2)%xi  = lM%fs(2)%xi
+            fs(2)%N   = lM%fs(2)%N
+            fs(2)%Nx  = lM%fs(2)%Nx
+            fs(2)%xib = lM%fs(2)%xib
+            fs(2)%Nb  = lM%fs(2)%Nb
 
             fs(1)%nG    = lM%fs(2)%nG
             fs(1)%eType = lM%fs(1)%eType
@@ -321,12 +329,17 @@
                CALL GETGNN(nsd, fs(1)%eType, fs(1)%eNoN, fs(1)%xi(:,g),
      2            fs(1)%N(:,g), fs(1)%Nx(:,:,g))
             END DO
+            CALL GETNNBNDS(fs(2)%eType, fs(2)%eNoN, fs(2)%xib, fs(2)%Nb)
          END IF
       END IF
 
       RETURN
       END SUBROUTINE GETTHOODFS
 !####################################################################
+!     Set the residue of the continuity equation and its tangent matrix
+!     due to variation with pressure to 0 on all the edge nodes. This
+!     step is done only for P2P1 type discretization for mixed saddle
+!     point type problems such as fluid, stokes, ustruct, and fsi.
       SUBROUTINE THOOD_ValRC()
       USE COMMOD
       USE ALLFUN
@@ -337,10 +350,10 @@
 
       INTEGER, ALLOCATABLE :: eNds(:)
 
-      IF ((eq(cEq)%phys .NE. phys_stokes) .AND.
-     2    (eq(cEq)%phys .NE. phys_fluid)  .AND.
-     3    (eq(cEq)%phys .NE. phys_ustruct).AND.
-     4    (eq(cEq)%phys .NE. phys_fsi)) RETURN
+      IF ( (eq(cEq)%phys .NE. phys_stokes)  .AND.
+     2     (eq(cEq)%phys .NE. phys_fluid)   .AND.
+     3     (eq(cEq)%phys .NE. phys_ustruct) .AND.
+     4     (eq(cEq)%phys .NE. phys_fsi) )  RETURN
 
       THflag = .FALSE.
       DO iM=1, nMsh

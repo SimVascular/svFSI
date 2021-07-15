@@ -1273,12 +1273,12 @@ c        N(8) = lx*my*0.5_RKIND
       REAL(KIND=RKIND) :: fp, fn, en, ze
 
       IF (eType .EQ. eType_NRB) RETURN
-      
+
       fp =  4._RKIND
       fn = -4._RKIND
       en = -8._RKIND
       ze =  0._RKIND
-      
+
 !     3D elements
       SELECT CASE(eType)
       CASE(eType_TET10)
@@ -1487,22 +1487,22 @@ c        N(8) = lx*my*0.5_RKIND
 
       INTEGER(KIND=IKIND) a, i, j, INFO, IPIV(l)
       REAL(KIND=RKIND) xXi(nsd,insd), xXi2(nsd,l), K(l,l), B(l,eNoN), t
-      
+
       t    = 2._RKIND
-      xXi  = 0._RKIND 
+      xXi  = 0._RKIND
       xXi2 = 0._RKIND
-      Nxx  = 0._RKIND 
-      K    = 0._RKIND 
-      B    = 0._RKIND 
-      IF (insd .EQ. 2) THEN 
+      Nxx  = 0._RKIND
+      K    = 0._RKIND
+      B    = 0._RKIND
+      IF (insd .EQ. 2) THEN
          DO a=1, eNoN
-            ! | dx1/dXi1  dx1/dXi2 |
-            ! | dx2/dXi1  dx2/dXi2 |
+         ! | dx1/dXi1  dx1/dXi2 |
+         ! | dx2/dXi1  dx2/dXi2 |
             xXi(:,1) = xXi(:,1) + lx(:,a)*Nxi(1,a)
             xXi(:,2) = xXi(:,2) + lx(:,a)*Nxi(2,a)
 
-            ! | dx1^2/dXi1^2  dx1^2/dXi2^2  dx1^2/dXi1dXi2 |
-            ! | dx2^2/dXi1^2  dx2^2/dXi2^2  dx2^2/dXi1dXi2 |
+         ! | dx1^2/dXi1^2  dx1^2/dXi2^2  dx1^2/dXi1dXi2 |
+         ! | dx2^2/dXi1^2  dx2^2/dXi2^2  dx2^2/dXi1dXi2 |
             xXi2(:,1) = xXi2(:,1) + lx(:,a)*Nxi2(1,a)
             xXi2(:,2) = xXi2(:,2) + lx(:,a)*Nxi2(2,a)
             xXi2(:,3) = xXi2(:,3) + lx(:,a)*Nxi2(3,a)
@@ -1510,7 +1510,7 @@ c        N(8) = lx*my*0.5_RKIND
 
          K(1,:) = (/ xXi(1,1)**2, xXi(2,1)**2, t*xXi(1,1)*xXi(2,1) /)
          K(2,:) = (/ xXi(1,2)**2, xXi(2,2)**2, t*xXi(1,2)*xXi(2,2) /)
-         K(3,:) = (/ xXi(1,1)*xXi(1,2), xXi(2,1)*xXi(2,2), 
+         K(3,:) = (/ xXi(1,1)*xXi(1,2), xXi(2,1)*xXi(2,2),
      2               xXi(1,1)*xXi(2,2) + xXi(1,2)*xXi(2,1) /)
 
          DO a=1, eNoN
@@ -1523,18 +1523,18 @@ c        N(8) = lx*my*0.5_RKIND
          IF (INFO .NE. 0) err = "Error in Lapack @ GNNxx."
          Nxx = B
 
-      ELSE if (insd .EQ. 3) THEN 
+      ELSE if (insd .EQ. 3) THEN
          DO a=1, eNoN
-            ! | dx1/dXi1  dx1/dXi2  dx1/dXi3 |
-            ! | dx2/dXi1  dx2/dXi2  dx2/dXi3 |
-            ! | dx3/dXi1  dx3/dXi2  dx3/dXi3 |
+         ! | dx1/dXi1  dx1/dXi2  dx1/dXi3 |
+         ! | dx2/dXi1  dx2/dXi2  dx2/dXi3 |
+         ! | dx3/dXi1  dx3/dXi2  dx3/dXi3 |
             xXi(:,1) = xXi(:,1) + lx(:,a)*Nxi(1,a)
             xXi(:,2) = xXi(:,2) + lx(:,a)*Nxi(2,a)
             xXi(:,3) = xXi(:,3) + lx(:,a)*Nxi(3,a)
 
-            ! | dx1^2/dXi1^2 ... dx1^2/dXi1dXi2 dx1^2/dXi2dXi3 dx1^2/dXi1dXi3 |
-            ! | dx2^2/dXi1^2 ... dx2^2/dXi1dXi2 dx2^2/dXi2dXi3 dx2^2/dXi1dXi3 |
-            ! | dx3^2/dXi1^2 ... dx3^2/dXi1dXi2 dx3^2/dXi2dXi3 dx3^2/dXi1dXi3 |
+         ! | dx1^2/dXi1^2 ... dx1^2/dXi1dXi2 dx1^2/dXi2dXi3 dx1^2/dXi1dXi3 |
+         ! | dx2^2/dXi1^2 ... dx2^2/dXi1dXi2 dx2^2/dXi2dXi3 dx2^2/dXi1dXi3 |
+         ! | dx3^2/dXi1^2 ... dx3^2/dXi1dXi2 dx3^2/dXi2dXi3 dx3^2/dXi1dXi3 |
             xXi2(:,1) = xXi2(:,1) + lx(:,a)*Nxi2(1,a)
             xXi2(:,2) = xXi2(:,2) + lx(:,a)*Nxi2(2,a)
             xXi2(:,3) = xXi2(:,3) + lx(:,a)*Nxi2(3,a)
@@ -1544,31 +1544,31 @@ c        N(8) = lx*my*0.5_RKIND
          END DO
 
          DO i=1,3
-            K(i,:) = (/ xXi(1,i)**2, xXi(2,i)**2, xXi(3,i)**2, 
-     2                  t*xXi(1,i)*xXi(2,i), t*xXi(2,i)*xXi(3,i), 
+            K(i,:) = (/ xXi(1,i)**2, xXi(2,i)**2, xXi(3,i)**2,
+     2                  t*xXi(1,i)*xXi(2,i), t*xXi(2,i)*xXi(3,i),
      3                  t*xXi(1,i)*xXi(3,i)/)
          END DO
 
          i = 1
          j = 2
-         K(4,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j), 
-     2               xXi(3,i)*xXi(3,j), 
+         K(4,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j),
+     2               xXi(3,i)*xXi(3,j),
      3               xXi(1,i)*xXi(2,j) + xXi(1,j)*xXi(2,i),
      4               xXi(2,i)*xXi(3,j) + xXi(2,j)*xXi(3,i),
      5               xXi(1,i)*xXi(3,j) + xXi(1,j)*xXi(3,i) /)
 
          i = 2
          j = 3
-         K(5,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j), 
-     2               xXi(3,i)*xXi(3,j), 
+         K(5,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j),
+     2               xXi(3,i)*xXi(3,j),
      3               xXi(1,i)*xXi(2,j) + xXi(1,j)*xXi(2,i),
      4               xXi(2,i)*xXi(3,j) + xXi(2,j)*xXi(3,i),
      5               xXi(1,i)*xXi(3,j) + xXi(1,j)*xXi(3,i) /)
 
          i = 1
          j = 3
-         K(6,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j), 
-     2               xXi(3,i)*xXi(3,j), 
+         K(6,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j),
+     2               xXi(3,i)*xXi(3,j),
      3               xXi(1,i)*xXi(2,j) + xXi(1,j)*xXi(2,i),
      4               xXi(2,i)*xXi(3,j) + xXi(2,j)*xXi(3,i),
      5               xXi(1,i)*xXi(3,j) + xXi(1,j)*xXi(3,i) /)
@@ -1577,10 +1577,10 @@ c        N(8) = lx*my*0.5_RKIND
             DO i=1,6
                B(i,a) = Nxi2(i,a) - Nx(1,a)*xXi2(1,i) -
      2                  Nx(2,a)*xXi2(2,i) - Nx(3,a)*xXi2(3,i)
-            END DO 
+            END DO
          END DO
 
-         CALL DGESV(l,eNoN,K,l,IPIV,B,l,INFO)
+         CALL DGESV(l, eNoN, K, l, IPIV, B, l, INFO)
          IF (INFO .NE. 0) err = "Error in Lapack @ GNNxx."
          Nxx = B
       END IF

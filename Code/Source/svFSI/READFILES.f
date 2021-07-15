@@ -867,6 +867,11 @@
                wrn = "Taylor-Hood basis is not allowed for NURBS mesh"//
      2            " or shells and fibers"
             ELSE
+               IF ( (msh(iM)%eType .NE. eType_TRI6)  .AND.
+     2              (msh(iM)%eType .NE. eType_TET10) ) THEN
+                  err = "Taylor-Hood basis is currently applicable"//
+     2               " for TRI6 (2D) or TET10 (3D) elements only"
+               END IF
                msh(iM)%nFs = 2
             END IF
          END IF

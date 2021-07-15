@@ -167,8 +167,9 @@
             IF ((eq(cEq)%phys .EQ. phys_stokes) .OR.
      2          (eq(cEq)%phys .EQ. phys_fluid)  .OR.
      3          (eq(cEq)%phys .EQ. phys_ustruct).OR.
-     4          (eq(cEq)%phys .EQ. phys_fsi)) 
-     5          CALL THOOD_ValRC()
+     4          (eq(cEq)%phys .EQ. phys_fsi)) THEN
+               CALL THOOD_ValRC()
+            END IF
 
             CALL SETBCUNDEFNEU()
 

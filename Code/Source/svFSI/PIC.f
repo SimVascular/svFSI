@@ -197,9 +197,9 @@
          END DO
       END IF
 
-      IF ((eq(cEq)%phys .EQ. phys_ustruct) .OR.
-     2    (eq(cEq)%phys .EQ. phys_stokes)  .OR.
-     3    (eq(cEq)%phys .EQ. phys_fluid)   .OR.
+      IF ((eq(cEq)%phys .EQ. phys_stokes) .OR.
+     2    (eq(cEq)%phys .EQ. phys_fluid)  .OR.
+     3    (eq(cEq)%phys .EQ. phys_ustruct).OR.
      4    (eq(cEq)%phys .EQ. phys_fsi)) THEN
          CALL PICETH()
       END IF
@@ -284,8 +284,11 @@
       RETURN
       END SUBROUTINE PICC
 !====================================================================
-!     Pressure correction at edge nodes for Taylor-Hood type element
-!     via interpolation
+!     Pressure correction at edge nodes for Taylor-Hood type element.
+!     Here, we interpolate pressure at the edge nodes by interpolating
+!     using a reduced basis (such as P1) applied on element vertices
+!     (i.e., corner nodes). For e.g., for a P2 element, pressure is
+!     interpolated at the edge nodes using P1 vertices.
       SUBROUTINE PICETH()
       USE COMMOD
       USE ALLFUN
@@ -331,10 +334,9 @@
 
          DO e=1, msh(iM)%nEl
             cDmn = DOMAIN(msh(iM), cEq, e)
-            IF ((eq(cEq)%dmn(cDmn)%phys .NE. phys_ustruct) .AND.
-     2          (eq(cEq)%dmn(cDmn)%phys .NE. phys_stokes)  .AND. 
-     3          (eq(cEq)%dmn(cDmn)%phys .NE. phys_fluid)   .AND.
-     4          (eq(cEq)%dmn(cDmn)%phys .NE. phys_fsi)) CYCLE
+            IF ((eq(cEq)%dmn(cDmn)%phys .NE. phys_stokes) .AND.
+     2          (eq(cEq)%dmn(cDmn)%phys .NE. phys_fluid)  .AND.
+     3          (eq(cEq)%dmn(cDmn)%phys .NE. phys_ustruct)) CYCLE
 
             DO a=1, eNoN
                Ac = msh(iM)%IEN(a,e)
