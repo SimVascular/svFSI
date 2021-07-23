@@ -255,7 +255,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
 
       iStat = 0
-      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//"> "//m
       CALL loadVTK(vtu, fName, iStat)
       IF (iStat .LT. 0) err = "VTU file read error (init)"
 

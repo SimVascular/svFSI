@@ -837,6 +837,10 @@
       LOGICAL cmmInit
 !     Whether variable wall properties are used for CMM
       LOGICAL cmmVarWall
+!     SCHWARZ July 2021----------------------------------------------
+!     Whether variable wall properties should be read and used
+      LOGICAL useVarWall
+!     ---------------------------------------------------------------
 !     Whether shell equation is being solved
       LOGICAL shlEq
 !     Whether PRESTRESS is being solved
@@ -893,6 +897,10 @@
       INTEGER(KIND=IKIND) rsTS
 !     Number of stress values to be stored
       INTEGER(KIND=IKIND) nsymd
+!     SCHWARZ July 2021----------------------------------------------
+!     Number of variable wall properties to read in from mesh
+      INTEGER(KIND=IKIND) nvwp
+!     ---------------------------------------------------------------
 
 !     REAL VARIABLES
 !     Time step size
@@ -963,6 +971,10 @@
       REAL(KIND=RKIND), ALLOCATABLE :: pS0(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: pSn(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: pSa(:)
+
+!     Variables for variable wall properties - SCHWARZ July 2021----
+      REAL(KIND=RKIND), ALLOCATABLE :: vWP0(:,:)
+!     --------------------------------------------------------------
 
 !     Temporary storage for initializing state variables
       REAL(KIND=RKIND), ALLOCATABLE :: Pinit(:)

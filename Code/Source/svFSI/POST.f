@@ -521,12 +521,13 @@
       REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
      2   p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nsymd),
      3   Im(nsd,nsd), F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd),
-     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd)
+     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd), eVWP(nvwp)
       TYPE(fsType) :: fs
 
       INTEGER, ALLOCATABLE :: eNds(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), yl(:,:),
-     2   fN(:,:), resl(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
+     2   fN(:,:), resl(:), Nx(:,:), N(:), sA(:), sF(:,:),
+     3   sE(:), lVWP(:,:)
 
       dof  = eq(iEq)%dof
       i    = eq(iEq)%s
@@ -555,7 +556,7 @@
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), sE(lM%nEl), xl(nsd,fs%eNoN),
      2   dl(tDof,fs%eNoN), yl(tDof,fs%eNoN), fN(nsd,nFn), resl(m),
-     3   Nx(nsd,fs%eNoN), N(fs%eNoN))
+     3   Nx(nsd,fs%eNoN), N(fs%eNoN), lVWP(nvwp,fs%eNoN))
 
       sA   = 0._RKIND
       sF   = 0._RKIND
@@ -594,6 +595,12 @@
             xl(:,a) = x(:,Ac)
             dl(:,a) = lD(:,Ac)
             yl(:,a) = lY(:,Ac)
+!           Variable wall - SCHWARZ July 2021---------------------------
+!           Calculate local wall property
+            IF (useVarWall) THEN
+                lVWP(:,a) = vWP0(:,Ac)
+            END IF
+!           ------------------------------------------------------------
          END DO
 
          Je = 0._RKIND
@@ -607,6 +614,7 @@
 
             Im = MAT_ID(nsd)
             F  = Im
+            eVWP = 0._RKIND
             DO a=1, fs%eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
@@ -618,6 +626,13 @@
                   F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
                   F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
                   F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+!                 Variable wall - SCHWARZ July 2021---------------------
+!                 Calculate local wall property
+                  IF (useVarWall) THEN
+                     eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
+                  END IF
+!                 ------------------------------------------------------
+
                ELSE
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
                   F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
@@ -734,7 +749,8 @@
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
 
                ELSE IF (cPhys .EQ. phys_struct) THEN
-                  CALL GETPK2CC(eq(iEq)%dmn(cDmn), F, nFn, fN, ya, S,Dm)
+                  CALL GETPK2CC(eq(iEq)%dmn(cDmn), F, nFn, fN, ya,
+     2                     S,Dm, eVWP)
                   P1 = MATMUL(F, S)
                   sigma = MATMUL(P1, TRANSPOSE(F))
                   IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF

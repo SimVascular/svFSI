@@ -50,7 +50,7 @@
       INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
       REAL(KIND=RKIND) :: maxX(nsd), minX(nsd), fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp, fExt
-      TYPE(listType), POINTER :: lPtr, lPM
+      TYPE(listType), POINTER :: lPtr, lPM, lPtr2
       TYPE(stackType) :: avNds
       TYPE(fileType) :: fTmp
 
@@ -407,6 +407,38 @@ c               END IF
             DEALLOCATE(msh(iM)%x)
          END DO
       END IF
+
+!     Read variable wall properties - SCHWARZ July 2021 ----------------
+      flag = .FALSE.
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+         lPtr2 => lPM%get(nvwp,"Number of variable wall properties")
+         lPtr => lPM%get(cTmp, "Variable wall properties file path")
+         IF (ASSOCIATED(lPtr) .AND. ASSOCIATED(lPtr2)) THEN
+            IF (rmsh%isReqd) THEN
+               err = "Variable wall properties "//
+     2            "is not currently allowed with remeshing"
+            END IF
+            flag = .TRUE.
+            useVarWall = .TRUE.
+            ALLOCATE(msh(iM)%x(nvwp,msh(iM)%gnNo))
+            msh(iM)%x = 0._RKIND
+            CALL READVTUPDATA(msh(iM), cTmp, "varWallProps", nvwp, 1)
+         END IF
+      END DO
+      IF (flag) THEN
+         ALLOCATE(vWP0(nvwp,gtnNo))
+         vWP0 = 0._RKIND
+         DO iM=1, nMsh
+            IF (.NOT.ALLOCATED(msh(iM)%x)) CYCLE
+            DO a=1, msh(iM)%gnNo
+               Ac = msh(iM)%gN(a)
+               vWP0(:,Ac) = msh(iM)%x(:,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END DO
+      END IF
+!     ------------------------------------------------------------------
 
 !      Load any initial data (velocity, pressure, displacements)
       IF (.NOT.resetSim) CALL LOADVARINI(list)
