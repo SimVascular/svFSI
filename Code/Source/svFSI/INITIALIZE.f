@@ -154,6 +154,7 @@
       IF (dFlag) i = 3*tDof
       IF (pstEq) i = i + nsymd
       IF (sstEq) i = i + nsd
+      IF (useVarWall) i = i + nvwp
       IF (cepEq) THEN
          i = i + nXion
          IF (cem%cpld) i = i + 1
@@ -238,6 +239,16 @@
          pSn = 0._RKIND
          pSa = 0._RKIND
       END IF
+
+!     Variable wall properties - SCHWARZ July 2021----------------------
+!     VARIABLE WALL
+      IF (useVarWall) THEN
+         IF (ALLOCATED(vWP0)) err = "Variable wall properties "//
+     2      "already allocated. Correction needed"
+         ALLOCATE(vWP0(nvwp,tnNo))
+         vWP0 = 0._RKIND
+      END IF
+!     ------------------------------------------------------------------
 
 !     Electrophysiology
       IF (cepEq) THEN
@@ -662,6 +673,10 @@
       IF (ALLOCATED(pS0))      DEALLOCATE(pS0)
       IF (ALLOCATED(pSn))      DEALLOCATE(pSn)
       IF (ALLOCATED(pSa))      DEALLOCATE(pSa)
+
+!     Variable wall properties - SCHWARZ July 2021 ---------------------
+      IF (ALLOCATED(vWP0))      DEALLOCATE(vWP0)
+!     ------------------------------------------------------------------
 
       IF (ALLOCATED(Pinit))    DEALLOCATE(Pinit)
       IF (ALLOCATED(Vinit))    DEALLOCATE(Vinit)

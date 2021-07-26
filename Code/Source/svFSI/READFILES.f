@@ -97,6 +97,9 @@
          pstEq        = .FALSE.
          sstEq        = .FALSE.
          ibFlag       = .FALSE.
+!        Variable wall properties - SCHWARZ------------------
+         useVarWall   = .FALSE.
+!        ----------------------------------------------------
 
          i = IARGC()
          IF (i .NE. 0) THEN

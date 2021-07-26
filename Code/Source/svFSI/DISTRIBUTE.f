@@ -186,6 +186,9 @@
          CALL cm%bcast(cmmVarWall)
          CALL cm%bcast(shlEq)
          CALL cm%bcast(pstEq)
+!        Variable wall properties - SCHWARZ July 2021-------------------
+         CALL cm%bcast(useVarWall)
+!        ---------------------------------------------------------------
          CALL cm%bcast(sstEq)
          CALL cm%bcast(cepEq)
          IF (rmsh%isReqd) THEN
@@ -255,6 +258,24 @@
          pS0 = LOCAL(tmpX)
          DEALLOCATE(tmpX)
       END IF
+
+!     Variable wall properties - SCHWARZ July 2021 ---------------------
+!     Distribute variable wall properties (vWP0) to processors
+      flag = ALLOCATED(vWP0)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         IF (cm%mas()) THEN
+            ALLOCATE(tmpX(nvwp,gtnNo))
+            tmpX = vWP0
+            DEALLOCATE(vWP0)
+         ELSE
+            ALLOCATE(tmpX(0,0))
+         END IF
+         ALLOCATE(vWP0(nvwp,tnNo))
+         vWP0 = LOCAL(tmpX)
+         DEALLOCATE(tmpX)
+      END IF
+!     ------------------------------------------------------------------
 
 !     Distribute initial flow quantities to processors
       flag = ALLOCATED(Pinit)
