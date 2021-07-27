@@ -188,6 +188,7 @@
          CALL cm%bcast(pstEq)
 !        Variable wall properties - SCHWARZ July 2021-------------------
          CALL cm%bcast(useVarWall)
+         CALL cm%bcast(nvwp)
 !        ---------------------------------------------------------------
          CALL cm%bcast(sstEq)
          CALL cm%bcast(cepEq)
