@@ -218,8 +218,8 @@
                SELECT CASE (cPhys)
                CASE (phys_fluid)
                   CALL FLUID3D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w,
-     2               ksix, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl,
-     3               bfl, lR, lK)
+     2               ksix, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, Nwxx,
+     3               al, yl, bfl, lR, lK)
 
                CASE (phys_ustruct)
                   CALL USTRUCT3D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w,
@@ -231,8 +231,8 @@
                SELECT CASE (cPhys)
                CASE (phys_fluid)
                   CALL FLUID2D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w,
-     2               ksix, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl,
-     3               bfl, lR, lK)
+     2               ksix, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, Nwxx,
+     3               al, yl, bfl, lR, lK)
 
                CASE (phys_ustruct)
                   CALL USTRUCT2D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w,
