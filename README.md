@@ -1,6 +1,6 @@
 ## Introduction
 
-`svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electro-physiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used a stand-alone solver. The solver is released under the MIT License open source initiative.
+`svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver. The solver is released under the MIT License open source initiative.
 
 ## Dependence
 
@@ -19,7 +19,7 @@ On Ubuntu, most of the dependencies can be downloaded using `apt-get`. On Mac OS
 
 Precompiled binaries for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188).
 
-Users are recommended to build from the source code to access the most recent features and bug fixes. Instructions for quick build is provided here for a Linux/Mac OS system.
+Users are recommended to build from the source code to access the most recent features and bug fixes. Instructions for a quick build are provided here for a Linux/Mac OS system.
 
 1. Clone or download the current repository.
 2. Create a `build` directory
@@ -34,7 +34,7 @@ Users are recommended to build from the source code to access the most recent fe
    ```bash
    make
    ```
-   Successful build will generate a solver binary, called `svFSI` in the following directory `build/svFSI-build/bin`.
+   A successful build will generate a solver binary, called `svFSI` in the following directory `build/svFSI-build/bin`.
 
    For more advanced users, please refer [`INSTALL.md`](./INSTALL.md) for detailed platform-specific instructions to install `svFSI`.
 
@@ -50,7 +50,7 @@ To enable Trilinos in `svFSI`, users need to turn on the option `SV_USE_TRILINOS
 option(SV_USE_TRILINOS "Use Trilinos Library with svFSI" ON)
 ```
 
-In most cases, users can proceed to build `svFSI` following the [Quick Build](#quick-build), and CMake should be able to locate Trilinos automatically through `find_package`. In case the automatic way fails, users can also specify the path to Trilinos through `ccmake -DCMAKE_PREFIX_PATH:PATH="<Path to Trilinos>/lib/cmake/Trilinos;<Path to other package>;"`.
+In most cases, users can proceed to build `svFSI` following the [Quick Build](#quick-build), and CMake should be able to locate Trilinos automatically through `find_package`. In case the automatic way fails, users can also specify the path to Trilinos through `ccmake -DCMAKE_PREFIX_PATH:PATH="<Path_to_Trilinos>/lib/cmake/Trilinos;<Path_to_any_other_package>;"`.
 
 For more detailed instructions, please refer INSTALL.md.
 
@@ -66,9 +66,9 @@ mpiexec -np <number of MPI processes>  <Path to Build>/svFSI-build/bin/svFSI <Pa
 ```
 ## Features
 
-`svFSI` provides the capability to model a variety of physics including unsteady diffusion, linear and nonlinear elastodyanmics, convective heat transfer, fluid flows and fluid-structure-interaction (FSI), and cardiac electrophysiology. As the code is modular, the users are provided with a choice to couple these physics depending on their needs. We strongly recommend users to browse through the examples provided in the GitHub repository [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests) to get a detailed insight into the capability of the code.
+`svFSI` provides the capability to model a variety of physics including unsteady diffusion, linear and nonlinear elastodynamics, convective heat transfer, fluid flows, fluid-structure-interaction (FSI), and cardiac electrophysiology. As the code is modular, the users are provided with a choice to couple these physics depending on their needs. We strongly recommend users to browse through the examples provided in the GitHub repository [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests) to get a detailed insight into the capability of the code.
 
-Below, we provide a list of the available choice of constitutive models for different types of equations being solved. Users are also encouraged to implement new constitutive models. Users may use global search tool such as `grep` to locate the implementations of the available constitutive models in the code using the abbreviated names below.
+Below, we provide a list of the available choice of constitutive models for different types of equations being solved. Users are also encouraged to implement new constitutive models. Users may use global search tools such as `grep` to locate the implementations of the available constitutive models in the code using the abbreviated names below.
 
 *Abbreviation* refers to the variable name in the source code; *Full name* refers to the generic name of the model; *Input keyword* refers to the phrase in the input file that can invoke such model.
 
@@ -93,17 +93,17 @@ Below, we provide a list of the available choice of constitutive models for diff
 3. Available constitutive models for the fluid equation
    | *Abbreviation*  | *Full name*                          | *Input keyword*                  |
    | --------------- | ------------------------------------ | -------------------------------- |
-   | viscType\_Const | Constant viscosity (Newtonian model) | "constant", "const", "newtonian" |
-   | viscType\_CY    | Carreau-Yasuda non-Newtonian model   | "carreau-yasuda", "cy"           |
-   | viscType\_Cass  | Cassons non-Newtonian model          | "cassons", "cass"                |
+   | viscType\_Const | Constant viscosity (Newtonian model) | "Constant", "Const", "Newtonian" |
+   | viscType\_CY    | Carreau-Yasuda non-Newtonian model   | "Carreau-Yasuda", "CY"           |
+   | viscType\_Cass  | Cassons non-Newtonian model          | "Cassons", "Cass"                |
 
 4. Available cardiac electrophysiology models
    | *Abbreviation* | *Full name*                      | *Input keyword*               |
    | -------------- | -------------------------------- | ----------------------------- |
-   | cepModel\_AP   | Aliev-Panfilov model             | "ap", "aliev-panfilov"        |
-   | cepModel\_BO   | Bueno-Orovio-Cherry-Fenton model | "bo", "bueno-orovio"          |
-   | cepModel\_FN   | Fitzhugh-Nagumo model            | "fn", "fitzhugh-nagumo"       |
-   | cepModel\_TTP  | tenTusscher-Panfilov model       | "ttp", "tentusscher-panfilov" |
+   | cepModel\_AP   | Aliev-Panfilov model             | "AP", "Aliev-Panfilov"        |
+   | cepModel\_BO   | Bueno-Orovio-Cherry-Fenton model | "BO", "Bueno-Orovio"          |
+   | cepModel\_FN   | Fitzhugh-Nagumo model            | "FN", "Fitzhugh-Nagumo"       |
+   | cepModel\_TTP  | tenTusscher-Panfilov model       | "TTP", "tenTusscher-Panfilov" |
 
 ## Additional Resource
 More details can be found here:

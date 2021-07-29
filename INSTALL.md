@@ -1,3 +1,8 @@
+
+# **Build svFSI from Source**
+
+Below are the instructions to build svFSI on Ubuntu and MacOS.
+
 ## =================================================================
 ## svFSI on Ubuntu 18.04
 
@@ -115,7 +120,7 @@ An example CMake command for compiling `svFSI` with Trilinos is given below:
     <../svFSI_src>
 ```
 
-Note that `-march` flag could be chosen depending on the processor. A variety of options are available for Intel and AMD processors at,
+Note that the `-march` flag could be chosen depending on the processor. A variety of options are available for Intel and AMD processors at,
 
 https://gcc.gnu.org/onlinedocs/gcc/x86-Options.html
 
@@ -135,7 +140,7 @@ The code will not run if any library is not found. A wrapper script is also avai
 
 Follow the steps below to install `svFSI` on Mac.
 
-1. Install Xcode command line tools using the command line below:
+1. Install Xcode command-line tools using the command below:
 
 ```bash
 xcode-select install
@@ -165,7 +170,7 @@ brew install mpich
 brew install cmake
 ```
 
-Verify if MPI compilers are pointing to the correct compilers as,
+Verify if MPI compilers are pointing to the correct compilers as
 
 ```bash
 which mpicc
@@ -181,7 +186,7 @@ export LIBRARY_PATH="/usr/local/lib:$LIBRARY_PATH"
 
 in `~/.bash_profile`.
 
-6. Mac OS usually comes with a default `blas` and `lapack` packages. If you prefer to use `OpenBLAS`, you may install it using Homebrew as,
+6. Mac OS usually comes with default `blas` and `lapack` packages. If you prefer to use `OpenBLAS`, you may install it using Homebrew as,
 
 ```bash
 brew install openblas
@@ -195,7 +200,7 @@ BLASDIR="/usr/local/Cellar/openblas/0.3.15_1"
 export LIBRARY_PATH="$BLASDIR/lib:$LIBRARY_PATH"
 ```
 
-Please make sure your to update the `BLASDIR` location depending on the version of OpenBLAS you install.
+Please make sure to update the `BLASDIR` location depending on the version of OpenBLAS you install.
 
 7. Download `svFSI` from GitHub:
 
