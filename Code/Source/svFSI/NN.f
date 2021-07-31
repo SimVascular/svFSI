@@ -1264,13 +1264,14 @@ c        N(8) = lx*my*0.5_RKIND
       END SUBROUTINE GETGNN
 !--------------------------------------------------------------------
 !     Returns second order derivatives at given natural coords
-      SUBROUTINE GETGNNxx(eNoN, eType, Nxx)
+      SUBROUTINE GETGNNxx(insd, ind2, eType, eNoN, xi, Nxx)
       USE COMMOD
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, eType
-      REAL(KIND=RKIND), INTENT(OUT) :: Nxx(3*(nsd-1),eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: insd, ind2, eType, eNoN
+      REAL(KIND=RKIND), INTENT(IN)  :: xi(insd)
+      REAL(KIND=RKIND), INTENT(OUT) :: Nxx(ind2,eNoN)
 
-      REAL(KIND=RKIND) :: fp, fn, en, ze
+      REAL(KIND=RKIND) :: fp, fn, en, ze, mx, my, ux, uy, lx, ly
 
       IF (eType .EQ. eType_NRB) RETURN
 
@@ -1302,8 +1303,96 @@ c        N(8) = lx*my*0.5_RKIND
          Nxx(:,5)  = (/ze, en, fn/)
          Nxx(:,6)  = (/en, ze, fn/)
 
-      CASE DEFAULT
-         err = "Undefined element type @ GETGNNxx."
+      CASE(eType_QUD8)
+         lx = 1._RKIND - xi(1)
+         ly = 1._RKIND - xi(2)
+         ux = 1._RKIND + xi(1)
+         uy = 1._RKIND + xi(2)
+         mx = xi(1)
+         my = xi(2)
+
+         Nxx(1,1) =  ly*0.5_RKIND
+         Nxx(2,1) =  lx*0.5_RKIND
+         Nxx(3,1) =  (lx+lx+ly+ly-3._RKIND)/4._RKIND
+
+         Nxx(1,2) =  ly*0.5_RKIND
+         Nxx(2,2) =  ux*0.5_RKIND
+         Nxx(3,2) = -(ux+ux+ly+ly-3._RKIND)/4._RKIND
+
+         Nxx(1,3) =  uy*0.5_RKIND
+         Nxx(2,3) =  ux*0.5_RKIND
+         Nxx(3,3) =  (ux+ux+uy+uy-3._RKIND)/4._RKIND
+
+         Nxx(1,4) =  uy*0.5_RKIND
+         Nxx(2,4) =  lx*0.5_RKIND
+         Nxx(3,4) = -(lx+lx+uy+uy-3._RKIND)/4._RKIND
+
+         Nxx(1,5) = -ly
+         Nxx(2,5) =  0._RKIND
+         Nxx(3,5) =  mx
+
+         Nxx(1,6) =  0._RKIND
+         Nxx(2,6) = -ux
+         Nxx(3,6) = -my
+
+         Nxx(1,7) = -uy
+         Nxx(2,7) =  0._RKIND
+         Nxx(3,7) = -mx
+
+         Nxx(1,8) =  0._RKIND
+         Nxx(2,8) = -lx
+         Nxx(3,8) =  my
+
+      CASE(eType_QUD9)
+         lx = 1._RKIND - xi(1)
+         ly = 1._RKIND - xi(2)
+         ux = 1._RKIND + xi(1)
+         uy = 1._RKIND + xi(2)
+         mx = xi(1)
+         my = xi(2)
+
+         Nxx(1,1) = -ly*my*0.5_RKIND
+         Nxx(2,1) = -lx*mx*0.5_RKIND
+         Nxx(3,1) =  (lx-mx)*(ly-my)/4._RKIND
+
+         Nxx(1,2) = -ly*my*0.5_RKIND
+         Nxx(2,2) =  ux*mx*0.5_RKIND
+         Nxx(3,2) = -(ux+mx)*(ly-my)/4._RKIND
+
+         Nxx(1,3) =  uy*my*0.5_RKIND
+         Nxx(2,3) =  ux*mx*0.5_RKIND
+         Nxx(3,3) =  (ux+mx)*(uy+my)/4._RKIND
+
+         Nxx(1,4) =  uy*my*0.5_RKIND
+         Nxx(2,4) = -lx*mx*0.5_RKIND
+         Nxx(3,4) = -(lx-mx)*(uy+my)/4._RKIND
+
+         Nxx(1,5) =  ly*my
+         Nxx(2,5) =  lx*ux
+         Nxx(3,5) =  mx*(ly-my)
+
+         Nxx(1,6) =  ly*uy
+         Nxx(2,6) = -ux*mx
+         Nxx(3,6) = -(ux+mx)*my
+
+         Nxx(1,7) = -uy*my
+         Nxx(2,7) =  lx*ux
+         Nxx(3,7) = -mx*(uy+my)
+
+         Nxx(1,8) =  ly*uy
+         Nxx(2,8) =  lx*mx
+         Nxx(3,8) =  (lx-mx)*my
+
+         Nxx(1,9) = -ly*uy*2._RKIND
+         Nxx(2,9) = -lx*ux*2._RKIND
+         Nxx(3,9) =  mx*my*4._RKIND
+
+!     1D elements
+      CASE(eType_LIN2)
+         Nxx(1,1)  =  1._RKIND
+         Nxx(1,2)  =  1._RKIND
+         Nxx(1,3)  = -2._RKIND
+
       END SELECT
 
       RETURN
@@ -1900,6 +1989,8 @@ c        N(8) = lx*my*0.5_RKIND
       b = ptr(lFa%eNoN+1)
       v = lX(:,a) - lX(:,b)
       IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+      DEALLOCATE(setIt, ptr, lX)
 
       RETURN
       END SUBROUTINE GNNB

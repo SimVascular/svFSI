@@ -160,6 +160,9 @@
 
       DEALLOCATE(ptr, xl, al, yl, bfl, lR, lK)
 
+      CALL DESTROY(fs(1))
+      CALL DESTROY(fs(2))
+
       RETURN
       END SUBROUTINE CONSTRUCT_STOKES
 !####################################################################

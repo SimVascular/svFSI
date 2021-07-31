@@ -180,6 +180,9 @@
 
       DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd)
 
+      CALL DESTROY(fs(1))
+      CALL DESTROY(fs(2))
+
       RETURN
       END SUBROUTINE CONSTRUCT_uSOLID
 !####################################################################

@@ -731,25 +731,31 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: Yg(tDof,tnNo), Dg(tDof,tnNo)
 
-      LOGICAL :: eDir(maxnsd)
+      LOGICAL :: flag, eDir(maxnsd)
       INTEGER(KIND=IKIND) :: a, e, i, g, Ac, Ec, ss, ee, lDof, nNo, nEl,
-     2   nG, eNoN, eNoNb, cPhys
+     2   eNoN, eNoNb, cPhys
       REAL(KIND=RKIND) :: w, Jac, xp(nsd), xi(nsd), xi0(nsd), nV(nsd),
      2   ub(nsd), tauB(2), Ks(nsd,nsd)
+      TYPE(fsType) :: fs(2)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nb(:), Nxi(:,:), Nx(:,:),
-     2   xl(:,:), xbl(:,:), yl(:,:), ubl(:,:), ubg(:,:), tmpA(:,:),
-     3   tmpY(:,:), lR(:,:), lK(:,:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Nw(:), Nq(:), Nwx(:,:), Nqx(:,:),
+     2   Nwxi(:,:), xl(:,:), xbl(:,:), xwl(:,:), xql(:,:), yl(:,:),
+     3   ubl(:,:), ubg(:,:), tmpA(:,:), tmpY(:,:), lR(:,:), lK(:,:,:)
 
       nNo   = lFa%nNo
       nEl   = lFa%nEl
-      nG    = lFa%nG
       eNoNb = lFa%eNoN
       eNoN  = lM%eNoN
-
       tauB  = lBc%tauB
 
+      IF (lM%nFs .EQ. 1) THEN
+         flag = .TRUE.
+      ELSE
+         flag = .FALSE.
+      END IF
+
+!     Compute the Dirichlet value to be applied weakly on the face
       ss    = eq(cEq)%s
       ee    = eq(cEq)%e
       IF (eq(cEq)%dof .EQ. nsd+1) ee = ee - 1
@@ -767,6 +773,8 @@
       CALL SETBCDIRL(lBc, lFa, tmpA, tmpY, lDof)
       IF (BTEST(lBc%bType,bType_impD)) tmpY(:,:) = tmpA(:,:)
 
+!     Transfer Dirichlet value to global numbering (lFa%nNo -> tnNo).
+!     Take effective direction into account if set.
       ALLOCATE(ubg(nsd,tnNo))
       ubg = 0._RKIND
       IF (ANY(eDir)) THEN
@@ -788,26 +796,25 @@
       END IF
       DEALLOCATE(tmpA, tmpY)
 
-      ALLOCATE(Nb(eNoNb), xbl(nsd,eNoNb), ubl(nsd,eNoNb))
+      ALLOCATE(ptr(eNoN), xl(nsd,eNoN), yl(tDof,eNoN), lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN))
 
-      ALLOCATE(N(eNoN), Nxi(nsd,eNoN), Nx(nsd,eNoN), xl(nsd,eNoN),
-     2   yl(tDof,eNoN), ptr(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+      ALLOCATE(xbl(nsd,eNoNb), ubl(nsd,eNoNb))
 
-!     Initialize parameteric coordinate for Newton's iterations
-      xi0 = 0._RKIND
-      DO g=1, lM%nG
-         xi0 = xi0 + lM%xi(:,g)
-      END DO
-      xi0 = xi0 / REAL(lM%nG, KIND=RKIND)
-
+!     Loop over all the elements of the face and construct residue and
+!     tangent matrices
       DO e=1, nEl
-         Ec = lFa%gE(e)
+         Ec    = lFa%gE(e)
          cDmn  = DOMAIN(lM, cEq, Ec)
          cPhys = eq(cEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_fluid) err = "Weakly applied Dirichlet "//
+     2      "BC is allowed for fluid phys only"
 
-         IF (cPhys .NE. phys_fluid) err =
-     2      " Weak Dirichlet BC formulated for fluid phys only"
+!        Initialize local residue and stiffness
+         lR = 0._RKIND
+         lK = 0._RKIND
 
+!        Create local copies of fluid velocity and position vector
          DO a=1, eNoN
             Ac = lM%IEN(a,Ec)
             ptr(a)  = Ac
@@ -816,6 +823,17 @@
             yl(:,a) = Yg(:,Ac)
          END DO
 
+!        Set function spaces for velocity and pressure on mesh
+         CALL GETTHOODFS(fs, lM, flag, 1)
+
+         ALLOCATE(xwl(nsd,fs(1)%eNoN), Nw(fs(1)%eNoN),
+     2      Nwx(nsd,fs(1)%eNoN), Nwxi(nsd,fs(1)%eNoN))
+         ALLOCATE(xql(nsd,fs(2)%eNoN), Nq(fs(2)%eNoN),
+     2      Nqx(nsd,fs(2)%eNoN))
+         xwl(:,:) = xl(:,:)
+         xql(:,:) = xl(:,1:fs(2)%eNoN)
+
+!        Create local copies of the wall/solid/interface quantites
          DO a=1, eNoNb
             Ac = lFa%IEN(a,e)
             xbl(:,a) = x(:,Ac)
@@ -823,35 +841,53 @@
             IF (mvMsh) xbl(:,a) = xbl(:,a) + Dg(nsd+2:2*nsd+1,Ac)
          END DO
 
-         lK = 0._RKIND
-         lR = 0._RKIND
-         DO g=1, nG
+!        Initialize parameteric coordinate for Newton's iterations.
+!        Newton method is used to compute derivatives on the face using
+!        mesh-based shape functions as an inverse problem.
+         xi0 = 0._RKIND
+         DO g=1, fs(1)%nG
+            xi0 = xi0 + fs(1)%xi(:,g)
+         END DO
+         xi0 = xi0 / REAL(fs(1)%nG, KIND=RKIND)
+
+!        Gauss integration 1
+         DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV))
             nV  = nV/Jac
             w   = lFa%w(g) * Jac
-            Nb  = lFa%N(:,g)
 
             xp = 0._RKIND
             ub = 0._RKIND
             DO a=1, eNoNb
-               xp = xp + xbl(:,a)*Nb(a)
-               ub = ub + ubl(:,a)*Nb(a)
+               xp = xp + xbl(:,a)*lFa%N(a,g)
+               ub = ub + ubl(:,a)*lFa%N(a,g)
             END DO
 
+!           Compute Nw and Nwxi of the mesh at the face integration
+!           point using Newton method. Then calculate Nwx.
             xi = xi0
-            CALL GETNNX(lM%eType, eNoN, xl, lM%xib, lM%Nb, xp, xi, N,
-     2         Nxi)
+            CALL GETNNX(fs(1)%eType, fs(1)%eNoN, xwl, fs(1)%xib,
+     2         fs(1)%Nb, xp, xi, Nw, Nwxi)
+            IF (g.EQ.1 .OR. .NOT.fs(1)%lShpF)
+     2         CALL GNN(fs(1)%eNoN, nsd, Nwxi, xwl, Nwx, Jac, Ks)
 
-            IF (g.EQ.1 .OR. .NOT.lM%lShpF)
-     2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, Ks)
+!           Compute Nq of the mesh at the face integration point using
+!           Newton method.
+            xi = xi0
+            CALL GETNNX(fs(2)%eType, fs(2)%eNoN, xql, fs(2)%xib,
+     2         fs(2)%Nb, xp, xi, Nq, Nqx)
 
             IF (nsd .EQ. 3) THEN
-               CALL BWFLUID3D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
+                CALL BWFLUID3D(fs(1)%eNoN, fs(2)%eNoN, w, Nw, Nq, Nwx,
+     2             yl, ub, nV, tauB, lR, lK)
             ELSE
-               CALL BWFLUID2D(eNoN, w, N, Nx, yl, ub, nV, tauB, lR, lK)
+                CALL BWFLUID2D(fs(1)%eNoN, fs(2)%eNoN, w, Nw, Nq, Nwx,
+     2             yl, ub, nV, tauB, lR, lK)
             END IF
          END DO
+
+         DEALLOCATE(xwl, xql, Nw, Nq, Nwx, Nqx, Nwxi)
 
 !     Now doing the assembly part
 #ifdef WITH_TRILINOS
@@ -864,6 +900,11 @@
          END IF
 #endif
       END DO
+
+      DEALLOCATE(ptr, xl, yl, lR, lK, xbl, ubl, ubg)
+
+      CALL DESTROY(fs(1))
+      CALL DESTROY(fs(2))
 
       RETURN
       END SUBROUTINE SETBCDIRWL

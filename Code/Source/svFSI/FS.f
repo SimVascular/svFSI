@@ -41,7 +41,8 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER(KIND=IKIND) insd, g
+      LOGICAL flag
+      INTEGER(KIND=IKIND) g, insd, ind2
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -66,14 +67,25 @@
          lM%fs(1)%Nx  = lM%Nx
       END IF
 
+      flag = (lM%eType .EQ. eType_HEX20) .OR.
+     2       (lM%eType .EQ. eType_HEX27) .OR.
+     3       (lM%eType .EQ. eType_WDG)
+      IF (flag) THEN
+         wrn = " Second derivatives are not computed for "//
+     2      "HEX20/HEX27/WDG type elements"
+      END IF
+
+!     Second order derivatives for vector function space
+      IF (.NOT.lM%fs(1)%lShpF) THEN
+         ind2 = MAX(3*(insd-1), 1)
+         DO g=1, lM%fs(1)%nG
+            CALL GETGNNxx(insd, ind2, lM%fs(1)%eType, lM%fs(1)%eNoN,
+     2         lM%fs(1)%xi(:,g), lM%fs(1)%Nxx(:,:,g))
+         END DO
+      END IF
+
 !     Sets Taylor-Hood basis (fluid, stokes, ustruct, FSI)
       IF (lM%nFs .EQ. 2) THEN
-!        Second order derivative for vector function space
-         DO g=1, lM%fs(1)%nG
-            CALL GETGNNxx(lM%fs(1)%eNoN, lM%fs(1)%eType,
-     2                    lM%fs(1)%Nxx(:,:,g))
-         END DO
-
 !        Select Taylor-Hood element
          CALL SETTHOODFS(lM%fs(2), lM%fs(1)%eType)
 
@@ -170,7 +182,7 @@
       TYPE(fsType), INTENT(INOUT) :: fs
       INTEGER(KIND=IKIND), INTENT(IN) :: insd
 
-      INTEGER(KIND=IKIND) nG, eNoN
+      INTEGER(KIND=IKIND) nG, eNoN, ind2
 
       nG   = fs%nG
       eNoN = fs%eNoN
@@ -178,17 +190,9 @@
       ALLOCATE(fs%w(nG), fs%xi(insd,nG), fs%xib(2,nsd), fs%N(eNoN,nG),
      2   fs%Nb(2,eNoN), fs%Nx(insd,eNoN,nG))
 
-      IF ( (fs%eType .EQ. eType_NRB  )   .OR.
-     2     (fs%eType .EQ. eType_TRI6 )   .OR.
-     3     (fs%eType .EQ. eType_TET10) ) THEN
-         IF (insd .EQ. 1) THEN
-            ALLOCATE(fs%Nxx(1,eNoN,nG))
-         ELSE IF (insd .EQ. 2) THEN
-            ALLOCATE(fs%Nxx(3,eNoN,nG))
-         ELSE IF (insd .EQ. 3) THEN
-            ALLOCATE(fs%Nxx(6,eNoN,nG))
-         END IF
-      END IF
+      ind2 = MAX(3*(insd-1), 1)
+      ALLOCATE(fs%Nxx(ind2,eNoN,nG))
+      fs%Nxx = 0._RKIND
 
       RETURN
       END SUBROUTINE ALLOCFS
@@ -276,6 +280,9 @@
             fs(i)%Nx  = lM%fs(1)%Nx
             fs(i)%xib = lM%fs(1)%xib
             fs(i)%Nb  = lM%fs(1)%Nb
+            IF (ALLOCATED(fs(i)%Nxx)) THEN
+               fs(i)%Nxx = lM%fs(1)%Nxx
+            END IF
          END DO
       ELSE
          IF (iOpt .EQ. 1) THEN
@@ -288,9 +295,11 @@
             fs(1)%xi   = lM%fs(1)%xi
             fs(1)%N    = lM%fs(1)%N
             fs(1)%Nx   = lM%fs(1)%Nx
-            fs(1)%Nxx  = lM%fs(1)%Nxx
             fs(1)%xib  = lM%fs(1)%xib
             fs(1)%Nb   = lM%fs(1)%Nb
+            IF (ALLOCATED(fs(1)%Nxx)) THEN
+               fs(1)%Nxx = lM%fs(1)%Nxx
+            END IF
 
             fs(2)%nG    = lM%fs(1)%nG
             fs(2)%eType = lM%fs(2)%eType
@@ -329,7 +338,7 @@
                CALL GETGNN(nsd, fs(1)%eType, fs(1)%eNoN, fs(1)%xi(:,g),
      2            fs(1)%N(:,g), fs(1)%Nx(:,:,g))
             END DO
-            CALL GETNNBNDS(fs(2)%eType, fs(2)%eNoN, fs(2)%xib, fs(2)%Nb)
+            CALL GETNNBNDS(fs(1)%eType, fs(1)%eNoN, fs(1)%xib, fs(1)%Nb)
          END IF
       END IF
 

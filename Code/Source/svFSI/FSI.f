@@ -265,6 +265,9 @@
       DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK,
      2   lKd)
 
+      CALL DESTROY(fs(1))
+      CALL DESTROY(fs(2))
+
       RETURN
       END SUBROUTINE CONSTRUCT_FSI
 !####################################################################
