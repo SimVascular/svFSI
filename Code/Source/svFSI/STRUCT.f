@@ -62,6 +62,7 @@
      3   pSl(nsymd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
      4   lK(dof*dof,eNoN,eNoN), lVWP(nvwp,eNoN))
 
+
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
 
@@ -189,11 +190,6 @@
       ya_g   = 0._RKIND
       eVWP   = 0._RKIND
 
-!      PRINT *, "Beginning of loop"
-!      PRINT *, eVWP(1)
-!      PRINT *, eVWP(2)
-!      PRINT *, eVWP(3)
-
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
@@ -212,11 +208,6 @@
 !     Variable wall - SCHWARZ July 2021---------------------------------
 !     Calculate local wall property
          IF (useVarWall) eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
-      
-!         PRINT *, "In loop"
-!         PRINT *, eVWP(1)
-!         PRINT *, eVWP(2)
-!         PRINT *, eVWP(3)
 !     ------------------------------------------------------------------
 
          S0(1,1) = S0(1,1) + N(a)*pS0l(1,a)
@@ -231,12 +222,6 @@
       S0(2,1) = S0(1,2)
       S0(3,2) = S0(2,3)
       S0(1,3) = S0(3,1)
-
-!      PRINT *, "End of loop"
-!      PRINT *, eVWP(1)
-!      PRINT *, eVWP(2)
-!      PRINT *, eVWP(3)
-      
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notationa (Dm)

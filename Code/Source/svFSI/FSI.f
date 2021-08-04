@@ -50,7 +50,7 @@
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
      2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), ya_l(:), N(:),
-     3   Nx(:,:), lR(:,:), lK(:,:,:), lKd(:,:,:)
+     3   Nx(:,:), lR(:,:), lK(:,:,:), lKd(:,:,:), lVWP(:,:)
 
       eNoN = lM%eNoN
       nFn  = lM%nFn
@@ -59,7 +59,7 @@
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
      3   pSl(nsymd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
-     3   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
+     4   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN), lVWP(nvwp,eNoN))
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
@@ -85,6 +85,12 @@
             yl(:,a)  = Yg(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
+
+!           Variable wall - SCHWARZ July 2021---------------------------
+!           Calculate local wall property
+            IF (useVarWall) lVWP(:,a) = vWP0(:,Ac)
+!           ------------------------------------------------------------
+
             IF (ALLOCATED(lM%fN)) THEN
                DO iFn=1, nFn
                   fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
@@ -118,11 +124,11 @@
 
                CASE (phys_lElas)
                   CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
-     2               lR, lK)
+     2               lR, lK, lVWP)
 
                CASE (phys_struct)
                   CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl,
-     2               fN, pS0l, pSl, ya_l, lR, lK)
+     2               fN, pS0l, pSl, ya_l, lR, lK, lVWP)
 
                CASE (phys_ustruct)
 c                  CALL USTRUCT3D(eNoN, nFn, w, Jac, N, Nx, al, yl, dl,

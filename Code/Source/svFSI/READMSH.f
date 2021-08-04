@@ -421,6 +421,7 @@ c               END IF
             END IF
             flag = .TRUE.
             useVarWall = .TRUE.
+            PRINT *,"Setting varwall flag to true"
             ALLOCATE(msh(iM)%x(nvwp,msh(iM)%gnNo))
             msh(iM)%x = 0._RKIND
             CALL READVTUPDATA(msh(iM), cTmp, "varWallProps", nvwp, 1)
