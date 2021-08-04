@@ -135,12 +135,8 @@
          IF (useVarWall) THEN
 !           Converting elastic modulus and poisson ratio to g1
             g1 = eVWP(1)* 0.5_RKIND/(1._RKIND+eVWP(2))
-!            PRINT *, "USING VARWALL"
-!            PRINT *, g1
          ELSE
             g1 = 2._RKIND * stM%C10
-!            PRINT *, "NOT USING VARWALL"
-!            PRINT *, g1
          END IF
          Sb = g1*IDm
 

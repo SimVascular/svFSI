@@ -49,7 +49,7 @@
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), dl(:,:),
      2   dol(:,:), bfl(:,:), pS0l(:,:), pSl(:), N(:), Nx(:,:), lR(:,:),
-     3   lK(:,:,:)
+     3   lK(:,:,:), lVWP(:,:)
 
       eNoN = lM%eNoN
       IF (.NOT.mvMsh) err = "Mesh equation is solved for moving mesh/"//
@@ -58,7 +58,8 @@
 !     MESH: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), dl(tDof,eNoN),
      2   dol(nsd,eNoN), bfl(nsd,eNoN), pS0l(nsymd,eNoN), pSl(nsymd),
-     3   N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+     3   N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
+     4   lVWP(nvwp,eNoN))
 
 !     Start and end DOF
       is = nsd + 2
@@ -84,6 +85,10 @@
             al(:,a)  = Ag(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             dol(:,a) = Do(is:ie,Ac)
+!           Variable wall - SCHWARZ July 2021---------------------------
+!           Calculate local wall property
+            IF (useVarWall) lVWP(:,a) = vWP0(:,Ac)
+!           ------------------------------------------------------------
          END DO
 
 !        For MESH, the reference configuration is the one at the
@@ -105,7 +110,7 @@
             pS0l = 0._RKIND
             IF (nsd .EQ. 3) THEN
                CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
-     2            lK)
+     2            lK,lVWP)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
