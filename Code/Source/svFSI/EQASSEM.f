@@ -42,8 +42,6 @@
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      PRINT *, eq(cEq)%phys
-
       SELECT CASE (eq(cEq)%phys)
       CASE (phys_fluid)
          CALL CONSTRUCT_FLUID(lM, Ag, Yg)

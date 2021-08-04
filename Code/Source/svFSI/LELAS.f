@@ -188,7 +188,10 @@
 
 !     Variable wall - SCHWARZ July 2021---------------------------------
 !     Calculate local wall property
-         IF (useVarWall) eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
+!     Don't use on the mesh part though lol
+         IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
+            eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
+         END IF
 !     ------------------------------------------------------------------
 
          S0(1) = S0(1) + N(a)*pS0l(1,a)
@@ -203,7 +206,7 @@
 
 !     Variable wall - SCHWARZ July 2021---------------------------------
 !     Calculate local wall property
-      IF (useVarWall) THEN
+      IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
          Cst(1,:) = eVWP(1:6)
          Cst(2,:) = eVWP(7:12)
          Cst(3,:) = eVWP(13:18)
