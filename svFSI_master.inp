@@ -27,10 +27,10 @@
 #  This is a keyword with value: 1.3
 #
 #  First part, which is the part before ":", is the keyword to the
-#  parameter and the second part, which is the part after ":", is the
+#  parameter, and the second part, which is the part after ":", is the
 #  value. Keywords can occur in any order in the script.
 #
-#  There are five type of values that a keyword can read:
+#  There are five types of values that a keyword can read:
 #     o   logical (true/false)
 #     o   integer values
 #     o   real/float values
@@ -60,18 +60,19 @@
 #      Poisson ratio:       0.35     # [0.0 - (0.5-epsilon)]
 #   }
 #
-#  In this example, "Domain" is keyword (i.e., the entity to be
-#  specified) and "1" refers to first "Domain". Within this entity,
-#  "Density" is set to "0.1" and "Poisson ratio" is set to "0.35".
+#  In this example, "Domain" is a keyword (i.e., the entity to be
+#  specified) and "1" refers to the first "Domain". Within this
+#  entity, "Density" is set to "0.1" and "Poisson ratio" is set to
+#  "0.35".
 #
-#  Note that the order of lines doesn't matter within each blocks
+#  Note that the order of lines doesn't matter within each block
 #  enclosed by "{" and "}". If a keyword doesn't have a default value,
 #  it has to be specified by the user. For the optional arguments,
 #  default value is shown.
 
 #  For more details, please refer to the examples provided in
-#  "svFSI-Tests" repository at GitHub. You may also refer READFILES.f
-#  for a more complete set of available options.
+#  "svFSI-Tests" repository at GitHub. You may also refer to
+#  READFILES.f for a more complete set of available options.
 #---------------------------------------------------------------------
 
 ######################################################################
@@ -85,7 +86,7 @@ Time step size:                        0.001       # (0 - inf)
 
 #---------------------------------------------------------------------
 Spectral radius of infinite time step: 0.5         # [0.0 - 1.0]       [DEFAULT: 0.2]
-#  The code uses generalized alpha method for time integration
+#  The code uses the generalized alpha method for time integration
 #  implemented using Newmark's predictor and multi-step corrector
 #  strategy. Spectral radius is used to compute parameters for the
 #  generalized alpha method. A value of 0.0 leads to an over-damped
@@ -95,16 +96,16 @@ Spectral radius of infinite time step: 0.5         # [0.0 - 1.0]       [DEFAULT:
 Starting time step:                    0           # [0 - inf)         [DEFAULT: 0]
 #  This is the starting time step value that is usually 0 if the
 #  simulation is started from 0 or initialized from the restart file
-#  for a restarted simulation. The users can also override by provid-
-#  ing a specific number as the starting time step. This may be used
-#  in FSI simulations where an equilibrium flow has already been
+#  for a restarted simulation. The users can override by providing
+#  a specific number as the starting time step. This may be used in
+#  FSI simulations where an equilibrium flow has already been
 #  established using rigid walls and the users may want to start FSI
 #  thereafter.
 
 #---------------------------------------------------------------------
 Number of initialization time steps:   10          # (0 - inf)         [DEFAULT: 0]
 #  "Number of initialization time steps" (nITS) could be used to
-#  initialize the simulattion with a reduced time step (= dt/10). This
+#  initialize the simulation with a reduced time step (= dt/10). This
 #  is useful to avoid any numerical instability due to zero
 #  initialization.
 
@@ -132,7 +133,7 @@ Increment in saving restart files:     10          # [1 - inf)         [DEFAULT:
 Convert BIN to VTK format:             f           # [t/f]             [DEFAULT: f]
 #  If set to true, the code will read all the available restart files
 #  and output desired quantities to vtk format for visualization in
-#  Paraview. This feature will allow to modify output variables at a
+#  Paraview. This feature will allow modifying output variables at a
 #  later time if not already written during the original simulation.
 #  The code will scan for all the restart files in the results folder
 #  set by the keyword "Save results in folder" at a frequency set by
@@ -161,9 +162,9 @@ Save averaged results:                 t           # [f/t]             [DEFAULT:
 #  that the averaging operation is performed after the last time step
 #  of the simulation using vtu files written at a frequency specified
 #  by "Increment in saving VTK files". An error is thrown if a vtu
-#  file is not found. For cardiovascular simulations, user should make
-#  sure that the total number of time steps correspond to the period
-#  of the cardiac cycle.
+#  file is not found. For cardiovascular simulations, the user should
+#  ensure that the total number of time steps corresponds to the
+#  period of the cardiac cycle.
 
 Start averaging from zero:             t           # [f/t]             [DEFAULT: f]
 #  If set to true, averaging is performed from the first time step to
@@ -215,7 +216,7 @@ Use separator in the history file:     t           # [f/t]             [DEFAULT:
 #  history file between each equation when solving multiple equations.
 
 #  Below parameters control the level of screen output.
-#  [Verbose] prints detailed messages to both screen and history file.
+#  [Verbose] prints detailed messages to screen and the history file.
 #  [Warning] prints out warning messages if the code finds unexpected
 #  behavior or inputs. [Debug] prints out additional information that
 #  may be used for debugging purposes.
@@ -253,7 +254,8 @@ Debug:                                 f           # [f/t]             [DEFAULT:
 
 #  Nested keywords "Add mesh" and "Add face" could be used to provide
 #  paths to the mesh and face files. The users should also provide a
-#  string-based name for each mesh and face immediately after colon.
+#  string-based name for each mesh and face immediately after the
+#  colon.
 
 #---------------------------------------------------------------------
 #  Add mesh using vtu/vtp format
@@ -325,7 +327,7 @@ Add mesh: mesh_name {
    #------------------------------------------------------------------
    #  Fiber mesh: If the loaded mesh is a one-dimensional network of
    #  fibers, then the keyword, "Set mesh as fibers" should be set.
-   #  This setting is useful, for e.g., in loading Purkinje network
+   #  This setting is useful, for e.g., in loading the Purkinje network
    #  for cardiac electrophysiology simulations.
    #    Set mesh as fibers: t
    #
@@ -335,7 +337,7 @@ Add mesh: mesh_name {
    #    needed to couple the gap junction between 1D Purkinje fibers
    #    and 3D myocardium.
    #    a. The Purkinje mesh should be set as fibers.
-   #    b. The end nodes of Purkinje mesh should be loaded as a face.
+   #    b. The end nodes of the Purkinje mesh should be loaded as a face.
    #    c. A projection should be performed between the end-nodes loaded
    #       as a face, and the endocardial face.
    #
@@ -455,8 +457,8 @@ Add projection:   wall_interface {
 # 3.  Equations
 
 #  svFSI is a multiphysics finite element solver. The equation solved
-#  is specified using the "Add equation" keyword. Below is list of all
-#  the equation names and their description:
+#  is specified using the "Add equation" keyword. Below is a list of
+#  all the equation names and their description:
 
 #  |------------------------|---------------------------------------|
 #  |         Name           |            Description                |
@@ -527,7 +529,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
 
    #------------------------------------------------------------------
    #  Domain parameters:
-   #    Domain parameters are set using the Domain keyword identifing
+   #    Domain parameters are set using the Domain keyword identifying
    #  the domain ID followed by a nested block of parameters. If the
    #  mesh comprises a single domain with uniform properties, the
    #  domain parameters can be simply listed without nesting inside
@@ -727,9 +729,9 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  |-----------------------|-------------------------------------|
    #
    #  In the above equations, "lElas (p)/struct (p)" indicates that
-   #  prestress is solved for. "CMM (i)" indicates CMM is initialized
-   #  using inflation where as "CMM (p)" indicates CMM is initialized
-   #  using prestress approach.
+   #  prestress is solved. "CMM (i)" indicates that CMM is initialized
+   #  using inflation whereas "CMM (p)" indicates that CMM is
+   #  initialized using prestress approach.
    #
 
    Output: Spatial {
@@ -750,13 +752,13 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
       Pressure:     t
    }
 
-   #  If multiple equations are solved (e.g., FSI, 3 laplace eqns.
+   #  If multiple equations are solved (e.g., FSI, 3 Laplace eqns.
    #  with different boundary conditions or source terms, etc.),
    #  the naming of output variables could be changed so that the
-   #  vtu file has appropriate name when visualized in Paraview.
-   #  If the vtu file has data arrays with same names, Paraview will
-   #  display only the first occurence. "Alias" keyword will allow
-   #  users to provide custom names to output data.
+   #  vtu file has an appropriate name when visualized in Paraview.
+   #  If the vtu file has data arrays with identical names, Paraview
+   #  will display only the first occurrence. The "Alias" keyword
+   #  will allow users to provide custom names to output data.
    #
    #  #  Output: Alias {
    #  #     Displacement: Displacement_fs
@@ -767,10 +769,10 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
 
    #------------------------------------------------------------------
    #  Boundary conditions (BCs):
-   #     BCs are integral part of the problem and svFSI has multiple
-   #  options to set BCS. BCs are set on a face using the "Add BC"
-   #  keyword tagged to the face name and followed by a nested set
-   #  of commands. The basic types include:
+   #     BCs are an integral part of the problem and svFSI has
+   #  multiple options to set BCS. BCs are set on a face using the
+   #  "Add BC" keyword tagged to the face-name and followed by a nested
+   #  set of commands. The basic types include:
    #
    #  |-------------------|-----------------------------------------|
    #  |               Boundary Condition "Type"                     |
@@ -787,7 +789,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  |  / CMM            | using coupled momentum method (CMM)     |
    #  |-------------------|-----------------------------------------|
    #
-   #  Further, users can provide temporal and spatial distribution
+   #  Further, users can provide both temporal and spatial distribution
    #  using "Time dependence" and "Profile" keywords. For e.g.,
    #
    #  Add BC: face_1 {
@@ -817,7 +819,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  |  action_potential |   CEP                                   |
    #  |-------------------|-----------------------------------------|
    #
-   #-------------- Time Depdendence Settings Description -----------|
+   #-------------- Time Dependence Settings Description ------------|
    #
    #  Below are the options available for setting "Time dependence":
    #  - Steady : [DEFAULT] A constant value is imposed on the state
@@ -827,7 +829,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        Value: 10.0   # for scalar value (Dirichlet/Neumann)
    #        Value: {1.0, -1.0, 0.0}  # for vector valued (Traction)
    #
-   #  - Unsteady : A file input is expected to set unsteady boundary
+   #  - Unsteady : A file input is expected to set an unsteady boundary
    #      condition. The file can contain time-dependent values of the
    #      state variable itself, or the Fourier coefficients from an
    #      interpolation fit could be directly provided as input.
@@ -844,17 +846,17 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #      If the users, however, want to ramp the boundary value
    #      instead of impulsively starting a simulation with a steady
    #      value, "Ramp function: t" can be set. The code then reads
-   #      only first two entries from the input file, linearly ramps
-   #      from the first value to the second value, and maintains
-   #      a steady value thereafter. This feature is useful for doing
-   #      quasi-static simulations in solid mechanics.
+   #      only the first two entries from the input file, linearly
+   #      increments from the first value to the second value, and
+   #      maintains a steady value thereafter. This feature is useful
+   #      for performing quasi-static simulations in solid mechanics.
    #
    #  - Coupled : This indicates that the face is coupled to either
-   #      GenBC or cplBC 0D reduced order modeling codes.
+   #      GenBC or cplBC 0D reduced-order modeling codes.
    #
    #  - Resistance : A resistance value is applied only when a Neu/
-   #      Neumann boudary condition type is used. Resistance value is
-   #      input using "Value" command. For e.g., "Value : 8850.0".
+   #      Neumann boundary condition type is used. Resistance value is
+   #      input using the "Value" command. For e.g., "Value : 8850.0".
    #      Note that a resistance BC can be applied for fluid/CMM/FSI
    #      equations only.
    #
@@ -881,8 +883,8 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        Time dependence: Spatial
    #        Spatial values file path: face_pressure_file.vtp
    #
-   #  - General : This is the most general type of BC where both
-   #      spatial and temporal variation is provided in a file. The
+   #  - General : This is the most general type of BC where both the
+   #      spatial and temporal variations are provided in a file. The
    #      solver can load a SimVascular-compatible "BCt" file such as
    #      "BCt.vtp" or can be loaded in the form of an ASCII formatted
    #      text file.
@@ -927,36 +929,36 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        is set to true for lElas/mesh/struct/shell equations.
    #
    #  #------------  Additional Dirichlet BC controls
-   #  3. Effective direction: This is applicable to Dirichlet BC only.
-   #        Users can enforce a Dirichlet BC along a particular
-   #        Cartesian coordinate vector. The argument for the keyword
+   #  3. Effective direction: This applies to Dirichlet BC only. Users
+   #        can enforce a Dirichlet BC along a particular Cartesian
+   #        coordinate vector. The argument for the keyword
    #        "Effective direction" is an integer-valued vector denoting
    #        the Cartesian directions. For e.g.,
    #        "Effective direction: (1,0,0)" sets a Dir BC along X-axis.
    #
-   #  4. Zero out perimeter: This is applicable to Dirichlet BC only.
+   #  4. Zero out perimeter: This applies to to Dirichlet BC only.
    #        Default setting is true for Dirichlet BC. When the flag is
    #        set to true, the solver will zero out the `ring' formed at
    #        the conjoining of two faces. The nodal values at the ring
    #        will then be 0. It is not required that the "zero out
-   #        perimeter" need to be to true on both the meeting faces.
+   #        perimeter" needs to be true on both the meeting faces.
    #        Setting the flag on either one despite having distinct
    #        BC types can lead to zeroing out the perimeter. Note that
    #        for CMM type BC, zero out is required to be true and is
    #        enforced.
    #
-   #  5. Weakly applied: This is applicable to Dirichlet BC only and
+   #  5. Weakly applied: This applies to to Dirichlet BC only and
    #        defaults to false. If "Weakly applied" is set to true, the
    #        Dirichlet BC is applied weakly using augmented Lagrange-
    #        multiplier formulation. This setting is applied to fluid/
    #        FSI equations only. Invoking this requires specifying
-   #        penalty parameters using "Penalty parameter" keyword.
+   #        penalty parameters using the "Penalty parameter" keyword.
    #        Directional control can be achieved using "Penalty
    #        parameter (tangential)" or "Penalty parameter (normal)"
    #        keywords.
    #
    #  #------------  Additional Neumann BC controls
-   #  6. Follower pressure load: This is applicable for Neu BC only.
+   #  6. Follower pressure load: This applies to Neumann BC only.
    #        If set to true, the applied load `follows' deformation,
    #        implying that the magnitude of the load is proportional
    #        to the surface area during the deformation. The expression
@@ -965,7 +967,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        configuration and A is the magnitude of area in the
    #        current configuration that changes with deformation.
    #
-   #  7. Undeforming Neu face: This is applicable for Neu BC and
+   #  7. Undeforming Neu face: This applies to for Neu BC and
    #        ustruct equation only. If set to true, this setting will
    #        mimic clamped condition on a specimen routinely done in
    #        experiments. Clamping will not allow the surface, on which
@@ -978,9 +980,9 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #
    #  9. Traction multiplier: [DEFAULT: 1.0] Applicable for Traction
    #        BC only. A real/float value can be given as input that
-   #        acts as a scalar multipler on the traction loaded from a
+   #        acts as a scalar multiplier on the traction loaded from a
    #        vtp file. This setting may be useful when the direction of
-   #        traction needs to be flipped ("Traction multipler: -1.0").
+   #        traction needs to be flipped ("Traction multiplier: -1.0").
    #
    #  #------------  Additional Robin BC controls
    #  10. Robin BC types involves a spring-mass-damper-type force
@@ -1052,7 +1054,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    }
 
    #------------------------------------------------------------------
-   #  Couple to reduced order models (0D):
+   #  Couple to reduced-order models (0D):
    #    svFSI allows two ways of coupling for either open-loop or
    #  close-loop simulations to set boundary conditions for cardio-
    #  vascular flow simulations:
@@ -1084,12 +1086,12 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #------------------------------------------------------------------
    #  Body force (BF):
    #     In addition to prescribing body force as a domain property,
-   #  svFSI allows prescribing nodally-depedent body force that varies
+   #  svFSI allows prescribing nodally-dependent body force that varies
    #  in space (and time). This setting is useful for the method of
-   #  manufactured solutions where the body force computed using
+   #  manufactured solutions where the body forces computed using the
    #  analytical solution is used to obtain numerical solution and
    #  compare against analytical solution.
-   #     Body force over a mesh is provided using "Add BF" command.
+   #     Body force over a mesh is provided using the "Add BF" command.
    #  svFSI allows three types of body force including,
    #  -  Volumetric/Vol/Internal/Int
    #  -  Traction/Neu
@@ -1107,7 +1109,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        Value: {1.0, -1.0, 0.0}  # for vector (Vol/Trac)
    #        Value: 10.0   # for scalar value (Neu)
    #
-   #  - Unsteady : A file input is expected to set unsteady boundary
+   #  - Unsteady : A file input is expected to set an unsteady boundary
    #      condition. The file can contain time-dependent values of the
    #      state variable itself, or the Fourier coefficients from an
    #      interpolation fit could be directly provided as input.
@@ -1124,8 +1126,8 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #      If the users, however, want to ramp the body force instead
    #      of impulsively starting a simulation with a steady value,
    #      "Ramp function: t" can be set. The code then reads only
-   #      first two entries from the input file, linearly ramps from
-   #      the first value to the second value, and maintains a steady
+   #      first two entries from the input file, linearly increments
+   #      from the first value to the second, and maintains a steady
    #      value thereafter.
    #
    #  - Spatial : A spatially varying body force is applied by reading
@@ -1182,7 +1184,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  also expects the equation to be FSI to read any remesh settings.
    #  If these two requirements are satisfied, the code will look for
    #  keyword, "Remesher" followed by the name of the remeshing tool
-   #  and other parameters. Currently Tetgen is the only supported
+   #  and other parameters. Currently, Tetgen is the only supported
    #  remeshing tool. Below is the description of other parameters:
    #
    #  1. Max edge size: [DEFAULT: 0.5] This nested block requires
@@ -1226,9 +1228,9 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  structure interaction simulation. This is achieved by,
    #  a. Load the fluid outer wall and set it as a shell.
    #  b. "Initialize" CMM equation using "inflate" or "prestress".
-   #  c. Apply pressure or traction boundary condition at the wall.
+   #  c. Apply pressure or traction boundary conditions at the wall.
    #
-   #  An example if provided below:
+   #  An example is provided below:
    #
    #  # (a) Load wall mesh as a shell surface
    #  # Add mesh: wall {
@@ -1269,7 +1271,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
 
 #---------------------------------------------------------------------
 #  For the FSI equation, a mesh equation should immediately follow.
-#  Default settings are used for parameters that are not explicity
+#  Default settings are used for parameters that are not explicitly
 #  set below.
 Add equation: mesh
 {
@@ -1297,7 +1299,7 @@ Add equation: mesh
 #  models for fluid flows, and cellular activation models for
 #  cardiac electrophysiology.
 
-#  1. List of basic domain properties are provided below:
+#  1. A list of basic domain properties are provided below:
 #
 #  |-----------------------|-----------------------------------------|
 #  |       Equation        |          Domain Properties              |
@@ -1336,9 +1338,9 @@ Add equation: mesh
 #  |                       | "Poisson ratio", "Shell thickness",     |
 #  |                       | "Elasticity modulus"                    |
 #  |                                                                 |
-#  | Note: "Shell thickness" and "Elasticity modulus" are read only  |
-#  |       if "Variable wall properties" command is not set. Please  |
-#  |       refer to section "Variable wall properties" for more info.|
+#  | Note: "Shell thickness" and "Elasticity modulus" are read if and|
+#  |       only if the command "Variable wall properties" is not set.|
+#  |       Refer to section "Variable wall properties" for more info.|
 #  |                                                                 |
 #  |-----------------------|-----------------------------------------|
 #  |         FSI           | Combination of fluid and either of      |
@@ -1364,8 +1366,6 @@ Add equation: mesh
 #    for the isochoric component of the strain energy function.
 #    Available choices are:
 #
-#    |----------------------|----------------------------------------|
-#    |  "lin" / "linear"    | Linear Hookean material                |
 #    |----------------------|----------------------------------------|
 #    |  "stVK" /            | St. Venant-Kirchhoff material          |
 #    |  "stVenantKirchhoff" |                                        |
@@ -1535,14 +1535,14 @@ Add equation: mesh
 #       directions set in the "Add mesh" block. The total conductivity
 #       tensor would then be computed as,
 #             D = Diso*I + \sum_i [Dani_{i} f_{i} x f_{i}]
-#       where, Diso is the isotropic conductivity constant, I is the
+#       where Diso is the isotropic conductivity constant, I is the
 #       identity tensor, Dani_{i} is the anisotropic conductivity
 #       constant for each fiber direction (f_{i}), and a summation
 #       is performed on all the fibers directions {i}.
 #
 #  o  Myocardial zone: Some parameters of the biophysically detailed
 #       activation models (e.g., TTP model) depend on whether the
-#       myocyte belongs to endocardium/purkinje, mid-myocardium, or
+#       myocyte belongs to endocardium/Purkinje, mid-myocardium, or
 #       epicardium. This is set using the "Myocardial zone" domain
 #       property command.
 #
@@ -1551,8 +1551,8 @@ Add equation: mesh
 #       non-pacemaker cells. Other settings in this block include
 #       "Amplitude", "Start time", "Duration", and "Cycle length".
 #       If the "Cycle length" is not provided the code will compute
-#       it as the product of total number of time steps and the time
-#       step size.
+#       it as the product of the total number of time steps and the
+#       the step size.
 #
 #  o  Time step for integration: To be set if choosing a different
 #       time step size compared to the one set by "Time step size"
@@ -1573,7 +1573,7 @@ Add equation: mesh
 #       -  Relative tolerance: 1e-6    # [DEFAULT: 1e-4]
 #       -  Absolute tolerance: 1e-10   # [DEFAULT: 1e-6]
 #
-#  Below we provide examples for pacemaker and non-packemaker cells:
+#  Below we provide examples for pacemaker and non-pacemaker cells:
 #
 #  # Here domain id == 1 are non-pacemaker cells
 #    Domain: 1 {

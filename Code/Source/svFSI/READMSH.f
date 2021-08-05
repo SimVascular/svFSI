@@ -931,13 +931,27 @@ c               END IF
       IF (lM%eType .EQ. eType_QUD8 .OR. lM%eType .EQ. eType_QUD9) THEN
          std = " Make sure corner nodes in elements are arranged 1-4"
          std = "      anti-clockwise and edge nodes are arranged 5-8"
+         std = "      https://vtk.org/wp-content/uploads/2015/04/"//
+     2      "file-formats.pdf"
          RETURN
 
       ELSE IF (lM%eType.EQ.eType_HEX8 .OR. lM%eType.EQ.eType_HEX20 .OR.
      2    lM%eType.EQ.eType_HEX27) THEN
          std = " Make sure corner nodes in elements are arranged 1-4 on"
          std = "      one face and 5-8 on the opposite face"
+         std = "      https://vtk.org/wp-content/uploads/2015/04/"//
+     2      "file-formats.pdf"
          RETURN
+
+      ELSE IF (lM%eType.EQ.eType_TRI6)THEN
+         std = " Make sure the element conforms with vtk requirement:"
+         std = "      https://vtk.org/wp-content/uploads/2015/04/"//
+     2      "file-formats.pdf"
+
+      ELSE IF (lM%eType.EQ.eType_TET10) THEN
+         std = " Make sure the element conforms with vtk requirement:"
+         std = "      https://vtk.org/wp-content/uploads/2015/04/"//
+     2      "file-formats.pdf"
 
       END IF
 

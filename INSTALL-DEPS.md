@@ -1,5 +1,5 @@
 
-This file describes a generaly procedure to install `svFSI` dependencies. While most dependencies provided below are built from source, users are encouraged to use package managers such as `apt` for Ubuntu and `brew` for Mac OSX when available. Users may modify the parameters according to the local module and compiler environment. Please note that the below procedures are primarily intended for moderate to advanced linux users only. Others are encouraged to use precompiled binaries at [SimTK](https://simtk.org/frs/index.php?group_id=188) or the `Quick Build` procedure outlined in the README.md file.
+This file describes a general procedure to install `svFSI` dependencies. While most dependencies provided below are built from source, users are encouraged to use package managers such as `apt` for Ubuntu and `brew` for Mac OSX when available. Users may modify the parameters according to the local module and compiler environment. Please note that the below procedures are primarily intended for moderate to advanced Linux users only. Others are encouraged to use precompiled binaries at [SimTK](https://simtk.org/frs/index.php?group_id=188) or the `Quick Build` procedure outlined in the README.md file.
 
 ## =================================================================
 ## Curses CMake
@@ -95,7 +95,7 @@ make
 sudo make install
 ```
 
-Create a link to the library at standard location
+Create a link to the library at a standard location such as
 
 ```bash
 sudo ln -sf /opt/netlib/lapack/3.9.1/static/liblapack.so  /usr/local/lib
@@ -199,7 +199,7 @@ Copy a template Makefile.inc to the src/ directory as,
 cp Make.inc/Makefile.debian.PAR ./Makefile.inc
 ```
 
-Modify the variables in Makefile.inc according to the local environment, libraries, etc. For e.g., we use the following settings for parallel build of MUMPS with metis, scotch, lapack, blas, scalapack, and mpich:
+Modify the variables in Makefile.inc according to the local environment, libraries, etc. For e.g., we use the following settings for parallel a build of MUMPS with metis, scotch, lapack, blas, scalapack, and mpich:
 
 ```bash
 #
@@ -284,12 +284,12 @@ To build shared libraries of MUMPS, the following steps may help:
 - Add the "-fPIC" option to your compiler options in Makefile.inc
 - Run `make clean` and recompile all MUMPS source files, to build the MUMPS ".a" libraries
 - Run something like `ld -shared -o libdmumps.so libdmumps.a` to create a shared library "libdmumps.so".
-- Repeat the last step for all the static libraries in lib/ folder to create the corresponding shared libraries.
+- Repeat the last step for all the static libraries in the lib/ folder to create the corresponding shared libraries.
 
 
 ### Copy to the destination folder
 
-Copy `include`, `lib` and `examples` to the destination folder.
+Copy `include`, `lib`, and `examples` to the destination folder.
 
 ```bash
 sudo cp -r include/ lib/ examples/ /opt/mumps/5.4.0

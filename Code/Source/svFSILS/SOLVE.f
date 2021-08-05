@@ -99,7 +99,7 @@
          CALL PRECONDDIAG(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
      &      Val, R, Wc)
       ELSE IF (prec .EQ. PRECOND_RCS) THEN
-         CALL PRECONDRNC(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
+         CALL PRECONDRCS(lhs, lhs%rowPtr, lhs%colPtr, lhs%diagPtr, dof,
      &      Val, R, Wr, Wc)
       ELSE
          PRINT *, "This linear solver and preconditioner combination"//
@@ -131,7 +131,7 @@
             PRINT *, 'FSILS: LS_type not defined'
             STOP "FSILS: FATAL ERROR"
       END SELECT
-      R = R*Wc
+      R = Wc*R
 
       DO a=1, nNo
          Ri(:,a) = R(:,lhs%map(a))

@@ -3,6 +3,11 @@ include_directories(${MPI_C_INCLUDE_PATH})
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   set(CMAKE_Fortran_FLAGS "-O3 -DNDEBUG -march=native")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
+
+  # Use below flags for debugging
+  # set(CMAKE_Fortran_FLAGS "-O0")
+  # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
+  # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -Wall -Wconversion -Wline-truncation -pedantic -fimplicit-none -fbacktrace -fbounds-check -p -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow")
 else()
   # nothing for now
   # may need to reset for intel compiler or others

@@ -164,7 +164,12 @@
 !        will be 0 for subsequent iterations
             IF (sstEq) CALL USTRUCTR(Yg)
 
-            IF (eq(cEq)%phys .EQ. phys_stokes) CALL THOOD_ValRC()
+            IF ((eq(cEq)%phys .EQ. phys_stokes) .OR.
+     2          (eq(cEq)%phys .EQ. phys_fluid)  .OR.
+     3          (eq(cEq)%phys .EQ. phys_ustruct).OR.
+     4          (eq(cEq)%phys .EQ. phys_fsi)) THEN
+               CALL THOOD_ValRC()
+            END IF
 
             CALL SETBCUNDEFNEU()
 

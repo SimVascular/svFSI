@@ -113,6 +113,8 @@
          ALLOCATE(xql(nsd,fs(2)%eNoN), Nqx(nsd,fs(2)%eNoN))
          xwl(:,:) = xl(:,:)
          xql(:,:) = xl(:,1:fs(2)%eNoN)
+         Nwx      = 0._RKIND
+         Nqx      = 0._RKIND
 
 !        Gauss integration 1
          DO g=1, fs(1)%nG
@@ -127,10 +129,12 @@
                CALL USTRUCT3D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn, w,
      2            Jac, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, al, yl, dl, bfl,
      3            fN, ya_l, lR, lK, lKd)
+
             ELSE IF (nsd .EQ. 2) THEN
                CALL USTRUCT2D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn, w,
      2            Jac, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, al, yl, dl, bfl,
      3            fN, ya_l, lR, lK, lKd)
+
             END IF
          END DO ! g: loop
 
@@ -155,10 +159,12 @@
                CALL USTRUCT3D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w, Jac,
      2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, dl, bfl,
      3            lR, lK, lKd)
+
             ELSE IF (nsd .EQ. 2) THEN
                CALL USTRUCT2D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w, Jac,
      2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, dl, bfl,
      3            lR, lK, lKd)
+
             END IF
          END DO ! g: loop
 
@@ -173,6 +179,9 @@
       END DO ! e: loop
 
       DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd)
+
+      CALL DESTROY(fs(1))
+      CALL DESTROY(fs(2))
 
       RETURN
       END SUBROUTINE CONSTRUCT_uSOLID
@@ -1460,8 +1469,6 @@
             DEALLOCATE(KU)
          END IF
       END  IF
-
-      CALL THOOD_ValRC()
 
       RETURN
       END SUBROUTINE USTRUCTR

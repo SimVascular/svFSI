@@ -1263,6 +1263,141 @@ c        N(8) = lx*my*0.5_RKIND
       RETURN
       END SUBROUTINE GETGNN
 !--------------------------------------------------------------------
+!     Returns second order derivatives at given natural coords
+      SUBROUTINE GETGNNxx(insd, ind2, eType, eNoN, xi, Nxx)
+      USE COMMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: insd, ind2, eType, eNoN
+      REAL(KIND=RKIND), INTENT(IN)  :: xi(insd)
+      REAL(KIND=RKIND), INTENT(OUT) :: Nxx(ind2,eNoN)
+
+      REAL(KIND=RKIND) :: fp, fn, en, ze, mx, my, ux, uy, lx, ly
+
+      IF (eType .EQ. eType_NRB) RETURN
+
+      fp =  4._RKIND
+      fn = -4._RKIND
+      en = -8._RKIND
+      ze =  0._RKIND
+
+!     3D elements
+      SELECT CASE(eType)
+      CASE(eType_TET10)
+         Nxx(:,1)  = (/fp, ze, ze, ze, ze, ze/)
+         Nxx(:,2)  = (/ze, fp, ze, ze, ze, ze/)
+         Nxx(:,3)  = (/ze, ze, fp, ze, ze, ze/)
+         Nxx(:,4)  = (/fp, fp, fp, fp, fp, fp/)
+         Nxx(:,5)  = (/ze, ze, ze, fp, ze, ze/)
+         Nxx(:,6)  = (/ze, ze, ze, ze, fp, ze/)
+         Nxx(:,7)  = (/ze, ze, ze, ze, ze, fp/)
+         Nxx(:,8)  = (/en, ze, ze, fn, ze, fn/)
+         Nxx(:,9)  = (/ze, en, ze, fn, fn, ze/)
+         Nxx(:,10) = (/ze, ze, en, ze, fn, fn/)
+
+!     2D elements
+      CASE(eType_TRI6)
+         Nxx(:,1)  = (/fp, ze, ze/)
+         Nxx(:,2)  = (/ze, fp, ze/)
+         Nxx(:,3)  = (/fp, fp, fp/)
+         Nxx(:,4)  = (/ze, ze, fp/)
+         Nxx(:,5)  = (/ze, en, fn/)
+         Nxx(:,6)  = (/en, ze, fn/)
+
+      CASE(eType_QUD8)
+         lx = 1._RKIND - xi(1)
+         ly = 1._RKIND - xi(2)
+         ux = 1._RKIND + xi(1)
+         uy = 1._RKIND + xi(2)
+         mx = xi(1)
+         my = xi(2)
+
+         Nxx(1,1) =  ly*0.5_RKIND
+         Nxx(2,1) =  lx*0.5_RKIND
+         Nxx(3,1) =  (lx+lx+ly+ly-3._RKIND)/4._RKIND
+
+         Nxx(1,2) =  ly*0.5_RKIND
+         Nxx(2,2) =  ux*0.5_RKIND
+         Nxx(3,2) = -(ux+ux+ly+ly-3._RKIND)/4._RKIND
+
+         Nxx(1,3) =  uy*0.5_RKIND
+         Nxx(2,3) =  ux*0.5_RKIND
+         Nxx(3,3) =  (ux+ux+uy+uy-3._RKIND)/4._RKIND
+
+         Nxx(1,4) =  uy*0.5_RKIND
+         Nxx(2,4) =  lx*0.5_RKIND
+         Nxx(3,4) = -(lx+lx+uy+uy-3._RKIND)/4._RKIND
+
+         Nxx(1,5) = -ly
+         Nxx(2,5) =  0._RKIND
+         Nxx(3,5) =  mx
+
+         Nxx(1,6) =  0._RKIND
+         Nxx(2,6) = -ux
+         Nxx(3,6) = -my
+
+         Nxx(1,7) = -uy
+         Nxx(2,7) =  0._RKIND
+         Nxx(3,7) = -mx
+
+         Nxx(1,8) =  0._RKIND
+         Nxx(2,8) = -lx
+         Nxx(3,8) =  my
+
+      CASE(eType_QUD9)
+         lx = 1._RKIND - xi(1)
+         ly = 1._RKIND - xi(2)
+         ux = 1._RKIND + xi(1)
+         uy = 1._RKIND + xi(2)
+         mx = xi(1)
+         my = xi(2)
+
+         Nxx(1,1) = -ly*my*0.5_RKIND
+         Nxx(2,1) = -lx*mx*0.5_RKIND
+         Nxx(3,1) =  (lx-mx)*(ly-my)/4._RKIND
+
+         Nxx(1,2) = -ly*my*0.5_RKIND
+         Nxx(2,2) =  ux*mx*0.5_RKIND
+         Nxx(3,2) = -(ux+mx)*(ly-my)/4._RKIND
+
+         Nxx(1,3) =  uy*my*0.5_RKIND
+         Nxx(2,3) =  ux*mx*0.5_RKIND
+         Nxx(3,3) =  (ux+mx)*(uy+my)/4._RKIND
+
+         Nxx(1,4) =  uy*my*0.5_RKIND
+         Nxx(2,4) = -lx*mx*0.5_RKIND
+         Nxx(3,4) = -(lx-mx)*(uy+my)/4._RKIND
+
+         Nxx(1,5) =  ly*my
+         Nxx(2,5) =  lx*ux
+         Nxx(3,5) =  mx*(ly-my)
+
+         Nxx(1,6) =  ly*uy
+         Nxx(2,6) = -ux*mx
+         Nxx(3,6) = -(ux+mx)*my
+
+         Nxx(1,7) = -uy*my
+         Nxx(2,7) =  lx*ux
+         Nxx(3,7) = -mx*(uy+my)
+
+         Nxx(1,8) =  ly*uy
+         Nxx(2,8) =  lx*mx
+         Nxx(3,8) =  (lx-mx)*my
+
+         Nxx(1,9) = -ly*uy*2._RKIND
+         Nxx(2,9) = -lx*ux*2._RKIND
+         Nxx(3,9) =  mx*my*4._RKIND
+
+!     1D elements
+      CASE(eType_LIN2)
+         Nxx(1,1)  =  1._RKIND
+         Nxx(1,2)  =  1._RKIND
+         Nxx(1,3)  = -2._RKIND
+
+      END SELECT
+
+      RETURN
+      END SUBROUTINE GETGNNxx
+!--------------------------------------------------------------------
 !     Returns shape functions bounds
       PURE SUBROUTINE GETNNBNDS(eType, eNoN, xib, Nb)
       USE COMMOD
@@ -1428,6 +1563,119 @@ c        N(8) = lx*my*0.5_RKIND
 
       RETURN
       END SUBROUTINE GNN
+!--------------------------------------------------------------------
+!     Compute second order derivative on parent element
+      SUBROUTINE GNNxx(l, eNoN, insd, Nxi, Nxi2, lx, Nx, Nxx)
+      USE COMMOD
+      USE UTILMOD
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: l, eNoN, insd
+      REAL(KIND=RKIND), INTENT(IN) :: Nxi(insd,eNoN), Nxi2(l,eNoN)
+      REAL(KIND=RKIND), INTENT(IN) :: lx(nsd,eNoN), Nx(insd,eNoN)
+      REAL(KIND=RKIND), INTENT(OUT) :: Nxx(l,eNoN)
+
+      INTEGER(KIND=IKIND) a, i, j, INFO, IPIV(l)
+      REAL(KIND=RKIND) xXi(nsd,insd), xXi2(nsd,l), K(l,l), B(l,eNoN), t
+
+      t    = 2._RKIND
+      xXi  = 0._RKIND
+      xXi2 = 0._RKIND
+      Nxx  = 0._RKIND
+      K    = 0._RKIND
+      B    = 0._RKIND
+      IF (insd .EQ. 2) THEN
+         DO a=1, eNoN
+         ! | dx1/dXi1  dx1/dXi2 |
+         ! | dx2/dXi1  dx2/dXi2 |
+            xXi(:,1) = xXi(:,1) + lx(:,a)*Nxi(1,a)
+            xXi(:,2) = xXi(:,2) + lx(:,a)*Nxi(2,a)
+
+         ! | dx1^2/dXi1^2  dx1^2/dXi2^2  dx1^2/dXi1dXi2 |
+         ! | dx2^2/dXi1^2  dx2^2/dXi2^2  dx2^2/dXi1dXi2 |
+            xXi2(:,1) = xXi2(:,1) + lx(:,a)*Nxi2(1,a)
+            xXi2(:,2) = xXi2(:,2) + lx(:,a)*Nxi2(2,a)
+            xXi2(:,3) = xXi2(:,3) + lx(:,a)*Nxi2(3,a)
+         END DO
+
+         K(1,:) = (/ xXi(1,1)**2, xXi(2,1)**2, t*xXi(1,1)*xXi(2,1) /)
+         K(2,:) = (/ xXi(1,2)**2, xXi(2,2)**2, t*xXi(1,2)*xXi(2,2) /)
+         K(3,:) = (/ xXi(1,1)*xXi(1,2), xXi(2,1)*xXi(2,2),
+     2               xXi(1,1)*xXi(2,2) + xXi(1,2)*xXi(2,1) /)
+
+         DO a=1, eNoN
+            B(1,a) = Nxi2(1,a) - Nx(1,a)*xXi2(1,1) - Nx(2,a)*xXi2(2,1)
+            B(2,a) = Nxi2(2,a) - Nx(1,a)*xXi2(1,2) - Nx(2,a)*xXi2(2,2)
+            B(3,a) = Nxi2(3,a) - Nx(1,a)*xXi2(1,3) - Nx(2,a)*xXi2(2,3)
+         END DO
+
+         CALL DGESV(l,eNoN,K,l,IPIV,B,l,INFO)
+         IF (INFO .NE. 0) err = "Error in Lapack @ GNNxx."
+         Nxx = B
+
+      ELSE if (insd .EQ. 3) THEN
+         DO a=1, eNoN
+         ! | dx1/dXi1  dx1/dXi2  dx1/dXi3 |
+         ! | dx2/dXi1  dx2/dXi2  dx2/dXi3 |
+         ! | dx3/dXi1  dx3/dXi2  dx3/dXi3 |
+            xXi(:,1) = xXi(:,1) + lx(:,a)*Nxi(1,a)
+            xXi(:,2) = xXi(:,2) + lx(:,a)*Nxi(2,a)
+            xXi(:,3) = xXi(:,3) + lx(:,a)*Nxi(3,a)
+
+         ! | dx1^2/dXi1^2 ... dx1^2/dXi1dXi2 dx1^2/dXi2dXi3 dx1^2/dXi1dXi3 |
+         ! | dx2^2/dXi1^2 ... dx2^2/dXi1dXi2 dx2^2/dXi2dXi3 dx2^2/dXi1dXi3 |
+         ! | dx3^2/dXi1^2 ... dx3^2/dXi1dXi2 dx3^2/dXi2dXi3 dx3^2/dXi1dXi3 |
+            xXi2(:,1) = xXi2(:,1) + lx(:,a)*Nxi2(1,a)
+            xXi2(:,2) = xXi2(:,2) + lx(:,a)*Nxi2(2,a)
+            xXi2(:,3) = xXi2(:,3) + lx(:,a)*Nxi2(3,a)
+            xXi2(:,4) = xXi2(:,4) + lx(:,a)*Nxi2(4,a)
+            xXi2(:,5) = xXi2(:,5) + lx(:,a)*Nxi2(5,a)
+            xXi2(:,6) = xXi2(:,6) + lx(:,a)*Nxi2(6,a)
+         END DO
+
+         DO i=1,3
+            K(i,:) = (/ xXi(1,i)**2, xXi(2,i)**2, xXi(3,i)**2,
+     2                  t*xXi(1,i)*xXi(2,i), t*xXi(2,i)*xXi(3,i),
+     3                  t*xXi(1,i)*xXi(3,i)/)
+         END DO
+
+         i = 1
+         j = 2
+         K(4,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j),
+     2               xXi(3,i)*xXi(3,j),
+     3               xXi(1,i)*xXi(2,j) + xXi(1,j)*xXi(2,i),
+     4               xXi(2,i)*xXi(3,j) + xXi(2,j)*xXi(3,i),
+     5               xXi(1,i)*xXi(3,j) + xXi(1,j)*xXi(3,i) /)
+
+         i = 2
+         j = 3
+         K(5,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j),
+     2               xXi(3,i)*xXi(3,j),
+     3               xXi(1,i)*xXi(2,j) + xXi(1,j)*xXi(2,i),
+     4               xXi(2,i)*xXi(3,j) + xXi(2,j)*xXi(3,i),
+     5               xXi(1,i)*xXi(3,j) + xXi(1,j)*xXi(3,i) /)
+
+         i = 1
+         j = 3
+         K(6,:) = (/ xXi(1,i)*xXi(1,j), xXi(2,i)*xXi(2,j),
+     2               xXi(3,i)*xXi(3,j),
+     3               xXi(1,i)*xXi(2,j) + xXi(1,j)*xXi(2,i),
+     4               xXi(2,i)*xXi(3,j) + xXi(2,j)*xXi(3,i),
+     5               xXi(1,i)*xXi(3,j) + xXi(1,j)*xXi(3,i) /)
+
+         DO a=1, eNoN
+            DO i=1,6
+               B(i,a) = Nxi2(i,a) - Nx(1,a)*xXi2(1,i) -
+     2                  Nx(2,a)*xXi2(2,i) - Nx(3,a)*xXi2(3,i)
+            END DO
+         END DO
+
+         CALL DGESV(l, eNoN, K, l, IPIV, B, l, INFO)
+         IF (INFO .NE. 0) err = "Error in Lapack @ GNNxx."
+         Nxx = B
+      END IF
+
+      RETURN
+      END SUBROUTINE GNNxx
 !--------------------------------------------------------------------
 !     Compute shell kinematics: normal vector, covariant & contravariant
 !     basis vectors
@@ -1741,6 +1989,8 @@ c        N(8) = lx*my*0.5_RKIND
       b = ptr(lFa%eNoN+1)
       v = lX(:,a) - lX(:,b)
       IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+      DEALLOCATE(setIt, ptr, lX)
 
       RETURN
       END SUBROUTINE GNNB
