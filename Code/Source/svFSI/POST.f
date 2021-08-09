@@ -710,8 +710,6 @@
                END IF
 
             CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
-               sigma = 0._RKIND
-               sigma_temp = 0._RKIND
                IF (cPhys .EQ. phys_lElas) THEN
                   IF (nsd .EQ. 3) THEN
                      IF (useVarWall) THEN

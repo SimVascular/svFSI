@@ -501,7 +501,7 @@
             outPuts(2)  = out_stress
             outPuts(3)  = out_strain
          ELSE
-            nDOP = (/8,2,0,0/)
+            nDOP = (/9,2,0,0/)
             outPuts(1) = out_displacement
             outPuts(2) = out_mises
             outPuts(3) = out_stress
@@ -510,6 +510,7 @@
             outPuts(6) = out_acceleration
             outPuts(7) = out_integ
             outPuts(8) = out_jacobian
+            outPuts(9) = out_cauchy
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
