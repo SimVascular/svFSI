@@ -521,7 +521,8 @@
       REAL(KIND=RKIND) w, Jac, detF, Je, ya, Ja, elM, nu, lambda, mu,
      2   p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nsymd),
      3   Im(nsd,nsd), F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd),
-     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd), eVWP(nvwp)
+     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd), eVWP(nvwp),
+     5   sigma_temp(6), Cst(6,6)
       TYPE(fsType) :: fs
 
       INTEGER, ALLOCATABLE :: eNds(:)
@@ -563,6 +564,7 @@
       sE   = 0._RKIND
       insd = nsd
       ya   = 0._RKIND
+
       IF (lM%lFib) insd = 1
 
       DO e=1, lM%nEl
@@ -709,20 +711,42 @@
 
             CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
                sigma = 0._RKIND
+               sigma_temp = 0._RKIND
                IF (cPhys .EQ. phys_lElas) THEN
                   IF (nsd .EQ. 3) THEN
-                     detF = lambda*(ed(1) + ed(2) + ed(3))
-                     sigma(1,1) = detF + 2._RKIND*mu*ed(1)
-                     sigma(2,2) = detF + 2._RKIND*mu*ed(2)
-                     sigma(3,3) = detF + 2._RKIND*mu*ed(3)
+                     IF (useVarWall) THEN
+                        Cst(1,:) = eVWP(1:6)
+                        Cst(2,:) = eVWP(7:12)
+                        Cst(3,:) = eVWP(13:18)
+                        Cst(4,:) = eVWP(19:24)
+                        Cst(5,:) = eVWP(25:30)
+                        Cst(6,:) = eVWP(31:36)
+                        sigma_temp(:) = MATMUL(Cst,ed)
+                        sigma(1,1) = sigma_temp(1)
+                        sigma(2,2) = sigma_temp(2)
+                        sigma(3,3) = sigma_temp(3)
 
-                     sigma(1,2) = mu*ed(4)
-                     sigma(2,3) = mu*ed(5)
-                     sigma(3,1) = mu*ed(6)
+                        sigma(1,2) = sigma_temp(4)
+                        sigma(2,3) = sigma_temp(5)
+                        sigma(3,1) = sigma_temp(6)
 
-                     sigma(2,1) = sigma(1,2)
-                     sigma(3,2) = sigma(2,3)
-                     sigma(1,3) = sigma(3,1)
+                        sigma(2,1) = sigma(1,2)
+                        sigma(3,2) = sigma(2,3)
+                        sigma(1,3) = sigma(3,1)
+                     ELSE
+                        detF = lambda*(ed(1) + ed(2) + ed(3))
+                        sigma(1,1) = detF + 2._RKIND*mu*ed(1)
+                        sigma(2,2) = detF + 2._RKIND*mu*ed(2)
+                        sigma(3,3) = detF + 2._RKIND*mu*ed(3)
+
+                        sigma(1,2) = mu*ed(4)
+                        sigma(2,3) = mu*ed(5)
+                        sigma(3,1) = mu*ed(6)
+
+                        sigma(2,1) = sigma(1,2)
+                        sigma(3,2) = sigma(2,3)
+                        sigma(1,3) = sigma(3,1)
+                     END IF
                   ELSE
                      detF = lambda*(ed(1) + ed(2))
                      sigma(1,1) = detF + 2._RKIND*mu*ed(1)

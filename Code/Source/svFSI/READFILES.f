@@ -417,6 +417,7 @@
 
       THflag = .FALSE.
       propL  = prop_NA
+
       SELECT CASE (eqName)
 !     FLUID Navier-Stokes solver ------------------------------------
       CASE ('fluid')
@@ -486,6 +487,11 @@
          propL(5,1) = f_y
          IF (nsd .EQ. 3) propL(6,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
+
+         IF (useVarWall .AND. (nvwp .LT. 36._RKIND)) THEN
+            err = "Number of variable wall properties for linear "//
+     2         "elastic material must be at least 36."
+         END IF
 
          lPtr => list%get(pstEq, "Prestress")
 
@@ -563,6 +569,8 @@
          IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
+         IF (useVarWall) err = "Varible wall for USTRUCT is not "//
+     2      "implemented yet"
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) err = "Prestress for USTRUCT is not implemented yet"
 
@@ -601,6 +609,9 @@
          propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
+         IF (useVarWall) err = "Varible wall for SHELLS is not "//
+     2      "implemented yet"
+
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) err = "Prestress for SHELLS is not implemented yet"
 
@@ -613,6 +624,7 @@
 
 !     COUPLED MOMENTUM FLUID STRUCTURE INTERACTION equation solver---
       CASE ('CMM')
+
          IF (nsd .NE. 3) err = "CMM eq. is not implemented for 2D "//
      2      "domains"
          lEq%phys = phys_CMM
@@ -703,6 +715,9 @@
 
          CALL READDOMAIN(lEq, propL, list)
          IF (cmmInit) lEq%dmn(:)%prop(solid_density) = 0._RKIND
+
+         IF (useVarWall) err = "Varible wall for CMM should not be "//
+     2      "defined in mesh data block"
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -2489,6 +2504,15 @@ c     2         "can be applied for Neumann boundaries only"
       CASE DEFAULT
          err = "Undefined constitutive model used"
       END SELECT
+
+      IF (useVarWall .AND. (lDmn%stM%isoType .NE. stIso_nHook)) THEN
+         err = "Variable wall properties currently only implemented "//
+     2         "for isotropic Neo-Hookean material in STRUCT."
+      END IF
+      IF (useVarWall .AND. (nvwp .LT. 2._RKIND)) THEN
+         err = "Number of variable wall properties for isotropic "//
+     2         "Neo-Hookean must be at least 2."
+      END IF
 
 !     Fiber reinforcement stress
       lFib => lPD%get(ctmp, "Fiber reinforcement stress")
