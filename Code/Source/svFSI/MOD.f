@@ -941,7 +941,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)
 !     New time derivative of variables
       REAL(KIND=RKIND), ALLOCATABLE :: An(:,:)
-!     Old integrated variables (dissplacement)
+!     Old integrated variables (displacement)
       REAL(KIND=RKIND), ALLOCATABLE :: Do(:,:)
 !     New integrated variables
       REAL(KIND=RKIND), ALLOCATABLE :: Dn(:,:)

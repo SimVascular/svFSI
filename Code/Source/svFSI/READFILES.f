@@ -226,6 +226,10 @@
 
 !--------------------------------------------------------------------
 !     Reading equations
+
+      IF ((nsd .NE. 3) .AND. useVarWall) err = "Variable wall "//
+     2      "properties can only be used in 3-dimensions"
+
       nEq = list%srch("Add equation",ll=1)
       std = " Number of equations: "//nEq
       ALLOCATE(eq(nEq))
@@ -431,7 +435,7 @@
          IF (nsd .EQ. 3) propL(5,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
-         nDOP = (/11,2,3,0/)
+         nDOP = (/12,2,3,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_WSS
@@ -444,6 +448,7 @@
          outPuts(9)  = out_viscosity
          outPuts(10) = out_divergence
          outPuts(11) = out_acceleration
+         outPuts(12) = out_displacement
 
          CALL READLS(lSolver_NS, lEq, list)
 
@@ -480,18 +485,25 @@
       CASE ('lElas')
          lEq%phys = phys_lElas
 
-         propL(1,1) = solid_density
-         propL(2,1) = elasticity_modulus
-         propL(3,1) = poisson_ratio
-         propL(4,1) = f_x
-         propL(5,1) = f_y
-         IF (nsd .EQ. 3) propL(6,1) = f_z
-         CALL READDOMAIN(lEq, propL, list)
-
-         IF (useVarWall .AND. (nvwp .LT. 36._RKIND)) THEN
+         IF (useVarWall .AND. (nvwp .LT. 2._RKIND)) THEN
             err = "Number of variable wall properties for linear "//
-     2         "elastic material must be at least 36."
+     2         "elastic material must be at least 2."
          END IF
+
+         IF (useVarWall) THEN
+            propL(1,1) = solid_density
+            propL(2,1) = f_x
+            propL(3,1) = f_y
+            IF (nsd .EQ. 3) propL(4,1) = f_z
+         ELSE
+            propL(1,1) = solid_density
+            propL(2,1) = elasticity_modulus
+            propL(3,1) = poisson_ratio
+            propL(4,1) = f_x
+            propL(5,1) = f_y
+            IF (nsd .EQ. 3) propL(6,1) = f_z
+         END IF
+         CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
 

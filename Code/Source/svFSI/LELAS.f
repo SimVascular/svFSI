@@ -153,21 +153,12 @@
      2   wl, lDm, ed(6), ud(3), f(3), S0(6), S(6), eVWP(nvwp), Cst(6,6)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
-      nu   = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
       i    = eq(cEq)%s
       j    = i + 1
       k    = j + 1
-
-      lambda = elM*nu / (1._RKIND+nu) / (1._RKIND-2._RKIND*nu)
-      mu     = elM * 0.5_RKIND / (1._RKIND+nu)
-      lDm    = lambda/mu
-      T1     = eq(cEq)%af*eq(cEq)%beta*dt*dt
-      amd    = eq(cEq)%am/T1*rho
-      wl     = w*T1*mu
 
       ed = 0._RKIND
       ud = -f
@@ -186,9 +177,9 @@
          ed(5) = ed(5) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
          ed(6) = ed(6) + Nx(1,a)*dl(k,a) + Nx(3,a)*dl(i,a)
 
-!     Variable wall - SCHWARZ July 2021---------------------------------
+!     ------------------------------------------------------------------
 !     Calculate local wall property
-!     Don't use on the mesh part though lol
+!     Don't use if calculating mesh
          IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
             eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
          END IF
@@ -201,30 +192,33 @@
          S0(5) = S0(5) + N(a)*pS0l(5,a)
          S0(6) = S0(6) + N(a)*pS0l(6,a)
       END DO
+
+
+      IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
+         elM  = eVWP(1)
+         nu   = evWP(2)
+      ELSE
+         elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
+         nu   = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
+      END IF
+      
+      lambda = elM*nu / (1._RKIND+nu) / (1._RKIND-2._RKIND*nu)
+      mu     = elM * 0.5_RKIND / (1._RKIND+nu)
+      lDm    = lambda/mu
+      T1     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      amd    = eq(cEq)%am/T1*rho
+      wl     = w*T1*mu
+
       divD = lambda*(ed(1) + ed(2) + ed(3))
 
 
-!     Variable wall - SCHWARZ July 2021---------------------------------
-!     Calculate local wall property
-      IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
-         Cst(1,:) = eVWP(1:6)
-         Cst(2,:) = eVWP(7:12)
-         Cst(3,:) = eVWP(13:18)
-         Cst(4,:) = eVWP(19:24)
-         Cst(5,:) = eVWP(25:30)
-         Cst(6,:) = eVWP(31:36)
-         S(:) = MATMUL(Cst,ed)
-      ELSE
-   !     Stress in Voigt notation
-         S(1) = divD + 2._RKIND*mu*ed(1)
-         S(2) = divD + 2._RKIND*mu*ed(2)
-         S(3) = divD + 2._RKIND*mu*ed(3)
-         S(4) = mu*ed(4)  ! 2*eps_12
-         S(5) = mu*ed(5)  ! 2*eps_23
-         S(6) = mu*ed(6)  ! 2*eps_13
-      END IF
-
-!     ------------------------------------------------------------------
+!     Stress in Voigt notation
+      S(1) = divD + 2._RKIND*mu*ed(1)
+      S(2) = divD + 2._RKIND*mu*ed(2)
+      S(3) = divD + 2._RKIND*mu*ed(3)
+      S(4) = mu*ed(4)  ! 2*eps_12
+      S(5) = mu*ed(5)  ! 2*eps_23
+      S(6) = mu*ed(6)  ! 2*eps_13
 
       pSl  = S
 
@@ -290,7 +284,7 @@
 
       INTEGER(KIND=IKIND) a, b, i, j
       REAL(KIND=RKIND) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd,
-     2   wl, lDm, ed(3), ud(2), f(2), S0(3), S(3)
+     2   T2, wl, lDm, ed(3), ud(2), f(2), S0(3), S(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -333,6 +327,8 @@
 !     Add prestress contribution
       S = pSl + S0
 
+!     Need to add variable wall tangent matrix
+
       DO a=1, eNoN
          lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + Nx(1,a)*S(1) +
      2      Nx(2,a)*S(3))
@@ -343,9 +339,9 @@
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)
 
-            T1 = amd*N(a)*N(b)/mu + NxdNx
+            T2 = amd*N(a)*N(b)/mu + NxdNx
 
-            lK(1,a,b) = lK(1,a,b) + wl*(T1
+            lK(1,a,b) = lK(1,a,b) + wl*(T2
      2         + (1._RKIND + lDm)*Nx(1,a)*Nx(1,b))
 
             lK(2,a,b) = lK(2,a,b) + wl*(lDm*Nx(1,a)*Nx(2,b)
@@ -354,7 +350,7 @@
             lK(dof+1,a,b) = lK(dof+1,a,b) + wl*(lDm*Nx(2,a)*Nx(1,b)
      2         + Nx(1,a)*Nx(2,b))
 
-            lK(dof+2,a,b) = lK(dof+2,a,b) + wl*(T1
+            lK(dof+2,a,b) = lK(dof+2,a,b) + wl*(T2
      2         + (1._RKIND + lDm)*Nx(2,a)*Nx(2,b))
          END DO
       END DO

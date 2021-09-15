@@ -559,6 +559,7 @@
      2   dl(tDof,fs%eNoN), yl(tDof,fs%eNoN), fN(nsd,nFn), resl(m),
      3   Nx(nsd,fs%eNoN), N(fs%eNoN), lVWP(nvwp,fs%eNoN))
 
+      S    = 0._RKIND
       sA   = 0._RKIND
       sF   = 0._RKIND
       sE   = 0._RKIND
@@ -574,7 +575,7 @@
      2       cPhys .NE. phys_ustruct .AND.
      3       cPhys .NE. phys_lElas) CYCLE
 
-         IF (cPhys .EQ. phys_lElas) THEN
+         IF (cPhys .EQ. phys_lElas .AND. .NOT. useVarWall) THEN
             elM = eq(iEq)%dmn(cDmn)%prop(elasticity_modulus)
             nu  = eq(iEq)%dmn(cDmn)%prop(poisson_ratio)
             lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
@@ -642,6 +643,12 @@
                   F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
                END IF
             END DO
+            IF (cPhys .EQ. phys_lElas .AND. useVarWall) THEN
+               elM = eVWP(1)
+               nu  = eVWP(2)
+               lambda = elM*nu/(1._RKIND + nu)/(1._RKIND - 2._RKIND*nu)
+               mu     = 0.5_RKIND*elM/(1._RKIND + nu)
+            END IF
             detF = MAT_DET(F, nsd)
 
             ed = 0._RKIND
@@ -712,39 +719,18 @@
             CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
                IF (cPhys .EQ. phys_lElas) THEN
                   IF (nsd .EQ. 3) THEN
-                     IF (useVarWall) THEN
-                        Cst(1,:) = eVWP(1:6)
-                        Cst(2,:) = eVWP(7:12)
-                        Cst(3,:) = eVWP(13:18)
-                        Cst(4,:) = eVWP(19:24)
-                        Cst(5,:) = eVWP(25:30)
-                        Cst(6,:) = eVWP(31:36)
-                        sigma_temp(:) = MATMUL(Cst,ed)
-                        sigma(1,1) = sigma_temp(1)
-                        sigma(2,2) = sigma_temp(2)
-                        sigma(3,3) = sigma_temp(3)
+                     detF = lambda*(ed(1) + ed(2) + ed(3))
+                     sigma(1,1) = detF + 2._RKIND*mu*ed(1)
+                     sigma(2,2) = detF + 2._RKIND*mu*ed(2)
+                     sigma(3,3) = detF + 2._RKIND*mu*ed(3)
 
-                        sigma(1,2) = sigma_temp(4)
-                        sigma(2,3) = sigma_temp(5)
-                        sigma(3,1) = sigma_temp(6)
+                     sigma(1,2) = mu*ed(4)
+                     sigma(2,3) = mu*ed(5)
+                     sigma(3,1) = mu*ed(6)
 
-                        sigma(2,1) = sigma(1,2)
-                        sigma(3,2) = sigma(2,3)
-                        sigma(1,3) = sigma(3,1)
-                     ELSE
-                        detF = lambda*(ed(1) + ed(2) + ed(3))
-                        sigma(1,1) = detF + 2._RKIND*mu*ed(1)
-                        sigma(2,2) = detF + 2._RKIND*mu*ed(2)
-                        sigma(3,3) = detF + 2._RKIND*mu*ed(3)
-
-                        sigma(1,2) = mu*ed(4)
-                        sigma(2,3) = mu*ed(5)
-                        sigma(3,1) = mu*ed(6)
-
-                        sigma(2,1) = sigma(1,2)
-                        sigma(3,2) = sigma(2,3)
-                        sigma(1,3) = sigma(3,1)
-                     END IF
+                     sigma(2,1) = sigma(1,2)
+                     sigma(3,2) = sigma(2,3)
+                     sigma(1,3) = sigma(3,1)
                   ELSE
                      detF = lambda*(ed(1) + ed(2))
                      sigma(1,1) = detF + 2._RKIND*mu*ed(1)
