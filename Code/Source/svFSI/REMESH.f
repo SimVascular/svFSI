@@ -394,7 +394,7 @@
       IF (ALLOCATED(pSn))      DEALLOCATE(pSn)
       IF (ALLOCATED(pSa))      DEALLOCATE(pSa)
 
-!     Variable wall properties - SCHWARZ July 2021 ---------------------
+!     Varwall properties -----------------------------------------------
       IF (ALLOCATED(vWP0))      DEALLOCATE(vWP0)
 !     ------------------------------------------------------------------
 

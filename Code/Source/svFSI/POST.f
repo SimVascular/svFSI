@@ -598,12 +598,11 @@
             xl(:,a) = x(:,Ac)
             dl(:,a) = lD(:,Ac)
             yl(:,a) = lY(:,Ac)
-!           Variable wall - SCHWARZ July 2021---------------------------
+!           Varwall properties -----------------------------------------
 !           Calculate local wall property
             IF (useVarWall) THEN
                 lVWP(:,a) = vWP0(:,Ac)
             END IF
-!           ------------------------------------------------------------
          END DO
 
          Je = 0._RKIND
@@ -629,12 +628,11 @@
                   F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
                   F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
                   F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
-!                 Variable wall - SCHWARZ July 2021---------------------
+!                 Variable wall ----------------------------------------
 !                 Calculate local wall property
                   IF (useVarWall) THEN
                      eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
                   END IF
-!                 ------------------------------------------------------
 
                ELSE
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)

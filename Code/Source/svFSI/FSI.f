@@ -99,7 +99,7 @@
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
 
-!           Variable wall - SCHWARZ July 2021---------------------------
+!           Varwall properties -----------------------------------------
 !           Calculate local wall property
             IF (useVarWall) lVWP(:,a) = vWP0(:,Ac)
 !           ------------------------------------------------------------

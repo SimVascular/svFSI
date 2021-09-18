@@ -87,7 +87,7 @@
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
 
-!           Variable wall - SCHWARZ July 2021---------------------------
+!           Varwall properties-----------------------------------------------------
 !           Calculate local wall property
             IF (useVarWall) lVWP(:,a) = vWP0(:,Ac)
 !           ------------------------------------------------------------
@@ -205,7 +205,7 @@
          F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
          F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
 
-!     Variable wall - SCHWARZ July 2021---------------------------------
+!     Varwall properits-------------------------------------------------
 !     Calculate local wall property
          IF (useVarWall) eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
 !     ------------------------------------------------------------------

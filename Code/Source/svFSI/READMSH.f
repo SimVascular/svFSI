@@ -408,7 +408,7 @@ c               END IF
          END DO
       END IF
 
-!     Read variable wall properties - SCHWARZ July 2021 ----------------
+!     Read varwall properties ------------------------------------------
       flag = .FALSE.
       DO iM=1, nMsh
          lPM => list%get(msh(iM)%name,"Add mesh",iM)
@@ -421,7 +421,7 @@ c               END IF
             END IF
             flag = .TRUE.
             useVarWall = .TRUE.
-            PRINT *,"Setting varwall flag to true"
+            std = "Setting varwall flag to true"
             ALLOCATE(msh(iM)%x(nvwp,msh(iM)%gnNo))
             msh(iM)%x = 0._RKIND
             CALL READVTUPDATA(msh(iM), cTmp, "varWallProps", nvwp, 1)

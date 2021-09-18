@@ -46,9 +46,7 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd)
-!     VARIABLE WALL PROPERTIES - SCHWARZ JULY 2021 ---------------------
       REAL(KIND=RKIND), INTENT(IN), OPTIONAL :: eVWP(nvwp)
-!     ------------------------------------------------------------------
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
