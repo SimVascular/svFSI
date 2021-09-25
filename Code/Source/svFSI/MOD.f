@@ -227,7 +227,7 @@
          REAL(KIND=RKIND) :: C10 = 0._RKIND
 !        Mooney-Rivlin model (C10, C01)
          REAL(KIND=RKIND) :: C01 = 0._RKIND
-!        Holzapfel model(a, b, aff, bff, ass, bss, afs, bfs, kap)
+!        Holzapfel model(a, b, aff, bff, ass, bss, afs, bfs, kap, kexp)
          REAL(KIND=RKIND) :: a   = 0._RKIND
          REAL(KIND=RKIND) :: b   = 0._RKIND
          REAL(KIND=RKIND) :: aff = 0._RKIND
@@ -236,6 +236,7 @@
          REAL(KIND=RKIND) :: bss = 0._RKIND
          REAL(KIND=RKIND) :: afs = 0._RKIND
          REAL(KIND=RKIND) :: bfs = 0._RKIND
+         REAL(KIND=RKIND) :: kexp = 0._RKIND
 !        Collagen fiber dispersion parameter (Holzapfel model)
          REAL(KIND=RKIND) :: kap = 0._RKIND
 !        Fiber reinforcement stress

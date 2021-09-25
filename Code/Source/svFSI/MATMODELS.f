@@ -56,7 +56,7 @@
 !     Guccione
       REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
 !     HGO/HO model
-      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, Hff(nsd,nsd),
+      REAL(KIND=RKIND) :: Eff, Ess, chi, Efs, kap, Hff(nsd,nsd),
      4   Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
@@ -312,12 +312,14 @@
      2      EXP(stM%bfs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
+     	 
+     	 chi = 1._RKIND / (1._RKIND + EXP(-stM%kexp*Eff))
 
-         IF (Eff .GT. 0._RKIND) THEN
+!         IF (Eff .GT. 0._RKIND) THEN
 !            Fiber reinforcement/active stress
              g1  = Tfa
 
-             g1  = g1 + 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff)
+             g1  = g1 + 2._RKIND * stM%aff * Eff * EXP(stM%bff*Eff*Eff) * chi
              Hff = MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
              Sb  = Sb + g1*Hff
 
@@ -325,10 +327,10 @@
              g1  = 4._RKIND*J4d*stM%aff*(1._RKIND +
      2          2._RKIND*stM%bff*Eff)*EXP(stM%bff*Eff)
              CCb = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
-         END IF
+!         END IF
 
-         IF (Ess .GT. 0._RKIND) THEN
-             g2  = 2._RKIND * stM%ass * Ess * EXP(stM%bss*Ess*Ess)
+!         IF (Ess .GT. 0._RKIND) THEN
+             g2  = 2._RKIND * stM%ass * Ess * EXP(stM%bss*Ess*Ess) * chi
              Hss = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
              Sb  = Sb + g2*Hss
 
@@ -336,7 +338,7 @@
              g2  = 4._RKIND*J4d*stM%ass*(1._RKIND +
      2          2._RKIND*stM%bss*Ess)*EXP(stM%bss*Ess)
              CCb = CCb + g2*TEN_DYADPROD(Hss, Hss, nsd)
-         END IF
+!         END IF
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci

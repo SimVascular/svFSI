@@ -2482,6 +2482,7 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%bss, "b4s")
          lPtr => lSt%get(lDmn%stM%afs, "afs")
          lPtr => lSt%get(lDmn%stM%bfs, "bfs")
+         lPtr => lSt%get(lDmn%stM%kexp, "k")
 
       CASE DEFAULT
          err = "Undefined constitutive model used"
