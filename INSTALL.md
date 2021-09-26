@@ -27,10 +27,16 @@ Recommended folder structure:
 ```bash
 mkdir svFSI
 cd svFSI
-git clone git@github.com:SimVascular/svFSI.git
+git clone https://github.com/SimVascular/svFSI.git
 mv svFSI src
 mkdir build
 cd build
+```
+
+If you have `ssh` keys set up on GitHub, you may clone using the following command instead of the above `https` ones,
+
+```bash
+git clone git@github.com:SimVascular/svFSI.git
 ```
 
 This structure creates a separate directory for `svFSI` git repository `src` and a separate `build` folder where `svFSI` is compiled.
@@ -205,10 +211,16 @@ Please make sure to update the `BLASDIR` location depending on the version of Op
 7. Download `svFSI` from GitHub:
 
 ```bash
-mkdir svFSI-git
-cd svFSI-git
-git clone git@github.com:SimVascular/svFSI.git
+mkdir svFSI
+cd svFSI
+git clone https://github.com/SimVascular/svFSI.git
 mv svFSI/  src
+```
+
+If you have `ssh` keys set up on GitHub, you may clone using the following command instead of the above `https` ones,
+
+```bash
+git clone git@github.com:SimVascular/svFSI.git
 ```
 
 8. Create a separate `build` folder and compile using the following commands:
@@ -216,7 +228,7 @@ mv svFSI/  src
 ```bash
 mkdir build
 cd build
-ccmake ../
+ccmake ../src
 make
 ```
 ## =================================================================
