@@ -987,26 +987,32 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  #------------  Additional Robin BC controls
    #  10. Robin BC types involves a spring-mass-damper-type force
    #        application on the surface upon which Robin BC is applied.
-   #        The mathematical expression evaluates to, h = -k*u - c*v,
+   #        The mathematical expression evaluates to,
+   #                    \sigma.n = -(k*u + c*v + p*n),
    #        where k is the stiffness parameter and c is the damping
    #        constant, while u and v are the surface displacement and
-   #        velocity, respectively.
-   #          Therefore, additional parameters need to be provided if
-   #        Robin BC type is set including "Stiffness" and "Damping"
-   #        constants. For e.g.,
+   #        velocity, respectively. p is the external pressure acting
+   #        along normal direction.
+   #          In svFSI, Robin BC is only an extension to the Neumann
+   #        boundary condition and therefore, all the commands for the
+   #        Neumann BC are accepted for Robin BC as well. However,
+   #        additional parameters must be provided for Robin BC that
+   #        include "Stiffness" and "Damping" constants, and whether
+   #        the Robin BC is applied along the normal or not. For e.g.,
+   #
    #          Add BC: face_name {
    #             Type: Robin
+   #             Time dependence: Steady
+   #             Value: 0.0
    #             Stiffness : 1.0e5
    #             Damping: 0.0
+   #             Applied along normal direction: f
    #          }
    #
-   #        If there is an additional load on the face (i.e.,
-   #        h = -k*u - c*v - pn), one may use Neumann BC on the same
-   #        face as,
-   #          Add BC : face_name {
-   #             Type : Neu
-   #             Value: 1.0e4
-   #          }
+   #           When the Robin BC is applied along the normal direction,
+   #        the applied surface traction takes the form,
+   #               \sigma.n = -(k u.n + c v.n - p)n
+   #
    #
    #  #------------  Additional CMM type BC controls
    #  11. If a face (typically a fluid wall/interface) is set to be

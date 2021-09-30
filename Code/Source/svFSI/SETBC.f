@@ -487,9 +487,9 @@
 
             IF (nsd .EQ. 3) THEN
                DO a=1, eNoN
-                  lR(1,a) = lR(1,a) - w*N(a)*h(1)
-                  lR(2,a) = lR(2,a) - w*N(a)*h(2)
-                  lR(3,a) = lR(3,a) - w*N(a)*h(3)
+                  lR(1,a) = lR(1,a) + w*N(a)*h(1)
+                  lR(2,a) = lR(2,a) + w*N(a)*h(2)
+                  lR(3,a) = lR(3,a) + w*N(a)*h(3)
                END DO
 
                IF (cPhys .EQ. phys_ustruct) THEN
@@ -542,24 +542,24 @@
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
-                        lK(1,a,b) = lK(1,a,b) - wl*T1*nDn(1,1)
-                        lK(2,a,b) = lK(2,a,b) - wl*T1*nDn(1,2)
-                        lK(3,a,b) = lK(3,a,b) - wl*T1*nDn(1,3)
+                        lK(1,a,b) = lK(1,a,b) + wl*T1*nDn(1,1)
+                        lK(2,a,b) = lK(2,a,b) + wl*T1*nDn(1,2)
+                        lK(3,a,b) = lK(3,a,b) + wl*T1*nDn(1,3)
 
-                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1*nDn(2,1)
-                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1*nDn(2,2)
-                        lK(dof+3,a,b) = lK(dof+3,a,b) - wl*T1*nDn(2,3)
+                        lK(dof+1,a,b) = lK(dof+1,a,b) + wl*T1*nDn(2,1)
+                        lK(dof+2,a,b) = lK(dof+2,a,b) + wl*T1*nDn(2,2)
+                        lK(dof+3,a,b) = lK(dof+3,a,b) + wl*T1*nDn(2,3)
 
-                        lK(2*dof+1,a,b) = lK(2*dof+1,a,b)-wl*T1*nDn(3,1)
-                        lK(2*dof+2,a,b) = lK(2*dof+2,a,b)-wl*T1*nDn(3,2)
-                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b)-wl*T1*nDn(3,3)
+                        lK(2*dof+1,a,b) = lK(2*dof+1,a,b)+wl*T1*nDn(3,1)
+                        lK(2*dof+2,a,b) = lK(2*dof+2,a,b)+wl*T1*nDn(3,2)
+                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b)+wl*T1*nDn(3,3)
                      END DO
                   END DO
                END IF
             ELSE IF (nsd .EQ. 2) THEN
                DO a=1, eNoN
-                  lR(1,a) = lR(1,a) - w*N(a)*h(1)
-                  lR(2,a) = lR(2,a) - w*N(a)*h(2)
+                  lR(1,a) = lR(1,a) + w*N(a)*h(1)
+                  lR(2,a) = lR(2,a) + w*N(a)*h(2)
                END DO
 
                IF (cPhys .EQ. phys_ustruct) THEN
@@ -592,10 +592,10 @@
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
-                        lK(1,a,b) = lK(1,a,b) - wl*T1*nDn(1,1)
-                        lK(2,a,b) = lK(2,a,b) - wl*T1*nDn(1,2)
-                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1*nDn(2,1)
-                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1*nDn(2,2)
+                        lK(1,a,b) = lK(1,a,b) + wl*T1*nDn(1,1)
+                        lK(2,a,b) = lK(2,a,b) + wl*T1*nDn(1,2)
+                        lK(dof+1,a,b) = lK(dof+1,a,b) + wl*T1*nDn(2,1)
+                        lK(dof+2,a,b) = lK(dof+2,a,b) + wl*T1*nDn(2,2)
                      END DO
                   END DO
                END IF
