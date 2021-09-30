@@ -13,7 +13,7 @@ The following packages are required to build and use `svFSI`.
    - blas & lapack
    - trilinos (optional)
 
-On Ubuntu, most of the dependencies can be downloaded using `apt-get`. On Mac OSX, the dependencies may be installed using `brew`.
+On Ubuntu, most of the dependencies can be installed using `apt install`. On macOS, the dependencies may be installed using `brew`. Apart from GNU compilers, `svFSI` can also be built with Intel oneAPI Toolkits. For more details, please refer to [`INSTALL.md`](./INSTALL.md#Build) and [`INSTALL-DEPS.md`](./INSTALL-DEPS.md#intel-oneapi-toolkitsd).
 
 ## Quick Build
 
