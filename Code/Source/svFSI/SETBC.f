@@ -426,8 +426,8 @@
      2   Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, e, g, s, Ac, iM, eNoN, cPhys
-      REAL(KIND=RKIND) :: af, am, afm, w, wl, T1, T2, nV(nsd), u(nsd),
-     2   ud(nsd), h(nsd), nDn(nsd,nsd)
+      REAL(KIND=RKIND) :: Jac, af, am, afm, w, wl, T1, T2, nV(nsd),
+     2   u(nsd), ud(nsd), h(nsd), nDn(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), xl(:,:), yl(:,:), dl(:,:),
@@ -463,8 +463,10 @@
          lKd = 0._RKIND
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
-            w  = lFa%w(g) * SQRT(NORM(nV))
-            N  = lFa%N(:,g)
+            Jac = SQRT(NORM(nV))
+            nV  = nV/Jac
+            w   = lFa%w(g) * Jac
+            N   = lFa%N(:,g)
 
             u  = 0._RKIND
             ud = 0._RKIND
@@ -473,16 +475,15 @@
                ud(:) = ud(:) + N(a)*yl(:,a)
             END DO
 
-            nDn = MAT_ID(nsd)
+            nDn  = MAT_ID(nsd)
+            h(:) = ks*u(:) + cs*ud(:)
             IF (isN) THEN
-               h(:) = (ks*NORM(u, nV) + cs*NORM(ud, nV)) * nV(:)
+               h(:) = NORM(h, nV) * nV(:)
                DO a=1, nsd
                   DO b=1, nsd
                      nDn(a,b) = nV(a)*nV(b)
                   END DO
                END DO
-            ELSE
-               h(:) = ks*u(:) + cs*ud(:)
             END IF
 
             IF (nsd .EQ. 3) THEN
@@ -973,7 +974,9 @@
 
       LOGICAL RCRflag
       INTEGER(KIND=IKIND) iFa, i, j, ptr, iBc, iM
-      REAL(KIND=RKIND) orgQ, orgY, diff, area
+      REAL(KIND=RKIND) diff, area
+
+      REAL(KIND=RKIND), ALLOCATABLE :: orgY(:), orgQ(:)
 
       IF (ALL(cplBC%fa%bGrp.EQ.cplBC_Dir)) RETURN
 
@@ -1023,12 +1026,13 @@
          diff = diff*relTol
       END IF
 
+      ALLOCATE(orgY(cplBC%nFa), orgQ(cplBC%nFa))
+      orgY = cplBC%fa(:)%y
+      orgQ = cplBC%fa(:)%Qn
       DO iBc=1, eq(iEq)%nBc
          i = eq(iEq)%bc(iBc)%cplBCptr
          IF (i.NE.0 .AND. BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-            orgY = cplBC%fa(i)%y
-            orgQ = cplBC%fa(i)%Qn
-            cplBC%fa(i)%Qn = cplBC%fa(i)%Qn + diff
+            cplBC%fa(i)%Qn = orgQ(i) + diff
 
             IF (cplBC%useGenBC) THEN
                CALL genBC_Integ_X('D')
@@ -1036,12 +1040,13 @@
                CALL cplBC_Integ_X(RCRflag)
             END IF
 
-            eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY)/diff
+            eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY(i))/diff
 
-            cplBC%fa(i)%y  = orgY
-            cplBC%fa(i)%Qn = orgQ
+            cplBC%fa(:)%y  = orgY
+            cplBC%fa(:)%Qn = orgQ
          END IF
       END DO
+      DEALLOCATE(orgY, orgQ)
 
       RETURN
       END SUBROUTINE CALCDERCPLBC
