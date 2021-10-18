@@ -50,7 +50,7 @@
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
      2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), ya_l(:), N(:),
-     3   Nx(:,:), lR(:,:), lK(:,:,:)
+     3   Nx(:,:), lR(:,:), lK(:,:,:), lVWP(:,:)
 
       eNoN = lM%eNoN
       nFn  = lM%nFn
@@ -60,10 +60,12 @@
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
      3   pSl(nsymd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
-     4   lK(dof*dof,eNoN,eNoN))
+     4   lK(dof*dof,eNoN,eNoN), lVWP(nvwp,eNoN))
+
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
+
 !        Update domain and proceed if domain phys and eqn phys match
          cDmn  = DOMAIN(lM, cEq, e)
          cPhys = eq(cEq)%dmn(cDmn)%phys
@@ -84,6 +86,11 @@
             yl(:,a)  = Yg(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
+
+!           Varwall properties-----------------------------------------------------
+!           Calculate local wall property
+            IF (useVarWall) lVWP(:,a) = vWP0(:,Ac)
+!           ------------------------------------------------------------
             IF (ALLOCATED(lM%fN)) THEN
                DO iFn=1, nFn
                   fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
@@ -107,7 +114,7 @@
             pSl = 0._RKIND
             IF (nsd .EQ. 3) THEN
                CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2            pS0l, pSl, ya_l, lR, lK)
+     2                pS0l, pSl, ya_l, lR, lK, lVWP)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
@@ -138,20 +145,20 @@
       END DO ! e: loop
 
       DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, N, Nx,
-     2   lR, lK)
+     2   lR, lK, lVWP)
 
       RETURN
       END SUBROUTINE CONSTRUCT_dSOLID
 !####################################################################
       SUBROUTINE STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2   pS0l, pSl, ya_l, lR, lK)
+     2   pS0l, pSl, ya_l, lR, lK, lVWP)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
-     3   fN(3,nFn), pS0l(6,eNoN), ya_l(eNoN)
+     3   fN(3,nFn), pS0l(6,eNoN), ya_l(eNoN), lVWP(nvwp,eNoN)
       REAL(KIND=RKIND), INTENT(OUT) :: pSl(6)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
@@ -159,7 +166,7 @@
       INTEGER(KIND=IKIND) :: a, b, i, j, k
       REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3),
      2   NxSNx, BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3),
-     3   Bm(6,3,eNoN), S0(3,3)
+     3   Bm(6,3,eNoN), S0(3,3), eVWP(nvwp)
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -181,6 +188,8 @@
       F(3,3) = 1._RKIND
       S0     = 0._RKIND
       ya_g   = 0._RKIND
+      eVWP   = 0._RKIND
+
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
@@ -195,6 +204,11 @@
          F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
          F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
          F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+
+!     Varwall properits-------------------------------------------------
+!     Calculate local wall property
+         IF (useVarWall) eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
+!     ------------------------------------------------------------------
 
          S0(1,1) = S0(1,1) + N(a)*pS0l(1,a)
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
@@ -211,7 +225,7 @@
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notationa (Dm)
-      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm, eVWP)
 
 !     Prestress
       pSl(1) = S(1,1)

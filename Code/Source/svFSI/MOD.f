@@ -837,6 +837,8 @@
       LOGICAL cmmInit
 !     Whether variable wall properties are used for CMM
       LOGICAL cmmVarWall
+!     Whether variable wall properties should be read and used
+      LOGICAL useVarWall
 !     Whether shell equation is being solved
       LOGICAL shlEq
 !     Whether PRESTRESS is being solved
@@ -893,6 +895,8 @@
       INTEGER(KIND=IKIND) rsTS
 !     Number of stress values to be stored
       INTEGER(KIND=IKIND) nsymd
+!     Number of variable wall properties to read in from mesh
+      INTEGER(KIND=IKIND) nvwp
 
 !     REAL VARIABLES
 !     Time step size
@@ -933,7 +937,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: Ao(:,:)
 !     New time derivative of variables
       REAL(KIND=RKIND), ALLOCATABLE :: An(:,:)
-!     Old integrated variables (dissplacement)
+!     Old integrated variables (displacement)
       REAL(KIND=RKIND), ALLOCATABLE :: Do(:,:)
 !     New integrated variables
       REAL(KIND=RKIND), ALLOCATABLE :: Dn(:,:)
@@ -963,6 +967,9 @@
       REAL(KIND=RKIND), ALLOCATABLE :: pS0(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: pSn(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: pSa(:)
+
+!     Variables for variable wall properties
+      REAL(KIND=RKIND), ALLOCATABLE :: vWP0(:,:)
 
 !     Temporary storage for initializing state variables
       REAL(KIND=RKIND), ALLOCATABLE :: Pinit(:)

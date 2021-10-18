@@ -38,7 +38,7 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, Dm)
+      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, Dm, eVWP)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
@@ -46,6 +46,7 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd)
+      REAL(KIND=RKIND), INTENT(IN), OPTIONAL :: eVWP(nvwp)
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
@@ -129,7 +130,12 @@
 
 !     NeoHookean model
       CASE (stIso_nHook)
-         g1 = 2._RKIND * stM%C10
+         IF (useVarWall) THEN
+!           Converting elastic modulus and poisson ratio to g1
+            g1 = eVWP(1)* 0.5_RKIND/(1._RKIND+eVWP(2))
+         ELSE
+            g1 = 2._RKIND * stM%C10
+         END IF
          Sb = g1*IDm
 
 !        Fiber reinforcement/active stress

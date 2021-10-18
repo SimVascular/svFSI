@@ -47,14 +47,17 @@
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), dl(:,:),
-     2   bfl(:,:), pS0l(:,:), pSl(:), N(:), Nx(:,:), lR(:,:), lK(:,:,:)
+     2   bfl(:,:), pS0l(:,:), pSl(:), N(:), Nx(:,:), lR(:,:), lK(:,:,:),
+     3   lVWP(:,:)
 
       eNoN = lM%eNoN
 
 !     LELAS: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), dl(tDof,eNoN),
      2   bfl(nsd,eNoN), pS0l(nsymd,eNoN), pSl(nsymd), N(eNoN),
-     3   Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
+     3   Nx(nsd,eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
+     4   lVWP(nvwp,eNoN))
+
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
@@ -76,7 +79,14 @@
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
+!           Varwall properties------------------------------------------
+!           Calculate local wall property
+            IF (useVarWall) THEN
+               lVWP(:,a) = vWP0(:,Ac)
+            END IF
+!        ---------------------------------------------------------------
          END DO
+
 
 !        Gauss integration
          lR = 0._RKIND
@@ -92,7 +102,7 @@
             pSl = 0._RKIND
             IF (nsd .EQ. 3) THEN
                CALL LELAS3D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
-     2            lK)
+     2            lK, lVWP)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL LELAS2D(eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl, lR,
@@ -128,22 +138,21 @@
       END SUBROUTINE CONSTRUCT_LELAS
 !####################################################################
       PURE SUBROUTINE LELAS3D (eNoN, w, N, Nx, al, dl, bfl, pS0l, pSl,
-     2   lR, lK)
+     2   lR, lK, lVWP)
       USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
       REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
-     2   al(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN), pS0l(6,eNoN)
+     2   al(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN), pS0l(6,eNoN),
+     3   lVWP(nvwp,eNoN)
       REAL(KIND=RKIND), INTENT(INOUT) :: pSl(6), lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) a, b, i, j, k
       REAL(KIND=RKIND) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd,
-     2   wl, lDm, ed(6), ud(3), f(3), S0(6), S(6)
+     2   wl, lDm, ed(6), ud(3), f(3), S0(6), S(6), eVWP(nvwp), Cst(6,6)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
-      nu   = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       f(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       f(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       f(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -151,16 +160,11 @@
       j    = i + 1
       k    = j + 1
 
-      lambda = elM*nu / (1._RKIND+nu) / (1._RKIND-2._RKIND*nu)
-      mu     = elM * 0.5_RKIND / (1._RKIND+nu)
-      lDm    = lambda/mu
-      T1     = eq(cEq)%af*eq(cEq)%beta*dt*dt
-      amd    = eq(cEq)%am/T1*rho
-      wl     = w*T1*mu
-
       ed = 0._RKIND
       ud = -f
       S0 = 0._RKIND
+      eVWP = 0._RKIND
+
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(al(i,a)-bfl(1,a))
          ud(2) = ud(2) + N(a)*(al(j,a)-bfl(2,a))
@@ -173,6 +177,14 @@
          ed(5) = ed(5) + Nx(3,a)*dl(j,a) + Nx(2,a)*dl(k,a)
          ed(6) = ed(6) + Nx(1,a)*dl(k,a) + Nx(3,a)*dl(i,a)
 
+!     ------------------------------------------------------------------
+!     Calculate local wall property
+!     Don't use if calculating mesh
+         IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
+            eVWP(:) = eVWP(:) + N(a)*lVWP(:,a)
+         END IF
+!     ------------------------------------------------------------------
+
          S0(1) = S0(1) + N(a)*pS0l(1,a)
          S0(2) = S0(2) + N(a)*pS0l(2,a)
          S0(3) = S0(3) + N(a)*pS0l(3,a)
@@ -180,7 +192,25 @@
          S0(5) = S0(5) + N(a)*pS0l(5,a)
          S0(6) = S0(6) + N(a)*pS0l(6,a)
       END DO
+
+
+      IF (useVarWall .AND. (phys_mesh .NE. eq(cEq)%phys)) THEN
+         elM  = eVWP(1)
+         nu   = evWP(2)
+      ELSE
+         elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
+         nu   = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
+      END IF
+      
+      lambda = elM*nu / (1._RKIND+nu) / (1._RKIND-2._RKIND*nu)
+      mu     = elM * 0.5_RKIND / (1._RKIND+nu)
+      lDm    = lambda/mu
+      T1     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      amd    = eq(cEq)%am/T1*rho
+      wl     = w*T1*mu
+
       divD = lambda*(ed(1) + ed(2) + ed(3))
+
 
 !     Stress in Voigt notation
       S(1) = divD + 2._RKIND*mu*ed(1)
@@ -189,6 +219,7 @@
       S(4) = mu*ed(4)  ! 2*eps_12
       S(5) = mu*ed(5)  ! 2*eps_23
       S(6) = mu*ed(6)  ! 2*eps_13
+
       pSl  = S
 
 !     Add prestress contribution
@@ -253,7 +284,7 @@
 
       INTEGER(KIND=IKIND) a, b, i, j
       REAL(KIND=RKIND) NxdNx, rho, elM, nu, lambda, mu, divD, T1, amd,
-     2   wl, lDm, ed(3), ud(2), f(2), S0(3), S(3)
+     2   T2, wl, lDm, ed(3), ud(2), f(2), S0(3), S(3)
 
       rho  = eq(cEq)%dmn(cDmn)%prop(solid_density)
       elM  = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
@@ -296,6 +327,8 @@
 !     Add prestress contribution
       S = pSl + S0
 
+!     Need to add variable wall tangent matrix
+
       DO a=1, eNoN
          lR(1,a) = lR(1,a) + w*(rho*N(a)*ud(1) + Nx(1,a)*S(1) +
      2      Nx(2,a)*S(3))
@@ -306,9 +339,9 @@
          DO b=1, eNoN
             NxdNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)
 
-            T1 = amd*N(a)*N(b)/mu + NxdNx
+            T2 = amd*N(a)*N(b)/mu + NxdNx
 
-            lK(1,a,b) = lK(1,a,b) + wl*(T1
+            lK(1,a,b) = lK(1,a,b) + wl*(T2
      2         + (1._RKIND + lDm)*Nx(1,a)*Nx(1,b))
 
             lK(2,a,b) = lK(2,a,b) + wl*(lDm*Nx(1,a)*Nx(2,b)
@@ -317,7 +350,7 @@
             lK(dof+1,a,b) = lK(dof+1,a,b) + wl*(lDm*Nx(2,a)*Nx(1,b)
      2         + Nx(1,a)*Nx(2,b))
 
-            lK(dof+2,a,b) = lK(dof+2,a,b) + wl*(T1
+            lK(dof+2,a,b) = lK(dof+2,a,b) + wl*(T2
      2         + (1._RKIND + lDm)*Nx(2,a)*Nx(2,b))
          END DO
       END DO
