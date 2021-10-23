@@ -41,9 +41,12 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   # set(CMAKE_Fortran_FLAGS "-O0")
   # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
   # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -Wall -Wconversion -Wline-truncation -pedantic -fimplicit-none -fbacktrace -fbounds-check -p -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow")
+elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+  set(CMAKE_Fortran_FLAGS "-O3 -march=native")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp -pthread")
 else()
   # nothing for now
-  # may need to set for intel compiler or others
+  # may need to set for other compilers
 endif()
 
 # Find Trilinos package if requested
@@ -101,10 +104,6 @@ if(WITH_TRILINOS)
   ADD_DEFINITIONS(-DWITH_TRILINOS)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 endif()
-
-# svFSI requires LAPACK
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
 
 
 set(FSRCS TYPEMOD.f
@@ -198,14 +197,22 @@ target_link_libraries(${SV_SVFSI_EXE}
   ${GLOBAL_LIBRARIES}
   ${INTELRUNTIME_LIBRARIES}
   ${ZLIB_LIBRARY}
-  ${BLAS_LIBRARIES}
-  ${LAPACK_LIBRARIES}
   ${METIS_SVFSI_LIBRARY_NAME}
   ${PARMETIS_SVFSI_LIBRARY_NAME}
   ${TETGEN_LIBRARY_NAME}
   ${SV_MPI_Fortran_LIBRARIES}
   ${SV_LIB_SVFSILS_NAME}${SV_MPI_NAME_EXT}
   )
+
+if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+  # svFSI requires LAPACK
+  find_package(BLAS REQUIRED)
+  find_package(LAPACK REQUIRED)
+  target_link_libraries(${SV_SVFSI_EXE} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
+elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+  set_target_properties(svFSI PROPERTIES LINKER_LANGUAGE Fortran)
+  target_link_libraries(${SV_SVFSI_EXE} -mkl)
+endif()  
 
 # extra MPI libraries only if there are not set to NOT_FOUND or other null
 if(SV_MPI_EXTRA_LIBRARY)

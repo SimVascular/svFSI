@@ -1,6 +1,6 @@
 ## Introduction
 
-`svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver. The solver is released under the MIT License open source initiative.
+`svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver.
 
 ## Dependence
 
@@ -13,7 +13,7 @@ The following packages are required to build and use `svFSI`.
    - blas & lapack
    - trilinos (optional)
 
-On Ubuntu, most of the dependencies can be downloaded using `apt-get`. On Mac OSX, the dependencies may be installed using `brew`.
+On Ubuntu, most of the dependencies can be installed using `apt install`. On macOS, the dependencies may be installed using `brew`. Apart from GNU compilers, `svFSI` can also be built with Intel oneAPI Toolkits. For more details, please refer to [`INSTALL.md`](./INSTALL.md#Build) and [`INSTALL-DEPS.md`](./INSTALL-DEPS.md#intel-oneapi-toolkitsd).
 
 ## Quick Build
 
@@ -112,9 +112,6 @@ More details can be found here:
 - Cardiac electrophysiology modeling: http://simvascular.github.io/docsSimCardio.html#cep-modeling
 - Cardiac mechanics modeling:  http://simvascular.github.io/docsSimCardio.html#mechanics-modeling
 - Prescribed-motion LV modeling: https://simvascular.github.io/docsSimCardio.html#automatic-cardiac-modeling
-
-## License
-`svFSI` is published under the BSD 3-Clause License. Details are included in each source code file.
 
 ## Citation
 In preparation.

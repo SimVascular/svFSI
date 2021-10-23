@@ -1,7 +1,27 @@
 
 This file describes a general procedure to install `svFSI` dependencies. While most dependencies provided below are built from source, users are encouraged to use package managers such as `apt` for Ubuntu and `brew` for Mac OSX when available. Users may modify the parameters according to the local module and compiler environment. Please note that the below procedures are primarily intended for moderate to advanced Linux users only. Others are encouraged to use precompiled binaries at [SimTK](https://simtk.org/frs/index.php?group_id=188) or the `Quick Build` procedure outlined in the README.md file.
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
+## Intel oneAPI Toolkits
+
+Intel has release its next-gen software development suite, oneAPI, free of charge. This suite provides comprehensive compiler support for Linux, Windows and limited support for macOS. To build `svFSI` with Intel oneAPI compilers, the following two toolkits should be installed:
+[Intel oneAPI Base Toolkit](https://software.intel.com/content/www/us/en/develop/tools/oneapi/base-toolkit.html#gs.cld9rl) and [Intel oneAPI HPC Toolkit](https://software.intel.com/content/www/us/en/develop/tools/oneapi/hpc-toolkit.html#gs.cldcfd). Detailed installation instructions are provided on the download page of each toolkit.
+
+Intel oneAPI Base Toolkit provides development tools for general computing and consists of over a dozen components. Users only need to install selected few in order to build `svFSI`. We recommend the following:
+- Intel oneAPI Collective Communications Library
+- Intel oneAPI DPC++/C++ Compiler
+- Intel oneAPI DPC++ Library
+- Intel oneAPI Math Kernel Library
+- Intel oneAPI Threading Building Blocks
+- Intel Distribution for GDB
+- Intel DPC++ Compatibility Tool
+- Intel VTune Profiler
+
+Intel oneAPI HPC Toolkit complements the Base Toolkit and provides necessary components for high-performance computing, such as Fortran compiler and MPI library. We recommend install all of the components. Please note that there is no Intel MPI library for macOS as of version 2021.3.0.
+
+<hr style="border:2px solid gray"> </hr>
+
 ## Curses CMake
 
 Before installing cmake, install libncurses5-dev from apt as,
@@ -12,7 +32,8 @@ sudo apt-get install libncurses5-dev
 
 to get ccmake installed
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## CMAKE 3.20.5
 
 Downloaded cmake version 3.20.5 from,
@@ -32,7 +53,8 @@ make
 sudo make install
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## MPICH
 
 Downloaded mpich version 3.4.2 from,
@@ -51,7 +73,8 @@ make
 sudo make install
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## OpenMPI
 
 Downloaded openmpi version 4.1.1 from,
@@ -70,7 +93,8 @@ make
 sudo make install
 ```
 
-# =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## LAPACK
 
 Downloaded lapack version 3.9.1 from,
@@ -126,7 +150,8 @@ sudo ln -sf /opt/netlib/lapack/3.9.1/static/liblapack.a  /usr/local/lib
 sudo ln -sf /opt/netlib/lapack/3.9.1/static/libblas.a  /usr/local/lib
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## Boost
 
 Boost installed version: boost_1_66_0.tar.gz
@@ -141,7 +166,8 @@ cd boost_1_66_0
 sudo ./b2 install
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## HDF5
 
 HDF5 installed version: hdf5-1.10.4.tar.gz
@@ -159,7 +185,8 @@ make
 sudo make install
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## HYPRE
 
 HYPRE installed version: hypre-2.22.0.tar.gz
@@ -175,7 +202,8 @@ cd hypre-2.22.0/src
 sudo make install
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## MUMPS
 
 MUMPS installed version: MUMPS_5.4.0.tar.gz
@@ -295,7 +323,8 @@ Copy `include`, `lib`, and `examples` to the destination folder.
 sudo cp -r include/ lib/ examples/ /opt/mumps/5.4.0
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## Trilinos
 
 Trilinos installed version: Trilinos-trilinos-release-13-0-1.tar.gz
@@ -312,13 +341,15 @@ mkdir build_mpich
 cd build_mpich
 ```
 
-### Compiler flags for performance
+Compiler flags for performance
 
+```bash
 CXXFLAGS = -O3 -DNDEBUG -march=native
 CFLAGS = -O3 -DNDEBUG -march=native
 FCFLAGS = -O3 -march=native
+```
 
-### CMake Configuration:
+CMake configuration for GNU compilers:
 
 ```bash
     cmake                                            \
@@ -360,6 +391,41 @@ FCFLAGS = -O3 -march=native
     ../
 ```
 
+Minimalist CMake configuration for Intel oneAPI Toolkits
+```bash
+#!/bin/bash
+
+INTEL_MPI_DIR=/opt/pkg/intel/oneapi/mpi/2021.3.0
+INTEL_MKL_DIR=/opt/pkg/intel/oneapi/mkl/2021.3.0
+
+cmake \
+    -DCMAKE_INSTALL_PREFIX:PATH=/opt/pkg/trilinos/13.0.1_intel \
+    -D TPL_ENABLE_MPI=ON \
+    -D MPI_BASE_DIR="${INTEL_MPI_DIR}" \
+    -D TPL_ENABLE_MKL:BOOL=ON \
+    -D MKL_LIBRARY_DIRS:FILEPATH="${INTEL_MKL_DIR}/lib/intel64" \
+    -D MKL_INCLUDE_DIRS:FILEPATH="${INTEL_MKL_DIR}/include" \
+    -D Trilinos_ENABLE_OpenMP=OFF \
+    -DTPL_ENABLE_BLAS:BOOL=ON \
+    -D BLAS_LIBRARY_DIRS:FILEPATH="${INTEL_MKL_DIR}/lib/intel64" \
+    -D BLAS_LIBRARY_NAMES:STRING="mkl_intel_lp64;mkl_sequential;mkl_core" \
+    -DTPL_ENABLE_LAPACK:BOOL=ON \
+    -D LAPACK_LIBRARY_DIRS:FILEPATH="${INTEL_MKL_DIR}/lib/intel64" \
+    -D LAPACK_LIBRARY_NAMES:STRING="mkl_intel_lp64;mkl_sequential;mkl_core" \
+    -DTrilinos_ENABLE_FLOAT=ON \
+    -DTrilinos_ENABLE_TESTS:BOOL=ON \
+    -DTrilinos_ENABLE_Epetra:BOOL=ON \
+    -DTrilinos_ENABLE_AztecOO:BOOL=ON \
+    -DTrilinos_ENABLE_Amesos:BOOL= ON \
+    -DTrilinos_ENABLE_ML:Bool=ON \
+    -DTrilinos_ENABLE_MueLu:Bool=ON \
+    -DTrilinos_ENABLE_Ifpack:BOOL=ON \
+    -DCMAKE_BUILD_TYPE=RELEASE \
+    -D BUILD_SHARED_LIBS=ON \
+    ../
+```
+Here, `BLAS_LIBRARY_NAMES` and `LAPACK_LIBRARY_NAMES` are platform/architecture specific. Please consult [Intel Link Line Advisor](https://software.intel.com/content/www/us/en/develop/tools/oneapi/components/onemkl/link-line-advisor.html).
+
 Finally, compile and install
 
 ```bash
@@ -367,5 +433,6 @@ make -j <num_processes>
 sudo make install
 ```
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 
