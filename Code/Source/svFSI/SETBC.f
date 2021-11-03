@@ -426,7 +426,7 @@
      2   Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, e, g, s, Ac, iM, eNoN, cPhys
-      REAL(KIND=RKIND) :: Jac, af, am, afm, w, wl, T1, T2, nV(nsd),
+      REAL(KIND=RKIND) :: Jac, afu, afv, afm, w, wl, T1, T2, nV(nsd),
      2   u(nsd), ud(nsd), h(nsd), nDn(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
@@ -434,9 +434,9 @@
      2   lR(:,:), lK(:,:,:), lKd(:,:,:)
 
       s   = eq(cEq)%s
-      am  = eq(cEq)%af*eq(cEq)%gam*dt
-      af  = eq(cEq)%af*eq(cEq)%beta*dt*dt
-      afm = am/eq(cEq)%am
+      afv = eq(cEq)%af*eq(cEq)%gam*dt
+      afu = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afm = afv/eq(cEq)%am
 
       iM   = lFa%iM
       eNoN = lFa%eNoN
@@ -494,7 +494,7 @@
                END DO
 
                IF (cPhys .EQ. phys_ustruct) THEN
-                  wl = w*af
+                  wl = w*afv
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = wl*N(a)*N(b)
@@ -539,7 +539,7 @@
                      END DO
                   END DO
                ELSE
-                  wl = w*(ks*af + cs*am)
+                  wl = w*(ks*afu + cs*afv)
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
@@ -564,7 +564,7 @@
                END DO
 
                IF (cPhys .EQ. phys_ustruct) THEN
-                  wl = w*af
+                  wl = w*afv
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = wl*N(a)*N(b)
@@ -589,7 +589,7 @@
                      END DO
                   END DO
                ELSE
-                  wl = w*(ks*af + cs*am)
+                  wl = w*(ks*afu + cs*afv)
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)

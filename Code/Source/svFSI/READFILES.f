@@ -513,9 +513,10 @@
          propL(2,1) = damping
          propL(3,1) = elasticity_modulus
          propL(4,1) = poisson_ratio
-         propL(5,1) = f_x
-         propL(6,1) = f_y
-         IF (nsd .EQ. 3) propL(7,1) = f_z
+         propL(5,1) = solid_viscosity
+         propL(6,1) = f_x
+         propL(7,1) = f_y
+         IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
@@ -553,11 +554,12 @@
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
          propL(3,1) = poisson_ratio
-         propL(4,1) = ctau_M
-         propL(5,1) = ctau_C
-         propL(6,1) = f_x
-         propL(7,1) = f_y
-         IF (nsd .EQ. 3) propL(8,1) = f_z
+         propL(4,1) = solid_viscosity
+         propL(5,1) = ctau_M
+         propL(6,1) = ctau_C
+         propL(7,1) = f_x
+         propL(8,1) = f_y
+         IF (nsd .EQ. 3) propL(9,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
@@ -1038,6 +1040,8 @@
             CASE (poisson_ratio)
                lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0._RKIND,
      2            ul=0.5_RKIND)
+            CASE (solid_viscosity)
+               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (conductivity)
                lPtr => lPD%get(rtmp,"Conductivity",1,ll=0._RKIND)
             CASE (f_x)
@@ -2482,6 +2486,7 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%bss, "b4s")
          lPtr => lSt%get(lDmn%stM%afs, "afs")
          lPtr => lSt%get(lDmn%stM%bfs, "bfs")
+         lPtr => lSt%get(lDmn%stM%khs, "k")
 
       CASE DEFAULT
          err = "Undefined constitutive model used"

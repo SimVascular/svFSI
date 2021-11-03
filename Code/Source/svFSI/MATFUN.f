@@ -84,6 +84,40 @@
       RETURN
       END FUNCTION MAT_TRACE
 !--------------------------------------------------------------------
+!     Symmetric part of a matrix, S = (A + A.T)/2
+      FUNCTION MAT_SYMM(A, nd) RESULT(S)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nd
+      REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd)
+      REAL(KIND=RKIND) :: S(nd,nd)
+
+      INTEGER(KIND=IKIND) :: i, j
+
+      S = 0._RKIND
+      DO i=1, nd
+         DO j=1, nd
+            S(i,j) = 0.5_RKIND*(A(i,j) + A(j,i))
+         END DO
+      END DO
+
+      RETURN
+      END FUNCTION MAT_SYMM
+!--------------------------------------------------------------------
+!     Deviatoric part of a matrix, D = A - (tr.(A)/nd) I
+      FUNCTION MAT_DEV(A, nd) RESULT(D)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nd
+      REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd)
+      REAL(KIND=RKIND) :: D(nd,nd)
+
+      INTEGER(KIND=IKIND) :: trA
+
+      trA = MAT_TRACE(A,nd)
+      D   = A - (trA/REAL(nd,KIND=RKIND)) * MAT_ID(nd)
+
+      RETURN
+      END FUNCTION MAT_DEV
+!--------------------------------------------------------------------
 !     Create a matrix from outer product of two vectors
       FUNCTION MAT_DYADPROD(u, v, nd) RESULT(A)
       IMPLICIT NONE

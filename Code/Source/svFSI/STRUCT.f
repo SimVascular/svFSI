@@ -157,24 +157,28 @@
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, i, j, k
-      REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(3), ud(3),
-     2   NxSNx, BmDBm, F(3,3), S(3,3), P(3,3), Dm(6,6), DBm(6,3),
-     3   Bm(6,3,eNoN), S0(3,3)
+      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, ya_g, fb(3),
+     2   ud(3), NxSNx, NxNx, BmDBm, vx(3,3), F(3,3), Fi(3,3), ddev(3,3),
+     3   Svis(3,3), S(3,3), P(3,3), S0(3,3), Dm(6,6), DBm(6,3),
+     4   Bm(6,3,eNoN), NxFi(3,eNoN), PvNx(3,eNoN), r13, r23, T1, T2
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
+      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
-      amd     = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
-      afl     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afu     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afv     = eq(cEq)%af*eq(cEq)%gam*dt
+      amd     = eq(cEq)%am*rho + afv*dmp
       i       = eq(cEq)%s
       j       = i + 1
       k       = j + 1
 
 !     Inertia, body force and deformation tensor (F)
       ud     = -rho*fb
+      vx     = 0._RKIND
       F      = 0._RKIND
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
@@ -186,15 +190,25 @@
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
          ud(3) = ud(3) + N(a)*(rho*(al(k,a)-bfl(3,a)) + dmp*yl(k,a))
 
-         F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-         F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-         F(1,3) = F(1,3) + Nx(3,a)*dl(i,a)
-         F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-         F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
-         F(2,3) = F(2,3) + Nx(3,a)*dl(j,a)
-         F(3,1) = F(3,1) + Nx(1,a)*dl(k,a)
-         F(3,2) = F(3,2) + Nx(2,a)*dl(k,a)
-         F(3,3) = F(3,3) + Nx(3,a)*dl(k,a)
+         vx(1,1) = vx(1,1) + Nx(1,a)*yl(i,a)
+         vx(1,2) = vx(1,2) + Nx(2,a)*yl(i,a)
+         vx(1,3) = vx(1,3) + Nx(3,a)*yl(i,a)
+         vx(2,1) = vx(2,1) + Nx(1,a)*yl(j,a)
+         vx(2,2) = vx(2,2) + Nx(2,a)*yl(j,a)
+         vx(2,3) = vx(2,3) + Nx(3,a)*yl(j,a)
+         vx(3,1) = vx(3,1) + Nx(1,a)*yl(k,a)
+         vx(3,2) = vx(3,2) + Nx(2,a)*yl(k,a)
+         vx(3,3) = vx(3,3) + Nx(3,a)*yl(k,a)
+
+         F(1,1)  = F(1,1)  + Nx(1,a)*dl(i,a)
+         F(1,2)  = F(1,2)  + Nx(2,a)*dl(i,a)
+         F(1,3)  = F(1,3)  + Nx(3,a)*dl(i,a)
+         F(2,1)  = F(2,1)  + Nx(1,a)*dl(j,a)
+         F(2,2)  = F(2,2)  + Nx(2,a)*dl(j,a)
+         F(2,3)  = F(2,3)  + Nx(3,a)*dl(j,a)
+         F(3,1)  = F(3,1)  + Nx(1,a)*dl(k,a)
+         F(3,2)  = F(3,2)  + Nx(2,a)*dl(k,a)
+         F(3,3)  = F(3,3)  + Nx(3,a)*dl(k,a)
 
          S0(1,1) = S0(1,1) + N(a)*pS0l(1,a)
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
@@ -209,9 +223,20 @@
       S0(3,2) = S0(2,3)
       S0(1,3) = S0(3,1)
 
+      Jac = MAT_DET(F, 3)
+      Fi  = MAT_INV(F, 3)
+
+!     Viscous contribution
+      ddev = 2._RKIND*mu*Jac*MAT_DEV(MAT_SYMM(vx,3), 3)
+      Svis = MATMUL(ddev, TRANSPOSE(Fi))
+      Svis = MATMUL(Fi, Svis)
+
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notationa (Dm)
       CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
+
+!     Elastic + Viscous stresses
+      S = S + Svis
 
 !     Prestress
       pSl(1) = S(1,1)
@@ -220,6 +245,8 @@
       pSl(4) = S(1,2)
       pSl(5) = S(2,3)
       pSl(6) = S(3,1)
+
+!     Total 2nd Piola-Kirchhoff stress
       S = S + S0
 
 !     1st Piola-Kirchhoff tensor (P)
@@ -251,7 +278,23 @@
          Bm(6,3,a) = (Nx(3,a)*F(3,1) + F(3,3)*Nx(1,a))
       END DO
 
-!     Local residue and tangent matrices
+      DO a=1, eNoN
+         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1) +
+     2      Nx(3,a)*Fi(3,1)
+         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2) +
+     2      Nx(3,a)*Fi(3,2)
+         NxFi(3,a) = Nx(1,a)*Fi(1,3) + Nx(2,a)*Fi(2,3) +
+     2      Nx(3,a)*Fi(3,3)
+
+         PvNx(1,a) = ddev(1,1)*NxFi(1,a) + ddev(1,2)*NxFi(2,a) +
+     2      ddev(1,3)*NxFi(3,a)
+         PvNx(2,a) = ddev(2,1)*NxFi(1,a) + ddev(2,2)*NxFi(2,a) +
+     2      ddev(2,3)*NxFi(3,a)
+         PvNx(3,a) = ddev(3,1)*NxFi(1,a) + ddev(3,2)*NxFi(2,a) +
+     2      ddev(3,3)*NxFi(3,a)
+      END DO
+
+!     Local residue
       DO a=1, eNoN
          lR(1,a) = lR(1,a) + w*(N(a)*ud(1) + Nx(1,a)*P(1,1) +
      2      Nx(2,a)*P(1,2) + Nx(3,a)*P(1,3))
@@ -259,63 +302,95 @@
      2      Nx(2,a)*P(2,2) + Nx(3,a)*P(2,3))
          lR(3,a) = lR(3,a) + w*(N(a)*ud(3) + Nx(1,a)*P(3,1) +
      2      Nx(2,a)*P(3,2) + Nx(3,a)*P(3,3))
+      END DO
 
-         DO b=1, eNoN
+!     Local stiffness tensor
+      r13 = 1._RKIND / 3._RKIND
+      r23 = 2._RKIND / 3._RKIND
+      DO b=1, eNoN
+         DO a=1, eNoN
 !           Geometric stiffness
             NxSNx = Nx(1,a)*S(1,1)*Nx(1,b) + Nx(2,a)*S(2,1)*Nx(1,b) +
      2              Nx(3,a)*S(3,1)*Nx(1,b) + Nx(1,a)*S(1,2)*Nx(2,b) +
      3              Nx(2,a)*S(2,2)*Nx(2,b) + Nx(3,a)*S(3,2)*Nx(2,b) +
      4              Nx(1,a)*S(1,3)*Nx(3,b) + Nx(2,a)*S(2,3)*Nx(3,b) +
      5              Nx(3,a)*S(3,3)*Nx(3,b)
-            T1 = amd*N(a)*N(b) + afl*NxSNx
+            T1 = amd*N(a)*N(b) + afu*NxSNx
 
 !           Material Stiffness (Bt*D*B)
             DBm = MATMUL(Dm, Bm(:,:,b))
 
+            NxNx = NxFi(1,a)*NxFi(1,b) + NxFi(2,a)*NxFi(2,b)
+     2           + NxFi(3,a)*NxFi(3,b)
+
             BmDBm = Bm(1,1,a)*DBm(1,1) + Bm(2,1,a)*DBm(2,1) +
      2              Bm(3,1,a)*DBm(3,1) + Bm(4,1,a)*DBm(4,1) +
-     2              Bm(5,1,a)*DBm(5,1) + Bm(6,1,a)*DBm(6,1)
-            lK(1,a,b) = lK(1,a,b) + w*(T1 + afl*BmDBm)
+     3              Bm(5,1,a)*DBm(5,1) + Bm(6,1,a)*DBm(6,1)
+            T2 = afu*(BmDBm + PvNx(1,a)*NxFi(1,b) - NxFi(1,a)*PvNx(1,b))
+     2         + afv*mu*Jac*(r13*NxFi(1,a)*NxFi(1,b) + NxNx)
+            lK(1,a,b) = lK(1,a,b) + w*(T1 + T2)
 
             BmDBm = Bm(1,1,a)*DBm(1,2) + Bm(2,1,a)*DBm(2,2) +
      2              Bm(3,1,a)*DBm(3,2) + Bm(4,1,a)*DBm(4,2) +
-     2              Bm(5,1,a)*DBm(5,2) + Bm(6,1,a)*DBm(6,2)
-            lK(2,a,b) = lK(2,a,b) + w*afl*BmDBm
+     3              Bm(5,1,a)*DBm(5,2) + Bm(6,1,a)*DBm(6,2)
+            T2 = afu*(BmDBm + PvNx(1,a)*NxFi(2,b) - NxFi(2,a)*PvNx(1,b))
+     2         + afv*mu*Jac*(NxFi(2,a)*NxFi(1,b)
+     3         - r23*NxFi(1,a)*NxFi(2,b))
+            lK(2,a,b) = lK(2,a,b) + w*T2
 
             BmDBm = Bm(1,1,a)*DBm(1,3) + Bm(2,1,a)*DBm(2,3) +
      2              Bm(3,1,a)*DBm(3,3) + Bm(4,1,a)*DBm(4,3) +
-     2              Bm(5,1,a)*DBm(5,3) + Bm(6,1,a)*DBm(6,3)
-            lK(3,a,b) = lK(3,a,b) + w*afl*BmDBm
+     3              Bm(5,1,a)*DBm(5,3) + Bm(6,1,a)*DBm(6,3)
+            T2 = afu*(BmDBm + PvNx(1,a)*NxFi(3,b) - NxFi(3,a)*PvNx(1,b))
+     2         + afv*mu*Jac*(NxFi(3,a)*NxFi(1,b)
+     3         - r23*NxFi(1,a)*NxFi(3,b))
+            lK(3,a,b) = lK(3,a,b) + w*T2
 
             BmDBm = Bm(1,2,a)*DBm(1,1) + Bm(2,2,a)*DBm(2,1) +
      2              Bm(3,2,a)*DBm(3,1) + Bm(4,2,a)*DBm(4,1) +
-     2              Bm(5,2,a)*DBm(5,1) + Bm(6,2,a)*DBm(6,1)
-            lK(dof+1,a,b) = lK(dof+1,a,b) + w*afl*BmDBm
+     3              Bm(5,2,a)*DBm(5,1) + Bm(6,2,a)*DBm(6,1)
+            T2 = afu*(BmDBm + PvNx(2,a)*NxFi(1,b) - NxFi(1,a)*PvNx(2,b))
+     2         + afv*mu*Jac*(NxFi(1,a)*NxFi(2,b)
+     3         - r23*NxFi(2,a)*NxFi(1,b))
+            lK(dof+1,a,b) = lK(dof+1,a,b) + w*T2
 
             BmDBm = Bm(1,2,a)*DBm(1,2) + Bm(2,2,a)*DBm(2,2) +
      2              Bm(3,2,a)*DBm(3,2) + Bm(4,2,a)*DBm(4,2) +
-     2              Bm(5,2,a)*DBm(5,2) + Bm(6,2,a)*DBm(6,2)
-            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + afl*BmDBm)
+     3              Bm(5,2,a)*DBm(5,2) + Bm(6,2,a)*DBm(6,2)
+            T2 = afu*(BmDBm + PvNx(2,a)*NxFi(2,b) - NxFi(2,a)*PvNx(2,b))
+     2         + afv*mu*Jac*(r13*NxFi(2,a)*NxFi(2,b) + NxNx)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + T2)
 
             BmDBm = Bm(1,2,a)*DBm(1,3) + Bm(2,2,a)*DBm(2,3) +
      2              Bm(3,2,a)*DBm(3,3) + Bm(4,2,a)*DBm(4,3) +
-     2              Bm(5,2,a)*DBm(5,3) + Bm(6,2,a)*DBm(6,3)
-            lK(dof+3,a,b) = lK(dof+3,a,b) + w*afl*BmDBm
+     3              Bm(5,2,a)*DBm(5,3) + Bm(6,2,a)*DBm(6,3)
+            T2 = afu*(BmDBm + PvNx(2,a)*NxFi(3,b) - NxFi(3,a)*PvNx(2,b))
+     2         + afv*mu*Jac*(NxFi(3,a)*NxFi(2,b)
+     3         - r23*NxFi(2,a)*NxFi(3,b))
+            lK(dof+3,a,b) = lK(dof+3,a,b) + w*T2
 
             BmDBm = Bm(1,3,a)*DBm(1,1) + Bm(2,3,a)*DBm(2,1) +
      2              Bm(3,3,a)*DBm(3,1) + Bm(4,3,a)*DBm(4,1) +
-     2              Bm(5,3,a)*DBm(5,1) + Bm(6,3,a)*DBm(6,1)
-            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*afl*BmDBm
+     3              Bm(5,3,a)*DBm(5,1) + Bm(6,3,a)*DBm(6,1)
+            T2 = afu*(BmDBm + PvNx(3,a)*NxFi(1,b) - NxFi(1,a)*PvNx(3,b))
+     2         + afv*mu*Jac*(NxFi(1,a)*NxFi(3,b)
+     3         - r23*NxFi(3,a)*NxFi(1,b))
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*T2
 
             BmDBm = Bm(1,3,a)*DBm(1,2) + Bm(2,3,a)*DBm(2,2) +
      2              Bm(3,3,a)*DBm(3,2) + Bm(4,3,a)*DBm(4,2) +
-     2              Bm(5,3,a)*DBm(5,2) + Bm(6,3,a)*DBm(6,2)
-            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*afl*BmDBm
+     3              Bm(5,3,a)*DBm(5,2) + Bm(6,3,a)*DBm(6,2)
+            T2 = afu*(BmDBm + PvNx(3,a)*NxFi(2,b) - NxFi(2,a)*PvNx(3,b))
+     2         + afv*mu*Jac*(NxFi(2,a)*NxFi(3,b)
+     3         - r23*NxFi(3,a)*NxFi(2,b))
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*T2
 
             BmDBm = Bm(1,3,a)*DBm(1,3) + Bm(2,3,a)*DBm(2,3) +
      2              Bm(3,3,a)*DBm(3,3) + Bm(4,3,a)*DBm(4,3) +
-     2              Bm(5,3,a)*DBm(5,3) + Bm(6,3,a)*DBm(6,3)
-            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + w*(T1 + afl*BmDBm)
+     3              Bm(5,3,a)*DBm(5,3) + Bm(6,3,a)*DBm(6,3)
+            T2 = afu*(BmDBm + PvNx(3,a)*NxFi(3,b) - NxFi(3,a)*PvNx(3,b))
+     2         + afv*mu*Jac*(r13*NxFi(3,a)*NxFi(3,b) + NxNx)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + w*(T1 + T2)
          END DO
       END DO
 
@@ -336,22 +411,26 @@
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, i, j
-      REAL(KIND=RKIND) :: rho, dmp, T1, amd, afl, ya_g, fb(2), ud(2),
-     2   NxSNx, BmDBm, F(2,2), S(2,2), P(2,2), Dm(3,3), DBm(3,2),
-     3   Bm(3,2,eNoN), S0(2,2)
+      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, ya_g, fb(2),
+     2   ud(2), NxSNx, NxNx, BmDBm, vx(2,2), F(2,2), Fi(2,2), ddev(2,2),
+     3   Svis(2,2), S(2,2), P(2,2), S0(2,2), Dm(3,3), Dbm(3,2),
+     4   Bm(3,2,eNoN), NxFi(2,eNoN), PvNx(2,eNoN), T1, T2
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
+      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
-      amd     = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
-      afl     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afu     = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afv     = eq(cEq)%af*eq(cEq)%gam*dt
+      amd     = eq(cEq)%am*rho + afv*dmp
       i       = eq(cEq)%s
       j       = i + 1
 
 !     Inertia, body force and deformation tensor (F)
       ud     = -rho*fb
+      vx     = 0._RKIND
       F      = 0._RKIND
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
@@ -361,10 +440,15 @@
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
          ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
 
-         F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
-         F(1,2) = F(1,2) + Nx(2,a)*dl(i,a)
-         F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
-         F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
+         vx(1,1) = vx(1,1) + Nx(1,a)*yl(i,a)
+         vx(1,2) = vx(1,2) + Nx(2,a)*yl(i,a)
+         vx(2,1) = vx(2,1) + Nx(1,a)*yl(j,a)
+         vx(2,2) = vx(2,2) + Nx(2,a)*yl(j,a)
+
+         F(1,1)  = F(1,1)  + Nx(1,a)*dl(i,a)
+         F(1,2)  = F(1,2)  + Nx(2,a)*dl(i,a)
+         F(2,1)  = F(2,1)  + Nx(1,a)*dl(j,a)
+         F(2,2)  = F(2,2)  + Nx(2,a)*dl(j,a)
 
          S0(1,1) = S0(1,1) + N(a)*pS0l(1,a)
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
@@ -374,14 +458,27 @@
       END DO
       S0(2,1) = S0(1,2)
 
+      Jac = MAT_DET(F, 2)
+      Fi  = MAT_INV(F, 2)
+
+!     Viscous contribution
+      ddev = 2._RKIND*mu*Jac*MAT_DEV(MAT_SYMM(vx,2), 2)
+      Svis = MATMUL(ddev, TRANSPOSE(Fi))
+      Svis = MATMUL(Fi, Svis)
+
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notation
       CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
+
+!     Elastic + Viscous stresses
+      S = S + Svis
 
 !     Prestress
       pSl(1) = S(1,1)
       pSl(2) = S(2,2)
       pSl(3) = S(1,2)
+
+!     Total 2nd Piola-Kirchhoff stress
       S = S + S0
 
 !     1st Piola-Kirchhoff tensor (P)
@@ -398,18 +495,29 @@
          Bm(3,2,a) = (Nx(1,a)*F(2,2) + F(2,1)*Nx(2,a))
       END DO
 
-!     Local residue and tangent matrices
+      DO a=1, eNoN
+         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1)
+         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2)
+
+         PvNx(1,a) = ddev(1,1)*NxFi(1,a) + ddev(1,2)*NxFi(2,a)
+         PvNx(2,a) = ddev(2,1)*NxFi(1,a) + ddev(2,2)*NxFi(2,a)
+      END DO
+
+!     Local residue
       DO a=1, eNoN
          lR(1,a) = lR(1,a) + w*(N(a)*ud(1) + Nx(1,a)*P(1,1) +
      2      Nx(2,a)*P(1,2))
          lR(2,a) = lR(2,a) + w*(N(a)*ud(2) + Nx(1,a)*P(2,1) +
      2      Nx(2,a)*P(2,2))
+      END DO
 
-         DO b=1, eNoN
+!     Local stiffness tensor
+      DO b=1, eNoN
+         DO a=1, eNoN
 !           Geometric stiffness
             NxSNx = Nx(1,a)*S(1,1)*Nx(1,b) + Nx(2,a)*S(2,1)*Nx(1,b) +
      2              Nx(1,a)*S(1,2)*Nx(2,b) + Nx(2,a)*S(2,2)*Nx(2,b)
-            T1 = amd*N(a)*N(b) + afl*NxSNx
+            T1 = amd*N(a)*N(b) + afu*NxSNx
 
 !           Material stiffness (Bt*D*B)
             DBm(1,1) = Dm(1,1)*Bm(1,1,b) + Dm(1,2)*Bm(2,1,b) +
@@ -427,21 +535,31 @@
             DBm(3,2) = Dm(3,1)*Bm(1,2,b) + Dm(3,2)*Bm(2,2,b) +
      2         Dm(3,3)*Bm(3,2,b)
 
+            NxNx = NxFi(1,a)*NxFi(1,b) + NxFi(2,a)*NxFi(2,b)
+
             BmDBm = Bm(1,1,a)*DBm(1,1) + Bm(2,1,a)*DBm(2,1) +
      2         Bm(3,1,a)*DBm(3,1)
-            lK(1,a,b) = lK(1,a,b) + w*(T1 + afl*BmDBm)
+            T2 = afu*(BmDBm + PvNx(1,a)*NxFi(1,b) - NxFi(1,a)*PvNx(1,b))
+     2         + afv*mu*Jac*NxNx
+            lK(1,a,b) = lK(1,a,b) + w*(T1 + T2)
 
             BmDBm = Bm(1,1,a)*DBm(1,2) + Bm(2,1,a)*DBm(2,2) +
      2         Bm(3,1,a)*DBm(3,2)
-            lK(2,a,b) = lK(2,a,b) + w*afl*BmDBm
+            T2 = afu*(BmDBm + PvNx(1,a)*NxFi(2,b) - NxFi(2,a)*PvNx(1,b))
+     2         + afv*mu*Jac*(NxFi(2,a)*NxFi(1,b) - NxFi(1,a)*NxFi(2,b))
+            lK(2,a,b) = lK(2,a,b) + w*T2
 
             BmDBm = Bm(1,2,a)*DBm(1,1) + Bm(2,2,a)*DBm(2,1) +
      2         Bm(3,2,a)*DBm(3,1)
-            lK(dof+1,a,b) = lK(dof+1,a,b) + w*afl*BmDBm
+            T2 = afu*(BmDBm + PvNx(2,a)*NxFi(1,b) - NxFi(1,a)*PvNx(2,b))
+     2         + afv*mu*Jac*(NxFi(1,a)*NxFi(2,b) - NxFi(2,a)*NxFi(1,b))
+            lK(dof+1,a,b) = lK(dof+1,a,b) + w*T2
 
             BmDBm = Bm(1,2,a)*DBm(1,2) + Bm(2,2,a)*DBm(2,2) +
      2         Bm(3,2,a)*DBm(3,2)
-            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + afl*BmDBm)
+            T2 = afu*(BmDBm + PvNx(2,a)*NxFi(2,b) - NxFi(2,a)*PvNx(2,b))
+     2         + afv*mu*Jac*NxNx
+            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + T2)
          END DO
       END DO
 
