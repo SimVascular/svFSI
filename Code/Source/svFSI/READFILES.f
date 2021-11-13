@@ -297,7 +297,7 @@
                DO i=1, eq(iEq)%nDmn
                   IF (eq(iEq)%dmn(i)%phys .NE. phys_ustruct .AND.
      2                eq(iEq)%dmn(i)%phys .NE. phys_struct) CYCLE
-                  IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO) err =
+                  IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO_d) err =
      2               "Active strain is allowed with Holzapfel-Ogden "//
      3               "passive constitutive model only"
                END DO
@@ -2454,9 +2454,19 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%C10, "c1")
          lPtr => lSt%get(lDmn%stM%C01, "c2")
 
-      CASE ("HGO")
+      CASE ("HGO", "HGO-decoupled", "HGO-d")
       ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
-         lDmn%stM%isoType = stIso_HGO
+         lDmn%stM%isoType = stIso_HGO_d
+         lDmn%stM%C10 = mu*0.5_RKIND
+         lPtr => lSt%get(lDmn%stM%aff, "a4")
+         lPtr => lSt%get(lDmn%stM%bff, "b4")
+         lPtr => lSt%get(lDmn%stM%ass, "a6")
+         lPtr => lSt%get(lDmn%stM%bss, "b6")
+         lPtr => lSt%get(lDmn%stM%kap, "kappa")
+
+      CASE ("HGO-ma", "HGO-modified")
+      ! Neo-Hookean ground matrix + quad penalty + anistropic fibers !
+         lDmn%stM%isoType = stIso_HGO_ma
          lDmn%stM%C10 = mu*0.5_RKIND
          lPtr => lSt%get(lDmn%stM%aff, "a4")
          lPtr => lSt%get(lDmn%stM%bff, "b4")
@@ -2475,9 +2485,22 @@ c     2         "can be applied for Neumann boundaries only"
      2         "with 2 family of directions"
          END IF
 
-      CASE ("HO", "Holzapfel")
+      CASE ("HO", "Holzapfel", "HO-decoupled", "HO-d")
       ! Holzapefel and Ogden model for myocardium !
-         lDmn%stM%isoType = stIso_HO
+         lDmn%stM%isoType = stIso_HO_d
+         lPtr => lSt%get(lDmn%stM%a, "a")
+         lPtr => lSt%get(lDmn%stM%b, "b")
+         lPtr => lSt%get(lDmn%stM%aff, "a4f")
+         lPtr => lSt%get(lDmn%stM%bff, "b4f")
+         lPtr => lSt%get(lDmn%stM%ass, "a4s")
+         lPtr => lSt%get(lDmn%stM%bss, "b4s")
+         lPtr => lSt%get(lDmn%stM%afs, "afs")
+         lPtr => lSt%get(lDmn%stM%bfs, "bfs")
+         lPtr => lSt%get(lDmn%stM%khs, "k")
+
+      CASE ("HO-ma", "HO-modified")
+      ! Holzapefel and Ogden model for myocardium !
+         lDmn%stM%isoType = stIso_HO_ma
          lPtr => lSt%get(lDmn%stM%a, "a")
          lPtr => lSt%get(lDmn%stM%b, "b")
          lPtr => lSt%get(lDmn%stM%aff, "a4f")

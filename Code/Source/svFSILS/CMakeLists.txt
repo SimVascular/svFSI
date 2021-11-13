@@ -1,7 +1,7 @@
 include_directories(${MPI_C_INCLUDE_PATH})
 
 if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-  set(CMAKE_Fortran_FLAGS "-O3 -DNDEBUG -march=native")
+  set(CMAKE_Fortran_FLAGS "-O3 -DNDEBUG -march=cascadelake")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
 
   # Use below flags for debugging
