@@ -73,15 +73,17 @@ Below, we provide a list of the available choice of constitutive models for diff
 *Abbreviation* refers to the variable name in the source code; *Full name* refers to the generic name of the model; *Input keyword* refers to the phrase in the input file that can invoke such model.
 
 1. Available isochoric constitutive models for the structure equation
-   | *Abbreviation* | *Full name*                     | *Input keyword*                                         |
-   | -------------- | ------------------------------- | ------------------------------------------------------- |
-   | stIso\_StVK    | Saint Venant-Kirchhoff          | "stVK", "stVenantKirchhoff"                             |
-   | stIso\_mStVK   | modified Saint Venant-Kirchhoff | "m-stVK", "modified-stVK", "modified-stVenantKirchhoff" |
-   | stIso\_nHook   | Neo-Hookean model               | "nHK", "nHK91", "neoHookean", "neoHookeanSimo91"        |
-   | stIso\_MR      | Mooney-Rivlin model             | "MR", "Mooney-Rivlin"                                   |
-   | stIso\_HGO     | Holzapfel-Gasser-Ogden model    | "HGO"                                                   |
-   | stIso\_Gucci   | Guccione model                  | "Guccione", "Gucci"                                     |
-   | stIso\_HO      | Holzapfel-Ogden model           | "HO", "Holzapfel"                                       |
+   | *Abbreviation* | *Full name*                        | *Input keyword*                                         |
+   | -------------- | ---------------------------------- | ------------------------------------------------------- |
+   | stIso\_stVK    | Saint Venant-Kirchhoff             | "stVK", "stVenantKirchhoff"                             |
+   | stIso\_mStVK   | modified Saint Venant-Kirchhoff    | "m-stVK", "modified-stVK", "modified-stVenantKirchhoff" |
+   | stIso\_nHook   | Neo-Hookean model                  | "nHK", "nHK91", "neoHookean", "neoHookeanSimo91"        |
+   | stIso\_MR      | Mooney-Rivlin model                | "MR", "Mooney-Rivlin"                                   |
+   | stIso\_HGO_d   | Holzapfel-Gasser-Ogden (decoupled) | "HGO", "HGO-d", HGO-decoupled"                          |
+   | stIso\_HGO_ma  | HGO model (modified anisotropy)    | "HGO-ma", "HGO-modified"                                |
+   | stIso\_Gucci   | Guccione model                     | "Guccione", "Gucci"                                     |
+   | stIso\_HO_d    | Holzapfel-Ogden model (decoupled)  | "HO", "Holzapfel", "HO-decoupled", "HO-d"               |
+   | stIso\_HO_ma   | HO model (modified anisotropy)     | "HO-ma", "HO-modified"                                  |
 
 2. Available volumetric constitutive models for the structure equation
    | *Abbreviation* | *Full name*         | *Input keyword*                          |

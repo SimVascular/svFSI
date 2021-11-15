@@ -1321,12 +1321,12 @@ Add equation: mesh
 #  |                       | "Force_Z" (3D)                          |
 #  |-----------------------|-----------------------------------------|
 #  |         struct        | "Density", "Elasticity modulus",        |
-#  |                       | "Poisson ratio", "Damping", "Force_X",  |
-#  |                       | "Force_Y", "Force_Z" (3D)               |
+#  |                       | "Poisson ratio", "Damping", "Viscosity",|
+#  |                       | "Force_X", "Force_Y", "Force_Z" (3D)    |
 #  |-----------------------|-----------------------------------------|
 #  |         ustruct       | "Density", "Elasticity modulus",        |
-#  |                       | "Poisson ratio", "Force_X", "Force_Y",  |
-#  |                       | "Force_Z" (3D),                         |
+#  |                       | "Poisson ratio", "Viscosity",           |
+#  |                       | "Force_X", "Force_Y", "Force_Z" (3D),   |
 #  |                       | "Momentum stabilization coefficient",   |
 #  |                       | "Condinuity stabilization coefficient"  |
 #  |-----------------------|-----------------------------------------|
@@ -1392,12 +1392,31 @@ Add equation: mesh
 #    |                      |    }                                   |
 #    |----------------------|----------------------------------------|
 #    |                      | Holzapfel-Gasser-Ogden type material   |
-#    |                      | model for vascular tissue. This is a   |
+#    |                      | model for vascular tissue in the de-   |
+#    |                      | coupled form where all the anisotropic |
+#    |                      | terms use isochoric invariants. This is|
+#    |                      | a nested block that requires additional|
+#    |                      | parameter inputs, "a4", "b4", "a6",    |
+#    |                      | "b6", and "kappa". For e.g.,           |
+#    |  "HGO" /             |    Constitutive model: HGO-d {         |
+#    |  "HGO-d" /           |       a4:                              |
+#    |  "HGO-decoupled"     |       b4:                              |
+#    |                      |       a6:                              |
+#    |                      |       b7:                              |
+#    |                      |       kappa:                           |
+#    |                      |    }                                   |
+#    |                      | For this model to be used, two families|
+#    |                      | of fibers must be loaded in "Add mesh" |
+#    |----------------------|----------------------------------------|
+#    |                      | Holzapfel-Gasser-Ogden type material   |
+#    |                      | model for vascular tissue with modified|
+#    |                      | anisotropy where all the anisotropic   |
+#    |                      | terms use full invariants. This is a   |
 #    |                      | nested block that requires additional  |
 #    |                      | parameter inputs, "a4", "b4", "a6",    |
 #    |                      | "b6", and "kappa". For e.g.,           |
-#    |  "HGO"               |    Constitutive model: HGO {           |
-#    |                      |       a4:                              |
+#    |  "HGO-ma" /          |    Constitutive model: HGO-ma {        |
+#    |  "HGO-modified"      |       a4:                              |
 #    |                      |       b4:                              |
 #    |                      |       a6:                              |
 #    |                      |       b7:                              |
@@ -1421,19 +1440,45 @@ Add equation: mesh
 #    |                      | of fibers must be loaded in "Add mesh" |
 #    |----------------------|----------------------------------------|
 #    |                      | Holzapfel's orthotropic material model |
-#    |                      | for myocardium. This is a nested block |
-#    |                      | that requires additional parameter     |
-#    |                      | inputs, "a", "b", "a4f", "b4f", "a4s", |
-#    |                      | "b4s", "afs", and "bfs". For e.g.,     |
-#    |  "HO" /              |    Constitutive model: Holzapfel {     |
-#    |  "Holzapfel"         |       a:                               |
-#    |                      |       b:                               |
+#    |                      | for myocardium in the decoupled form   |
+#    |                      | where the anisotropic terms in the     |
+#    |                      | strain energy involve isochoric invar- |
+#    |                      | iants. This is a nested block that re- |
+#    |                      | quires additional parameter inputs,    |
+#    |                      | "a", "b", "a4f", "b4f", "a4s", "b4s",  |
+#    |                      | "afs", "bfs", and "k". For e.g.,       |
+#    |  "HO" /              |    Constitutive model: HO-d {          |
+#    |  "Holzapfel" /       |       a:                               |
+#    |  "HO-d" /            |       b:                               |
+#    |  "HO-decoupled"      |       a4f:                             |
+#    |                      |       b4f:                             |
+#    |                      |       a4s:                             |
+#    |                      |       b4s:                             |
+#    |                      |       afs:                             |
+#    |                      |       bfs:                             |
+#    |                      |       k:                               |
+#    |                      |    }                                   |
+#    |                      | For this model to be used, two families|
+#    |                      | of fibers must be loaded in "Add mesh" |
+#    |----------------------|----------------------------------------|
+#    |                      | Holzapfel's orthotropic material model |
+#    |                      | for myocardium in the modified form    |
+#    |                      | where the anisotropic terms in the     |
+#    |                      | strain energy involve full invariants. |
+#    |                      | This is a nested block that requires   |
+#    |                      | additional parameter inputs including, |
+#    |                      | "a", "b", "a4f", "b4f", "a4s", "b4s",  |
+#    |                      | "afs", "bfs", and "k". For e.g.,       |
+#    |                      |    Constitutive model: HO-ma {         |
+#    |  "HO-ma" /           |       a:                               |
+#    |  "HO-modified"       |       b:                               |
 #    |                      |       a4f:                             |
 #    |                      |       b4f:                             |
 #    |                      |       a4s:                             |
 #    |                      |       b4s:                             |
 #    |                      |       afs:                             |
 #    |                      |       bfs:                             |
+#    |                      |       k:                               |
 #    |                      |    }                                   |
 #    |                      | For this model to be used, two families|
 #    |                      | of fibers must be loaded in "Add mesh" |
