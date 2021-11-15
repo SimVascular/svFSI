@@ -135,7 +135,7 @@
 !        Fiber reinforcement/active stress
          Sb = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
-         r1 = g1*Inv1/nd
+         r1 = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S  = J2d*Sb - r1*Ci
          CC = (-2._RKIND/nd) * ( TEN_DYADPROD(Ci, S, nsd) +
      2                      TEN_DYADPROD(S, Ci, nsd))
@@ -646,7 +646,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !        Fiber reinforcement/active stress
          Sb = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
 
-         r1 = g1*Inv1/nd
+         r1 = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S  = J2d*Sb - r1*Ci
          CC = 2._RKIND*r1 * ( TEN_SYMMPROD(Ci, Ci, nsd) -
      2        1._RKIND/nd *   TEN_DYADPROD(Ci, Ci, nsd) )
