@@ -56,7 +56,7 @@
 !     CMM: dof = nsd+1
 !     CMM init: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(nsd,eNoN), bfl(nsd,eNoN), pS0l(nsymd,eNoN), pSl(nsymd),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), pS0l(nsymd,eNoN), pSl(nsymd),
      3   vwpl(2,eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
      4   lK(dof*dof,eNoN,eNoN))
 
