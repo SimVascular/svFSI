@@ -1,3 +1,7 @@
+## NOTE
+
+This branch is created from master on Jan 4, 2022 and will be referenced in the manuscript to be submitted for the Journal of Open Source Software (JOSS).
+
 ## Introduction
 
 `svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver.
