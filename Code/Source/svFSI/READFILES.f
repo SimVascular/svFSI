@@ -1835,7 +1835,7 @@
 
 !     Read BCs for shells with triangular elements. Not necessary for
 !     NURBS elements
-      lPtr => list%get(ctmp,"Shell BC type")
+      lPtr => list%get(ctmp,"CST shell BC type")
       IF (ASSOCIATED(lPtr)) THEN
          SELECT CASE (ctmp)
          CASE ("Fixed", "fixed", "Clamped", "clamped")

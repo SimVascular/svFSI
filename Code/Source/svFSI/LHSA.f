@@ -74,7 +74,7 @@
 !     Treat shells with triangular elements here
       DO iM=1, nMsh
          IF (.NOT.shlEq .OR. .NOT.msh(iM)%lShl) CYCLE
-         IF (msh(iM)%eType .EQ. eType_NRB) CYCLE
+         IF (msh(iM)%eType .NE. eType_TRI3) CYCLE
          DO e=1, msh(iM)%nEl
             DO a=1, 2*msh(iM)%eNoN
                IF (a .LE. msh(iM)%eNoN) THEN

@@ -1087,6 +1087,7 @@
 
       clcDmn = .FALSE.
       IF (.NOT.savedOnce) THEN
+         IF (ALLOCATED(d%xe)) DEALLOCATE(d%xe)
          ALLOCATE(d%xe(d%nEl,2))
          IF (cm%mas()) THEN
 !     Based on the two posible fields

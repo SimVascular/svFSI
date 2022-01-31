@@ -176,7 +176,7 @@
          Nx = lM%Nx(:,:,g)
          SELECT CASE (cPhys)
          CASE (phys_shell)
-            CALL SHELLFP(eNoN, w, N, Nx, dl, xl, bfl, lR, lK)
+            CALL SHELLBF(eNoN, w, N, Nx, dl, xl, bfl, lR, lK)
 
          CASE (phys_CMM)
             CALL BCMMi(eNoN, idof, w, N, Nx, xl, bfl, lR)

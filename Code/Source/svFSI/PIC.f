@@ -92,7 +92,7 @@
 
          IF (dFlag) THEN
             IF (.NOT.sstEq) THEN
-!              struct, lElas, FSI (struct, mesh)
+!              struct, lElas, shells, FSI (struct, mesh)
                coef = dt*dt*(0.5_RKIND*eq(iEq)%gam - eq(iEq)%beta)
      2            /(eq(iEq)%gam - 1._RKIND)
                Dn(s:e,:) = Do(s:e,:) + Yn(s:e,:)*dt + An(s:e,:)*coef

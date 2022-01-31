@@ -32,7 +32,7 @@
 !-----------------------------------------------------------------------
 !
 !     This routines is for solving nonlinear shell mechanics problem
-!     using linear triangle finite elements and IGA.
+!     using finite elements and IGA.
 !
 !--------------------------------------------------------------------
 
@@ -72,7 +72,6 @@
          dl  = 0._RKIND
          bfl = 0._RKIND
          DO a=1, eNoN
-            Ac = lM%IEN(a,e)
             IF (a .LE. lM%eNoN) THEN
                Ac = lM%IEN(a,e)
                ptr(a) = Ac
@@ -90,20 +89,19 @@
          END DO
 
          IF (lM%eType .EQ. eType_TRI3) THEN
-!        Triangles - constant strain, no numerical integration
-            CALL SHELLTRI(lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
+!           Constant strain triangles, no numerical integration
+            CALL SHELLCST(lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
 
-         ELSE IF (lM%eType .EQ. eType_NRB) THEN
-!        NURBS
+         ELSE
             lR = 0._RKIND
             lK = 0._RKIND
 
-!           Update shape functions
-            CALL NRBNNX(lM, e)
+!           Update shape functions for NURBS elements
+            IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !           Gauss integration
             DO g=1, lM%nG
-               CALL SHELLNRB(lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
+               CALL SHELL3D(lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
             END DO
 
 !           Assembly
@@ -124,7 +122,8 @@
       RETURN
       END SUBROUTINE CONSTRUCT_SHELL
 !####################################################################
-      SUBROUTINE SHELLTRI (lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
+!     Construct shell mechanics for constant strain triangle elements
+      SUBROUTINE SHELLCST (lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -133,14 +132,14 @@
       REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
 
-      LOGICAL :: bFlag, setIt(3)
+      LOGICAL :: setIt(3)
       INTEGER(KIND=IKIND) :: i, j, k, a, b, g
       REAL(KIND=RKIND) :: rho, dmp, elM, nu, ht, T1, amd, afl, w, Jac0,
      2   Jac, ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2),
      3   gCov(3,2), gCnv(3,2), x0(3,eNoN), xc(3,eNoN), eLoc(3,3),
      4   Jm(2,2), Qm(3,3), Dm(3,3), Em(3), Eb(3), DEm(3), DEb(3),
-     5   Bm(3,3,eNoN), Bb(3,3,eNoN), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDE,
-     6   BtDB, NxSNx
+     5   Bm(3,3,lM%eNoN), Bb(3,3,eNoN), DBm(3,3,lM%eNoN), DBb(3,3,eNoN),
+     6   BtDE, BtDB, NxSNx
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:),
      2   lK(:,:,:), tmpX(:,:)
@@ -164,15 +163,6 @@
       i    = eq(cEq)%s
       j    = i + 1
       k    = j + 1
-
-!     Determine if current element is a boundary element
-      bFlag = .FALSE.
-      DO a=lM%eNoN+1, eNoN
-         IF (ptr(a) .EQ. 0) THEN
-            bFlag = .TRUE.
-            EXIT
-         END IF
-      END DO
 
 !     Get the reference configuration
       x0(:,:) = xl(:,:)
@@ -261,28 +251,28 @@
          Bm(3,3,a) = Nx(2,a)*gCov(3,1) + Nx(1,a)*gCov(3,2)
       END DO
 
-!     Zero-out Bm for fixed BC on boundary elements
-      IF (bFlag) THEN
-         setIt = .FALSE.
-         DO a=lM%eNoN+1, eNoN
-            IF (ptr(a) .EQ. 0) THEN
-               b = a - lM%eNoN
-               IF (BTEST(lM%sbc(b,e),bType_fix)) setIt(b) = .TRUE.
-            END IF
-         END DO
+!     For the boundary elements, zero-out Bm for fixed/clamped BC.
+      setIt = .FALSE.
+      a = lM%eNoN + 1
+      DO WHILE (a .LE. eNoN)
+         IF (ptr(a) .EQ. 0) THEN
+            b = a - lM%eNoN
+            IF (BTEST(lM%sbc(b,e),bType_fix)) setIt(b) = .TRUE.
+         END IF
+         a = a + 1
+      END DO
 
-         DO a=1, lM%eNoN
-            IF (setIt(a)) THEN
-               DO b=1, lM%eNoN
-                  IF (a .EQ. b) CYCLE
-                  Bm(:,:,b) = 0._RKIND
-               END DO
-            END IF
-         END DO
-      END IF
+      DO a=1, lM%eNoN
+         IF (setIt(a)) THEN
+            DO b=1, lM%eNoN
+               IF (a .EQ. b) CYCLE
+               Bm(:,:,b) = 0._RKIND
+            END DO
+         END IF
+      END DO
 
-!     Bending strain and its variation for triangular elements
-      CALL SHELLBENDTRI(lM, e, ptr, x0, xc, Eb, Bb)
+!     Bending strain and its variation for CST elements
+      CALL SHELLBENDCST(lM, e, ptr, x0, xc, Eb, Bb)
 
 !     Contribution to residue and tangent matrices from membrane strain
 !     D * Em
@@ -500,11 +490,11 @@
       DEALLOCATE(N, Nx, lR, lK)
 
       RETURN
-      END SUBROUTINE SHELLTRI
+      END SUBROUTINE SHELLCST
 !--------------------------------------------------------------------
 !     This subroutine computes bending strain, Eb, and its variational
-!     derivative, Bb, for triangular shell elements
-      SUBROUTINE SHELLBENDTRI(lM, e, ptr, x0, xc, Eb, Bb)
+!     derivative, Bb, for CST elements
+      SUBROUTINE SHELLBENDCST(lM, e, ptr, x0, xc, Eb, Bb)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -557,7 +547,8 @@
       Jac = SQRT(NORM(nV))
       nV  = nV/Jac
 
-!     Update position vector of surrounding nodes, if boundary elements
+!     Update the position vector of the `artificial' or `ghost' nodes
+!     depending on the boundary condition.
       IF (bFlag) THEN
          DO j=lM%eNoN+1, eNoN
             IF (ptr(j) .NE. 0) CYCLE
@@ -640,13 +631,13 @@
 
 !     Xi matrix (reference config)
       xi0(:,:)  = adg0(:,:)
-      xi0(1,1)  = adg0(1,1) + 1._RKIND
-      xi0(2,2)  = adg0(2,2) + 1._RKIND
+      xi0(1,3)  = adg0(1,3) + 1._RKIND    ! xi_6
+      xi0(2,1)  = adg0(2,1) + 1._RKIND    ! eta_4
 
 !     Xi matrix (current config)
       xi(:,:)   = adg(:,:)
-      xi(1,1)   = adg(1,1) + 1._RKIND
-      xi(2,2)   = adg(2,2) + 1._RKIND
+      xi(1,3)   = adg(1,3) + 1._RKIND     ! xi_6
+      xi(2,1)   = adg(2,1) + 1._RKIND     ! eta_4
 
 !     Tmat and inverse (reference config)
       DO i=1, 3
@@ -696,19 +687,19 @@
 
 !     H1
       H1 = 0._RKIND
-      H1(1, 4: 6) =  gCnv(:,1)*adg(2,1)
-      H1(2, 4: 6) =  gCnv(:,2)*adg(2,1)
-      H1(3, 4: 6) =  gCnv(:,1)*adg(2,2)
-      H1(4, 4: 6) =  gCnv(:,2)*adg(2,2)
-      H1(5, 4: 6) =  gCnv(:,1)*adg(2,3)
-      H1(6, 4: 6) =  gCnv(:,2)*adg(2,3)
+      H1(1, 1: 3) =  gCnv(:,1)*adg(2,1)
+      H1(2, 1: 3) =  gCnv(:,2)*adg(2,1)
+      H1(3, 1: 3) =  gCnv(:,1)*adg(2,2)
+      H1(4, 1: 3) =  gCnv(:,2)*adg(2,2)
+      H1(5, 1: 3) =  gCnv(:,1)*adg(2,3)
+      H1(6, 1: 3) =  gCnv(:,2)*adg(2,3)
 
-      H1(1, 7: 9) = -gCnv(:,1)*adg(1,1)
-      H1(2, 7: 9) = -gCnv(:,2)*adg(1,1)
-      H1(3, 7: 9) = -gCnv(:,1)*adg(1,2)
-      H1(4, 7: 9) = -gCnv(:,2)*adg(1,2)
-      H1(5, 7: 9) = -gCnv(:,1)*adg(1,3)
-      H1(6, 7: 9) = -gCnv(:,2)*adg(1,3)
+      H1(1, 4: 6) = -gCnv(:,1)*adg(1,1)
+      H1(2, 4: 6) = -gCnv(:,2)*adg(1,1)
+      H1(3, 4: 6) = -gCnv(:,1)*adg(1,2)
+      H1(4, 4: 6) = -gCnv(:,2)*adg(1,2)
+      H1(5, 4: 6) = -gCnv(:,1)*adg(1,3)
+      H1(6, 4: 6) = -gCnv(:,2)*adg(1,3)
 
       H1(1,10:12) =  gCnv(:,1)
       H1(2,10:12) =  gCnv(:,2)
@@ -771,6 +762,20 @@
       H3 = 0._RKIND
       tmpA = MATMUL(Nm, Mm(:,:,1))
       tmpA = -tmpA / Jac
+      H3(1,1) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
+      H3(1,2) = a(1,4)*tmpA(1,2) + a(2,4)*tmpA(2,2) + a(3,4)*tmpA(3,2)
+      H3(1,3) = a(1,4)*tmpA(1,3) + a(2,4)*tmpA(2,3) + a(3,4)*tmpA(3,3)
+
+      H3(2,1) = a(1,5)*tmpA(1,1) + a(2,5)*tmpA(2,1) + a(3,5)*tmpA(3,1)
+      H3(2,2) = a(1,5)*tmpA(1,2) + a(2,5)*tmpA(2,2) + a(3,5)*tmpA(3,2)
+      H3(2,3) = a(1,5)*tmpA(1,3) + a(2,5)*tmpA(2,3) + a(3,5)*tmpA(3,3)
+
+      H3(3,1) = a(1,6)*tmpA(1,1) + a(2,6)*tmpA(2,1) + a(3,6)*tmpA(3,1)
+      H3(3,2) = a(1,6)*tmpA(1,2) + a(2,6)*tmpA(2,2) + a(3,6)*tmpA(3,2)
+      H3(3,3) = a(1,6)*tmpA(1,3) + a(2,6)*tmpA(2,3) + a(3,6)*tmpA(3,3)
+
+      tmpA = MATMUL(Nm, Mm(:,:,2))
+      tmpA = -tmpA / Jac
       H3(1,4) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
       H3(1,5) = a(1,4)*tmpA(1,2) + a(2,4)*tmpA(2,2) + a(3,4)*tmpA(3,2)
       H3(1,6) = a(1,4)*tmpA(1,3) + a(2,4)*tmpA(2,3) + a(3,4)*tmpA(3,3)
@@ -782,20 +787,6 @@
       H3(3,4) = a(1,6)*tmpA(1,1) + a(2,6)*tmpA(2,1) + a(3,6)*tmpA(3,1)
       H3(3,5) = a(1,6)*tmpA(1,2) + a(2,6)*tmpA(2,2) + a(3,6)*tmpA(3,2)
       H3(3,6) = a(1,6)*tmpA(1,3) + a(2,6)*tmpA(2,3) + a(3,6)*tmpA(3,3)
-
-      tmpA = MATMUL(Nm, Mm(:,:,2))
-      tmpA = -tmpA / Jac
-      H3(1,7) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
-      H3(1,8) = a(1,4)*tmpA(1,2) + a(2,4)*tmpA(2,2) + a(3,4)*tmpA(3,2)
-      H3(1,9) = a(1,4)*tmpA(1,3) + a(2,4)*tmpA(2,3) + a(3,4)*tmpA(3,3)
-
-      H3(2,7) = a(1,5)*tmpA(1,1) + a(2,5)*tmpA(2,1) + a(3,5)*tmpA(3,1)
-      H3(2,8) = a(1,5)*tmpA(1,2) + a(2,5)*tmpA(2,2) + a(3,5)*tmpA(3,2)
-      H3(2,9) = a(1,5)*tmpA(1,3) + a(2,5)*tmpA(2,3) + a(3,5)*tmpA(3,3)
-
-      H3(3,7) = a(1,6)*tmpA(1,1) + a(2,6)*tmpA(2,1) + a(3,6)*tmpA(3,1)
-      H3(3,8) = a(1,6)*tmpA(1,2) + a(2,6)*tmpA(2,2) + a(3,6)*tmpA(3,2)
-      H3(3,9) = a(1,6)*tmpA(1,3) + a(2,6)*tmpA(2,3) + a(3,6)*tmpA(3,3)
 
       H3(1,10:12) = nV(:)
       H3(2,13:15) = nV(:)
@@ -843,6 +834,9 @@
             END IF
 
 !           Update Bb now
+!           Free boundary conditions: assumed that the `artificial'
+!           triangle is always located in the plane of the main element
+!           of the patch
             IF (BTEST(lM%sbc(i,e),bType_free)) THEN
 !              E_I
                IF (.NOT.lFix(i)) THEN
@@ -861,6 +855,9 @@
                   Bb(:,:,f) = Bb(:,:,f) + MATMUL(Bb(:,:,j), tmpA)
                END IF
                Bb(:,:,j) = 0._RKIND
+
+!           Hinged boundary conditions: a special case of simple support
+!           in which no translation displacements are allowed.
             ELSE IF (BTEST(lM%sbc(i,e),bType_hing)) THEN
 !              E_I
                IF (.NOT.lFix(i)) THEN
@@ -872,6 +869,9 @@
                Bb(:,:,p) = 0._RKIND
                Bb(:,:,f) = 0._RKIND
                Bb(:,:,j) = 0._RKIND
+
+!           Fixed boundary condition: no displacements and no rotations
+!           are allowed.
             ELSE IF (BTEST(lM%sbc(i,e),bType_fix)) THEN
                IF (.NOT.lFix(i)) THEN
                   tmpA = Im - 2._RKIND*nInI
@@ -881,6 +881,8 @@
                lFix(f)   = .TRUE.
                Bb(:,:,f) = 0._RKIND
                Bb(:,:,p) = 0._RKIND
+
+!           Symmetric BCs (need to be verified)
             ELSE IF (BTEST(lM%sbc(i,e),bType_symm)) THEN
                IF (.NOT.lFix(i)) THEN
                   tmpA = Im - 2._RKIND*nInI
@@ -899,72 +901,10 @@
       END IF
 
       RETURN
-      END SUBROUTINE SHELLBENDTRI
-!--------------------------------------------------------------------
-!     Set follower pressure load/net traction on shells
-      SUBROUTINE SHELLFP (eNoN, w, N, Nx, dl, xl, tfl, lR, lK)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
-      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
-     2   dl(tDof,eNoN), xl(3,eNoN), tfl(eNoN)
-      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
-
-      INTEGER(KIND=IKIND) :: i, j, k, a, b
-      REAL(KIND=RKIND) :: T1, afl, wl, tfn, nV(3), gCov(3,2), gCnv(3,2),
-     2   xc(3,eNoN), lKP(3)
-
-      afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
-      i    = eq(cEq)%s
-      j    = i + 1
-      k    = j + 1
-
-!     Get the current configuration and traction vector
-      tfn = 0._RKIND
-      DO a=1, eNoN
-         xc(1,a) = xl(1,a) + dl(i,a)
-         xc(2,a) = xl(2,a) + dl(j,a)
-         xc(3,a) = xl(3,a) + dl(k,a)
-
-         tfn = tfn + N(a)*tfl(a)
-      END DO
-      wl = w * tfn
-
-!     Covariant and contravariant bases in current config
-      CALL GNNS(eNoN, Nx, xc, nV, gCov, gCnv)
-
-!     Local residue
-      DO a=1, eNoN
-         lR(1,a) = lR(1,a) - wl*N(a)*nV(1)
-         lR(2,a) = lR(2,a) - wl*N(a)*nV(2)
-         lR(3,a) = lR(3,a) - wl*N(a)*nV(3)
-      END DO
-
-!     Local stiffness: mass matrix and stiffness contribution due to
-!     follower traction load
-      T1 = afl*wl*0.5_RKIND
-      DO b=1, eNoN
-         DO a=1, eNoN
-            lKp(:) = gCov(:,1)*(N(b)*Nx(2,a) - N(a)*Nx(2,b))
-     2             - gCov(:,2)*(N(b)*Nx(1,a) - N(a)*Nx(1,b))
-
-            lK(2,a,b) = lK(2,a,b) - T1*lKp(3)
-            lK(3,a,b) = lK(3,a,b) + T1*lKp(2)
-
-            lK(dof+1,a,b) = lK(dof+1,a,b) + T1*lKp(3)
-            lK(dof+3,a,b) = lK(dof+3,a,b) - T1*lKp(1)
-
-            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) - T1*lKp(2)
-            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + T1*lKp(1)
-         END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE SHELLFP
+      END SUBROUTINE SHELLBENDCST
 !####################################################################
-      SUBROUTINE SHELLNRB (lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
+!     Construct shell mechanics for higher order elements/NURBS
+      SUBROUTINE SHELL3D (lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -1012,9 +952,24 @@
       END DO
 
 !     Define shape functions and their derivatives at Gauss point
-      N   = lM%N(:,g)
-      Nx  = lM%Nx(:,:,g)
-      Nxx = lM%Nxx(:,:,g)
+      IF (lM%eType .EQ. eType_NRB) THEN
+         N   = lM%N(:,g)
+         Nx  = lM%Nx(:,:,g)
+         Nxx = lM%Nxx(:,:,g)
+      ELSE
+         N   = lM%fs(1)%N(:,g)
+         Nx  = lM%fs(1)%Nx(:,:,g)
+         Nxx = lM%fs(1)%Nxx(:,:,g)
+      END IF
+
+c=====================================================================
+c    TODO: Might have to call GNNxx for Jacobian transformation. Check
+c    formulation again.
+c
+c     CALL GNNxx(3, eNoN, 2, lM%fs(1)%Nx(:,:,g), lM%fs(1)%Nxx(:,:,g),
+c        xl, Nx, Nxx)
+c
+c=====================================================================
 
 !     Covariant and contravariant bases in reference config
       CALL GNNS(eNoN, Nx, x0, nV0, gCov0, gCnv0)
@@ -1297,6 +1252,71 @@
       END DO
 
       RETURN
-      END SUBROUTINE SHELLNRB
+      END SUBROUTINE SHELL3D
+!####################################################################
+!     Set follower pressure load/net traction on shells. The traction
+!     on shells is treated as body force and the subroutine is called
+!     from BF.f
+      SUBROUTINE SHELLBF (eNoN, w, N, Nx, dl, xl, tfl, lR, lK)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: eNoN
+      REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
+     2   dl(tDof,eNoN), xl(3,eNoN), tfl(eNoN)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) :: i, j, k, a, b
+      REAL(KIND=RKIND) :: T1, afl, wl, tfn, nV(3), gCov(3,2), gCnv(3,2),
+     2   xc(3,eNoN), lKP(3)
+
+      afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      i    = eq(cEq)%s
+      j    = i + 1
+      k    = j + 1
+
+!     Get the current configuration and traction vector
+      tfn = 0._RKIND
+      DO a=1, eNoN
+         xc(1,a) = xl(1,a) + dl(i,a)
+         xc(2,a) = xl(2,a) + dl(j,a)
+         xc(3,a) = xl(3,a) + dl(k,a)
+
+         tfn = tfn + N(a)*tfl(a)
+      END DO
+      wl = w * tfn
+
+!     Covariant and contravariant bases in current config
+      CALL GNNS(eNoN, Nx, xc, nV, gCov, gCnv)
+
+!     Local residue
+      DO a=1, eNoN
+         lR(1,a) = lR(1,a) - wl*N(a)*nV(1)
+         lR(2,a) = lR(2,a) - wl*N(a)*nV(2)
+         lR(3,a) = lR(3,a) - wl*N(a)*nV(3)
+      END DO
+
+!     Local stiffness: mass matrix and stiffness contribution due to
+!     follower traction load
+      T1 = afl*wl*0.5_RKIND
+      DO b=1, eNoN
+         DO a=1, eNoN
+            lKp(:) = gCov(:,1)*(N(b)*Nx(2,a) - N(a)*Nx(2,b))
+     2             - gCov(:,2)*(N(b)*Nx(1,a) - N(a)*Nx(1,b))
+
+            lK(2,a,b) = lK(2,a,b) - T1*lKp(3)
+            lK(3,a,b) = lK(3,a,b) + T1*lKp(2)
+
+            lK(dof+1,a,b) = lK(dof+1,a,b) + T1*lKp(3)
+            lK(dof+3,a,b) = lK(dof+3,a,b) - T1*lKp(1)
+
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) - T1*lKp(2)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + T1*lKp(1)
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE SHELLBF
 !####################################################################
 

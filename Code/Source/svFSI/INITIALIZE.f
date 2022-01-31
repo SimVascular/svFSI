@@ -171,12 +171,12 @@
       IF (shlEq) THEN
          DO iM=1, nMsh
             IF (msh(iM)%lShl) THEN
-               IF (msh(iM)%eType .EQ. eType_NRB) THEN
+               IF (msh(iM)%eType .EQ. eType_TRI3) THEN
+                  CALL SETSHLXIEN(msh(iM))
+               ELSE
                   ALLOCATE(msh(iM)%eIEN(0,0))
                   ALLOCATE(msh(iM)%sbc(msh(iM)%eNoN,msh(iM)%nEl))
                   msh(iM)%sbc = 0
-               ELSE IF (msh(iM)%eType .EQ. eType_TRI3) THEN
-                  CALL SETSHLXIEN(msh(iM))
                END IF
             END IF
          END DO
