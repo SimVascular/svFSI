@@ -175,14 +175,15 @@
      2   RMSH_MESHSIM = 2
 !--------------------------------------------------------------------
 !     Type of constitutive model (isochoric) for structure equation:
-!     St.Venant-Kirchhoff, modified St.Venant-Kirchhoff, NeoHookean,
-!     Mooney-Rivlin, modified Holzapfel-Gasser-Ogden with dispersion,
-!     Linear model (S = mu*I), Guccione (1995), Holzapfel & Ogden model
-!     for myocardium (2009)
-      INTEGER(KIND=IKIND), PARAMETER :: stIso_NA = 600,
-     2   stIso_StVK = 601, stIso_mStVK = 602, stIso_nHook = 603,
-     3   stIso_MR = 604, stIso_HGO = 605, stIso_lin = 606,
-     4   stIso_Gucci = 607, stIso_HO = 608
+!     Linear model (S = mu*I), St.Venant-Kirchhoff, modified St.Venant-
+!     Kirchhoff, NeoHookean, Mooney-Rivlin, Holzapfel-Gasser-Ogden with
+!     dispersion (decoupled), HGO model with modified anisotropic
+!     components, Guccione (1995), Holzapfel-Ogden (HO) model for
+!     myocardium (decoupled), HO model with modified anisotropy
+      INTEGER(KIND=IKIND), PARAMETER :: stIso_NA = 600, stIso_lin = 601,
+     2   stIso_StVK = 602, stIso_mStVK = 603, stIso_nHook = 604,
+     3   stIso_MR = 605, stIso_HGO_d = 606, stIso_HGO_ma = 607,
+     4   stIso_Gucci = 608, stIso_HO_d = 609, stIso_HO_ma = 610
 !--------------------------------------------------------------------
 !     Type of constitutive model (volumetric) for structure eqn:
 !     Quadratic, Simo-Taylor91, Miehe94

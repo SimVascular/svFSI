@@ -3,7 +3,8 @@
 
 Below are the instructions to build svFSI on Ubuntu and MacOS.
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## svFSI on Ubuntu 18.04
 
 ### Download svFSI
@@ -27,29 +28,50 @@ Recommended folder structure:
 ```bash
 mkdir svFSI
 cd svFSI
-git clone git@github.com:SimVascular/svFSI.git
+git clone https://github.com/SimVascular/svFSI.git
 mv svFSI src
 mkdir build
 cd build
 ```
 
+If you have `ssh` keys set up on GitHub, you may clone using the following command instead of the above `https` ones,
+
+```bash
+git clone git@github.com:SimVascular/svFSI.git
+```
+
 This structure creates a separate directory for `svFSI` git repository `src` and a separate `build` folder where `svFSI` is compiled.
 
-### Build environment:
+### Build
 
-Ubuntu 18.04
-gcc/g++/gfortran 7.5.0
-mpich 3.4.0
-cmake 3.20.5
+Tested environment: Ubuntu 18.04,
+gcc/g++/gfortran 7.5.0,
+mpich 3.4.0,
+cmake 3.20.5,
 lapack/blas 3.9.1
+   ```bash
+   ccmake ..
+   ```
 
-Trilinos & its dependencies:
-    boost 1.66.0
-    hdf5 1.10.4
-    hypre 2.22.0
-    trilinos 13.01
+Or
+
+Tested environment: Ubuntu 18.04, Intel oneAPI Base Toolkit 2021.3.0, Intel oneAPI HPC Toolkit 2021.3.0
+   ```bash
+   ccmake \
+​      -DCMAKE_C_COMPILER:PATH=${ONEAPI_ROOT}/compiler/2021.3.0/linux/bin/intel64/icc \
+​      -DCMAKE_CXX_COMPILER:PATH=${ONEAPI_ROOT}/compiler/2021.3.0/linux/bin/intel64/icpc \
+​      -DCMAKE_Fortran_COMPILER:PATH=${ONEAPI_ROOT}/compiler/2021.3.0/linux/bin/intel64/ifort ..
+   ```
+   Here `ONEAPI_ROOT` is an environment variable automatically set by Intel oneAPI.
 
 ### Build with Trilinos (optional)
+
+Tested environment:
+Trilinos & its dependencies(
+    boost 1.66.0,
+    hdf5 1.10.4,
+    hypre 2.22.0,
+    trilinos 13.01)
 
 To compile `svFSI` with Trilinos, the following changes need to be made to the file, `Code/CMake/SimVascularOptions.cmake`
 
@@ -94,7 +116,7 @@ and for the linear solver `svFSILS`, modify `CMAKE_Fortran_FLAGS` in the file `C
 
 Note that the option `std=legacy` is used for more recent versions of gcc (version >= 10).
 
-### Additional CMake Settings
+### Additional CMake settings
 
 Occasionally, C and CXX compilers may be wrongly identified by the CMake system used for `svFSI`. By default, the C compiler used is `/usr/bin/cc` and the CXX compiler is `/usr/bin/c++`. However, depending on the modules loaded on HPC or one's local compiler environment, these may not be pointing to the desired compilers such as those wrapped by mpicc or mpicxx.
 
@@ -104,7 +126,7 @@ In such situations, we recommend providing the correct C and CXX compilers using
 ccmake -DCMAKE_C_COMPILER:PATH=/usr/bin/gcc -DCMAKE_CXX_COMPILER:PATH=/usr/bin/g++  <path_to_svFSI_source>
 ```
 
-### CMake Configuration:
+### CMake configuration:
 
 An example CMake command for compiling `svFSI` with Trilinos is given below:
 
@@ -135,7 +157,8 @@ ldd svFSI-build/bin/svFSI
 ```
 The code will not run if any library is not found. A wrapper script is also available in `svFSI-build/mysvFSI` which sets environmental variables.
 
-## =================================================================
+<hr style="border:2px solid gray"> </hr>
+
 ## `svFSI` on Mac OSX
 
 Follow the steps below to install `svFSI` on Mac.
@@ -205,10 +228,16 @@ Please make sure to update the `BLASDIR` location depending on the version of Op
 7. Download `svFSI` from GitHub:
 
 ```bash
-mkdir svFSI-git
-cd svFSI-git
-git clone git@github.com:SimVascular/svFSI.git
+mkdir svFSI
+cd svFSI
+git clone https://github.com/SimVascular/svFSI.git
 mv svFSI/  src
+```
+
+If you have `ssh` keys set up on GitHub, you may clone using the following command instead of the above `https` ones,
+
+```bash
+git clone git@github.com:SimVascular/svFSI.git
 ```
 
 8. Create a separate `build` folder and compile using the following commands:
@@ -216,7 +245,7 @@ mv svFSI/  src
 ```bash
 mkdir build
 cd build
-ccmake ../
+ccmake ../src
 make
 ```
-## =================================================================
+<hr style="border:2px solid gray"> </hr>

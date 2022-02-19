@@ -1296,6 +1296,7 @@
       lDmn%stM%bss     = 0._RKIND
       lDmn%stM%afs     = 0._RKIND
       lDmn%stM%bfs     = 0._RKIND
+      lDmn%stM%khs     = 100._RKIND
 
       lDmn%stM%Tf%g     = 0._RKIND
       lDmn%stM%Tf%fType = 0
@@ -1560,9 +1561,15 @@
          br = b(ml+1:m)
       END IF
       nl = NINT(REAL(n, KIND=RKIND)*SUM(bl)/sb, KIND=IKIND)
-      IF (nl .EQ. 0) nl = 1
-      IF (nl .EQ. n) nl = n - 1
-      nr = n - nl
+      IF (nl .EQ. 0) THEN
+         nl = 1
+         nr = n - 1
+      ELSE IF (nl .EQ. n) THEN
+         nl = n - 1
+         nr = 1
+      ELSE
+         nr = n - nl
+      END IF
       ALLOCATE (Al(ml,nl), Ar(mr,nr))
 
       CALL SPLITJOBS(ml,nl,Al,bl)

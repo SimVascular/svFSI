@@ -8,9 +8,12 @@ if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
   # set(CMAKE_Fortran_FLAGS "-O0")
   # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -cpp -pthread -std=legacy")
   # set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -Wall -Wconversion -Wline-truncation -pedantic -fimplicit-none -fbacktrace -fbounds-check -p -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow")
+elseif(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+  set(CMAKE_Fortran_FLAGS "-O3 -march=native")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -fpp -pthread")
 else()
   # nothing for now
-  # may need to reset for intel compiler or others
+  # may need to set for other compilers
 endif()
 
 set(lib ${SV_LIB_SVFSILS_NAME}${SV_MPI_NAME_EXT})

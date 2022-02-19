@@ -143,10 +143,8 @@
      2            ksix)
                IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
-               IF (.NOT.vmsStab) THEN
-                  CALL GNNxx(l, fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g),
-     2               fs(1)%Nxx(:,:,g), xwl, Nwx, Nwxx)
-               END IF
+               CALL GNNxx(l, fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g),
+     2            fs(1)%Nxx(:,:,g), xwl, Nwx, Nwxx)
             END IF
             w = fs(1)%w(g) * Jac
 

@@ -426,17 +426,17 @@
      2   Dg(tDof,tnNo)
 
       INTEGER(KIND=IKIND) :: a, b, e, g, s, Ac, iM, eNoN, cPhys
-      REAL(KIND=RKIND) :: af, am, afm, w, wl, T1, T2, nV(nsd), u(nsd),
-     2   ud(nsd), h(nsd), nDn(nsd,nsd)
+      REAL(KIND=RKIND) :: Jac, afu, afv, afm, w, wl, T1, T2, nV(nsd),
+     2   u(nsd), ud(nsd), h(nsd), nDn(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), xl(:,:), yl(:,:), dl(:,:),
      2   lR(:,:), lK(:,:,:), lKd(:,:,:)
 
       s   = eq(cEq)%s
-      am  = eq(cEq)%af*eq(cEq)%gam*dt
-      af  = eq(cEq)%af*eq(cEq)%beta*dt*dt
-      afm = am/eq(cEq)%am
+      afv = eq(cEq)%af*eq(cEq)%gam*dt
+      afu = eq(cEq)%af*eq(cEq)%beta*dt*dt
+      afm = afv/eq(cEq)%am
 
       iM   = lFa%iM
       eNoN = lFa%eNoN
@@ -463,8 +463,10 @@
          lKd = 0._RKIND
          DO g=1, lFa%nG
             CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
-            w  = lFa%w(g) * SQRT(NORM(nV))
-            N  = lFa%N(:,g)
+            Jac = SQRT(NORM(nV))
+            nV  = nV/Jac
+            w   = lFa%w(g) * Jac
+            N   = lFa%N(:,g)
 
             u  = 0._RKIND
             ud = 0._RKIND
@@ -473,27 +475,26 @@
                ud(:) = ud(:) + N(a)*yl(:,a)
             END DO
 
-            nDn = MAT_ID(nsd)
+            nDn  = MAT_ID(nsd)
+            h(:) = ks*u(:) + cs*ud(:)
             IF (isN) THEN
-               h(:) = (ks*NORM(u, nV) + cs*NORM(ud, nV)) * nV(:)
+               h(:) = NORM(h, nV) * nV(:)
                DO a=1, nsd
                   DO b=1, nsd
                      nDn(a,b) = nV(a)*nV(b)
                   END DO
                END DO
-            ELSE
-               h(:) = ks*u(:) + cs*ud(:)
             END IF
 
             IF (nsd .EQ. 3) THEN
                DO a=1, eNoN
-                  lR(1,a) = lR(1,a) - w*N(a)*h(1)
-                  lR(2,a) = lR(2,a) - w*N(a)*h(2)
-                  lR(3,a) = lR(3,a) - w*N(a)*h(3)
+                  lR(1,a) = lR(1,a) + w*N(a)*h(1)
+                  lR(2,a) = lR(2,a) + w*N(a)*h(2)
+                  lR(3,a) = lR(3,a) + w*N(a)*h(3)
                END DO
 
                IF (cPhys .EQ. phys_ustruct) THEN
-                  wl = w*af
+                  wl = w*afv
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = wl*N(a)*N(b)
@@ -538,32 +539,32 @@
                      END DO
                   END DO
                ELSE
-                  wl = w*(ks*af + cs*am)
+                  wl = w*(ks*afu + cs*afv)
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
-                        lK(1,a,b) = lK(1,a,b) - wl*T1*nDn(1,1)
-                        lK(2,a,b) = lK(2,a,b) - wl*T1*nDn(1,2)
-                        lK(3,a,b) = lK(3,a,b) - wl*T1*nDn(1,3)
+                        lK(1,a,b) = lK(1,a,b) + wl*T1*nDn(1,1)
+                        lK(2,a,b) = lK(2,a,b) + wl*T1*nDn(1,2)
+                        lK(3,a,b) = lK(3,a,b) + wl*T1*nDn(1,3)
 
-                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1*nDn(2,1)
-                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1*nDn(2,2)
-                        lK(dof+3,a,b) = lK(dof+3,a,b) - wl*T1*nDn(2,3)
+                        lK(dof+1,a,b) = lK(dof+1,a,b) + wl*T1*nDn(2,1)
+                        lK(dof+2,a,b) = lK(dof+2,a,b) + wl*T1*nDn(2,2)
+                        lK(dof+3,a,b) = lK(dof+3,a,b) + wl*T1*nDn(2,3)
 
-                        lK(2*dof+1,a,b) = lK(2*dof+1,a,b)-wl*T1*nDn(3,1)
-                        lK(2*dof+2,a,b) = lK(2*dof+2,a,b)-wl*T1*nDn(3,2)
-                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b)-wl*T1*nDn(3,3)
+                        lK(2*dof+1,a,b) = lK(2*dof+1,a,b)+wl*T1*nDn(3,1)
+                        lK(2*dof+2,a,b) = lK(2*dof+2,a,b)+wl*T1*nDn(3,2)
+                        lK(2*dof+3,a,b) = lK(2*dof+3,a,b)+wl*T1*nDn(3,3)
                      END DO
                   END DO
                END IF
             ELSE IF (nsd .EQ. 2) THEN
                DO a=1, eNoN
-                  lR(1,a) = lR(1,a) - w*N(a)*h(1)
-                  lR(2,a) = lR(2,a) - w*N(a)*h(2)
+                  lR(1,a) = lR(1,a) + w*N(a)*h(1)
+                  lR(2,a) = lR(2,a) + w*N(a)*h(2)
                END DO
 
                IF (cPhys .EQ. phys_ustruct) THEN
-                  wl = w*af
+                  wl = w*afv
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = wl*N(a)*N(b)
@@ -588,14 +589,14 @@
                      END DO
                   END DO
                ELSE
-                  wl = w*(ks*af + cs*am)
+                  wl = w*(ks*afu + cs*afv)
                   DO a=1, eNoN
                      DO b=1, eNoN
                         T1 = N(a)*N(b)
-                        lK(1,a,b) = lK(1,a,b) - wl*T1*nDn(1,1)
-                        lK(2,a,b) = lK(2,a,b) - wl*T1*nDn(1,2)
-                        lK(dof+1,a,b) = lK(dof+1,a,b) - wl*T1*nDn(2,1)
-                        lK(dof+2,a,b) = lK(dof+2,a,b) - wl*T1*nDn(2,2)
+                        lK(1,a,b) = lK(1,a,b) + wl*T1*nDn(1,1)
+                        lK(2,a,b) = lK(2,a,b) + wl*T1*nDn(1,2)
+                        lK(dof+1,a,b) = lK(dof+1,a,b) + wl*T1*nDn(2,1)
+                        lK(dof+2,a,b) = lK(dof+2,a,b) + wl*T1*nDn(2,2)
                      END DO
                   END DO
                END IF
@@ -973,7 +974,9 @@
 
       LOGICAL RCRflag
       INTEGER(KIND=IKIND) iFa, i, j, ptr, iBc, iM
-      REAL(KIND=RKIND) orgQ, orgY, diff, area
+      REAL(KIND=RKIND) diff, area
+
+      REAL(KIND=RKIND), ALLOCATABLE :: orgY(:), orgQ(:)
 
       IF (ALL(cplBC%fa%bGrp.EQ.cplBC_Dir)) RETURN
 
@@ -1023,12 +1026,13 @@
          diff = diff*relTol
       END IF
 
+      ALLOCATE(orgY(cplBC%nFa), orgQ(cplBC%nFa))
+      orgY = cplBC%fa(:)%y
+      orgQ = cplBC%fa(:)%Qn
       DO iBc=1, eq(iEq)%nBc
          i = eq(iEq)%bc(iBc)%cplBCptr
          IF (i.NE.0 .AND. BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-            orgY = cplBC%fa(i)%y
-            orgQ = cplBC%fa(i)%Qn
-            cplBC%fa(i)%Qn = cplBC%fa(i)%Qn + diff
+            cplBC%fa(i)%Qn = orgQ(i) + diff
 
             IF (cplBC%useGenBC) THEN
                CALL genBC_Integ_X('D')
@@ -1036,12 +1040,13 @@
                CALL cplBC_Integ_X(RCRflag)
             END IF
 
-            eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY)/diff
+            eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY(i))/diff
 
-            cplBC%fa(i)%y  = orgY
-            cplBC%fa(i)%Qn = orgQ
+            cplBC%fa(:)%y  = orgY
+            cplBC%fa(:)%Qn = orgQ
          END IF
       END DO
+      DEALLOCATE(orgY, orgQ)
 
       RETURN
       END SUBROUTINE CALCDERCPLBC

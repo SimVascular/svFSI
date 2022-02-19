@@ -120,10 +120,8 @@
      2            ksix)
                IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
 
-               IF (.NOT.vmsStab) THEN
-                  CALL GNNxx(l, fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g),
-     2               fs(1)%Nxx(:,:,g), xwl, Nwx, Nwxx)
-               END IF
+               CALL GNNxx(l, fs(1)%eNoN, nsd, fs(1)%Nx(:,:,g),
+     2            fs(1)%Nxx(:,:,g), xwl, Nwx, Nwxx)
             END IF
             w = fs(1)%w(g) * Jac
 
@@ -209,7 +207,7 @@
      2   kS, kU, divU, gam, mu, mu_s, mu_g, p, pa, u(3), ud(3), px(3),
      3   f(3), up(3), ua(3), ux(3,3), uxx(3,3,3), es(3,3), es_x(3,3,3),
      4   esNx(3,eNoNw), mu_x(3), rV(3), rS(3), rM(3,3), updu(3,3,eNoNw),
-     5   uNx(eNoNw), upNx(eNoNw), uaNx(eNoNw), d2u2(3), NxNx, T1, T2, T3
+     5   uNx(eNoNw), upNx(eNoNw), uaNx(eNoNw), d2u2(3), NxNx, T1, T2
 
       ctM  = 1._RKIND
       ctC  = 36._RKIND
@@ -579,7 +577,7 @@
      2   kS, kU, divU, gam, mu, mu_s, mu_g, p, pa, u(2), ud(2), px(2),
      3   f(2), up(2), ua(2), ux(2,2), uxx(2,2,2), es(2,2), es_x(2,2,2),
      4   esNx(2,eNoNw), mu_x(2), rV(2), rS(2), rM(2,2), updu(2,2,eNoNw),
-     5   uNx(eNoNw), upNx(eNoNw), uaNx(eNoNw), NxNx, d2u2(2), T1, T2, T3
+     5   uNx(eNoNw), upNx(eNoNw), uaNx(eNoNw), NxNx, d2u2(2), T1, T2
 
       ctM  = 1._RKIND
       ctC  = 36._RKIND
