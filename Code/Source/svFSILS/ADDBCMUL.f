@@ -64,6 +64,7 @@
 
       ALLOCATE(coef(lhs%nFaces), v(dof,lhs%nNo))
 
+!     Here is where the res(istance) value is "added" to the stiffness matrix (Moghadam et al. 2013 eq. 27)
       IF (op_Type .EQ. BCOP_TYPE_ADD) THEN
          coef = lhs%face%res
       ELSE IF(op_Type .EQ. BCOP_TYPE_PRE) THEN

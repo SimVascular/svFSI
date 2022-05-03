@@ -1863,7 +1863,7 @@ c     2         "can be applied for Neumann boundaries only"
          END SELECT
       END IF
 
-!     For Neumann BC, is load vector changing with deformation
+!     For Neumann BC, if load vector changing with deformation
 !     (follower pressure)
       lBc%flwP = .FALSE.
       IF (BTEST(lBc%bType,bType_Neu)) THEN

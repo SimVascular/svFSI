@@ -297,7 +297,7 @@
       ELSE
          DO a=1, nNo
             Ac     = lFa%gN(a)
-            hg(Ac) = -h(1)*lBc%gx(a) ! what is gx(a)?
+            hg(Ac) = -h(1)*lBc%gx(a) ! gx encodes the spatial profile on this face (uniform for uniform pressure?)
          END DO
       END IF
 
@@ -958,7 +958,7 @@
             CALL cplBC_Integ_X(RCRflag)
          END IF
       END IF
-!     Set g variable to updated pressures and flowrates
+!     Set g variable to updated pressures and flowrates (contained in y)
       DO iBc=1, eq(iEq)%nBc
          iFa = eq(iEq)%bc(iBc)%iFa
          ptr = eq(iEq)%bc(iBc)%cplBCptr

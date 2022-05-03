@@ -106,7 +106,7 @@
 !        ||Sai||**2._LSRP                   (USE)
          REAL(KIND=LSRP) nS
 !        Neu: P = res*Q                 (IN)
-         REAL(KIND=LSRP) :: res = 0._LSRP
+         REAL(KIND=LSRP) :: res = 0._LSRP    ! Resistance value for Neumann face
 !        nodal Sai for Neu              (IN)
          REAL(KIND=LSRP), ALLOCATABLE :: val(:,:)
 !        Neu W*Sai                      (TMP)

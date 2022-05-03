@@ -187,7 +187,7 @@
             DO iBc=1, eq(cEq)%nBc
                i = eq(cEq)%bc(iBc)%lsPtr
                IF (i .NE. 0) THEN
-                  res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r
+                  res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r ! resistance value for Neumann surface (to be added to stiffness matrix)?
                   incL(i) = 1
                END IF
             END DO

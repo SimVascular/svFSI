@@ -83,6 +83,7 @@
             lhs%face(faIn)%coupledFlag = .FALSE.
             IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
             flag = lhs%face(faIn)%bGrp .EQ. BC_TYPE_Neu
+!           If the face has a Neumann BC, and the resistance is not zero, add resistance to lhs object and set coupled flag to True
             IF (flag .AND. res(faIn).NE.0._LSRP) THEN
                lhs%face(faIn)%res = res(faIn)
                lhs%face(faIn)%coupledFlag = .TRUE.
