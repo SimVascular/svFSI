@@ -1289,6 +1289,8 @@
       REAL(KIND=RKIND) T1, wl, hc(nsd), udn, u(nsd)
 
       wl  = w*eq(cEq)%af*eq(cEq)%gam*dt
+      
+!     Compute u dot n for backflow stabilization method (Moghadam et al. 2013 Section 2.2.1)
       udn = 0._RKIND
       IF (mvMsh) THEN
          DO i=1, nsd
@@ -1324,6 +1326,7 @@
             lR(2,a) = lR(2,a) - w*N(a)*hc(2)
             lR(3,a) = lR(3,a) - w*N(a)*hc(3)
             DO b=1, eNoN
+!              ? Where is the coupling term added to the tangent matrix (Moghadam 2013 eq 27)?
                T1 = wl*N(a)*N(b)*udn
                lK(1,a,b)  = lK(1,a,b)  - T1
                lK(6,a,b)  = lK(6,a,b)  - T1

@@ -1499,12 +1499,14 @@
 !     Reading the type: Dir/Neu/Per
       lPtr => list%get(ctmp,"Type")
       SELECT CASE (ctmp)
+!     IBSET sets the bit at position bType_Dir to 1 in lBc%bType. lBc%bType can
+!     have multiple bTypes set
       CASE ("Dirichlet","Dir")
          lBc%bType = IBSET(lBc%bType,bType_Dir)
       CASE ("Neumann","Neu")
          lBc%bType = IBSET(lBc%bType,bType_Neu)
          IF (phys.EQ.phys_fluid .OR. phys.EQ.phys_FSI)
-     2      lBc%bType = IBSET(lBc%bType,bType_bfs)
+     2      lBc%bType = IBSET(lBc%bType,bType_bfs) ! bType_bfs does not appear to be used
       CASE ("Traction","Trac")
          lBc%bType = IBSET(lBc%bType,bType_trac)
 
