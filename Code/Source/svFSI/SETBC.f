@@ -49,9 +49,9 @@
 
       REAL(KIND=RKIND), ALLOCATABLE :: tmpA(:,:), tmpY(:,:)
 
-      DO iEq=1, nEq
-         DO iBc=1, eq(iEq)%nBc
-            IF(BTEST(eq(iEq)%bc(iBc)%bType,bType_CMM)) THEN
+      DO iEq=1, nEq ! Loop over equations
+         DO iBc=1, eq(iEq)%nBc ! Loop over BCs
+            IF(BTEST(eq(iEq)%bc(iBc)%bType,bType_CMM)) THEN ! If CMM boundary
                s = eq(iEq)%s
                e = eq(iEq)%e
                IF (eq(iEq)%dof .EQ. nsd+1) e = e - 1
@@ -66,7 +66,7 @@
                END DO
             END IF ! END bType_CMM
 
-            IF (.NOT.BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) CYCLE
+            IF (.NOT.BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) CYCLE ! If not Dirichlet BC, skip
             IF (eq(iEq)%bc(iBc)%weakDir) CYCLE
             s = eq(iEq)%s
             e = eq(iEq)%e
@@ -238,9 +238,9 @@
       DO iBc=1, eq(cEq)%nBc
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
-         IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) THEN
+         IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) THEN ! If Neumann BC
             CALL SETBCNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
-         ELSE IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) THEN
+         ELSE IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) THEN ! If Traction BC
             CALL SETBCTRACL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
          END IF
       END DO
@@ -267,7 +267,7 @@
 !     Geting the contribution of Neu BC
       IF (BTEST(lBc%bType,bType_cpl) .OR.
      2    BTEST(lBc%bType,bType_RCR)) THEN
-         h(1) = lBc%g ! g contains the updated pressures and flowrates from cplBC, genBC, or RCR
+         h(1) = lBc%g ! g contains the updated pressures from cplBC, genBC, or RCR
       ELSE
          IF (BTEST(lBc%bType,bType_gen)) THEN
 !     Using "hl" as a temporary variable here
@@ -958,7 +958,7 @@
             CALL cplBC_Integ_X(RCRflag)
          END IF
       END IF
-!     Set g variable to updated pressures and flowrates (contained in y)
+!     Set g variable to updated pressures or flowrates (contained in y)
       DO iBc=1, eq(iEq)%nBc
          iFa = eq(iEq)%bc(iBc)%iFa
          ptr = eq(iEq)%bc(iBc)%cplBCptr
@@ -970,7 +970,7 @@
 !--------------------------------------------------------------------
 !     cplBC derivative is calculated here. This corresponds to the M matrix in Moghadam et al. 2013
 !     This function computes eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY(i))/diff
-!     bc%r is used in SETBCNEUL to add to tangent matrix?
+!     bc%r is added to the stiffness matrix (actually added to the matrix-vector product in the iterative LS)
 !     This function also calculates the updated values from cplBC or genBC (i.e. replaces ELSE statement in SETBCCPL)
       SUBROUTINE CALCDERCPLBC
       USE COMMOD

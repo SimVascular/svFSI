@@ -81,11 +81,12 @@
                cplBC%fa(i)%name = TRIM(msh(iM)%fa(iFa)%name)
                cplBC%fa(i)%y    = 0._RKIND
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
-                  cplBC%fa(i)%bGrp = cplBC_Dir
+                  cplBC%fa(i)%bGrp = cplBC_Dir ! Set cplBC internal flag to Dirichlet
                ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-                  cplBC%fa(i)%bGrp = cplBC_Neu
+                  cplBC%fa(i)%bGrp = cplBC_Neu ! Set cplBC internal flag to Neumann
+                  ! If coupled scheme is implicit or semi-implicit, set bType to resistance
                   IF (cplBC%schm .NE. cplBC_E) eq(iEq)%bc(iBc)%bType=
-     2               IBSET(eq(iEq)%bc(iBc)%bType,bType_res)
+     2               IBSET(eq(iEq)%bc(iBc)%bType,bType_res) 
 
 !                 Copy RCR structure from bc() to cplBC()
                   cplBC%fa(i)%RCR%Rp = eq(iEq)%bc(iBc)%RCR%Rp

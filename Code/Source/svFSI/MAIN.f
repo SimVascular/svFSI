@@ -115,7 +115,7 @@
 !     Inner loop for iteration
          DO
             iEqOld = cEq
-
+!           If cplBC is being used, compute cplBC quantities (pressure, flowrate, resistance)
             IF (cplBC%coupled .AND. cEq.EQ.1) THEN
                CALL SETBCCPL
                CALL SETBCDIR(An, Yn, Dn)
