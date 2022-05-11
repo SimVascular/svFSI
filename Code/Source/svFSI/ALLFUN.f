@@ -199,7 +199,9 @@
 !--------------------------------------------------------------------
 !     This routine integrate s over the surface faId.
 !     AB: I believe s is vector-valued at each node, and this function stands for
-!     Integrate Vector
+!     Integrate Vector. This function computes the integral over the face of 
+!     v . n. For example, if v contains the velocities at each node on the face,
+!     this function computes the velocity flux through this face.
       FUNCTION IntegV(lFa, s)
       USE COMMOD
       IMPLICIT NONE
@@ -223,14 +225,17 @@
          END IF
       END IF
 
+!     If using Immersed Boundary method
       isIB = .FALSE.
       IF (ibFlag) THEN
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
       END IF
 
+!     Initialize integral to be 0.
       IntegV = 0._RKIND
-      DO e=1, lFa%nEl
-!     Updating the shape functions, if this is a NURB
+
+      DO e=1, lFa%nEl ! For each element on face
+!        Updating the shape functions, if this is a NURB
          IF (lFa%eType .EQ. eType_NRB) THEN
             IF (.NOT.isIB) THEN
                CALL NRBNNXB(msh(lFa%iM), lFa, e)
@@ -239,22 +244,24 @@
             END IF
          END IF
 
-         DO g=1, lFa%nG
+         DO g=1, lFa%nG ! For each Gauss integration point
             IF (.NOT.isIB) THEN
+!              Returns a vector (n) at element e and Gauss point g on face lFa
+!              that is the normal weighted by Jac
                CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
             ELSE
                CALL GNNIB(lFa, e, g, n)
             END IF
 
-!     Calculating the function value
+!     Calculating the function value (v . n) at this Gauss point
             sHat = 0._RKIND
-            DO a=1, lFa%eNoN
+            DO a=1, lFa%eNoN ! For each node on element
                Ac = lFa%IEN(a,e)
                DO i=1, nsd
                   sHat = sHat + lFa%N(a,g)*s(i,Ac)*n(i)
                END DO
             END DO
-!     Now integrating
+!     Now integrating. Add product of Gauss weight and function value
             IntegV = IntegV + lFa%w(g)*sHat
          END DO
       END DO
@@ -300,13 +307,13 @@
       END IF
 
       IntegG = 0._RKIND
-      IF (u-l+1 .EQ. nsd) THEN
+      IF (u-l+1 .EQ. nsd) THEN ! s represents a vector field, so use IntegV
          ALLOCATE (vec(nsd,nNo))
          DO a=1, nNo
             vec(:,a) = s(l:u,a)
          END DO
          IntegG = IntegV(lFa,vec)
-      ELSE IF (l .EQ. u) THEN
+      ELSE IF (l .EQ. u) THEN ! s represents a scalar field, so use IntegS
          ALLOCATE (sclr(nNo))
          DO a=1, nNo
             sclr(a) = s(l,a)

@@ -233,8 +233,8 @@
             Ac      = msh(iM)%IEN(a,Ec)
             ptr(a)  = Ac
             hl(a)   = hg(Ac)
-            xl(:,a) = x(:,Ac)
-            dl(:,a) = Dg(:,Ac)
+            xl(:,a) = x(:,Ac) ! reference config position vector at each node
+            dl(:,a) = Dg(:,Ac) ! displacement vector at each node
          END DO
 
 !        Initialize parameteric coordinate for Newton's iterations
@@ -258,10 +258,16 @@
             IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
      2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, ksix)
 
+!           Get a vector (nV) at element "e" and Gauss point
+!           "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!           Jac = SQRT(NORM(n)). 
             CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
-            Jac = SQRT(NORM(nV))
-            nV  = nV / Jac
-            w   = lFa%w(g)*Jac
+            Jac = SQRT(NORM(nV)) ! Extract Jacobian
+!           AB 5/11/22: I believe this is the Jacobian of the mapping from parent
+!           surface element to ref configuration surface element, so this encodes 
+!           the area of the ref configuration surface element
+            nV  = nV / Jac ! Normalize element surface normal
+            w   = lFa%w(g)*Jac ! Scale Gauss point weights by Jacobian
 
             IF (cPhys .EQ. phys_ustruct) THEN
                IF (nsd .EQ. 3) THEN

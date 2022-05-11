@@ -944,7 +944,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
 !     LHS matrix
       REAL(KIND=RKIND), ALLOCATABLE :: Val(:,:)
-!     Position vector
+!     Position vector of ref configuration mesh nodes
       REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !     Old variables (velocity)
       REAL(KIND=RKIND), ALLOCATABLE :: Yo(:,:)

@@ -592,6 +592,7 @@
       F(3,3) = 1._RKIND
       DO a=1, eNoN
          h       = h      + N(a)*hl(a)
+         ! Construct deformation gradient tensor F
          F(1,1)  = F(1,1) + Nx(1,a)*dl(i,a)
          F(1,2)  = F(1,2) + Nx(2,a)*dl(i,a)
          F(1,3)  = F(1,3) + Nx(3,a)*dl(i,a)
@@ -604,7 +605,7 @@
       END DO
       Jac = MAT_DET(F, 3)
       Fi  = MAT_INV(F, 3)
-
+       ! Compute N * F^-1, used for Nanson's formula da.n = J*dA*N.F^-1
       nFi(1) = nV(1)*Fi(1,1) + nV(2)*Fi(2,1) + nV(3)*Fi(3,1)
       nFi(2) = nV(1)*Fi(1,2) + nV(2)*Fi(2,2) + nV(3)*Fi(3,2)
       nFi(3) = nV(1)*Fi(1,3) + nV(2)*Fi(2,3) + nV(3)*Fi(3,3)
@@ -615,8 +616,9 @@
          NxFi(3,a) = Nx(1,a)*Fi(1,3) + Nx(2,a)*Fi(2,3) + Nx(3,a)*Fi(3,3)
       END DO
 
-      wl = w*Jac*h
+      wl = w*Jac*h ! Scale w by the Jacobian of deformation, and multiply by Neumann BC value
       DO a=1, eNoN
+!        Add Neumann BC contribution to residual
          lR(1,a) = lR(1,a) - wl*N(a)*nFi(1)
          lR(2,a) = lR(2,a) - wl*N(a)*nFi(2)
          lR(3,a) = lR(3,a) - wl*N(a)*nFi(3)

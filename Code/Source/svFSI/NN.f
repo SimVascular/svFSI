@@ -1852,7 +1852,8 @@ c        N(8) = lx*my*0.5_RKIND
 !--------------------------------------------------------------------
 !     This routine returns a vector at element "e" and Gauss point
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
-!     Jac = SQRT(NORM(n)).
+!     Jac = SQRT(NORM(n)). Jacobian of mapping from parent surface element to 
+!     ref config. surface element?
       SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN
@@ -1921,12 +1922,12 @@ c        N(8) = lx*my*0.5_RKIND
 !     Correcting the position vector if mesh is moving
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
-         lX(:,a) = x(:,Ac)
+         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
          IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
       END DO
 
 !     Calculating surface deflation
-      IF (msh(iM)%lShl) THEN
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell
 !        Since the face has only one parametric coordinate (edge), find
 !        its normal from cross product of mesh normal and interior edge
 
@@ -1973,6 +1974,7 @@ c        N(8) = lx*my*0.5_RKIND
       ELSE
          ALLOCATE(xXi(nsd,insd))
          xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
          DO a=1, eNoNb
             b = ptr(a)
             DO i=1, insd
