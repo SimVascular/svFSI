@@ -92,6 +92,8 @@
       CONTAINS
 !####################################################################
 !     This routine integrate s over the surface faId.
+!     I believe s is scalar valued at each node, and this function stands for 
+!     Integrate Scalar
       FUNCTION IntegS(lFa, s, pflag)
       USE COMMOD
       IMPLICIT NONE
@@ -196,6 +198,8 @@
       END FUNCTION IntegS
 !--------------------------------------------------------------------
 !     This routine integrate s over the surface faId.
+!     AB: I believe s is vector-valued at each node, and this function stands for
+!     Integrate Vector
       FUNCTION IntegV(lFa, s)
       USE COMMOD
       IMPLICIT NONE
@@ -262,6 +266,9 @@
       END FUNCTION IntegV
 !--------------------------------------------------------------------
 !     This routine integrate s(l:u,:) over the surface faId.
+!     I believe s is vector or scalar-valued at each node, and this function stands for 
+!     Integrate General. This function is a general interface to integrating
+!     scalar or vector values over the face. 
       FUNCTION IntegG(lFa, s, l, uo, THflag)
       USE COMMOD
       IMPLICIT NONE

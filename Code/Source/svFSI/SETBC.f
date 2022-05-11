@@ -1004,7 +1004,7 @@
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                ! AB 5/11/22: Need to change how these flow rates are calculated
                ! to account for deformed mesh
-               cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
+               cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd) ! Calls IntegG() I believe
                cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
                cplBC%fa(ptr)%Po = 0._RKIND
                cplBC%fa(ptr)%Pn = 0._RKIND

@@ -1,0 +1,11 @@
+make --dry-run --always-make --keep-going --print-directory
+make: Entering directory `/Users/aaronbrown/svFSI-git/src/Code/Source'
+for i in ; do ( \
+	  cd $i; \
+	  /Library/Developer/CommandLineTools/usr/bin/make) ; done
+make: Leaving directory `/Users/aaronbrown/svFSI-git/src/Code/Source'
+ 
+Makefile:43: ../../../BuildWithMake/include.mk: No such file or directory
+make: *** No rule to make target `../../../BuildWithMake/include.mk'.
+make: Failed to remake makefile `../../../BuildWithMake/include.mk'.
+
