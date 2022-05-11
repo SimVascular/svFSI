@@ -937,6 +937,8 @@
             IF (ptr .NE. 0) THEN
 !              Compute flow rates from 3D on Neumann boundaries
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
+               ! AB 5/11/22: Need to change how these flow rates are calculated
+               ! to account for deformed mesh
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                   cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
                   cplBC%fa(ptr)%Po = 0._RKIND
@@ -1000,7 +1002,9 @@
          IF (ptr .NE. 0) THEN
 !           If Neumann boundary, compute flow rate (at t and at t+1)
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-               cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd) ! This calculation does not take into account mesh deformation (I think)
+               ! AB 5/11/22: Need to change how these flow rates are calculated
+               ! to account for deformed mesh
+               cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
                cplBC%fa(ptr)%Po = 0._RKIND
                cplBC%fa(ptr)%Pn = 0._RKIND

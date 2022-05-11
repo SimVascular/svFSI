@@ -116,6 +116,7 @@
          DO
             iEqOld = cEq
 !           If cplBC is being used, compute cplBC quantities (pressure, flowrate, resistance)
+!           by communicating with cplBC/genBC
             IF (cplBC%coupled .AND. cEq.EQ.1) THEN
                CALL SETBCCPL
                CALL SETBCDIR(An, Yn, Dn)
@@ -187,7 +188,8 @@
             DO iBc=1, eq(cEq)%nBc
                i = eq(cEq)%bc(iBc)%lsPtr
                IF (i .NE. 0) THEN
-                  res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r ! resistance value for Neumann surface (to be added to stiffness matrix)?
+                  ! resistance value for Neumann surface, to be "added" to stiffness matrix in LSSOLVE
+                  res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r 
                   incL(i) = 1
                END IF
             END DO
