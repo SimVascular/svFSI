@@ -248,6 +248,8 @@
             IF (.NOT.isIB) THEN
 
 !              Set mvMsh to true so that normal and area calc in GNNB takes into account deformation
+!              with mvMsh true, the nodal positions will be updated by displacement
+!              before computing element surface normals and areas
                mvMsh = .TRUE.
 
 !              Returns a vector (n) at element e and Gauss point g on face lFa

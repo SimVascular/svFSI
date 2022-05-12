@@ -1923,7 +1923,7 @@ c        N(8) = lx*my*0.5_RKIND
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
-         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector?
       END DO
 
 !     Calculating surface deflation
