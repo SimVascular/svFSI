@@ -259,6 +259,9 @@
                Ac = lFa%IEN(a,e)
                DO i=1, nsd
                   sHat = sHat + lFa%N(a,g)*s(i,Ac)*n(i)
+                  !if eq%struct OR eq%FSI OR OR eq%lelas
+!                 sHat = sHat + lFa*N(a,g)*s(i,Ac)*nFi(i)*Jac, where nFi(i) and J are defined in BNEUFOLWP()
+!                 these quantities depend on the displacements Dg(:,Ac)
                END DO
             END DO
 !     Now integrating. Add product of Gauss weight and function value

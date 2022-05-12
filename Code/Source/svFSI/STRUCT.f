@@ -624,6 +624,9 @@
          lR(3,a) = lR(3,a) - wl*N(a)*nFi(3)
 
          DO b=1, eNoN
+!           Add follower pressure load contribution to stiffness
+!           (with follower pressure load, the contribution to the residual
+!            depends on the deformation through the current area vector)
             Ku = wl*af*N(a)*(nFi(2)*NxFi(1,b) - nFi(1)*NxFi(2,b))
             lK(2,a,b)     = lK(2,a,b)     + Ku
             lK(dof+1,a,b) = lK(dof+1,a,b) - Ku

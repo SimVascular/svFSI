@@ -7,7 +7,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 
 # This program built for i386-apple-darwin11.3.0
 
-# Make data base, printed on Wed May 11 11:29:30 2022
+# Make data base, printed on Wed May 11 14:11:38 2022
 
 # Variables
 
@@ -40,7 +40,7 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 __CFBundleIdentifier = com.microsoft.VSCode
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-2c8a7f1b-58eb-4d77-978a-1b0aa2cf7240.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-ebdf385a-1e3b-4712-b7a0-ee560d0f36c1.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -290,7 +290,7 @@ veryclean: clean
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4053 / max = 4053 / min = 4053 / avg = 4053
 
-# Finished Make data base on Wed May 11 11:29:30 2022
+# Finished Make data base on Wed May 11 14:11:38 2022
 
  
 Makefile:43: ../../../BuildWithMake/include.mk: No such file or directory

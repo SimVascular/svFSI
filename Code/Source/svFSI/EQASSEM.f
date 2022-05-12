@@ -260,7 +260,8 @@
 
 !           Get a vector (nV) at element "e" and Gauss point
 !           "g" of face "lFa" that is the normal weigthed by Jac, i.e.
-!           Jac = SQRT(NORM(n)). 
+!           Jac = SQRT(NORM(n)). Note, NORM(u) gives the SQUARE of the Euclidean
+!           norm of u
             CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV)) ! Extract Jacobian
 !           AB 5/11/22: I believe this is the Jacobian of the mapping from parent
