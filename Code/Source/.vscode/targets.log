@@ -7,7 +7,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 
 # This program built for i386-apple-darwin11.3.0
 
-# Make data base, printed on Wed May 11 14:11:38 2022
+# Make data base, printed on Thu May 12 14:24:45 2022
 
 # Variables
 
@@ -33,6 +33,10 @@ VSCODE_NLS_CONFIG = {"locale":"en-us","availableLanguages":{},"_languagePackSupp
 _ = /usr/bin/make
 # makefile (from `Makefile', line 1)
 MAKEFILE_LIST :=  Makefile
+ 
+Makefile:43: ../../../BuildWithMake/include.mk: No such file or directory
+make: *** No rule to make target `../../../BuildWithMake/include.mk'.  Stop.
+
 # makefile (from `Makefile', line 41)
 TOP = ../../../BuildWithMake
 # environment
@@ -40,7 +44,7 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 __CFBundleIdentifier = com.microsoft.VSCode
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-ebdf385a-1e3b-4712-b7a0-ee560d0f36c1.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-7e6966c2-0f51-46c6-873f-b53c78843e33.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -164,7 +168,7 @@ MAKELEVEL := 0
 # environment
 CONDA_PREFIX = /Users/aaronbrown/opt/miniconda3
 # environment
-VSCODE_PID = 98504
+VSCODE_PID = 17937
 # environment
 _CE_CONDA = 
 # environment
@@ -290,9 +294,6 @@ veryclean: clean
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4053 / max = 4053 / min = 4053 / avg = 4053
 
-# Finished Make data base on Wed May 11 14:11:38 2022
+# Finished Make data base on Thu May 12 14:24:45 2022
 
  
-Makefile:43: ../../../BuildWithMake/include.mk: No such file or directory
-make: *** No rule to make target `../../../BuildWithMake/include.mk'.  Stop.
-
