@@ -1923,7 +1923,12 @@ c        N(8) = lx*my*0.5_RKIND
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
-         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector?
+         !WRITE(*,eq(cEq)%s)
+         !WRITE(*,eq(cEq)%e)
+!        If struct or ustruct, add new displacement to nodal coordinates to get current config
+!        Should I deform the geometry by the old displacement Do or the new displacement Dn?
+         IF (eq(cEq)%phys .EQ. phys_struct .OR. eq(cEq)%phys .EQ. phys_ustruct) lX(:,a) = lX(:,a) + Dn(1:3,Ac) 
+!        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector? I believe these components are the fluid mesh displacements
       END DO
 
 !     Calculating surface deflation
