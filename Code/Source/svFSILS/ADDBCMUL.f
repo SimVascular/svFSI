@@ -49,6 +49,8 @@
 !     contribution or compution the PC contribution) different
 !     coefficients are used.
 !     The resistance is stored in lhs%face(faIn)%res
+!     The current matrix vector product is in Y. The vector to be 
+!     multiplied and added is in X. The matrix is represented by res.
 !        
 !--------------------------------------------------------------------
 
@@ -69,6 +71,7 @@
 !     Here is where the res(istance) value is "added" to the stiffness
 !     matrix (Moghadam et al. 2013 eq. 27).
 !     res is transfered to a variable coef
+!     See FSILS_STRUCT.h for lhs%face variable descriptions
       IF (op_Type .EQ. BCOP_TYPE_ADD) THEN
          coef = lhs%face%res
       ELSE IF(op_Type .EQ. BCOP_TYPE_PRE) THEN
@@ -81,7 +84,7 @@
       DO faIn=1, lhs%nFaces
          nsd = MIN(lhs%face(faIn)%dof,dof)
          IF (lhs%face(faIn)%coupledFlag) THEN
-            IF (lhs%face(faIn)%sharedFlag) THEN
+            IF (lhs%face(faIn)%sharedFlag) THEN ! if face is shared between procs
                v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
@@ -97,17 +100,24 @@
                   END DO
                END DO
             ELSE
-!              What is valM(i,a). I think valM has to do with integrals
+!              What is valM(i,a)? See PRECOND.F for where is it set
+!              lhs%face(faIn)%valM(i,a) =                            &
+!     &               lhs%face(faIn)%val(i,a)*W(i,Ac)
+!              val(i,a) contains the stiffness matrix contributions, which
+!              are assembled from lK
+!              I think valM has to do with integrals
 !              of shape functions, and I think I need to modify valM
 !              to account for deformation of elements
                S = 0._LSRP
-               DO a=1, lhs%face(faIn)%nNo
-                  Ac = lhs%face(faIn)%glob(a)
+               DO a=1, lhs%face(faIn)%nNo ! Loop over nodes on face
+                  Ac = lhs%face(faIn)%glob(a) ! Get global node number
                   DO i=1, nsd
                      S = S + lhs%face(faIn)%valM(i,a)*X(i,Ac)
                   END DO
                END DO
+!              Multiply S by the resistance (equal to coef, see above)
                S = coef(faIn)*S
+!              Add S to the current matrix-vector product Y
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd

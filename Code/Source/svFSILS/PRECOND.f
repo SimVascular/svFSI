@@ -129,6 +129,7 @@
 !     Now post-multipling K by W: K = K*W
       CALL POSMUL(rowPtr, colPtr, lhs%nNo, lhs%nnz, dof, Val, W)
 
+!     Set valM(i,a) = val(i,a) * W(i,Ac)
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
             DO a=1, lhs%face(faIn)%nNo

@@ -405,7 +405,7 @@
       ALLOCATE(v(nsd,nNo))
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
-            IF (lhs%face(faIn)%sharedFlag) THEN
+            IF (lhs%face(faIn)%sharedFlag) THEN ! if face is shared between procs
                v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
@@ -417,8 +417,8 @@
      &            v)**2._LSRP
             ELSE
                lhs%face(faIn)%nS = 0._LSRP
-               DO a=1, lhs%face(faIn)%nNo
-                  Ac = lhs%face(faIn)%glob(a)
+               DO a=1, lhs%face(faIn)%nNo ! Loop over nodes on face
+                  Ac = lhs%face(faIn)%glob(a) ! Get global index of nodes
                   DO i=1, nsd
                      lhs%face(faIn)%nS = lhs%face(faIn)%nS +            &
      &                  lhs%face(faIn)%valM(i,a)**2._LSRP

@@ -511,15 +511,18 @@
      2         gNodes, sVl)
          END IF
       ELSE IF (BTEST(lBc%bType,bType_Neu)) THEN
-         IF (BTEST(lBc%bType,bType_res)) THEN
+!        AB 5/13/22: I think this is where integrals in Moghadam et al. 
+!        eq. 27 are computed. Note that this function is only computed
+!        once (at initialization)
+         IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
             sV = 0._RKIND
-            DO e=1, lFa%nEl
-               IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e)
-               DO g=1, lFa%nG
-                  CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),n)
-                  DO a=1, lFa%eNoN
-                     Ac = lFa%IEN(a,e)
-                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n
+            DO e=1, lFa%nEl ! Loop over elements on face
+               IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
+               DO g=1, lFa%nG ! Loop over Gauss point
+                  CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),n) ! get weighted normal vector in ref config
+                  DO a=1, lFa%eNoN ! Loop over nodes  in element
+                     Ac = lFa%IEN(a,e) ! Extract global nodal index
+                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
                   END DO
                END DO
             END DO
@@ -529,6 +532,7 @@
             END DO
             lsPtr     = lsPtr + 1
             lBc%lsPtr = lsPtr
+!           Fills lhs%face(i) variables, including val if sVl exists
             CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
      2         gNodes, sVl)
          ELSE
