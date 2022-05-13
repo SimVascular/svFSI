@@ -294,15 +294,13 @@
             IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
                sV = 0._RKIND
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
-               DO g=1, lFa%nG ! Loop over Gauss point
-!                 Changed this to GNNBT() instead of GNNB() in FSILSINI()
-!                 Tet weighted normal vector in current config
-                  CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
+!              Changed this to GNNBT() instead of GNNB() in FSILSINI()
+!              Tet weighted normal vector in current config
+               CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
      2               n) 
-                  DO a=1, lFa%eNoN ! Loop over nodes  in element
-                     Ac = lFa%IEN(a,e) ! Extract global nodal index
-                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
-                  END DO
+               DO a=1, lFa%eNoN ! Loop over nodes  in element
+                  Ac = lFa%IEN(a,e) ! Extract global nodal index
+                  sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
                END DO
                DO a=1, lFa%nNo
                   Ac       = lFa%gN(a)
@@ -311,11 +309,13 @@
                lsPtr     = lsPtr + 1
                lBc%lsPtr = lsPtr
    !           Fills lhs%face(i) variables, including val if sVl exists
-               CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
-      2         gNodes, sVl)
+               CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, 
+     2         BC_TYPE_Neu, gNodes, sVl)
             ELSE
                lBc%lsPtr = 0
             END IF
+            
+         END DO
 
 !        Now doing the assembly part
 #ifdef WITH_TRILINOS
