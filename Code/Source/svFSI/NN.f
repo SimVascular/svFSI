@@ -1923,12 +1923,8 @@ c        N(8) = lx*my*0.5_RKIND
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
-         !WRITE(*,eq(cEq)%s)
-         !WRITE(*,eq(cEq)%e)
-!        If struct or ustruct, add new displacement to nodal coordinates to get current config
-!        Should I deform the geometry by the old displacement Do or the new displacement Dn?
-         IF (eq(cEq)%phys .EQ. phys_struct .OR. eq(cEq)%phys .EQ. phys_ustruct) lX(:,a) = lX(:,a) + Dn(1:3,Ac) 
-!        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector? I believe these components are the fluid mesh displacements
+!        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
+         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
       END DO
 
 !     Calculating surface deflation
@@ -2001,5 +1997,157 @@ c        N(8) = lx*my*0.5_RKIND
 
       RETURN
       END SUBROUTINE GNNB
+
+!--------------------------------------------------------------------
+!     This routine returns a vector at element "e" and Gauss point
+!     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!     Jac = SQRT(NORM(n)). The normal is the surface normal in the current 
+!     configuration, and the Jacobian is the Jacobian of the mapping from parent
+!     surface element to current configuration surface element
+      SUBROUTINE GNNBT(lFa, e, g, insd, eNoNb, Nx, n)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
+      REAL(KIND=RKIND) v(nsd)
+
+      LOGICAL, ALLOCATABLE :: setIt(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+
+      iM   = lFa%iM
+      Ec   = lFa%gE(e)
+      eNoN = msh(iM)%eNoN
+
+      ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+
+!     Creating a ptr list that contains pointer to the nodes of elements
+!     that are at the face at the beginning of the list and the rest at
+!     the end
+      setIt = .TRUE.
+      DO a=1, eNoNb
+         Ac = lFa%IEN(a,e)
+         DO b=1, eNoN
+            IF (setIt(b)) THEN
+               Bc = msh(iM)%IEN(b,Ec)
+               IF (Bc .EQ. Ac) EXIT
+            END IF
+         END DO
+         IF (b .GT. eNoN) THEN
+            WRITE(*,'(A)')
+            WRITE(*,'(A)') "=========================================="
+            WRITE(*,'(A)') " ERROR: could not find matching face nodes"
+            WRITE(*,'(A)',ADVANCE='NO') "    Face "//TRIM(lFa%name)//
+     2         " e: "//STR(e)
+            DO b=1, eNoNb
+               WRITE(*,'(A)',ADVANCE='NO') " "//STR(lFa%IEN(b,e))
+            END DO
+            WRITE(*,'(A)')
+            WRITE(*,'(A)',ADVANCE='NO') "    Mesh "//
+     2         TRIM(msh(iM)%name)//" Ec: "//STR(Ec)
+            DO b=1, eNoN
+               WRITE(*,'(A)',ADVANCE='NO') " "//STR(msh(iM)%IEN(b,Ec))
+            END DO
+            WRITE(*,'(A)')
+            WRITE(*,'(A)') "=========================================="
+            WRITE(*,'(A)')
+            CALL STOPSIM()
+         END IF
+         ptr(a)   = b
+         setIt(b) = .FALSE.
+      END DO
+      a = eNoNb
+      DO b=1, eNoN
+         IF (setIt(b)) THEN
+            a      = a + 1
+            ptr(a) = b
+         END IF
+      END DO
+
+!     Correcting the position vector with the displacement 
+!     (this part different from GNNB() above)
+      DO a=1, eNoN
+         Ac = msh(iM)%IEN(a,Ec)
+         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
+!        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector? I believe these components are the fluid mesh displacements
+!        Should I deform the geometry by the old displacement Do or the new displacement Dn?
+         lX(:,a) = lX(:,a) + Dn(:,Ac) 
+      END DO
+
+!     Calculating surface deflation
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell
+!        Since the face has only one parametric coordinate (edge), find
+!        its normal from cross product of mesh normal and interior edge
+
+!        Update shape functions if NURBS
+         IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
+
+!        Compute adjoining mesh element normal
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+         DO a=1, eNoN
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            END DO
+         END DO
+         v(:) = CROSS(xXi)
+         v(:) = v(:) / SQRT(NORM(v))
+         DEALLOCATE(xXi)
+
+!        Face element surface deflation
+         ALLOCATE(xXi(nsd,1))
+         xXi = 0._RKIND
+         DO a=1, eNoNb
+            b = ptr(a)
+            xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
+         END DO
+
+!        Face normal
+         n(1) = v(2)*xXi(3,1) - v(3)*xXi(2,1)
+         n(2) = v(3)*xXi(1,1) - v(1)*xXi(3,1)
+         n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
+
+!        I choose Gauss point of the mesh element for calculating
+!        interior edge
+         v(:) = 0._RKIND
+         DO a=1, eNoN
+            v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)
+         END DO
+         a = ptr(1)
+         v(:) = lX(:,a) - v(:)
+         IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+         DEALLOCATE(xXi)
+         RETURN
+      ELSE
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
+         DO a=1, eNoNb
+            b = ptr(a)
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,b)
+            END DO
+         END DO
+         n = CROSS(xXi)
+         DEALLOCATE(xXi)
+      END IF
+
+!     Changing the sign if neccessary. a locates on the face and b
+!     outside of the face, in the parent element
+      a = ptr(1)
+      b = ptr(lFa%eNoN+1)
+      v = lX(:,a) - lX(:,b)
+      IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+      DEALLOCATE(setIt, ptr, lX)
+
+      RETURN
+      END SUBROUTINE GNNBT
 !####################################################################
 

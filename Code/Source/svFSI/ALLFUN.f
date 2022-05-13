@@ -246,23 +246,22 @@
 
          DO g=1, lFa%nG ! For each Gauss integration point
             IF (.NOT.isIB) THEN
-
-!              Set mvMsh to true so that normal and area calc in GNNB takes into account deformation
-!              with mvMsh true, the nodal positions will be updated by displacement
-!              before computing element surface normals and areas
-               mvMsh = .TRUE.
-
-!              Returns a vector (n) at element e and Gauss point g on face lFa
-!              that is the normal weighted by Jac
+!              If struct, compute weighted normal in current config
+               IF ((eq(cEq)%phys .EQ. phys_struct) .OR.
+     2             (eq(cEq)%phys .EQ. phys_ustruct) ) THEN
+!                 Returns a vector (n) at element e and Gauss point g on face lFa
+!                 that is the current config normal weighted by Jac
+               CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
+               ELSE ! Else, compute weighted normal in reference config
+!                 Returns a vector (n) at element e and Gauss point g on face lFa
+!                 that is the normal weighted by Jac
                CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
-
-               mvMsh = .FALSE.
-
+               END IF
             ELSE
                CALL GNNIB(lFa, e, g, n)
             END IF
 
-!     Calculating the function value (v . n) at this Gauss point
+!     Calculating the function value (v . n)dA at this Gauss point
             sHat = 0._RKIND
             DO a=1, lFa%eNoN ! For each node on element
                Ac = lFa%IEN(a,e)
