@@ -195,10 +195,11 @@
 !     We use Nanson's formula to take change in normal direction with
 !     deformation into account. Additional calculations based on mesh
 !     need to be performed.
-      SUBROUTINE BNEUFOLWP(lFa, hg, Dg)
+      SUBROUTINE BNEUFOLWP(lBc, lFa, hg, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: hg(tnNo), Dg(tDof,tnNo)
 
@@ -285,7 +286,36 @@
                   CALL BSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
                END IF
             END IF
-         END DO
+
+!           Adding code more or less copied from BAFINI.f FSILSINI(). I think in BNEUFOLWP()
+!           we have to update the integrals involved in the resistance BC
+!           using the deformed geometry. This integral is contained in sV
+!           sV = int_Gammat (Na * n_i)
+            IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
+               sV = 0._RKIND
+               IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
+               DO g=1, lFa%nG ! Loop over Gauss point
+!                 Changed this to GNNBT() instead of GNNB() in FSILSINI()
+!                 Tet weighted normal vector in current config
+                  CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
+     2               n) 
+                  DO a=1, lFa%eNoN ! Loop over nodes  in element
+                     Ac = lFa%IEN(a,e) ! Extract global nodal index
+                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+                  END DO
+               END DO
+               DO a=1, lFa%nNo
+                  Ac       = lFa%gN(a)
+                  sVl(:,a) = sV(:,Ac)
+               END DO
+               lsPtr     = lsPtr + 1
+               lBc%lsPtr = lsPtr
+   !           Fills lhs%face(i) variables, including val if sVl exists
+               CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
+      2         gNodes, sVl)
+            ELSE
+               lBc%lsPtr = 0
+            END IF
 
 !        Now doing the assembly part
 #ifdef WITH_TRILINOS

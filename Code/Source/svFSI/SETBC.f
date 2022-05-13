@@ -304,7 +304,7 @@
 
 !     Add Neumann BCs contribution to the LHS/RHS
       IF (lBc%flwP) THEN ! If follower pressure load
-         CALL BNEUFOLWP(lFa, hg, Dg)
+         CALL BNEUFOLWP(lBc, lFa, hg, Dg)
       ELSE
          CALL BASSEMNEUBC(lFa, hg, Yg)
       END IF
