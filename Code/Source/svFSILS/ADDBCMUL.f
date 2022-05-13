@@ -48,6 +48,8 @@
 !     product operation. Depending on the type of operation (adding the
 !     contribution or compution the PC contribution) different
 !     coefficients are used.
+!     The resistance is stored in lhs%face(faIn)%res
+!        
 !--------------------------------------------------------------------
 
       SUBROUTINE ADDBCMUL(lhs, op_Type, dof, X, Y)
@@ -64,7 +66,9 @@
 
       ALLOCATE(coef(lhs%nFaces), v(dof,lhs%nNo))
 
-!     Here is where the res(istance) value is "added" to the stiffness matrix (Moghadam et al. 2013 eq. 27)
+!     Here is where the res(istance) value is "added" to the stiffness
+!     matrix (Moghadam et al. 2013 eq. 27).
+!     res is transfered to a variable coef
       IF (op_Type .EQ. BCOP_TYPE_ADD) THEN
          coef = lhs%face%res
       ELSE IF(op_Type .EQ. BCOP_TYPE_PRE) THEN
@@ -93,6 +97,9 @@
                   END DO
                END DO
             ELSE
+!              What is valM(i,a). I think valM has to do with integrals
+!              of shape functions, and I think I need to modify valM
+!              to account for deformation of elements
                S = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)

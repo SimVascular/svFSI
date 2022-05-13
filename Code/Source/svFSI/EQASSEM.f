@@ -298,6 +298,8 @@
                DEALLOCATE(lKd)
 
             ELSE IF (cPhys .EQ. phys_struct) THEN
+!              Assemble tangent matrix into global sparse tangent matrix Val
+!              and residual vector into global residual vector R
                CALL DOASSEM(eNoN, ptr, lK, lR)
 
             END IF

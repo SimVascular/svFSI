@@ -188,7 +188,7 @@
             DO iBc=1, eq(cEq)%nBc
                i = eq(cEq)%bc(iBc)%lsPtr
                IF (i .NE. 0) THEN
-                  ! resistance value for Neumann surface, to be "added" to stiffness matrix in LSSOLVE
+!                 scaled resistance value for Neumann surface, to be "added" to stiffness matrix in LSSOLVE
                   res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r 
                   incL(i) = 1
                END IF

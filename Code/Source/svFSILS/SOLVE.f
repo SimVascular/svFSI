@@ -56,7 +56,7 @@
       REAL(KIND=LSRP), INTENT(INOUT) :: Ri(dof,lhs%nNo)
       REAL(KIND=LSRP), INTENT(INOUT) :: Val(dof*dof,lhs%nnz)
       INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: incL(lhs%nFaces)
-      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces)
+      REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: res(lhs%nFaces) ! Neumann cplBC resistance
 
       LOGICAL flag
       INTEGER(KIND=LSIP) faIn, a, nNo, nnz, nFaces
@@ -83,7 +83,8 @@
             lhs%face(faIn)%coupledFlag = .FALSE.
             IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
             flag = lhs%face(faIn)%bGrp .EQ. BC_TYPE_Neu
-!           If the face has a Neumann BC, and the resistance is not zero, add resistance to lhs object and set coupled flag to True
+!           If the face has a Neumann BC, and the resistance is not zero, 
+!           add resistance to lhs object and set coupled flag to True
             IF (flag .AND. res(faIn).NE.0._LSRP) THEN
                lhs%face(faIn)%res = res(faIn)
                lhs%face(faIn)%coupledFlag = .TRUE.
@@ -91,6 +92,7 @@
          END DO
       END IF
 
+!     Residual vector
       ALLOCATE(R(dof,nNo), Wr(dof,nNo), Wc(dof,nNo))
       DO a=1, nNo
          R(:,lhs%map(a)) = Ri(:,a)

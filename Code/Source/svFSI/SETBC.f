@@ -275,6 +275,7 @@
             CALL IGBC(lBc%gm, tmpA, hg)
             DEALLOCATE(hg)
          ELSE IF (BTEST(lBc%bType,bType_res)) THEN
+!     Compute pressure by multiplying resistance and flow rate
             h(1) = lBc%r * Integ(lFa, Yn, eq(cEq)%s, eq(cEq)%s+nsd-1)
          ELSE IF (BTEST(lBc%bType,bType_std)) THEN
             h(1) = lBc%g
@@ -923,6 +924,8 @@
 
 !     If coupling scheme is implicit, calculate the coupling derivative (M matrix in Moghadam 2013)
 !     as well as the  new pressures and flowrates from cplBC/genBC
+!     CALCDERCPLBC populates eq(iEq)%bc(iBc)%r (resistance), as well as
+!     calculates the updated values from cplBC or genBC (i.e. replaces ELSE statement below)
       IF (cplBC%schm .EQ. cplBC_I) THEN
          CALL CALCDERCPLBC
       ELSE !   Just compute the new pressure and flowrates from cplBC/genBC
@@ -937,8 +940,6 @@
             IF (ptr .NE. 0) THEN
 !              Compute flow rates from 3D on Neumann boundaries
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-               ! AB 5/11/22: Need to change how these flow rates are calculated
-               ! to account for deformed mesh
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                   cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
                   cplBC%fa(ptr)%Po = 0._RKIND

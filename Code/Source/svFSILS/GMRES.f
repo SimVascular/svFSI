@@ -315,6 +315,9 @@
          ls%itr = ls%itr + 1
          CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, dof, Val, X, &
      &      u(:,:,1))
+!        Here, we are adding the contribution of the coupled BC resistance
+!        to the tangent matrix (matrix-vector product). The resistance is
+!        stored in lhs%face(faIn)%res
          CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, dof, X, u(:,:,1))
 
          u(:,:,1) = R - u(:,:,1)
