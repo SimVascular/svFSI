@@ -1999,6 +1999,7 @@ c        N(8) = lx*my*0.5_RKIND
       END SUBROUTINE GNNB
 
 !--------------------------------------------------------------------
+!     AB: 5/11/22
 !     This routine returns a vector at element "e" and Gauss point
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)). The normal is the surface normal in the current 

@@ -246,6 +246,7 @@
 
          DO g=1, lFa%nG ! For each Gauss integration point
             IF (.NOT.isIB) THEN
+!              AB 5/11/22:
 !              If struct, compute weighted normal in current config
                IF ((eq(cEq)%phys .EQ. phys_struct) .OR.
      2             (eq(cEq)%phys .EQ. phys_ustruct) ) THEN

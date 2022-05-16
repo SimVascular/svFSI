@@ -213,9 +213,11 @@
       RETURN
       END SUBROUTINE FSILS_BC_FREE
 !####################################################################
+!     AB 5/16/22:
 !     Update and communicate lhs%face%val with new values provided by Val
-!     These are the integrals in the resistance BC contribution to the 
-!     tangent matrix.
+!     These are the surface integrals in the resistance BC contribution 
+!     to the tangent matrix. Since FSILS_BC_CREATE() was already called
+!     at initialization, we don't need to reallocate data structures.
       SUBROUTINE FSILS_BC_UPDATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
      &   Val)
       INCLUDE "FSILS_STD.h"

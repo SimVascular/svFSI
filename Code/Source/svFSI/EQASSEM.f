@@ -310,8 +310,10 @@
          DEALLOCATE(ptr, hl, xl, dl, N, Nxi, Nx, lR, lK)
       END DO ! Loop over elements
 
-!     Now update integrals involved in resistance BC contribution to
-!     stiffness matrix to reflect deformed geometry. Since we are using
+!     AB 5/16/22:
+!     Now update surface integrals involved in resistance BC contribution to
+!     stiffness matrix to reflect deformed geometry. The value of this
+!     integral is stored in lhs%face%val. Since we are using
 !     the deformed geometry to compute the contribution of the pressure
 !     load to the residual vector, we must also use the deformed geometry
 !     to compute the contribution of the resistance BC to the tangent
@@ -323,16 +325,20 @@
       END SUBROUTINE BNEUFOLWP
 
 ! ----------------------------------------------------------------------
-!     Update the integral involved in the resistance BC input to the 
+!     AB 5/16/22:
+!     Update the surface integral involved in the resistance BC input to the 
 !     linear solver to take into account the deformed geometry.
 !     This integral is sV = int_Gammat (Na * n_i) (See Moghadam 2013 eq. 27.)
-!     which is eventually used in ADDBCMUL() to add the resistance BC
-!     contribution to the matrix-vector product of the tangent matrix
-!     and an arbitrary vector.
+!     This function recomputes this integral and updates the variable 
+!     lhs%face%val with the new value, which is eventually used in ADDBCMUL() 
+!     to add the resistance BC contribution to the matrix-vector product 
+!     of the tangent matrix and an arbitrary vector. 
 !     This code was more or less copied from BAFINI.f -> FSILSINI(). The
-!     major difference is that I call GNNBT() to get the weighted normal
-!     in the current configuration, rather than the weighted normal in
-!     the reference configuration.
+!     major differences is that I call a new one function GNNBT() to get 
+!     the weighted normal in the current configuration, rather than the 
+!     weighted normal in the reference configuration, and that I call a
+!     new function FSILS_BC_UPDATE() to update lhs values rather than
+!     reallocate and recompute everything.
       SUBROUTINE FSILSUPD(lBc, lFa, lsPtr)   
       USE COMMOD
       USE ALLFUN
