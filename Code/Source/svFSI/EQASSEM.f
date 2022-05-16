@@ -286,36 +286,7 @@
                   CALL BSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
                END IF
             END IF
-
-!           Adding code more or less copied from BAFINI.f FSILSINI(). I think in BNEUFOLWP()
-!           we have to update the integrals involved in the resistance BC
-!           using the deformed geometry. This integral is contained in sV
-!           sV = int_Gammat (Na * n_i)
-            IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
-               sV = 0._RKIND
-               IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
-!              Changed this to GNNBT() instead of GNNB() in FSILSINI()
-!              Tet weighted normal vector in current config
-               CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
-     2               n) 
-               DO a=1, lFa%eNoN ! Loop over nodes  in element
-                  Ac = lFa%IEN(a,e) ! Extract global nodal index
-                  sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
-               END DO
-               DO a=1, lFa%nNo
-                  Ac       = lFa%gN(a)
-                  sVl(:,a) = sV(:,Ac)
-               END DO
-               lsPtr     = lsPtr + 1
-               lBc%lsPtr = lsPtr
-   !           Fills lhs%face(i) variables, including val if sVl exists
-               CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, 
-     2         BC_TYPE_Neu, gNodes, sVl)
-            ELSE
-               lBc%lsPtr = 0
-            END IF
-            
-         END DO
+         END DO ! Loop over Gauss point
 
 !        Now doing the assembly part
 #ifdef WITH_TRILINOS
@@ -337,8 +308,158 @@
          END IF
 #endif
          DEALLOCATE(ptr, hl, xl, dl, N, Nxi, Nx, lR, lK)
-      END DO
+      END DO ! Loop over elements
+
+!     Now update integrals involved in resistance BC contribution to
+!     stiffness matrix to reflect deformed geometry. Since we are using
+!     the deformed geometry to compute the contribution of the pressure
+!     load to the residual vector, we must also use the deformed geometry
+!     to compute the contribution of the resistance BC to the tangent
+!     matrix
+      CALL FSILSUPD(lBc, lFa, lBc%lsPtr)
+      
 
       RETURN
       END SUBROUTINE BNEUFOLWP
+
+! ----------------------------------------------------------------------
+!     Update the integral involved in the resistance BC input to the 
+!     linear solver to take into account the deformed geometry.
+!     This integral is sV = int_Gammat (Na * n_i) (See Moghadam 2013 eq. 27.)
+!     which is eventually used in ADDBCMUL() to add the resistance BC
+!     contribution to the matrix-vector product of the tangent matrix
+!     and an arbitrary vector.
+!     This code was more or less copied from BAFINI.f -> FSILSINI(). The
+!     major difference is that I call GNNBT() to get the weighted normal
+!     in the current configuration, rather than the weighted normal in
+!     the reference configuration.
+      SUBROUTINE FSILSUPD(lBc, lFa, lsPtr)   
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: lsPtr
+      TYPE(bcType), INTENT(INOUT) :: lBc
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, e, Ac, g, iM, i, nNo
+      REAL(KIND=RKIND) n(nsd)
+      LOGICAL :: eDrn
+
+      INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:), sVl(:,:)
+
+      iM  = lFa%iM
+      nNo = lFa%nNo
+      ALLOCATE(sVl(nsd,nNo), sV(nsd,tnNo), gNodes(nNo))
+      DO a=1, nNo
+         gNodes(a) = lFa%gN(a)
+      END DO
+
+      IF (BTEST(lBc%bType,bType_Dir)) THEN
+         IF (lBc%weakDir) THEN
+            lBc%lsPtr = 0
+         ELSE
+!            lsPtr     = lsPtr + 1
+!            lBc%lsPtr = lsPtr
+            sVl = 0._RKIND
+            eDrn = .FALSE.
+            DO i=1, nsd
+               IF (lBc%eDrn(i) .NE. 0) THEN
+                  eDrn = .TRUE.
+                  EXIT
+               END IF
+            END DO
+            IF (eDrn) THEN
+               sVl = 1._RKIND
+               DO i=1, nsd
+                  IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0._RKIND
+               END DO
+            END IF
+!           Probably should be _UPDATE, but I don't think this is called anyway
+            CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Dir,
+     2         gNodes, sVl)
+         END IF
+      ELSE IF (BTEST(lBc%bType,bType_Neu)) THEN
+!        AB 5/13/22: I think this is where integrals in Moghadam et al. 
+!        eq. 27 are computed. Note that this function is only computed
+!        once (at initialization)
+         IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
+            sV = 0._RKIND
+            DO e=1, lFa%nEl ! Loop over elements on face
+               IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
+               DO g=1, lFa%nG ! Loop over Gauss point
+               
+!                 Changed this to GNNBT() instead of GNNB() in FSILSINI()
+!                 Get weighted normal vector in current config
+                  CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
+     2             n) ! get weighted normal vector in ref config
+
+
+                  DO a=1, lFa%eNoN ! Loop over nodes  in element
+                     Ac = lFa%IEN(a,e) ! Extract global nodal index
+                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+                  END DO
+               END DO
+            END DO
+            DO a=1, lFa%nNo
+               Ac       = lFa%gN(a)
+               sVl(:,a) = sV(:,Ac)
+            END DO
+!            lsPtr     = lsPtr + 1
+!            lBc%lsPtr = lsPtr
+
+!           Fills lhs%face(i) variables, including val if sVl exists
+            CALL FSILS_BC_UPDATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
+     2         gNodes, sVl)
+         ELSE
+            lBc%lsPtr = 0
+         END IF
+      ELSE IF (BTEST(lBc%bType,bType_trac)) THEN
+         lBc%lsPtr = 0
+      ELSE IF (BTEST(lBc%bType,bType_CMM)) THEN
+!         lsPtr     = lsPtr + 1
+!         lBc%lsPtr = lsPtr
+
+         nNo = 0
+         DO a=1, lFa%nNo
+            IF (ISZERO(lBc%gx(a))) nNo = nNo + 1
+         END DO
+         DEALLOCATE(gNodes, sVl)
+         ALLOCATE(sVl(nsd,nNo), gNodes(nNo))
+         sVl  = 0._RKIND
+
+         eDrn = .FALSE.
+         DO i=1, nsd
+            IF (lBc%eDrn(i) .NE. 0) THEN
+               eDrn = .TRUE.
+               EXIT
+            END IF
+         END DO
+         IF (eDrn) THEN
+            sVl = 1._RKIND
+            DO i=1, nsd
+               IF (lBc%eDrn(i) .NE. 0) sVl(i,:) = 0._RKIND
+            END DO
+         END IF
+
+         nNo = 0
+         DO a=1, lFa%nNo
+            Ac = lFa%gN(a)
+            IF (ISZERO(lBc%gx(a))) THEN
+               nNo = nNo + 1
+               gNodes(nNo) = Ac
+            END IF
+         END DO
+
+!        Probably should be _UPDATE, but I don't think this is called anyway
+         CALL FSILS_BC_CREATE(lhs, lsPtr, nNo, nsd, BC_TYPE_Dir, gNodes,
+     2      sVl)
+      ELSE
+         err = "Unxpected bType in FSILSINI"
+      END IF
+
+      DEALLOCATE(sVl, sV, gNodes)
+
+      RETURN
+      END SUBROUTINE FSILSUPD
 !####################################################################

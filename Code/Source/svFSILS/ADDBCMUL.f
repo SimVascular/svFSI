@@ -103,11 +103,12 @@
 !              What is valM(i,a)? See PRECOND.F for where is it set
 !              lhs%face(faIn)%valM(i,a) =                            &
 !     &               lhs%face(faIn)%val(i,a)*W(i,Ac)
-!              val(i,a) contains the stiffness matrix contributions, which
-!              are assembled from lK
-!              I think valM has to do with integrals
-!              of shape functions, and I think I need to modify valM
-!              to account for deformation of elements
+!              val(i,a) contains the integrals of Na * n_i over a surface
+!              which is precisely the integral in Moghadam et al. 2013, eq. 27
+!              Note, val should contain integrals over deformed config surface
+!              if follower pressure load is used (BNEUFOLWP)
+!              I believe valM is val, scaled by some factor to account
+!              for preconditioning
                S = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo ! Loop over nodes on face
                   Ac = lhs%face(faIn)%glob(a) ! Get global node number
