@@ -159,6 +159,7 @@
       END IF
 
       IntegS = 0._RKIND
+      PRINT*, lFa%nEl
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
          IF (lFa%eType .EQ. eType_NRB) THEN
@@ -247,7 +248,8 @@
          DO g=1, lFa%nG ! For each Gauss integration point
             IF (.NOT.isIB) THEN
 !              AB 5/11/22:
-!              If struct, compute weighted normal in current config
+!              If struct, compute weighted normal in current config, so that we
+!              integrate over the current config surface
                IF ((eq(cEq)%phys .EQ. phys_struct) .OR.
      2             (eq(cEq)%phys .EQ. phys_ustruct) ) THEN
 !                 Returns a vector (n) at element e and Gauss point g on face lFa

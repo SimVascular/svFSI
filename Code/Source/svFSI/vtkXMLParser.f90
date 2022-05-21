@@ -324,16 +324,26 @@
 !            "  "//trim(fName)
          call initVTKXMLlib
 
+         write(stdout,ftab4) "check101"
+
          call initVTKXMLstruct(vtk,fName)
+
+         write(stdout,ftab4) "check102"
 
          call readHeader(vtk,istat)
          if ( istat.lt.0 ) return
 
+         write(stdout,ftab4) "check103"
+
          call parseVTKKernel(vtk,istat)
          if ( istat.lt.0 ) return
 
+         write(stdout,ftab4) "check104"
+
          call vtkDataLoader(vtk,istat)
          if ( istat.lt.0 ) return
+
+         write(stdout,ftab4) "check105"
 
 !         write(stdout,ftab2) "Success!"
 !         write(stdout,ftab1)

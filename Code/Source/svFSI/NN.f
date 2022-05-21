@@ -1852,8 +1852,8 @@ c        N(8) = lx*my*0.5_RKIND
 !--------------------------------------------------------------------
 !     This routine returns a vector at element "e" and Gauss point
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
-!     Jac = SQRT(NORM(n)). Jacobian of mapping from parent surface element to 
-!     ref config. surface element?
+!     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
+!     ref configuration surface element.
       SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN
@@ -1874,6 +1874,15 @@ c        N(8) = lx*my*0.5_RKIND
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
 
+!     If Ec = 0, then this face element does not lie on a volume element, and
+!     we should just compute the area weighted normal vector anyway.
+      IF (Ec .EQ. 0) THEN
+!         WRITE(*,'(A)') "Face element not on volume element."
+!         WRITE(*,'(A)') "Calculate normal vector anyway."
+         CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
+         RETURN
+      END IF
+
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
 
 !     Creating a ptr list that contains pointer to the nodes of elements
@@ -1888,7 +1897,7 @@ c        N(8) = lx*my*0.5_RKIND
                IF (Bc .EQ. Ac) EXIT
             END IF
          END DO
-         IF (b .GT. eNoN) THEN
+         IF (b .GT. eNoN) THEN ! This occurs if a face element does not lie on a volume element
             WRITE(*,'(A)')
             WRITE(*,'(A)') "=========================================="
             WRITE(*,'(A)') " ERROR: could not find matching face nodes"
@@ -1977,7 +1986,7 @@ c        N(8) = lx*my*0.5_RKIND
          xXi = 0._RKIND
 !        AB 5/11/22: How does this calculation work?
          DO a=1, eNoNb
-            b = ptr(a)
+            b = ptr(a) ! get local node index of the boundary element
             DO i=1, insd
                xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,b)
             END DO
@@ -1988,9 +1997,9 @@ c        N(8) = lx*my*0.5_RKIND
 
 !     Changing the sign if neccessary. a locates on the face and b
 !     outside of the face, in the parent element
-      a = ptr(1)
-      b = ptr(lFa%eNoN+1)
-      v = lX(:,a) - lX(:,b)
+      a = ptr(1) ! a is a node that lies on the boundary
+      b = ptr(lFa%eNoN+1) ! b is a node that lies in the interior
+      v = lX(:,a) - lX(:,b) ! v points outward
       IF (NORM(n,v) .LT. 0._RKIND) n = -n
 
       DEALLOCATE(setIt, ptr, lX)
@@ -2024,6 +2033,15 @@ c        N(8) = lx*my*0.5_RKIND
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
+
+!     If Ec = 0, then this face element does not lie on a volume element, and
+!     we should just compute the area weighted normal vector anyway.
+      IF (Ec .EQ. 0) THEN
+         !WRITE(*,'(A)') "Face element not on volume element."
+         !WRITE(*,'(A)') "Calculate normal vector anyway."
+         CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
+         RETURN
+      END IF
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
 
@@ -2150,5 +2168,104 @@ c        N(8) = lx*my*0.5_RKIND
 
       RETURN
       END SUBROUTINE GNNBT
+
+!--------------------------------------------------------------------
+!     This routine returns a vector at element "e" and Gauss point
+!     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
+!     ref configuration surface element.
+!     TO DO: Compute area weighted normal vector for surface element
+      SUBROUTINE GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
+      REAL(KIND=RKIND) v(nsd)
+
+      LOGICAL, ALLOCATABLE :: setIt(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+
+      iM   = lFa%iM
+      Ec   = lFa%gE(e)
+      eNoN = msh(iM)%eNoN
+
+      ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+
+!     Correcting the position vector if mesh is moving
+      DO a=1, eNoNb ! Loop over nodes of boundary surface element
+!         Ac = msh(iM)%IEN(a,Ec)
+         Ac = lFa%IEN(a,e)
+         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
+!        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
+         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+      END DO
+
+!     Calculating surface deflation
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell
+!        Since the face has only one parametric coordinate (edge), find
+!        its normal from cross product of mesh normal and interior edge
+
+!        Update shape functions if NURBS
+         IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
+
+!        Compute adjoining mesh element normal
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+         DO a=1, eNoN
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            END DO
+         END DO
+         v(:) = CROSS(xXi)
+         v(:) = v(:) / SQRT(NORM(v))
+         DEALLOCATE(xXi)
+
+!        Face element surface deflation
+         ALLOCATE(xXi(nsd,1))
+         xXi = 0._RKIND
+         DO a=1, eNoNb
+            b = ptr(a)
+            xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
+         END DO
+
+!        Face normal
+         n(1) = v(2)*xXi(3,1) - v(3)*xXi(2,1)
+         n(2) = v(3)*xXi(1,1) - v(1)*xXi(3,1)
+         n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
+
+!        I choose Gauss point of the mesh element for calculating
+!        interior edge
+         v(:) = 0._RKIND
+         DO a=1, eNoN
+            v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)
+         END DO
+         a = ptr(1)
+         v(:) = lX(:,a) - v(:)
+         IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+         DEALLOCATE(xXi)
+         RETURN
+      ELSE
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
+         DO a=1, eNoNb
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,a)
+            END DO
+         END DO
+         n = CROSS(xXi)
+         DEALLOCATE(xXi)
+      END IF
+      DEALLOCATE(setIt, ptr, lX)
+
+      RETURN
+      END SUBROUTINE GNNBSURF
 !####################################################################
 

@@ -67,6 +67,7 @@
             lPtr => lPBC%get(ftmp,"Face file path")
             IF (.NOT.ASSOCIATED(lPtr)) err = "Face file not provided"
             CALL READVTP(lM%fa(iFa), ftmp%fname)
+            PRINT*, "lM%fa(iFa)%nEl", lM%fa(iFa)%nEl
             IF (ALLOCATED(lM%fa(iFa)%x)) DEALLOCATE(lM%fa(iFa)%x)
             IF (.NOT.ALLOCATED(lM%fa(iFa)%gN)) THEN
                CALL CALCNBC(lM, lM%fa(iFa))

@@ -156,8 +156,10 @@
       DO iM=1, nMsh
          ALLOCATE(tMs(iM)%fa(msh(iM)%nFa))
          DO iFa=1, msh(iM)%nFa
+            PRINT*, "before PARTFACE: ", iM, iFa, msh(iM)%fa(iFa)%nEl
             CALL PARTFACE(msh(iM), msh(iM)%fa(iFa), tMs(iM)%fa(iFa),
      2         gmtl)
+            PRINT*, "after PARTFACE: ", iM, iFa, msh(iM)%fa(iFa)%nEl
          END DO
       END DO
 
