@@ -2039,7 +2039,7 @@ c        N(8) = lx*my*0.5_RKIND
       IF (Ec .EQ. 0) THEN
          !WRITE(*,'(A)') "Face element not on volume element."
          !WRITE(*,'(A)') "Calculate normal vector anyway."
-         CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
+         CALL GNNBSURFT(lFa, e, g, insd, eNoNb, Nx, n)
          RETURN
       END IF
 
@@ -2094,7 +2094,7 @@ c        N(8) = lx*my*0.5_RKIND
          Ac = msh(iM)%IEN(a,Ec)
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
 !        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector? I believe these components are the fluid mesh displacements
-!        Should I deform the geometry by the old displacement Do or the new displacement Dn?
+!        Deform the geometry by the new displacements Dn?
          lX(:,a) = lX(:,a) + Dn(:,Ac) 
       END DO
 
@@ -2174,7 +2174,9 @@ c        N(8) = lx*my*0.5_RKIND
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
 !     ref configuration surface element.
-!     TO DO: Compute area weighted normal vector for surface element
+!     This function is called for face elements that do not lie on a volume element
+!     For these elements, the direction of the normal vector is assumed from the
+!     nodal ordering.
       SUBROUTINE GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN
@@ -2207,7 +2209,7 @@ c        N(8) = lx*my*0.5_RKIND
       END DO
 
 !     Calculating surface deflation
-      IF (msh(iM)%lShl) THEN ! If mesh is a shell
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell. I think this is unnecessary in this function
 !        Since the face has only one parametric coordinate (edge), find
 !        its normal from cross product of mesh normal and interior edge
 
@@ -2267,5 +2269,107 @@ c        N(8) = lx*my*0.5_RKIND
 
       RETURN
       END SUBROUTINE GNNBSURF
+
+!--------------------------------------------------------------------
+!     This routine returns a vector at element "e" and Gauss point
+!     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
+!     current configuration surface element.
+!     This function is called for face elements that do not lie on a volume element
+!     For these elements, the direction of the normal vector is assumed from the
+!     nodal ordering.
+!     Same as GNNBSURF(), except uses current configuration nodal positions.
+      SUBROUTINE GNNBSURFT(lFa, e, g, insd, eNoNb, Nx, n)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
+      REAL(KIND=RKIND) v(nsd)
+
+      LOGICAL, ALLOCATABLE :: setIt(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+
+      iM   = lFa%iM
+      Ec   = lFa%gE(e)
+      eNoN = msh(iM)%eNoN
+
+      ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+
+!     Correcting the position vector if mesh is moving
+      DO a=1, eNoNb ! Loop over nodes of boundary surface element
+!         Ac = msh(iM)%IEN(a,Ec)
+         Ac = lFa%IEN(a,e)
+         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
+!        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+         lX(:,a) = lX(:,a) + Dn(:,Ac) 
+      END DO
+
+!     Calculating surface deflation
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell. I think this is unnecessary in this function
+!        Since the face has only one parametric coordinate (edge), find
+!        its normal from cross product of mesh normal and interior edge
+
+!        Update shape functions if NURBS
+         IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
+
+!        Compute adjoining mesh element normal
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+         DO a=1, eNoN
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            END DO
+         END DO
+         v(:) = CROSS(xXi)
+         v(:) = v(:) / SQRT(NORM(v))
+         DEALLOCATE(xXi)
+
+!        Face element surface deflation
+         ALLOCATE(xXi(nsd,1))
+         xXi = 0._RKIND
+         DO a=1, eNoNb
+            b = ptr(a)
+            xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
+         END DO
+
+!        Face normal
+         n(1) = v(2)*xXi(3,1) - v(3)*xXi(2,1)
+         n(2) = v(3)*xXi(1,1) - v(1)*xXi(3,1)
+         n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
+
+!        I choose Gauss point of the mesh element for calculating
+!        interior edge
+         v(:) = 0._RKIND
+         DO a=1, eNoN
+            v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)
+         END DO
+         a = ptr(1)
+         v(:) = lX(:,a) - v(:)
+         IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+         DEALLOCATE(xXi)
+         RETURN
+      ELSE
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
+         DO a=1, eNoNb
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,a)
+            END DO
+         END DO
+         n = CROSS(xXi)
+         DEALLOCATE(xXi)
+      END IF
+      DEALLOCATE(setIt, ptr, lX)
+
+      RETURN
+      END SUBROUTINE GNNBSURFT
 !####################################################################
 
