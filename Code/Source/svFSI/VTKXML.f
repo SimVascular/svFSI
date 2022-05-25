@@ -99,24 +99,14 @@
       CALL loadVTK(vtp, fName, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (init)"
 
-      std = "check1"
-
-
       CALL getVTK_numPoints(vtp, lFa%nNo, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (num points)"
-
-      std = "check2"
 
       CALL getVTK_numElems(vtp, lFa%nEl, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (num cells)"
 
-      std = "check3"
-      PRINT*, "lFa%nEl", lFa%nEl
-
       CALL getVTK_nodesPerElem(vtp, lFa%eNoN, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (nodes per cell)"
-
-      std = "check4"
 
       ALLOCATE(lFa%x(nsd,lFa%nNo), tmpX(maxNSD,lFa%nNo))
       CALL getVTK_pointCoords(vtp, tmpX, iStat)
@@ -124,13 +114,9 @@
       lFa%x(:,:) = tmpX(1:nsd,:)
       DEALLOCATE(tmpX)
 
-      std = "check5"
-
       ALLOCATE(lFa%IEN(lFa%eNoN,lFa%nEl))
       CALL getVTK_elemIEN(vtp, lFa%IEN, iStat)
       IF (iStat .LT. 0) err = "VTP file read error (ien)"
-
-      std = "check6"
 
       ALLOCATE(lFa%gN(lFa%nNo))
       CALL getVTK_pointData(vtp, "GlobalNodeID", lFa%gN, iStat)
@@ -142,13 +128,16 @@
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)+1
                Ac = lFa%gN(Ac)
-               lFa%IEN(a,e) = Ac
+               lFa%IEN(a,e) = Ac ! lFa%IEN(a,e) is the GlobalNodeID of node a on element e
             END DO
          END DO
       END IF
 
-      std = "check7"
-
+!     Read GlobalElementID from face mesh. This is the ID of the volume element
+!     that the face element lies on. If the face is virtual, then elements of
+!     the face mesh do not lie on volume elements, so there is no GlobalElementID
+!     In this case, gE(e) = 0 for all e.
+!     ?? How does it even find GlobalElementID. There is no array named that for cap.vtp
       ALLOCATE(lFa%gE(lFa%nEl))
       CALL getVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
       IF (iStat .LT. 0) THEN
@@ -160,8 +149,6 @@
          lFa%gebc(1,:) = lFa%gE(:)
          lFa%gebc(2:1+lFa%eNoN,:) = lFa%IEN(:,:)
       END IF
-
-      std = "check8"
 
       CALL flushVTK(vtp)
 

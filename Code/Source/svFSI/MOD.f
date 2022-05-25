@@ -370,6 +370,8 @@
          TYPE(adjType) :: eAdj
 !        Function spaces (basis)
          TYPE(fsType), ALLOCATABLE :: fs(:)
+!        Is face a virtual face (i.e. does not lie on computational domain)
+         LOGICAL :: virtual = .FALSE.
       END TYPE faceType
 
 !     Declared type for outputed variables
@@ -864,7 +866,7 @@
       INTEGER(KIND=IKIND) startTS
 !     Current equation degrees of freedom
       INTEGER(KIND=IKIND) dof
-!     Global total number of nodes
+!     Global total number of nodes (across all meshes (total) and all procs (global))
       INTEGER(KIND=IKIND) gtnNo
 !     Number of equations
       INTEGER(KIND=IKIND) nEq

@@ -158,8 +158,10 @@
          END IF
       END IF
 
+      CALL MPI_BARRIER(cm%com(), err)
+
       IntegS = 0._RKIND
-      PRINT*, lFa%nEl
+      PRINT*, "nEl inside IntegS(): ", lFa%nEl
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
          IF (lFa%eType .EQ. eType_NRB) THEN
@@ -173,7 +175,12 @@
             fs%Nx = lFa%Nx
          END IF
 
+         IF (lFa%virtual) THEN
+            PRINT*, "e inside IntegS(): ", e
+         END IF
+
          DO g=1, fs%nG
+            
             IF (.NOT.isIB) THEN
                CALL GNNB(lFa, e, g, insd, fs%eNoN, fs%Nx(:,:,g), n)
             ELSE
@@ -181,10 +188,17 @@
             END IF
             Jac = SQRT(NORM(n))
 
+            IF (lFa%virtual) THEN
+               PRINT*, "g inside IntegS(): ", g
+            END IF
+
 !     Calculating the function value
             sHat = 0._RKIND
             DO a=1, fs%eNoN
                Ac   = lFa%IEN(a,e)
+               IF (lFa%virtual) THEN
+                  PRINT*, "Ac inside IntegS(): ", Ac
+               END IF
                sHat = sHat + s(Ac)*fs%N(a,g)
             END DO
 !     Now integrating

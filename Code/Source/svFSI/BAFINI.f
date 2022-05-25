@@ -183,7 +183,7 @@
       lFa%area = area
       DEALLOCATE(sA)
 
-!     Compute face normals at nodes
+!     Compute face normals at nodes, to be stored in nV
       IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
       ALLOCATE(lFa%nV(nsd,lFa%nNo), sV(nsd,tnNo))
       sV = 0._RKIND
@@ -198,6 +198,9 @@
       IF (.NOT.flag) THEN
 !        For linear elements or NURBS, we simply project element normals
 !        to nodes
+         IF (lFa%virtual) THEN
+            PRINT*, "Virtual face nEl in FACEINI(): ", lFa%nEl
+         END IF
          DO e=1, lFa%nEl
             IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(lM, lFa, e)
             DO g=1, lFa%nG
@@ -205,6 +208,9 @@
                DO a=1, lFa%eNoN
                   Ac       = lFa%IEN(a,e)
                   sV(:,Ac) = sV(:,Ac) + nV*lFa%N(a,g)*lFa%w(g)
+!                  IF (lFa%name.EQ.'cap' .OR. lFa%name.EQ.'base') THEN
+!                     PRINT*, "Inside FACEINI() node loop: ", e, a, Ac
+!                  END IF
                END DO
             END DO
          END DO

@@ -1874,9 +1874,9 @@ c        N(8) = lx*my*0.5_RKIND
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
 
-!     If Ec = 0, then this face element does not lie on a volume element, and
-!     we should just compute the area weighted normal vector anyway.
-      IF (Ec .EQ. 0) THEN
+!     If this is a virtual face, then this face element does not lie on a volume 
+!     element, and we should just compute the area weighted normal vector anyway.
+      IF (lFa%virtual) THEN
 !         WRITE(*,'(A)') "Face element not on volume element."
 !         WRITE(*,'(A)') "Calculate normal vector anyway."
          CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
@@ -2034,9 +2034,9 @@ c        N(8) = lx*my*0.5_RKIND
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
 
-!     If Ec = 0, then this face element does not lie on a volume element, and
-!     we should just compute the area weighted normal vector anyway.
-      IF (Ec .EQ. 0) THEN
+!     If this is a virtual face, then this face element does not lie on a volume 
+!     element, and we should just compute the area weighted normal vector anyway.
+      IF (lFa%virtual) THEN
          !WRITE(*,'(A)') "Face element not on volume element."
          !WRITE(*,'(A)') "Calculate normal vector anyway."
          CALL GNNBSURFT(lFa, e, g, insd, eNoNb, Nx, n)
@@ -2174,7 +2174,8 @@ c        N(8) = lx*my*0.5_RKIND
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
 !     ref configuration surface element.
-!     This function is called for face elements that do not lie on a volume element
+!     This function is called for virtual face elements (face elements that do 
+!     not lie on a volume element).
 !     For these elements, the direction of the normal vector is assumed from the
 !     nodal ordering.
       SUBROUTINE GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
@@ -2275,7 +2276,8 @@ c        N(8) = lx*my*0.5_RKIND
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
 !     current configuration surface element.
-!     This function is called for face elements that do not lie on a volume element
+!     This function is called for virtual face elements (face elements that do 
+!     not lie on a volume element).
 !     For these elements, the direction of the normal vector is assumed from the
 !     nodal ordering.
 !     Same as GNNBSURF(), except uses current configuration nodal positions.
