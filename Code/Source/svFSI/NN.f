@@ -2204,6 +2204,7 @@ c        N(8) = lx*my*0.5_RKIND
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
 !         Ac = msh(iM)%IEN(a,Ec)
          Ac = lFa%IEN(a,e)
+         PRINT*, 'Ac inside GNNBSURF', Ac
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
 !        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
          IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)

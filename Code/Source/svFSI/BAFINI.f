@@ -173,7 +173,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sA(:), sV(:,:)
 
 !     Calculating face area
-      ALLOCATE(sA(tnNo))
+      ALLOCATE(sA(tnNo)) ! Total number of nodes on this proc
       sA   = 1._RKIND
       area = Integ(lFa, sA)
       std  = "    Area of face <"//TRIM(lFa%name)//"> is "//STR(area)

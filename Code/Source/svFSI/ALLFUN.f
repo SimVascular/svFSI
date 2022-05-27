@@ -100,12 +100,16 @@
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: s(:)
       LOGICAL, INTENT(IN), OPTIONAL :: pflag
-      REAL(KIND=RKIND) IntegS
+      REAL(KIND=RKIND) IntegS, snode
 
       LOGICAL isIB, flag
       INTEGER(KIND=IKIND) a, e, g, Ac, nNo, insd
       REAL(KIND=RKIND) sHat, Jac, n(nsd)
       TYPE(fsType) :: fs
+
+      IF (lFa%virtual) THEN
+         PRINT*, 'proc: ', cm%id(), 'Face name: ', lFa%name
+      END IF
 
       flag = .FALSE.
       IF (PRESENT(pflag)) flag = pFlag
@@ -114,7 +118,7 @@
       IF (msh(lFa%iM)%lShl) insd = insd - 1
       IF (msh(lFa%iM)%lFib) insd = 0
 
-      nNo = SIZE(s)
+      nNo = SIZE(s) ! This must be tnNo, the total number of nodes on a proc
       IF (nNo .NE. tnNo) THEN
          IF (ibFlag) THEN
             IF (nNo .NE. ib%tnNo) err =
@@ -124,6 +128,11 @@
          END IF
       END IF
 
+      IF (lFa%virtual) THEN
+         DO a=1, nNo
+            PRINT*, 'proc: ', cm%id(), 'nNo: ', nNo, 's(a): ', s(a)
+         END DO
+      END IF
       isIB = .FALSE.
       IF (ibFlag) THEN
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
@@ -195,11 +204,16 @@
 !     Calculating the function value
             sHat = 0._RKIND
             DO a=1, fs%eNoN
-               Ac   = lFa%IEN(a,e)
-               IF (lFa%virtual) THEN
+!              If face is virtual, then master must get the function nodal value
+!              s(Ac) from another proc.
+               IF (.NOT. lFa%virtual) THEN
+                  Ac   = lFa%IEN(a,e) ! Get local node number on proc Ac in [1,tnNo]
+                  snode = s(Ac)
+               ELSE
                   PRINT*, "Ac inside IntegS(): ", Ac
-               END IF
-               sHat = sHat + s(Ac)*fs%N(a,g)
+                  snode = 0
+               END IF     
+               sHat = sHat + snode*fs%N(a,g)
             END DO
 !     Now integrating
             IntegS = IntegS + Jac*fs%w(g)*sHat
@@ -227,6 +241,8 @@
       LOGICAL isIB
       INTEGER(KIND=IKIND) a, i, e, Ac, g, nNo
       REAL(KIND=RKIND) sHat, n(nsd)
+
+      PRINT*, 'Inside IntegV'
 
       IF (SIZE(s,1) .NE. nsd) err = "Incompatible vector size in IntegV"
 
@@ -315,6 +331,7 @@
       REAL(KIND=RKIND) IntegG
       REAL(KIND=RKIND), ALLOCATABLE :: sclr(:), vec(:,:)
 
+      PRINT*, 'proc: ', cm%id(), 'Face name: ', lFa%name
       u = l
       IF (PRESENT(uo)) u = uo
 
@@ -342,6 +359,7 @@
          ALLOCATE (sclr(nNo))
          DO a=1, nNo
             sclr(a) = s(l,a)
+            PRINT*, 'proc: ', cm%id(), 'sclr(:,a): ', sclr(a)
          END DO
          IntegG = IntegS(lFa,sclr,flag)
       ELSE

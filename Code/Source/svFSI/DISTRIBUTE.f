@@ -1327,7 +1327,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          ALLOCATE(tempIEN(eNoN,lM%gnEl), lM%otnIEN(lM%gnEl))
 !     Making the lM%IEN array in order, based on the cm%id() number in
 !     master. lM%otnIEN maps old IEN order to new IEN order.
-!     Why does the IEN order change?
+!     Why does the IEN order change? I think to facilitate scattering later.
          disp = 0
          DO e=1, lM%gnEl ! Loop over global elements in mesh
 !           gPart(e) = proc that owns e
@@ -1420,15 +1420,15 @@ c            wrn = " ParMETIS failed to partition the mesh"
       DEALLOCATE(tempIEN)
 
 !     Constructing the initial global to local pointer
-!     lM%IEN: eNoN,nEl --> gnNo
-!     gtlPtr: gnNo     --> nNo
-!     lM%IEN: eNoN,nEl --> nNo
+!     lM%IEN: eNoN,nEl --> gnNo. Maps node a of element e (local to proc and mesh) to global node A on mesh
+!     gtlPtr: gnNo     --> nNo. Maps global node A on mesh to local node a on proc and mesh
+!     lM%IEN: eNoN,nEl --> nNo. Reconstructing IEN to map node a of element e (local to proc and mesh) to local node a on proc and mesh
       ALLOCATE(gtlPtr(lM%gnNo)) ! global number of nodes on this mesh
       nNo    = 0
       gtlPtr = 0
       DO e=1, nEl ! Loop over num elements on this proc on this mesh
          DO a=1, eNoN ! Loop over nodes in element
-            Ac = lM%IEN(a,e) ! Get global node Ac on this mesh
+            Ac = lM%IEN(a,e) ! Get global node Ac on this mesh. This is the global node ID in Paraview
 !           If Ac has not be seen yet, add it to this proc. Increment the number
 !           of nodes on this proc, and update gtlPtr
             IF (gtlPtr(Ac) .EQ. 0) THEN
@@ -1447,7 +1447,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     part:  nNo  --> gtnNo. Maps local node index on this proc on this mesh to global
       ALLOCATE(part(nNo))
       DO Ac=1, lM%gnNo ! Loop over nodes on this mesh
-         a = gtlPtr(Ac) ! get local node index on this proc 
+         a = gtlPtr(Ac) ! get local node index on this proc and mesh
          ! If a is non-zero, then this proc owns global node Ac, so assign the
          ! corresponding global total node gN(Ac) to part(a).
          ! At this point, gN(Ac) maps global node index on this mesh to
@@ -1457,7 +1457,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     mapping and converting other parameters.
 !     I will use an upper bound for gPart as a container for ltg,
 !     since there can be repeated nodes. gPart is just a temp variable.
-!     gmtl:  gtnNo --> tnNo. Maps global node index across all meshes to local node index (across all meshes or parts of meshes belong to this proc)
+!     gmtl:  gtnNo --> tnNo. Maps global node index across all meshes to local node index (across all meshes or parts of meshes belong to this proc). gmtl is zero global node Ac does not belong to this proc
 !     gPart: tnNo  --> gtnNo. Maps local node index on this proc (across multiple parts of meshes) to global node index across all meshes. Inverse of gmtl
 !     ltg:   tnNo  --> gtnNo. How is this different from gPart, if at all? I think they contain the same info, gPart is just temporary as we assemble the info
 !     lM%gN: nNo   --> tnNo. Changing gN to map local node index on this proc and this mesh to local node index on this proc across all meshes or parts of meshes belonging to this proc
@@ -1689,33 +1689,32 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     AB 5/24/22: Since master in general does not own all virtual face nodes,
 !     update the number of nodes and other key data structure. Use part to hold
 !     temporary data and rebuild ltg array
-      ALLOCATE(part(tnNo + gFa%nNo))
-      IF (lFa%virtual .AND. cm%mas()) THEN
-         DO a=1, tnNo ! Loop over nodes on this proc
-            Ac = ltg(a)
-            part(a) = Ac ! Store existing local-to-global map in part
-         END DO 
-         DO a=1, gFa%nNo ! Loop over nodes on virtual face
-            Ac = gmtl(gFa%gN(a)) ! Get local node on this proc corresponding to global node gN(a)
-            IF (Ac .EQ. 0) THEN
-               lFa%nNo  = lFa%nNo + 1 ! Increment number of nodes on this proc for this face
-               tnNo     = tnNo + 1 ! increment number of nodes on this proc
-               gmtl(gFa%gN(a)) = tnNo ! Map global node to local node on proc
-               part(tnNo) = gFa%gN(a) ! Map local node on this proc to global node
-            END IF
-         END DO 
-!        Rebuild loical-to-global map ltg
-         IF (ALLOCATED(ltg)) DEALLOCATE(ltg)
-         ALLOCATE(ltg(tnNo))
-         ltg = part(1:tnNo) ! Set ltg array, which maps the local node index on this proc across all meshes to the global index across all meshes
-         DEALLOCATE(part) ! Destroy temporary structure part
-      END IF
-
-
-
-!     Since the nodes of a virtual face do lie on the mesh, global nodes Ac
-!     are found correctly and lFa%nNo is computed correctly. It is non zero
-!     for procs who already own the boundary nodes (for which gmtl is non-zero)
+!      ALLOCATE(part(tnNo + gFa%nNo))
+!      IF (lFa%virtual .AND. cm%mas()) THEN
+!         DO a=1, tnNo ! Loop over nodes on this proc
+!            Ac = ltg(a)
+!            part(a) = Ac ! Store existing local-to-global map in part
+!         END DO 
+!         DO a=1, gFa%nNo ! Loop over nodes on virtual face
+!            Ac = gmtl(gFa%gN(a)) ! Get local node on this proc corresponding to global node gN(a)
+!            IF (Ac .EQ. 0) THEN
+!               lFa%nNo  = lFa%nNo + 1 ! Increment number of nodes on this proc for this face
+!               tnNo     = tnNo + 1 ! increment number of nodes on this proc
+!               gmtl(gFa%gN(a)) = tnNo ! Map global node to local node on proc
+!               part(tnNo) = gFa%gN(a) ! Map local node on this proc to global node
+!            END IF
+!         END DO 
+!        Rebuild local-to-global map ltg
+!        5/26/22: Maybe I don't need to update ltg. This seems to lead to problems
+!        during assembly (isolated node error). Just don't update ltg, only update
+!        gmtl.
+!        See how output is performed. Master is responsible for all output
+!        Talk to Chi
+!         IF (ALLOCATED(ltg)) DEALLOCATE(ltg)
+!         ALLOCATE(ltg(tnNo))
+!         ltg = part(1:tnNo) ! Set ltg array, which maps the local node index on this proc across all meshes to the global index across all meshes
+!         DEALLOCATE(part) ! Destroy temporary structure part
+!      END IF
 
       ALLOCATE(lFa%gN(lFa%nNo))
 
@@ -1749,7 +1748,10 @@ c            wrn = " ParMETIS failed to partition the mesh"
          DO e=1, lFa%nEl
             j = j + 1
             DO a=1, eNoNb
-               lFa%IEN(a,j) = gmtl(gFa%IEN(a,e))
+!              gmtl maps global node index (across all meshes and procs) to local
+!              node index on this proc (across all parts of meshes belong to this proc)          
+!              gmtl is zero if global node Ac does not belong to this proc
+               lFa%IEN(a,j) = gmtl(gFa%IEN(a,e)) 
                PRINT*, 'a: ', a, 'e: ', e, 'gFa%IEN(a,e): ', 
      2         gFa%IEN(a,e), 'lFa%IEN(a,j): ', lFa%IEN(a,j)
 
