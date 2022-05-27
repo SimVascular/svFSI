@@ -103,12 +103,13 @@
       REAL(KIND=RKIND) IntegS, snode
 
       LOGICAL isIB, flag
-      INTEGER(KIND=IKIND) a, e, g, Ac, nNo, insd
+      INTEGER(KIND=IKIND) a, e, g, Ac, nNo, insd, p, ierr
       REAL(KIND=RKIND) sHat, Jac, n(nsd)
       TYPE(fsType) :: fs
+      REAL(KIND=RKIND), ALLOCATABLE :: sgather(:)
 
       IF (lFa%virtual) THEN
-         PRINT*, 'proc: ', cm%id(), 'Face name: ', lFa%name
+         !PRINT*, 'proc: ', cm%id(), 'Face name: ', lFa%name
       END IF
 
       flag = .FALSE.
@@ -128,9 +129,13 @@
          END IF
       END IF
 
+!     If face is virtual, allocate sgather vector. This will hold
+!     snode values from all procs after MPI_Gather operation on master
       IF (lFa%virtual) THEN
+         !PRINT*, 'cm%np()', cm%np()
+         ALLOCATE(sgather(cm%np()))
          DO a=1, nNo
-            PRINT*, 'proc: ', cm%id(), 'nNo: ', nNo, 's(a): ', s(a)
+            !PRINT*, 'proc: ', cm%id(), 'nNo: ', nNo, 's(a): ', s(a)
          END DO
       END IF
       isIB = .FALSE.
@@ -170,7 +175,7 @@
       CALL MPI_BARRIER(cm%com(), err)
 
       IntegS = 0._RKIND
-      PRINT*, "nEl inside IntegS(): ", lFa%nEl
+      !PRINT*, "nEl inside IntegS(): ", lFa%nEl
       DO e=1, lFa%nEl
 !     Updating the shape functions, if this is a NURB
          IF (lFa%eType .EQ. eType_NRB) THEN
@@ -184,8 +189,8 @@
             fs%Nx = lFa%Nx
          END IF
 
-         IF (lFa%virtual) THEN
-            PRINT*, "e inside IntegS(): ", e
+         IF (lFa%virtual .AND. cm%mas()) THEN
+            !PRINT*, 'proc: ', cm%id(),  "e inside IntegS(): ", e
          END IF
 
          DO g=1, fs%nG
@@ -197,8 +202,9 @@
             END IF
             Jac = SQRT(NORM(n))
 
-            IF (lFa%virtual) THEN
-               PRINT*, "g inside IntegS(): ", g
+            IF (lFa%virtual .AND. cm%mas()) THEN
+               !PRINT*, "g inside IntegS(): ", g
+               !PRINT*, "n inside IntegS(): ", n(1), n(2), n(3)
             END IF
 
 !     Calculating the function value
@@ -207,12 +213,43 @@
 !              If face is virtual, then master must get the function nodal value
 !              s(Ac) from another proc.
                IF (.NOT. lFa%virtual) THEN
-                  Ac   = lFa%IEN(a,e) ! Get local node number on proc Ac in [1,tnNo]
-                  snode = s(Ac)
+                  Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
+                  snode = s(Ac) ! Get nodal function value to use
                ELSE
-                  PRINT*, "Ac inside IntegS(): ", Ac
-                  snode = 0
-               END IF     
+                  Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
+!                 Ac = 0 if this proc does not own this node
+                  IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
+                     snode = 0._RKIND ! Set snode to zero
+                  ELSE ! This proc does own this node
+                     snode = s(Ac) ! Get nodal function value to use
+                  END IF
+                  IF (cm%mas()) THEN
+                     !PRINT*, 'Before gather master snode: ', snode
+                  END IF
+!                 Communicate the true snode value among all procs. We use the 
+!                 gather operation to get snode from all procs onto master
+                  ! First, allocate space for snode values. The size of sgather
+                  ! vector is the number of procs being used.
+                  sgather = 0._RKIND
+                  !PRINT*, 'proc: ', cm%id(), 'snode: ', snode
+                  CALL MPI_GATHER(snode, 1, mpreal, sgather, 1,
+     2            mpreal, master, cm%com(), ierr)
+!                 If master, go through sgather and search for first non-zero 
+!                 value.
+                  IF (cm%mas()) THEN
+                     DO p=1, cm%np()
+                        IF (sgather(p) .NE. 0) THEN
+                           snode = sgather(p)
+                           EXIT 
+                        END IF
+                     END DO
+                  ELSE ! If not master, set snode to 0 so they don't contribute to integral
+                     snode = 0._RKIND
+                  END IF 
+               END IF  
+               IF (cm%mas()) THEN
+                  !PRINT*, 'After gather master snode: ', snode
+               END IF 
                sHat = sHat + snode*fs%N(a,g)
             END DO
 !     Now integrating
@@ -222,6 +259,10 @@
 
       IF (cm%seq() .OR. isIB) RETURN
       IntegS = cm%reduce(IntegS)
+      
+      IF (lFa%virtual) THEN
+         DEALLOCATE(sgather)
+      END IF
 
       RETURN
       END FUNCTION IntegS
@@ -239,10 +280,14 @@
       REAL(KIND=RKIND) IntegV
 
       LOGICAL isIB
-      INTEGER(KIND=IKIND) a, i, e, Ac, g, nNo
+      INTEGER(KIND=IKIND) a, i, e, Ac, g, nNo, p, ierr
       REAL(KIND=RKIND) sHat, n(nsd)
+      ! Temporary vector containing s at a node
+      REAL(KIND=RKIND) snode(nsd)
+      ! Temporary array containing snode from all procs
+      REAL(KIND=RKIND), ALLOCATABLE :: sgather(:,:) 
 
-      PRINT*, 'Inside IntegV'
+
 
       IF (SIZE(s,1) .NE. nsd) err = "Incompatible vector size in IntegV"
 
@@ -255,6 +300,12 @@
             err = "Incompatible vector size in IntegV"
          END IF
       END IF
+
+!     If face is virtual, allocate sgather array. This will hold
+!     snode values from all procs after MPI_Gather operation on master
+      IF (lFa%virtual) THEN
+         ALLOCATE(sgather(nsd, cm%np()))
+      END IF 
 
 !     If using Immersed Boundary method
       isIB = .FALSE.
@@ -297,18 +348,52 @@
 !     Calculating the function value (v . n)dA at this Gauss point
             sHat = 0._RKIND
             DO a=1, lFa%eNoN ! For each node on element
-               Ac = lFa%IEN(a,e)
+               IF (.NOT. lFa%virtual) THEN 
+                  Ac = lFa%IEN(a,e) ! Get local node number of proc. Ac in [1,tnNo]
+                  snode(:) = s(:,Ac) ! Get nodal function value to use
+               ELSE ! Master must get function value from other procs
+                  Ac = lFa%IEN(a,e)
+                  IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
+                     snode = 0._RKIND
+                  ELSE ! This proc does own this node
+                     snode = s(:,Ac) ! Get nodal function value to use
+                  END IF
+!                 Communicate the true snode value among all procs. We use the 
+!                 gather operation to get snode from all procs onto master
+                  ! First, allocate space for snode values. The size of sgather
+                  ! vector is the number of procs being used.
+                  sgather = 0._RKIND
+                  CALL MPI_GATHER(snode, nsd, mpreal, sgather, nsd,
+     2            mpreal, master, cm%com(), ierr)
+!                 If master, go through sgather and search for first non-zero
+!                 value.
+                  IF (cm%mas()) THEN
+                     DO p=1, cm%np()
+                        IF (.NOT. ALL(sgather(:,p) .EQ. 0)) THEN
+                           snode(:) = sgather(:,p)
+                           EXIT
+                        END IF
+                     END DO
+                  ELSE ! If not master, set snode to 0 so they don't contribute to integral
+                     snode = 0._RKIND 
+                  END IF 
+               END IF
+!              Compute dot product of s and n at Gauss point
                DO i=1, nsd
-                  sHat = sHat + lFa%N(a,g)*s(i,Ac)*n(i)
+                  sHat = sHat + lFa%N(a,g)*snode(i)*n(i)
                END DO
             END DO
-!     Now integrating. Add product of Gauss weight and function value
+!     Now integrating. Add product of Gauss weight and dot product at Gauss point
             IntegV = IntegV + lFa%w(g)*sHat
          END DO
       END DO
 
       IF (cm%seq() .OR . isIB) RETURN
       IntegV = cm%reduce(IntegV)
+
+      IF (lFa%virtual) THEN
+         DEALLOCATE(sgather)
+      END IF
 
       RETURN
       END FUNCTION IntegV
@@ -331,7 +416,6 @@
       REAL(KIND=RKIND) IntegG
       REAL(KIND=RKIND), ALLOCATABLE :: sclr(:), vec(:,:)
 
-      PRINT*, 'proc: ', cm%id(), 'Face name: ', lFa%name
       u = l
       IF (PRESENT(uo)) u = uo
 

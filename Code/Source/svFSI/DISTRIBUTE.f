@@ -1659,15 +1659,12 @@ c            wrn = " ParMETIS failed to partition the mesh"
 
 !     AB 5/23/22: If face is virtual, then the Ec = trash for every element and the
 !     above loop results in lFa%nEl = 0 for all procs. In this case, set lFa%nEl
-!     equal to gFa%nEl for the master proc. We will let the master proc handle
-!     the virtual surface. Also, set gFa%gE(e) = -1 so we don't get confused
+!     equal to gFa%nEl for the all procs. We'll deal with the parallelization
+!     and communication when we need to integrate (in IntegS and IntegV)
+!     Also, set gFa%gE(e) = -1 so we don't get confused
 !     and behavior will be defined.
       IF (lFa%virtual) THEN
-         IF(cm%mas()) THEN
-            lFa%nEl = gFa%nEl
-         ELSE
-            lFa%nEl = 0
-         END IF
+         lFa%nEl = gFa%nEl
          DO e=1, gFa%nEl
             gFa%gE(e) = -1
          END DO
@@ -1724,7 +1721,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       DO e=1, gFa%nEl ! Loop over global number of elements
          Ec = gFa%gE(e) ! Get global element index (trash for virtual surface)
          IF (gFa%name .EQ. "cap") THEN
-            PRINT*, "Ec", Ec
+            !PRINT*, "Ec", Ec
          END IF
 !        If the element index falls into the range of elements assigned to this
 !        proc, add this face elements info to the local face structure on this proc
@@ -1740,10 +1737,13 @@ c            wrn = " ParMETIS failed to partition the mesh"
 
 !     AB 5/23/22: If face is virtual, then the Ec = -1, Thus, lFa%IEN() is not
 !     populated above. In this case, IEN has been allocated but not populated, so 
-!     accessing it leads to undefined behavior. To fix this, for a virtual face
-!     we give all the responsbility to master, so perform a similar assignment
-!     as above, but for master only
-      IF (lFa%virtual .AND. cm%mas()) THEN
+!     accessing it leads to undefined behavior. For a virtual face, loop through
+!     all elements and fill in what we can of IEN on each processor. On a single
+!     processor, IEN will not be completely populated. For example, if a global
+!     node A, which corresponds to node a on global face element e, does not
+!     belong to processor 1 (this partition was done in PARTMESH and embodied in
+!     gmtl), then lFa%IEN(a,e) = 0.
+      IF (lFa%virtual) THEN
          j = 0
          DO e=1, lFa%nEl
             j = j + 1
@@ -1752,8 +1752,9 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !              node index on this proc (across all parts of meshes belong to this proc)          
 !              gmtl is zero if global node Ac does not belong to this proc
                lFa%IEN(a,j) = gmtl(gFa%IEN(a,e)) 
-               PRINT*, 'a: ', a, 'e: ', e, 'gFa%IEN(a,e): ', 
-     2         gFa%IEN(a,e), 'lFa%IEN(a,j): ', lFa%IEN(a,j)
+!               PRINT*, 'proc: ', cm%id(), 'a: ', a, 'e: ', e, 
+!     2          'gFa%IEN(a,e): ',  gFa%IEN(a,e), 
+!     2          'lFa%IEN(a,j): ', lFa%IEN(a,j)    
 
             END DO
          END DO
@@ -1764,9 +1765,9 @@ c            wrn = " ParMETIS failed to partition the mesh"
       DO a=1, gFa%nNo
          Ac = gmtl(gFa%gN(a))
          IF (gFa%name .EQ. "cap" .AND. cm%mas()) THEN
-            PRINT*, 'gN(a): ', gFa%gN(a), "Ac", Ac
+            !PRINT*, 'gN(a): ', gFa%gN(a), "Ac", Ac
          END IF
-         IF (Ac .NE. 0) THEN
+         IF (Ac .NE. 0) THEN ! If Ac is 0, then the node does not belong to this proc
             j = j + 1
             lFa%gN(j) = Ac
          END IF

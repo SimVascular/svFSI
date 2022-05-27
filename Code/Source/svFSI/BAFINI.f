@@ -198,9 +198,6 @@
       IF (.NOT.flag) THEN
 !        For linear elements or NURBS, we simply project element normals
 !        to nodes
-         IF (lFa%virtual) THEN
-            PRINT*, "Virtual face nEl in FACEINI(): ", lFa%nEl
-         END IF
          DO e=1, lFa%nEl
             IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(lM, lFa, e)
             DO g=1, lFa%nG
