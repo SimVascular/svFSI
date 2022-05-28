@@ -2407,9 +2407,6 @@ c        N(8) = lx*my*0.5_RKIND
          ELSE ! If not master, set tmpX to 0
             tmpDn = 0._RKIND
          END IF 
-         IF (cm%mas()) THEN
-            PRINT*, "tmpDn()", tmpDn(1), tmpDn(2), tmpDn(3)
-         END IF
 !        Update local position with position for computation
          lX(:,a) = tmpX(:) + tmpDn(:) 
       END DO

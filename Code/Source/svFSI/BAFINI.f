@@ -525,6 +525,8 @@
                   CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),n) ! get weighted normal vector in ref config
                   DO a=1, lFa%eNoN ! Loop over nodes  in element
                      Ac = lFa%IEN(a,e) ! Extract global nodal index
+!                    Ac should be 0 if a proc does not own it. Could possibly get
+!                    a segfault here. Should we have an if Ac .NE. 0?
                      sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
                   END DO
                END DO

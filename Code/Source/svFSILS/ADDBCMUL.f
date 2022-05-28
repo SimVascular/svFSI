@@ -118,8 +118,13 @@
                END DO
 !              Multiply S by the resistance (equal to coef, see above)
                S = coef(faIn)*S
-!              Add S to the current matrix-vector product Y
+!              Add S times second integral to the current matrix-vector product Y
                DO a=1, lhs%face(faIn)%nNo
+!                 If the coupled surface is virtually capped to compute flow rate
+!                 then the right integral should be over the capped surface, while
+!                 the left integral should be over the uncapped surface. We
+!                 can satisfy this by skipping this addition if the face is virtual
+                  IF (lhs%face(faIn)%virtual) CYCLE
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      Y(i,Ac) = Y(i,Ac) + lhs%face(faIn)%valM(i,a)*S

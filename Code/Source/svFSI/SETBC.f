@@ -238,6 +238,8 @@
       DO iBc=1, eq(cEq)%nBc
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
+!        If face is virtual, don't add contribution of associated BC
+         IF  (msh(iM)%fa(iFa)%virtual) CYCLE
          IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) THEN ! If Neumann BC
             CALL SETBCNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
          ELSE IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) THEN ! If Traction BC
