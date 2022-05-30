@@ -6,6 +6,11 @@ This branch is created from master on Jan 4, 2022 and will be referenced in the 
 
 `svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver. It is distributed under a MIT-like open source license.
 
+## Binary and Container
+Precompiled binaries for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188).
+
+Instructions to build and run `svFSI` in Docker container are provided [here](./Docker/README.md).
+
 ## Dependence
 
 The following packages are required to build and use `svFSI`.
@@ -19,9 +24,7 @@ The following packages are required to build and use `svFSI`.
 
 On Ubuntu, most of the dependencies can be installed using `apt install`. On macOS, the dependencies may be installed using `brew`. Apart from GNU compilers, `svFSI` can also be built with Intel oneAPI Toolkits. For more details, please refer to [`INSTALL.md`](./INSTALL.md#Build) and [`INSTALL-DEPS.md`](./INSTALL-DEPS.md#intel-oneapi-toolkitsd).
 
-## Quick Build
-
-Precompiled binaries for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188).
+## Quick Build from Source
 
 Users are recommended to build from the source code to access the most recent features and bug fixes. Instructions for a quick build are provided here for a Linux/Mac OS system.
 
