@@ -1,7 +1,7 @@
 # Docker-svFSI
 This Dockerfile will build [`svFSI`](https://github.com/SimVascular/svFSI) executable from the most recent source code in the main repository. This procedure has been successfully tested on MacOS Big Sur, Ubuntu 18.04 and Windows 10 with WSL 2. Assuming you already have [Docker](https://docs.docker.com/get-docker/) installed, please follow the steps below to run `svFSI`.
 
-1. Build Docker image. In the current directory (<Path to svFSI>/Docker), run the following command.
+1. Build Docker image. In the current directory (Path_to_svFSI/Docker), run the following command.
 
    ```bash
    docker build -t svfsi-image .
