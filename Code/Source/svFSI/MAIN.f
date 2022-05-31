@@ -190,6 +190,9 @@
                IF (i .NE. 0) THEN
 !                 scaled resistance value for Neumann surface, to be "added" to stiffness matrix in LSSOLVE
                   res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r 
+                  IF (cm%mas()) THEN
+                     PRINT*, 'i: ', i, 'res(i): ', res(i)
+                  END IF
                   incL(i) = 1
                END IF
             END DO

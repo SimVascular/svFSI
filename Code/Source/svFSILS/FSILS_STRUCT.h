@@ -111,6 +111,8 @@
          REAL(KIND=LSRP), ALLOCATABLE :: val(:,:)
 !        Neu W*Sai                      (TMP)
          REAL(KIND=LSRP), ALLOCATABLE :: valM(:,:)
+!        Is face a virtual face        (USE)
+         LOGICAL :: virtual = .FALSE.
       END TYPE FSILS_faceType
 
 !     All following are in (USE)

@@ -48,13 +48,14 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_BC_CREATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
-     &   Val)
+     &   Val, virtual)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
       INTEGER(KIND=LSIP), INTENT(IN) :: BC_type
       INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
       REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
+      LOGICAL, INTENT(IN), OPTIONAL :: virtual
 
       INTEGER(KIND=LSIP) a, Ac, i
 
@@ -79,6 +80,10 @@
       lhs%face(faIn)%nNo  = nNo
       lhs%face(faIn)%dof  = dof
       lhs%face(faIn)%bGrp = BC_type
+
+!     Set virtual flag for lhs%face is virtual flag is provided
+      lhs%face(faIn)%virtual = .FALSE.
+      IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
 
       ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
      &   lhs%face(faIn)%valM(dof,nNo))

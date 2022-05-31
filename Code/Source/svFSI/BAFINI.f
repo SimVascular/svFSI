@@ -518,6 +518,11 @@
 !        eq. 27 are computed. Note that this function is only computed
 !        once (at initialization)
          IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
+            IF (cm%mas()) THEN 
+               PRINT*, 'Inside FSILINI, lFa%name: ', lFa%name
+               PRINT*, 'lFa%nEl: ', lFa%nEl
+               PRINT*, 'lFa%nNo: ', lFa%nNo
+            END IF
             sV = 0._RKIND
             DO e=1, lFa%nEl ! Loop over elements on face
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
@@ -539,7 +544,7 @@
             lBc%lsPtr = lsPtr
 !           Fills lhs%face(i) variables, including val if sVl exists
             CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
-     2         gNodes, sVl)
+     2         gNodes, sVl, lFa%virtual)
          ELSE
             lBc%lsPtr = 0
          END IF

@@ -84,6 +84,8 @@
       DO faIn=1, lhs%nFaces
          nsd = MIN(lhs%face(faIn)%dof,dof)
          IF (lhs%face(faIn)%coupledFlag) THEN
+!            PRINT*, "faIn: ", faIn, "sharedFlag: ", 
+!     2      lhs%face(faIn)%sharedFlag
             IF (lhs%face(faIn)%sharedFlag) THEN ! if face is shared between procs
                v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
@@ -123,7 +125,11 @@
 !                 If the coupled surface is virtually capped to compute flow rate
 !                 then the right integral should be over the capped surface, while
 !                 the left integral should be over the uncapped surface. We
-!                 can satisfy this by skipping this addition if the face is virtual
+!                 can satisfy this by skipping the addition below if the face 
+!                 is virtual
+                  IF (lhs%face(faIn)%virtual) THEN
+                     PRINT*, "virtual inside ADDBCMUL()"
+                  END IF 
                   IF (lhs%face(faIn)%virtual) CYCLE
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
