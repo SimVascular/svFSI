@@ -4,7 +4,9 @@ This branch is created from master on Jan 4, 2022 and will be referenced in the 
 
 ## Introduction
 
-`svFSI` is a  multi-physics finite element solver designed for computational modeling of the cardiovascular system. Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver. It is distributed under a MIT-like open source license.
+`svFSI` is a multi-physics finite element solver designed for computational modeling of the cardiovascular system. It is a major component of the ongoing SimVascular [**SimCardio**](http://simvascular.github.io/docsSimCardio.html) project that aims to provide the complete pipeline for cardiac modeling, from image segmentation to computational modeling.
+
+Some of the unique capabilities of `svFSI` include modeling cardiac electrophysiology, biological tissue mechanics, blood flow, and large deformation fluid-structure interaction (FSI). `svFSI` also offers a wide choice of boundary conditions for performing patient-specific modeling of cardiovascular biomechanics. The code is parallelized using message-passing-interface (MPI) and offers multiple options to choose a linear solver and preconditioner. `svFSI` can be used as part of the [SimVascular](https://simvascular.github.io) software or can be used as a stand-alone solver. It is distributed under a MIT-like open source license.
 
 ## Binary and Container
 Precompiled binaries for Ubuntu and MacOS are available for download from [SimTK](https://simtk.org/frs/index.php?group_id=188).
@@ -114,13 +116,33 @@ Below, we provide a list of the available choice of constitutive models for diff
    | cepModel\_FN   | Fitzhugh-Nagumo model            | "FN", "Fitzhugh-Nagumo"       |
    | cepModel\_TTP  | tenTusscher-Panfilov model       | "TTP", "tenTusscher-Panfilov" |
 
-## Additional Resource
-More details can be found here:
-- Fluid-Structure Interaction (FSI): https://simvascular.github.io/docssvFSI.html
-- SimCardio: http://simvascular.github.io/docsSimCardio.html
+## Documentation
+More details can be found on the [**SimCardio**](http://simvascular.github.io/docsSimCardio.html) page, and direct links to the documentation for different funtionalities are provided here:
+- Fluid-Structure Interaction (FSI): http://simvascular.github.io/docsSimCardio.html#fluid-structure-interaction
 - Cardiac electrophysiology modeling: http://simvascular.github.io/docsSimCardio.html#cep-modeling
 - Cardiac mechanics modeling:  http://simvascular.github.io/docsSimCardio.html#mechanics-modeling
 - Prescribed-motion LV modeling: https://simvascular.github.io/docsSimCardio.html#automatic-cardiac-modeling
+
+## Tutorial
+
+- We provide webpage tutorials on the [**SimCardio**](http://simvascular.github.io/docsSimCardio.html) page.
+
+- SimVascular group uploads hands-on tutorials to our [YouTube](https://www.youtube.com/channel/UCT61XgTRqpfb39Hyio9IqGQ) channel periodically. Here are some for `svFSI`:
+
+  - Fluid-Structure Interaction (FSI): https://www.youtube.com/watch?v=QIpyThIAD7k
+
+  - Cardiac electrophysiology modeling: https://www.youtube.com/watch?v=TCK3SmGwBa8
+
+  - Cardiac mechancis modeling: https://www.youtube.com/watch?v=Jm3VSi6Aci8
+
+- We also maintain a large collection of examples that showcase different funtionalities of `svFSI`. You can find them here: https://github.com/SimVascular/svFSI-Tests. Each case includes a README file that explains the problem in hand and some key aspects of the software configuration.
+
+## Contribute to `svFSI`
+
+We welcome and appreciate all types of contributions to `svFSI`.
+- Seek support, suggest new features or report bugs, please contact us through [GitHub Issues](https://github.com/SimVascular/svFSI/issues) or [SimTK forum](https://simtk.org/plugins/phpBB/indexPhpbb.php?f=188).
+- Contribute your code to `svFSI`, please submit a pull request through GitHub.
+- Share your novel applications of `svFSI` with the community, please consider contribute your case to [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests).
 
 ## Citation
 In preparation.
