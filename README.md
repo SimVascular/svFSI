@@ -61,7 +61,7 @@ option(SV_USE_TRILINOS "Use Trilinos Library with svFSI" ON)
 
 In most cases, users can proceed to build `svFSI` following the [Quick Build](#quick-build), and CMake should be able to locate Trilinos automatically through `find_package`. In case the automatic way fails, users can also specify the path to Trilinos through `ccmake -DCMAKE_PREFIX_PATH:PATH="<Path_to_Trilinos>/lib/cmake/Trilinos;<Path_to_any_other_package>;"`.
 
-For more detailed instructions, please refer INSTALL.md.
+For more detailed instructions, please refer to [`INSTALL.md`](./INSTALL.md).
 
 ## Run Simulation
 
@@ -75,7 +75,7 @@ mpiexec -np <number of MPI processes>  <Path to Build>/svFSI-build/bin/svFSI <Pa
 ```
 ## Features
 
-`svFSI` provides the capability to model a variety of physics including unsteady diffusion, linear and nonlinear elastodynamics, convective heat transfer, fluid flows, fluid-structure-interaction (FSI), and cardiac electrophysiology. As the code is modular, the users are provided with a choice to couple these physics depending on their needs. We strongly recommend users to browse through the examples provided in the GitHub repository [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests) to get a detailed insight into the capability of the code.
+`svFSI` provides the capability to model a variety of physics including unsteady diffusion, linear and nonlinear elastodynamics, convective heat transfer, fluid flows, fluid-structure-interaction (FSI), and cardiac electrophysiology. As the code is modular, the users are provided with a choice to couple these physics depending on their needs. We strongly recommend users to browse through the examples provided in the GitHub repository [svFSI-Tests](https://github.com/SimVascular/svFSI-Tests) to get a detailed insight into the capability of the code. Also, most of the examples contain established simulation results, which users can use to verify the functionality of `svFSI`.
 
 Below, we provide a list of the available choice of constitutive models for different types of equations being solved. Users are also encouraged to implement new constitutive models. Users may use global search tools such as `grep` to locate the implementations of the available constitutive models in the code using the abbreviated names below.
 
@@ -124,21 +124,18 @@ More details can be found on the [**SimCardio**](http://simvascular.github.io/do
 - Prescribed-motion LV modeling: https://simvascular.github.io/docsSimCardio.html#automatic-cardiac-modeling
 
 ## Tutorial
-
 - We provide webpage tutorials on the [**SimCardio**](http://simvascular.github.io/docsSimCardio.html) page.
-
 - SimVascular group uploads hands-on tutorials to our [YouTube](https://www.youtube.com/channel/UCT61XgTRqpfb39Hyio9IqGQ) channel periodically. Here are some for `svFSI`:
-
   - Fluid-Structure Interaction (FSI): https://www.youtube.com/watch?v=QIpyThIAD7k
-
   - Cardiac electrophysiology modeling: https://www.youtube.com/watch?v=TCK3SmGwBa8
-
   - Cardiac mechancis modeling: https://www.youtube.com/watch?v=Jm3VSi6Aci8
-
 - We also maintain a large collection of examples that showcase different funtionalities of `svFSI`. You can find them here: https://github.com/SimVascular/svFSI-Tests. Each case includes a README file that explains the problem in hand and some key aspects of the software configuration.
 
-## Contribute to `svFSI`
+## Pre/Post Processing Tool
+We are also maintaining a collection of useful pre and post processing tools that are compatible with `svFSI`:
+https://github.com/SimVascular/svFSI-Tools
 
+## Contribute to `svFSI`
 We welcome and appreciate all types of contributions to `svFSI`.
 - Seek support, suggest new features or report bugs, please contact us through [GitHub Issues](https://github.com/SimVascular/svFSI/issues) or [SimTK forum](https://simtk.org/plugins/phpBB/indexPhpbb.php?f=188).
 - Contribute your code to `svFSI`, please submit a pull request through GitHub.
