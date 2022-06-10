@@ -560,8 +560,14 @@
       sA   = 0._RKIND
       sF   = 0._RKIND
       sE   = 0._RKIND
-      insd = nsd
       ya   = 0._RKIND
+
+      insd = nsd
+      IF (lM%lShl) insd = 2
+
+!     Initialize tensor operations
+      CALL TEN_INIT(insd)
+
       IF (lM%lFib) insd = 1
 
       DO e=1, lM%nEl

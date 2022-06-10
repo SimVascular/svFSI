@@ -1124,14 +1124,97 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       RETURN
       END SUBROUTINE GETTAU
 !####################################################################
+!     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
+!     for incompressible shell elements
+      SUBROUTINE GETPK2CC_SHLi(lDmn, gg_0, gg_x, Sml, Dml)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2)
+      REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
+
+      REAL(KIND=8) :: Jg2i, mu, gi_0(2,2), gi_x(2,2), S(2,2),CC(2,2,2,2)
+      TYPE(stModelType) :: stM
+
+      Sml  = 0._RKIND
+      Dml  = 0._RKIND
+
+!     Some preliminaries
+      stM  = lDmn%stM
+
+!     Contravariants in shell continuum
+      gi_0 = MAT_INV(gg_0, 2)
+      gi_x = MAT_INV(gg_x, 2)
+
+!     Ratio of inplane Jacobian determinants
+      Jg2i = MAT_DET(gg_x, 2)
+      IF (ISZERO(Jg2i)) err = " Divide by zero in-plane Jacobian"//
+     2   " determinant"
+      Jg2i = MAT_DET(gg_0, 2) / Jg2i
+
+      SELECT CASE(stM%isoType)
+      CASE (stIso_nHook)
+         mu = 2._RKIND * stM%C10
+         S  = mu*(gi_0 - Jg2i*gi_x)
+
+         CC = 2._RKIND*mu*(TEN_DYADPROD(gi_x, gi_x, 2) +
+     2                     TEN_SYMMPROD(gi_x, gi_x, 2))
+
+      CASE DEFAULT
+         err = "Undefined material constitutive model"
+      END SELECT
+
+!     Convert to Voigt notation
+      Sml(1) = S(1,1)
+      Sml(2) = S(2,2)
+      Sml(3) = S(1,2)
+
+      Dml(1,1) = CC(1,1,1,1)
+      Dml(1,2) = CC(1,1,2,2)
+      Dml(1,3) = CC(1,1,1,2)
+
+      Dml(2,2) = CC(2,2,2,2)
+      Dml(2,3) = CC(2,2,1,2)
+
+      Dml(3,3) = CC(1,2,1,2)
+
+      Dml(2,1) = Dml(1,2)
+      Dml(3,1) = Dml(1,3)
+      Dml(3,2) = Dml(2,3)
+
+      RETURN
+      END SUBROUTINE GETPK2CC_SHLi
+!--------------------------------------------------------------------
+!     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
+!     for compressible shell elements
+      SUBROUTINE GETPK2CC_SHLc(lDmn, gg_0, gg_x, Sml, Dml)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2)
+      REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
+
+      TYPE(stModelType) :: stM
+
+      Sml  = 0._RKIND
+      Dml  = 0._RKIND
+
+!     Some preliminaries
+      stM  = lDmn%stM
+
+      RETURN
+      END SUBROUTINE GETPK2CC_SHLc
+!####################################################################
 !     Convert elasticity tensor to Voigt notation
       SUBROUTINE CCTOVOIGT(CC, Dm)
-      USE COMMOD, ONLY : RKIND, nsd, nsymd
+      USE COMMOD, ONLY : IKIND, RKIND, nsd, nsymd
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND), INTENT(INOUT) :: Dm(nsymd,nsymd)
 
-      INTEGER i, j
+      INTEGER(KIND=IKIND) :: i, j
 
       IF (nsd .EQ. 3) THEN
          Dm(1,1) = CC(1,1,1,1)

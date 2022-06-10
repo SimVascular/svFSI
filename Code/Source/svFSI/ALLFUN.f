@@ -392,7 +392,7 @@
      2         sl(eNoN), tmps(nsd,insd))
 
             DO e=1, msh(iM)%nEl
-               IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
+               IF (dId.GE.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
                   IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
                END IF
 !           Updating the shape functions, if this is a NURB

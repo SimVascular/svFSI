@@ -578,7 +578,8 @@
          END IF
 
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
-     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct)) THEN
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct) .OR.
+     3       (lEq%dmn(iDmn)%phys .EQ. phys_shell)) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
          END IF
 

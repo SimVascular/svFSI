@@ -389,6 +389,10 @@
 
       INTEGER(KIND=IKIND) :: ii, nn, i, j, k, l
 
+      IF (nd.NE.2 .AND. nd.NE.3) THEN
+         RETURN
+      END IF
+
       nn = nd**4
       IF (ALLOCATED(t_ind)) DEALLOCATE(t_ind)
       ALLOCATE(t_ind(4,nn))

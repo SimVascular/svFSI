@@ -61,11 +61,11 @@
       CASE (phys_ustruct)
          CALL CONSTRUCT_uSOLID(lM, Ag, Yg, Dg)
 
-      CASE (phys_CMM)
-         CALL CONSTRUCT_CMM(lM, Ag, Yg, Dg)
-
       CASE (phys_shell)
          CALL CONSTRUCT_SHELL(lM, Ag, Yg, Dg)
+
+      CASE (phys_CMM)
+         CALL CONSTRUCT_CMM(lM, Ag, Yg, Dg)
 
       CASE (phys_FSI)
          CALL CONSTRUCT_FSI(lM, Ag, Yg, Dg)

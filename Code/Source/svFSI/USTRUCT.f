@@ -66,6 +66,9 @@
          vmsStab = .FALSE.
       END IF
 
+!     Initialize tensor operations
+      CALL TEN_INIT(nsd)
+
 !     USTRUCT: dof = nsd+1
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), ya_l(eNoN),

@@ -1076,11 +1076,13 @@
          END IF
 
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct) THEN
+     2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct .OR.
+     3       lEq%dmn(iDmn)%phys.EQ.phys_shell) THEN
             CALL READMATMODEL(lEq%dmn(iDmn), lPD)
+
+!           Check for incompressibility
             IF (ISZERO(lEq%dmn(iDmn)%stM%Kpen) .AND.
      2          lEq%dmn(iDmn)%phys .EQ. phys_struct) THEN
-
                err = "Incompressible struct is not allowed. Use "//
      2            "penalty method or ustruct"
             END IF
@@ -2511,6 +2513,15 @@ c     2         "can be applied for Neumann boundaries only"
       CASE DEFAULT
          err = "Undefined constitutive model used"
       END SELECT
+
+!     Check for shell model
+      IF (lDmn%phys .EQ. phys_shell) THEN
+         IF (lDmn%stM%isoType .NE. stIso_nHook) THEN
+            err = "Only Neo-Hookean model is allowed for shell elements"
+         END IF
+         lDmn%stM%Kpen = kap
+         RETURN
+      END IF
 
 !     Fiber reinforcement stress
       lFib => lPD%get(ctmp, "Fiber reinforcement stress")

@@ -1914,7 +1914,7 @@
          integer(IK) :: npos
          character :: c
 
-         write(stdout,'(A)') trim(STR(spos))//" "//trim(STR(epos))
+!         write(stdout,'(A)') trim(STR(spos))//" "//trim(STR(epos))
          npos = spos
          do
             read(fid,pos=npos) c
@@ -1929,8 +1929,8 @@
 
          do
             read(fid,pos=npos) c
-            write(stdout,'(A)') trim(STR(npos))//" '"// &
-            c//"' "//trim(STR(ichar(c)))
+!            write(stdout,'(A)') trim(STR(npos))//" '"// &
+!            c//"' "//trim(STR(ichar(c)))
             if ( c.eq.' ' .or. c.eq.eol .or. c.eq.'   ' ) exit
             npos = npos+1
          end do

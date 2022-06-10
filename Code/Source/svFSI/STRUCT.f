@@ -56,6 +56,9 @@
       nFn  = lM%nFn
       IF (nFn .EQ. 0) nFn = 1
 
+!     Initialize tensor operations
+      CALL TEN_INIT(nsd)
+
 !     STRUCT: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
