@@ -1134,7 +1134,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2)
       REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
 
-      REAL(KIND=8) :: Jg2i, mu, gi_0(2,2), gi_x(2,2), S(2,2),CC(2,2,2,2)
+      REAL(KIND=RKIND) :: Jg2i, mu, gi_0(2,2), gi_x(2,2), S(2,2),
+     2   CC(2,2,2,2)
       TYPE(stModelType) :: stM
 
       Sml  = 0._RKIND
@@ -1143,7 +1144,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     Some preliminaries
       stM  = lDmn%stM
 
-!     Contravariants in shell continuum
+!     Inverse of metric coefficients in shell continuum
       gi_0 = MAT_INV(gg_0, 2)
       gi_x = MAT_INV(gg_x, 2)
 
@@ -1196,13 +1197,115 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2)
       REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
 
+      INTEGER(KIND=IKIND), PARAMETER :: MAXITR = 20
+      REAL(KIND=RKIND), PARAMETER :: ATOL = 1E-10
+
+      INTEGER(KIND=IKIND) :: itr, i, j, k, l
+      REAL(KIND=RKIND) :: Jg2, J2, J23, f13, f23, trC3, C33, kap, mu,
+     2   pJ, plJ, gi_x(2,2), gi_0(3,3), Ci(3,3), S(3,3), CC(3,3,3,3)
       TYPE(stModelType) :: stM
 
       Sml  = 0._RKIND
       Dml  = 0._RKIND
 
+!     Initialize tensor operations
+      CALL TEN_INIT(3)
+
 !     Some preliminaries
       stM  = lDmn%stM
+      kap  = stM%Kpen
+      mu   = 2._RKIND * stM%C10
+      f13  = 1._RKIND / 3._RKIND
+      f23  = 2._RKIND / 3._RKIND
+
+!     Inverse of metric coefficients in shell continuum
+      gi_x = MAT_INV(gg_x, 2)
+
+      gi_0 = 0._RKIND
+      gi_0(1:2,1:2) = MAT_INV(gg_0, 2)
+      gi_0(3,3) = 1._RKIND
+
+!     Ratio of inplane Jacobian determinant squared
+      Jg2 = MAT_DET(gg_x, 2) / MAT_DET(gg_0, 2)
+
+!     Begin Newton iterations to satisfy plane-stress condition.
+!     The objective is to find C33 that satisfies S33 = 0.
+      itr = 0
+      C33 = 1._RKIND
+      DO
+         itr  = itr + 1
+
+!        Trace (C)
+         trC3 = (gg_x(1,1)*gi_0(1,1) + gg_x(1,2)*gi_0(1,2)
+     2        +  gg_x(2,1)*gi_0(2,1) + gg_x(2,2)*gi_0(2,2) + C33)*f13
+
+!        Jacobian-related quantities
+         J2  = Jg2*C33
+         J23 = J2**(-f13)
+
+!        Inverse of curvilinear Cauchy-Green deformation tensor
+         Ci(:,:) = 0._RKIND
+         Ci(3,3) = 1._RKIND/C33
+         Ci(1:2,1:2) = gi_x(:,:)
+
+!        Contribution from dilational penalty terms to S and CC
+         pJ  = 0.5_RKIND*kap*(J2 - 1._RKIND)
+         plJ = kap*J2
+
+         SELECT CASE (stM%isoType)
+         CASE (stIso_nHook)
+!           2nd Piola Kirchhoff stress
+            S  = mu*J23*(gi_0 - trC3*Ci) + pJ*Ci
+
+!           Elasticity tensor
+            CC = (mu*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (mu*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*mu*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+     4                       TEN_DYADPROD(Ci, gi_0, 3))
+
+         CASE DEFAULT
+            err = "Undefined material constitutive model"
+
+         END SELECT
+
+         IF (ABS(S(3,3)) .LE. ATOL) EXIT
+         IF (itr .GT. MAXITR) THEN
+            wrn = " Failed to converge plane-stress condition"
+            EXIT
+         END IF
+
+         C33 = C33 - (2._RKIND*S(3,3)/CC(3,3,3,3))
+      END DO
+
+!     Statically condense CC
+      DO i=1, 2
+         DO j=1, 2
+            DO k=1, 2
+               DO l=1, 2
+                  C33 = CC(i,j,3,3)*CC(3,3,k,l)/CC(3,3,3,3)
+                  CC(i,j,k,l) = CC(i,j,k,l) - C33
+               END DO
+            END DO
+         END DO
+      END DO
+
+!     Convert the in-plane components to Voigt notation
+      Sml(1) = S(1,1)
+      Sml(2) = S(2,2)
+      Sml(3) = S(1,2)
+
+      Dml(1,1) = CC(1,1,1,1)
+      Dml(1,2) = CC(1,1,2,2)
+      Dml(1,3) = CC(1,1,1,2)
+
+      Dml(2,2) = CC(2,2,2,2)
+      Dml(2,3) = CC(2,2,1,2)
+
+      Dml(3,3) = CC(1,2,1,2)
+
+      Dml(2,1) = Dml(1,2)
+      Dml(3,1) = Dml(1,3)
+      Dml(3,2) = Dml(2,3)
 
       RETURN
       END SUBROUTINE GETPK2CC_SHLc

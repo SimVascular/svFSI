@@ -255,8 +255,8 @@
 !     Compute stress resultants by integrating 2nd Piola Kirchhoff
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
-      CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), aa_0, aa_x, bb_0, bb_x,
-     2   Sm, Dm)
+      CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), aa_0, aa_x, bb_0, bb_x, Sm,
+     2   Dm)
 
 !---------------------------------------------------------------------
 !     Contribution to tangent matrices: Dm * Bm, Dm*Bb
@@ -1070,8 +1070,8 @@ c=====================================================================
 !     Compute stress resultants by integrating 2nd Piola Kirchhoff
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
-      CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), aa_0, aa_x, bb_0, bb_x,
-     2   Sm, Dm)
+      CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), aa_0, aa_x, bb_0, bb_x, Sm,
+     2   Dm)
 
 !---------------------------------------------------------------------
 !     Variation in the membrane strain
@@ -1294,8 +1294,8 @@ c=====================================================================
 
       LOGICAL :: flag
       INTEGER(KIND=IKIND) :: g
-      REAL(KIND=RKIND) :: ht, nu, xis, xi(3), wh(3), wl(3), gCov_0(2,2),
-     2   gCov_x(2,2), Sml(3), Dml(3,3)
+      REAL(KIND=RKIND) :: ht, nu, xis, xi(3), wh(3), wl(3), gg_0(2,2),
+     2   gg_x(2,2), Sml(3), Dml(3,3)
 
 !     Set shell thickness
       ht = lDmn%prop(shell_thickness)
@@ -1326,17 +1326,17 @@ c=====================================================================
 !        Local shell thickness coordinate
          xis = .5_RKIND*ht*xi(g)
 
-!        Covariants in shell continuum (ref/cur)
-         gCov_0(:,:) = aa_0(:,:) - 2._RKIND*xis*bb_0(:,:)
-         gCov_x(:,:) = aa_x(:,:) - 2._RKIND*xis*bb_x(:,:)
+!        Metric coefficients in shell continuum (ref/cur)
+         gg_0(:,:) = aa_0(:,:) - 2._RKIND*xis*bb_0(:,:)
+         gg_x(:,:) = aa_x(:,:) - 2._RKIND*xis*bb_x(:,:)
 
 !        Get 2nd Piola-Kirchhoff and elasticity tensors
          IF (flag) THEN
 !           For incompressible materials
-            CALL GETPK2CC_SHLi(lDmn, gCov_0, gCov_x, Sml, Dml)
+            CALL GETPK2CC_SHLi(lDmn, gg_0, gg_x, Sml, Dml)
          ELSE
 !           For compressible materials
-            CALL GETPK2CC_SHLc(lDmn, gCov_0, gCov_x, Sml, Dml)
+            CALL GETPK2CC_SHLc(lDmn, gg_0, gg_x, Sml, Dml)
          END IF
 
          wl(1) = .5_RKIND*wh(g)*ht

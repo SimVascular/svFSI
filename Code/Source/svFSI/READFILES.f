@@ -2415,9 +2415,8 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Default: NeoHookean model
       IF (.NOT.ASSOCIATED(lSt)) THEN
-         lDmn%stM%isoType = stIso_nHook
-         lDmn%stM%C10 = mu*0.5_RKIND
-         RETURN
+         wrn = "Couldn't find any penalty model."//
+     2      " Using default NeoHookean model."
       END IF
 
       SELECT CASE (TRIM(ctmp))
@@ -2511,17 +2510,9 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%khs, "k")
 
       CASE DEFAULT
-         err = "Undefined constitutive model used"
+         lDmn%stM%isoType = stIso_nHook
+         lDmn%stM%C10 = mu*0.5_RKIND
       END SELECT
-
-!     Check for shell model
-      IF (lDmn%phys .EQ. phys_shell) THEN
-         IF (lDmn%stM%isoType .NE. stIso_nHook) THEN
-            err = "Only Neo-Hookean model is allowed for shell elements"
-         END IF
-         lDmn%stM%Kpen = kap
-         RETURN
-      END IF
 
 !     Fiber reinforcement stress
       lFib => lPD%get(ctmp, "Fiber reinforcement stress")
@@ -2559,10 +2550,27 @@ c     2         "can be applied for Neumann boundaries only"
          END SELECT
       END IF
 
+!     Check for shell model
+      IF (lDmn%phys .EQ. phys_shell) THEN
+         IF (lDmn%stM%isoType .NE. stIso_nHook) THEN
+            err = "Only Neo-Hookean model is allowed for shell elements"
+         END IF
+
+!        ST91 is the default and the only dilational penalty model for
+!        compressible shell elements. This is set to avoid any square-
+!        root evaulations of the Jacobian during Newton iterations for
+!        satisfying plane-stress condition.
+         lDmn%stM%Kpen = kap
+         IF (.NOT.incompFlag) THEN
+            lDmn%stM%volType = stVol_ST91
+         END IF
+         RETURN
+      END IF
+
 !     Look for dilational penalty model. HGO uses quadratic penalty model
       lPtr => lPD%get(ctmp, "Dilational penalty model")
       IF (.NOT.ASSOCIATED(lPtr)) wrn =
-     2   "Couldn't find any penalty model"
+     2   "Couldn't find any penalty model. Using default ST91."
       SELECT CASE(TRIM(ctmp))
       CASE ("quad", "Quad", "quadratic", "Quadratic")
          lDmn%stM%volType = stVol_Quad
