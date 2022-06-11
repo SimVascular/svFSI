@@ -686,7 +686,7 @@
       nEl = 0
       DO iM=1, nMsh
          IF (msh(iM)%eType .EQ. eType_NRB) THEN
-            CALL INTNRBDATA(msh(iM), d(iM), outDof)
+            CALL INTNRBDATA(msh(iM), d(iM), outDof, nOute)
          ELSE
             CALL INTMSHDATA(msh(iM), d(iM), outDof, nOute)
          END IF
@@ -1018,21 +1018,22 @@
 !     This routine will interpolates NURBS into a QUD4/HEX8 mesh, so you
 !     can write it into a VTK file.
 !     TODO: Element data are not written to VTK file for NURBS
-      SUBROUTINE INTNRBDATA(lM, d, outDof)
+      SUBROUTINE INTNRBDATA(lM, d, outDof, nOute)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
       TYPE(dataType), INTENT(INOUT) :: d
-      INTEGER(KIND=IKIND), INTENT(IN) :: outDof
+      INTEGER(KIND=IKIND), INTENT(IN) :: outDof, nOute
 
       LOGICAL flag, clcDmn
       INTEGER(KIND=IKIND) ie, e, ex, ey, ez, s, sx, sy, sz, ia, Ac, a,
-     2   ax, ay, az, jx, jy, jz, ierr, i, nShft, insd
+     2   ax, ay, az, jx, jy, jz, ierr, i, nShft, insd, m
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: IEN(:,:), tDmnId(:), sCe(:),
      2   dise(:), sCn(:), disn(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: N(:,:), tmpX(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: N(:,:), tmpX(:,:), tmpI(:),
+     2   lDe(:,:), gDe(:,:)
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -1071,6 +1072,7 @@
          d%nEl = 0
          d%nNo = 0
       END IF
+
       ALLOCATE(d%IEN(d%eNoN,d%nEl), d%gx(outDof,d%nNo),
      2   IEN(d%eNoN,sCe(cm%tF())), tmpX(outDof,sCn(cm%tF())),
      3   N(lM%eNoN,lM%nSl))
@@ -1085,24 +1087,14 @@
 !     This would be the number of nodes in the lower procesors
       nShft = disn(cm%id())
 
+!     Element variables
       clcDmn = .FALSE.
-      IF (.NOT.savedOnce) THEN
-         IF (ALLOCATED(d%xe)) DEALLOCATE(d%xe)
-         ALLOCATE(d%xe(d%nEl,2))
-         IF (cm%mas()) THEN
-!     Based on the two posible fields
-            IF (.NOT.cm%seq()) THEN
-               i = 0
-               DO e=1, d%nEl
-                  IF (e .GT. dise(i)) THEN
-                     DO
-                        i = i + 1
-                        IF (e .LE. dise(i)) EXIT
-                     END DO
-                  END IF
-                  d%xe(e,1) = i
-               END DO
-            END IF
+      m = nOute
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
+         IF (savedOnce) THEN
+            m = m + 1
+         ELSE
+            m = m + 2
          END IF
          IF (ALLOCATED(dmnId)) THEN
             ALLOCATE(tDmnId(sCe(cm%tF())))
@@ -1113,6 +1105,17 @@
             END IF
          END IF
       END IF
+
+      IF (ALLOCATED(d%xe)) THEN
+         ALLOCATE(lDe(nOute,lM%nEl))
+         DO e=1, lM%nEl
+            DO i=1, nOute
+               lDe(i,e) = d%xe(i,e)
+            END DO
+         END DO
+         DEALLOCATE(d%xe)
+      END IF
+      IF (m .NE. 0) ALLOCATE(d%xe(d%nEl,m))
 
       ie = 0
       IF (insd .EQ. 2) THEN
@@ -1221,9 +1224,6 @@
          d%gx  = tmpX
          d%IEN = IEN
       ELSE
-         IF (ALLOCATED(tDmnId)) CALL MPI_GATHERV(tDmnId, sCe(cm%tF()),
-     2      mpint, d%xe(:,2), sCe, dise, mpint, master, cm%com(), ierr)
-
 !     First collecting all the elements connectivity
          sCe  = sCe*d%eNoN
          sCn  = sCn*outDof
@@ -1234,6 +1234,69 @@
 !     Now collecting the solutions
          CALL MPI_GATHERV(tmpX, sCn(cm%tF()), mpreal, d%gx, sCn, disn,
      2      mpreal, master, cm%com(), ierr)
+         sCe  = sCe/d%eNoN
+         dise = dise/d%eNoN
+      END IF
+
+!     Default element variables (Domain_ID, Proc_ID)
+      m = 0
+      IF (.NOT.savedOnce .OR. nMsh.GT.1) THEN
+!        Domain ID
+         m = 1
+         IF (ALLOCATED(dmnId)) THEN
+            ALLOCATE(tmpI(d%nEl))
+            CALL MPI_GATHERV(tDmnId, sCe(cm%tF()), mpint, tmpI, sCe,
+     2         dise, mpint, master, cm%com(), ierr)
+            IF (cm%mas()) THEN
+               DO e=1, d%nEl
+                  d%xe(e,1) = REAL(tmpI(e), KIND=RKIND)
+               END DO
+            END IF
+            DEALLOCATE(tmpI)
+         ELSE
+            d%xe(:,m) = 1._RKIND
+         END IF
+
+         IF (.NOT.savedOnce) THEN
+!           Proc_ID for parallel run
+            m = m + 1
+            IF (cm%mas()) THEN
+               IF (.NOT.cm%seq()) THEN
+                  i = 0
+                  DO e=1, d%nEl
+                     IF (e .GT. dise(i)) THEN
+                        DO
+                           i = i + 1
+                           IF (e .LE. dise(i)) EXIT
+                        END DO
+                     END IF
+                     d%xe(e,m) = REAL(i, KIND=RKIND)
+                  END DO
+               END IF
+            END IF
+         END IF
+      END IF
+
+      IF (ALLOCATED(lDe)) THEN
+         sCe = sCe*nOute
+         dise = dise*nOute
+         IF (cm%mas()) THEN
+            ALLOCATE(gDe(nOute,d%nEl))
+         ELSE
+            ALLOCATE(gDe(0,0))
+         END IF
+
+         CALL MPI_GATHERV(lDe, sCe(cm%tF()), mpreal, gDe, sCe, dise,
+     2      mpreal, master, cm%com(), ierr)
+
+         IF (cm%mas()) THEN
+            DO e=1, d%nEl
+               DO i=1, nOute
+                  d%xe(i,m+1) = gDe(i,e)
+               END DO
+            END DO
+         END IF
+         DEALLOCATE(lDe, gDe)
       END IF
 
       RETURN
