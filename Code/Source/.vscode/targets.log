@@ -7,7 +7,7 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 
 # This program built for i386-apple-darwin11.3.0
 
-# Make data base, printed on Mon May 16 12:40:33 2022
+# Make data base, printed on Tue Jul  5 16:27:33 2022
 
 # Variables
 
@@ -40,7 +40,7 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 __CFBundleIdentifier = com.microsoft.VSCode
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-200e42f3-1e9d-40cf-86b8-b49533a19c68.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-38181c0e-b6ef-4466-a47d-f893c904b49f.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -56,7 +56,7 @@ ELECTRON_RUN_AS_NODE = 1
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.TydzQHqA1U/Listeners
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.1vvujig6i2/Listeners
 # automatic
 %F = $(notdir $%)
 # environment
@@ -74,7 +74,7 @@ HOME = /Users/aaronbrown
 # default
 MAKEFILEPATH = $(shell /usr/bin/xcode-select -print-path 2>/dev/null || echo /Developer)/Makefiles
 # environment
-VSCODE_CODE_CACHE_PATH = /Users/aaronbrown/Library/Application Support/Code/CachedData/da15b6fd3ef856477bf6f4fb29ba1b7af717770d
+VSCODE_CODE_CACHE_PATH = /Users/aaronbrown/Library/Application Support/Code/CachedData/30d9c6cd9483b2cc586687151bcbcd635f373630
 # environment
 LOGNAME = aaronbrown
 # environment
@@ -118,7 +118,7 @@ TMPDIR = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/
 # automatic
 *F = $(notdir $*)
 # environment
-VSCODE_IPC_HOOK = /Users/aaronbrown/Library/Application Support/Code/1.67.1-main.sock
+VSCODE_IPC_HOOK = /Users/aaronbrown/Library/Application Support/Code/1.68.1-main.sock
 # makefile
 MAKEFLAGS = Rrp
 # environment
@@ -126,7 +126,7 @@ MFLAGS = -Rrp
 # automatic
 *D = $(patsubst %/,%,$(dir $*))
 # environment
-XPC_SERVICE_NAME = application.com.microsoft.VSCode.71023629.71023635
+XPC_SERVICE_NAME = application.com.microsoft.VSCode.78749844.78749850
 # environment
 PETSC_DIR = /Users/aaronbrown/petsc
 # automatic
@@ -164,7 +164,7 @@ MAKELEVEL := 0
 # environment
 CONDA_PREFIX = /Users/aaronbrown/opt/miniconda3
 # environment
-VSCODE_PID = 80274
+VSCODE_PID = 86079
 # environment
 _CE_CONDA = 
 # environment
@@ -178,7 +178,7 @@ LANG = C
 
 # Directories
 
-# . (device 16777223, inode 48604579): 8 files, no impossibilities.
+# . (device 16777220, inode 48604579): 8 files, no impossibilities.
 
 # 8 files, no impossibilities in 1 directories.
 
@@ -290,7 +290,7 @@ veryclean: clean
 # strcache size: total = 4096 / max = 4096 / min = 4096 / avg = 4096
 # strcache free: total = 4053 / max = 4053 / min = 4053 / avg = 4053
 
-# Finished Make data base on Mon May 16 12:40:33 2022
+# Finished Make data base on Tue Jul  5 16:27:33 2022
 
  
 Makefile:43: ../../../BuildWithMake/include.mk: No such file or directory
