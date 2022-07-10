@@ -1875,7 +1875,7 @@ c        N(8) = lx*my*0.5_RKIND
       eNoN = msh(iM)%eNoN
 
 !     If this is a virtual face, then this face element does not lie on a volume 
-!     element, and we should just compute the area weighted normal vector anyway.
+!     element, and we compute the normal vector slightly differently.
       IF (lFa%virtual) THEN
 !         WRITE(*,'(A)') "Face element not on volume element."
 !         WRITE(*,'(A)') "Calculate normal vector anyway."
@@ -2035,7 +2035,7 @@ c        N(8) = lx*my*0.5_RKIND
       eNoN = msh(iM)%eNoN
 
 !     If this is a virtual face, then this face element does not lie on a volume 
-!     element, and we should just compute the area weighted normal vector anyway.
+!     element, and we compute the normal vector slightly differently.
       IF (lFa%virtual) THEN
          !WRITE(*,'(A)') "Face element not on volume element."
          !WRITE(*,'(A)') "Calculate normal vector anyway."
@@ -2207,42 +2207,13 @@ c        N(8) = lx*my*0.5_RKIND
 !     Communicating nodal positions and correcting the position vector if mesh is moving
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
          Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
-!        Ac = 0 if this proc does not own this node
-         IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
-            tmpX = 0._RKIND ! Set position of this node to zero as a flag
-         ELSE ! This proc does own this node
-            tmpX(:) = x(:,Ac) ! Get position of this node
-         END IF
-         IF (cm%mas()) THEN
-!            PRINT*, 'Before gather master tmpX: ', 
-!     2              tmpX(1), tmpX(2), tmpX(3)
-         END IF
-!        Communicate the true tmpX value among all procs. We use the 
-!        gather operation to get tmpX from all procs onto master
-         ! First, allocate space for tmpX values. The size of tmpXg
-         ! array is the number of procs being used.
-         tmpXg = 0._RKIND
-         !PRINT*, 'proc: ', cm%id(), 'snode: ', snode
-         CALL MPI_GATHER(tmpX, nsd, mpreal, tmpXg, nsd,
-     2            mpreal, master, cm%com(), ierr)
-!        If master, go through tmpXg and search for first non-zero 
-!         value.
-         IF (cm%mas()) THEN
-            DO p=1, cm%np()+1
-               IF (.NOT. ALL(tmpXg(:,p) .EQ. 0)) THEN
-                  tmpX = tmpXg(:,p)
-                  EXIT 
-               END IF
-            END DO
-         ELSE ! If not master, set tmpX to 0
-            tmpX = 0._RKIND
-         END IF 
-         !PRINT*, 'Ac inside GNNBSURF', Ac
-         lX(:,a) = tmpX(:) ! get nodal coordinates from x (of reference configuration mesh)
-         IF (cm%mas()) THEN
-!            PRINT*, 'After gather master lX: ', 
-!     2              lX(1,a), lX(2,a), lX(3,a)
-         END IF
+         ! Collect node position onto Master. On slaves
+         ! set both (tmpX and tmpDn) to zero.
+         CALL GatherMasterV(x, Ac, tmpX)
+
+         ! Transfer nodal position to lX array
+         lX(:,a) = tmpX(:)
+
 !        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
          IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
       END DO
@@ -2313,7 +2284,6 @@ c        N(8) = lx*my*0.5_RKIND
       END IF
       DEALLOCATE(setIt, ptr, lX)
 
-      DEALLOCATE(tmpX, tmpXg)
 
       ! If master, broadcast value of n to slaves
       IF (cm%mas()) THEN 
@@ -2329,7 +2299,8 @@ c        N(8) = lx*my*0.5_RKIND
 !     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
 !     current configuration surface element.
 !     This function is called for virtual face elements (face elements that do 
-!     not lie on a volume element).
+!     not lie on a volume element). For virtual elements, we must communicate
+!     node information.
 !     For these elements, the direction of the normal vector is assumed from the
 !     nodal ordering.
 !     Same as GNNBSURF(), except uses current configuration nodal positions.
@@ -2361,53 +2332,17 @@ c        N(8) = lx*my*0.5_RKIND
       ALLOCATE(tmpX(nsd), tmpXg(nsd,cm%np()))
       ALLOCATE(tmpDn(nsd), tmpDng(nsd,cm%np()))
 
-
-!     Correcting the position vector and displacment vector
+!     Collecting node information on master, so master can compute the normal
+!     Also, updating nodal position with nodal displacement, so that we
+!     are computing the surface normal in the current configuration
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
          Ac = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
-!        Ac = 0 if this proc does not own this node
-         IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
-            tmpX = 0._RKIND ! Set position of this node to zero as a flag
-            tmpDn = 0._RKIND ! Set displacement of this node to zero
-         ELSE ! This proc does own this node
-            tmpX(:) = x(:,Ac) ! Get position of this node
-            tmpDn(:) = Dn(:,Ac) ! Get current displacement of this node
-         END IF
-!        Communicate the true tmpX and tmpDn values among all procs. We use the 
-!        gather operation to get tmpX from all procs onto master
-         ! First, allocate space for tmpX and tmpDn values. The size of tmpXg
-         ! array and tmpDn array is the number of procs being used.
-         tmpXg = 0._RKIND
-         tmpDng = 0._RKIND
-         ! Gather nodal positions
-         CALL MPI_GATHER(tmpX, nsd, mpreal, tmpXg, nsd,
-     2            mpreal, master, cm%com(), ierr)
-         ! Gather nodal displacements
-         CALL MPI_GATHER(tmpDn, nsd, mpreal, tmpDng, nsd,
-     2            mpreal, master, cm%com(), ierr)
-!        If master, go through tmpXg and search for first non-zero value
-         IF (cm%mas()) THEN
-            DO p=1, cm%np()
-               IF (.NOT. ALL(tmpXg(:,p) .EQ. 0)) THEN
-                  tmpX = tmpXg(:,p)
-                  EXIT 
-               END IF
-            END DO
-         ELSE ! If not master, set tmpX to 0
-            tmpX = 0._RKIND
-         END IF 
-!        Do the same for displacmeent in tmpDng
-         IF (cm%mas()) THEN
-            DO p=1, cm%np()
-               IF (.NOT. ALL(tmpDng(:,p) .EQ. 0)) THEN
-                  tmpDn = tmpDng(:,p)
-                  EXIT 
-               END IF
-            END DO
-         ELSE ! If not master, set tmpX to 0
-            tmpDn = 0._RKIND
-         END IF 
-!        Update local position with position for computation
+         ! Collect node position and node displacement onto Master. On slaves
+         ! set both (tmpX and tmpDn) to zero.
+         CALL GatherMasterV(x, Ac, tmpX)
+         CALL GatherMasterV(Dn, Ac, tmpDn)
+
+!        Update local position with displacement for normal computation
          lX(:,a) = tmpX(:) + tmpDn(:) 
       END DO
 
@@ -2477,8 +2412,6 @@ c        N(8) = lx*my*0.5_RKIND
       END IF
       DEALLOCATE(setIt, ptr, lX)
 
-      DEALLOCATE(tmpX, tmpXg)
-      DEALLOCATE(tmpDn, tmpDng)
 
       ! If master, broadcast value of n to slaves
       IF (cm%mas()) THEN 
