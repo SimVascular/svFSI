@@ -86,9 +86,7 @@
 !        If the face is virtual, don't add anything to tangent matrix.
 !        If the virtual face is a cap, it's contribution will be added
 !        when the face that it caps is processed
-         IF (lhs%face(faIn)%virtual) THEN
-            CONTINUE
-         END IF
+         IF (lhs%face(faIn)%virtual) CYCLE
 
          nsd = MIN(lhs%face(faIn)%dof,dof)
          IF (lhs%face(faIn)%coupledFlag) THEN
@@ -120,6 +118,7 @@
 !     2                      'vcap(i,Ac)', vcap(i,Ac)
                         END DO
                      END DO
+                     !PRINT*, 'faInCap: ', faInCap, 'coef', coef(faInCap)
                      S = S + coef(faInCap)*FSILS_DOTV(dof,lhs%mynNo, 
      2                                     lhs%commu, vcap, X)
 !                  END DO
