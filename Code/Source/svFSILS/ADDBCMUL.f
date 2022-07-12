@@ -112,7 +112,12 @@
                IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
 !                 DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
 !                    faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
-                     faInCap = lhs%face(faIn)%faInCap
+                     faInCap = lhs%face(faIn)%faInCap ! Get cap face id
+                     IF(.NOT. lhs%face(faInCap)%coupledFlag) THEN
+                        PRINT*, 'ADDBCMUL(): Cap face is not coupled.',
+     2                  'Probably cap face has zero resistance.'
+                        STOP "FSILS: FATAL ERROR"
+                     END IF
                      vcap = 0._LSRP
                      DO a=1, lhs%face(faInCap)%nNo
                         Ac = lhs%face(faInCap)%glob(a)
@@ -160,9 +165,16 @@
 !              which is the matrix-vector product of the right integral
 !              and a vector X.
                IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
+
 !                 DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
 !                    faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
-                     faInCap = lhs%face(faIn)%faInCap
+                     faInCap = lhs%face(faIn)%faInCap ! Get cap face id
+                     IF(.NOT. lhs%face(faInCap)%coupledFlag) THEN
+                        PRINT*, 'ADDBCMUL(): Cap face is not coupled.',
+     2                        'Probably cap face has zero resistance.'
+                     STOP "FSILS: FATAL ERROR"
+                     END IF
+
                      DO a=1, lhs%face(faInCap)%nNo
                         Ac = lhs%face(faInCap)%glob(a)
                         DO i=1, nsd
