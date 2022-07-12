@@ -486,6 +486,10 @@
       iM  = lFa%iM
       nNo = lFa%nNo
       ALLOCATE(sVl(nsd,nNo), sV(nsd,tnNo), gNodes(nNo))
+
+!     Copy mesh node id corresponding to face node id to gNodes
+!     a in 1:nNo (nNo is the number of nodes on this face on this proc)
+!     gN(a) in 1:tnNo (tnNo is the total number of nodes on this proc)
       DO a=1, nNo
          gNodes(a) = lFa%gN(a)
       END DO
@@ -518,33 +522,42 @@
 !        eq. 27 are computed. Note that this function is only computed
 !        once (at initialization)
          IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
-            IF (cm%mas()) THEN 
-               PRINT*, 'Inside FSILINI, lFa%name: ', lFa%name
-               PRINT*, 'lFa%nEl: ', lFa%nEl
-               PRINT*, 'lFa%nNo: ', lFa%nNo
-            END IF
+!            PRINT*, 'Inside FSILINI, ','proc: ', cm%id(), 'lFa%name: ', 
+!     2       lFa%name, 'lFa%nEl: ', lFa%nEl, 'lFa%nNo: ', lFa%nNo
+
             sV = 0._RKIND
             DO e=1, lFa%nEl ! Loop over elements on face
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
                DO g=1, lFa%nG ! Loop over Gauss point
                   CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),n) ! get weighted normal vector in ref config
-                  DO a=1, lFa%eNoN ! Loop over nodes  in element
+                  DO a=1, lFa%eNoN ! Loop over nodes in element
                      Ac = lFa%IEN(a,e) ! Extract global nodal index
+!                     IF (cm%mas()) THEN 
+!                        PRINT*, 'Inside FSILINI, Ac: ', Ac
+!                     END IF
 !                    Ac should be 0 if a proc does not own it. Could possibly get
 !                    a segfault here. Should we have an if Ac .NE. 0?
-                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+                     IF (Ac .NE. 0) THEN 
+                        sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+                     END IF
                   END DO
                END DO
             END DO
             DO a=1, lFa%nNo
+!              For a virtual face, Ac should be obtained correctly. It 
+!              should be the index of the node local to this proc, Ac in [1, tnNo]
+!              If lFa%nNo = 0, we do not enter loop, Moreover, sVl is allocated with no space
                Ac       = lFa%gN(a)
+               IF (Ac .EQ. 0) THEN
+                  err = "Ac = 0"
+               END IF
                sVl(:,a) = sV(:,Ac)
             END DO
             lsPtr     = lsPtr + 1
             lBc%lsPtr = lsPtr
 !           Fills lhs%face(i) variables, including val if sVl exists
             CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
-     2         gNodes, sVl, lFa%virtual)
+     2         gNodes, sVl, lFa%virtual, lFa%capFaceID)
          ELSE
             lBc%lsPtr = 0
          END IF

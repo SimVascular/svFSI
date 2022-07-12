@@ -372,6 +372,10 @@
          TYPE(fsType), ALLOCATABLE :: fs(:)
 !        Is face a virtual face (i.e. does not lie on computational domain)
          LOGICAL :: virtual = .FALSE.
+!        Name of (virtual) face that caps this surface
+         CHARACTER(LEN=stdL) :: capFaceName = ""
+!        ID number of (virtual) face that caps this surface
+         INTEGER(KIND=IKIND) :: capFaceID = 0
       END TYPE faceType
 
 !     Declared type for outputed variables

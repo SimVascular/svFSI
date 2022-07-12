@@ -61,12 +61,12 @@
       REAL(KIND=LSRP), INTENT(IN) :: X(dof, lhs%nNo)
       REAL(KIND=LSRP), INTENT(INOUT) :: Y(dof, lhs%nNo)
 
-      INTEGER(KIND=LSIP) faIn, i, a, Ac, nsd
+      INTEGER(KIND=LSIP) faIn, faInCap, i, a, Ac, nsd
       REAL(KIND=LSRP) S, FSILS_DOTV
 
-      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:), coef(:)
+      REAL(KIND=LSRP), ALLOCATABLE :: v(:,:), vcap(:,:), coef(:)
 
-      ALLOCATE(coef(lhs%nFaces), v(dof,lhs%nNo))
+      ALLOCATE(coef(lhs%nFaces), v(dof,lhs%nNo), vcap(dof,lhs%nNo))
 
 !     Here is where the res(istance) value is "added" to the stiffness
 !     matrix (Moghadam et al. 2013 eq. 27).
@@ -82,6 +82,14 @@
       END IF
 
       DO faIn=1, lhs%nFaces
+   
+!        If the face is virtual, don't add anything to tangent matrix.
+!        If the virtual face is a cap, it's contribution will be added
+!        when the face that it caps is processed
+         IF (lhs%face(faIn)%virtual) THEN
+            CONTINUE
+         END IF
+
          nsd = MIN(lhs%face(faIn)%dof,dof)
          IF (lhs%face(faIn)%coupledFlag) THEN
 !            PRINT*, "faIn: ", faIn, "sharedFlag: ", 
@@ -95,6 +103,29 @@
                   END DO
                END DO
                S = coef(faIn)*FSILS_DOTV(dof,lhs%mynNo, lhs%commu, v, X)
+
+!              If a virtual face caps this face, add it's contribution to S
+               IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
+!                  DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
+!                     faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
+                     faInCap = lhs%face(faIn)%faInCap
+!                     PRINT*, "faInCap inside ADDBCMUL(): ", faInCap,
+!     2               lhs%nFaces, lhs%face(faInCap)%nNo
+                     vcap = 0._LSRP
+                     DO a=1, lhs%face(faInCap)%nNo
+                        Ac = lhs%face(faInCap)%glob(a)
+                        DO i=1, nsd
+                           vcap(i,Ac) = lhs%face(faInCap)%valM(i,a)
+!                           PRINT*,'faInCap', faInCap, 
+!     2                      'vcap(i,Ac)', vcap(i,Ac)
+                        END DO
+                     END DO
+                     S = S + coef(faInCap)*FSILS_DOTV(dof,lhs%mynNo, 
+     2                                     lhs%commu, vcap, X)
+!                  END DO
+               END IF
+
+!              Add S times second integral to the current matrix-vector product Y
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd

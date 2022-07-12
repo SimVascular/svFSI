@@ -1552,6 +1552,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !        gFa%gnEL = gFa%nEl = lFa%gnEl, right?
          gFa%nNo  = lFa%nNo  ! number of nodes on this face
          gFa%virtual = lFa%virtual ! Is this face virtual
+         gFa%capFaceName = lFa%capFaceName ! Name of capping face
+         gFa%capFaceID = lFa%capFaceID ! ID number of capping face
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(1+gFa%eNoN,gFa%gnEl))
       ELSE
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(0,0))
@@ -1563,6 +1565,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
       CALL cm%bcast(gFa%gnEl)
       CALL cm%bcast(gFa%nNo)
       CALL cm%bcast(gFa%virtual)
+      CALL cm%bcast(gFa%capFaceName)
+      CALL cm%bcast(gFa%capFaceID)
 !     Selects face mesh element type (linear triangle, quadratic quad, etc.)
 !     Also sets up Gauss points and shape functions
 !     All procs call this and individually populate their global face object gFa
@@ -1598,6 +1602,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
       CALL SELECTELEB(lM, lFa)
       lFa%iM   = iM
       lFa%virtual = gFa%virtual
+      lFa%capFaceName = gFa%capFaceName
+      lFa%capFaceID = gFa%capFaceID
 
 !     AB 7/7/22: If face is virtual, cannot partition it according to the already 
 !     partitioned mesh. Instead, separately partition this face.

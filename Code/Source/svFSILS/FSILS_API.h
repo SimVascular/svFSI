@@ -99,7 +99,7 @@
          END SUBROUTINE FSILS_LS_FREE
 
          SUBROUTINE FSILS_BC_CREATE(lhs, faIn, nNo, dof, BC_type,       &
-     &         gNodes, Val, virtual)
+     &         gNodes, Val, virtual, faInCap)
             INCLUDE "FSILS_STRUCT.h"
             TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
             INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
@@ -107,6 +107,7 @@
             INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
             REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
             LOGICAL, INTENT(IN), OPTIONAL :: virtual
+            INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: faInCap
             
          END SUBROUTINE FSILS_BC_CREATE
          SUBROUTINE external_BC_CREATE(lhs, faIn, nNo, dof, BC_type,    &

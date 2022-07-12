@@ -113,6 +113,8 @@
          REAL(KIND=LSRP), ALLOCATABLE :: valM(:,:)
 !        Is face a virtual face        (USE)
          LOGICAL :: virtual = .FALSE.
+!        ID of face that caps this face
+         INTEGER(KIND=LSIP) :: faInCap = 0
       END TYPE FSILS_faceType
 
 !     All following are in (USE)

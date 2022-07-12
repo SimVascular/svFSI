@@ -2193,7 +2193,7 @@ c        N(8) = lx*my*0.5_RKIND
       LOGICAL, ALLOCATABLE :: setIt(:)
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:), tmpXg(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
       INTEGER(KIND=IKIND) ierr, p
 
       iM   = lFa%iM
@@ -2202,7 +2202,7 @@ c        N(8) = lx*my*0.5_RKIND
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
       ! Arrays to hold nodal positions for MPI gather operation
-      ALLOCATE(tmpX(nsd), tmpXg(nsd,cm%np()))
+      ALLOCATE(tmpX(nsd))
 
 !     Communicating nodal positions and correcting the position vector if mesh is moving
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
@@ -2282,7 +2282,7 @@ c        N(8) = lx*my*0.5_RKIND
          n = CROSS(xXi)
          DEALLOCATE(xXi)
       END IF
-      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(setIt, ptr, lX, tmpX)
 
 
       ! If master, broadcast value of n to slaves
@@ -2319,8 +2319,8 @@ c        N(8) = lx*my*0.5_RKIND
       LOGICAL, ALLOCATABLE :: setIt(:)
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:), tmpXg(:,:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpDn(:), tmpDng(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDn(:)
       INTEGER(KIND=IKIND) ierr, p
 
       iM   = lFa%iM
@@ -2329,8 +2329,8 @@ c        N(8) = lx*my*0.5_RKIND
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
       ! Arrays to hold nodal positions and displacements for MPI gather operation
-      ALLOCATE(tmpX(nsd), tmpXg(nsd,cm%np()))
-      ALLOCATE(tmpDn(nsd), tmpDng(nsd,cm%np()))
+      ALLOCATE(tmpX(nsd))
+      ALLOCATE(tmpDn(nsd))
 
 !     Collecting node information on master, so master can compute the normal
 !     Also, updating nodal position with nodal displacement, so that we
@@ -2410,7 +2410,7 @@ c        N(8) = lx*my*0.5_RKIND
          n = CROSS(xXi)
          DEALLOCATE(xXi)
       END IF
-      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(setIt, ptr, lX, tmpX, tmpDn)
 
 
       ! If master, broadcast value of n to slaves
