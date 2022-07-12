@@ -103,25 +103,29 @@
                S = coef(faIn)*FSILS_DOTV(dof,lhs%mynNo, lhs%commu, v, X)
 
 !              If a virtual face caps this face, add it's contribution to S
+!              Explanation: If the coupled surface is virtually capped to compute flow rate
+!              then the right integral should be over the capped surface, while
+!              the left integral should be over the uncapped surface. We
+!              can satisfy this by adding the cap's contribution to S
+!              which is the matrix-vector product of the right integral
+!              and a vector X.
                IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
-!                  DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
-!                     faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
+!                 DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
+!                    faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
                      faInCap = lhs%face(faIn)%faInCap
-!                     PRINT*, "faInCap inside ADDBCMUL(): ", faInCap,
-!     2               lhs%nFaces, lhs%face(faInCap)%nNo
                      vcap = 0._LSRP
                      DO a=1, lhs%face(faInCap)%nNo
                         Ac = lhs%face(faInCap)%glob(a)
                         DO i=1, nsd
                            vcap(i,Ac) = lhs%face(faInCap)%valM(i,a)
-!                           PRINT*,'faInCap', faInCap, 
-!     2                      'vcap(i,Ac)', vcap(i,Ac)
                         END DO
+!                        PRINT*, "vcap(:,Ac)", vcap(:,Ac)
                      END DO
                      !PRINT*, 'faInCap: ', faInCap, 'coef', coef(faInCap)
-                     S = S + coef(faInCap)*FSILS_DOTV(dof,lhs%mynNo, 
+                     ! coef(FaIn) or coef(FaInCap)? I think FaIn
+                     S = S + coef(faIn)*FSILS_DOTV(dof,lhs%mynNo, 
      2                                     lhs%commu, vcap, X)
-!                  END DO
+!                 END DO
                END IF
 
 !              Add S times second integral to the current matrix-vector product Y
@@ -148,6 +152,26 @@
                      S = S + lhs%face(faIn)%valM(i,a)*X(i,Ac)
                   END DO
                END DO
+!              If a virtual face caps this face, add it's contribution to S
+!              Explanation: If the coupled surface is virtually capped to compute flow rate
+!              then the right integral should be over the capped surface, while
+!              the left integral should be over the uncapped surface. We
+!              can satisfy this by adding the cap's contribution to S
+!              which is the matrix-vector product of the right integral
+!              and a vector X.
+               IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
+!                 DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
+!                    faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
+                     faInCap = lhs%face(faIn)%faInCap
+                     DO a=1, lhs%face(faInCap)%nNo
+                        Ac = lhs%face(faInCap)%glob(a)
+                        DO i=1, nsd
+                           S = S + lhs%face(faInCap)%valM(i,a)*X(i,Ac)
+                        END DO
+                     END DO
+!                 END DO
+               END IF
+
 !              Multiply S by the resistance (equal to coef, see above)
                S = coef(faIn)*S
 !              Add S times second integral to the current matrix-vector product Y

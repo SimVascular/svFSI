@@ -85,12 +85,10 @@
 !     Set virtual flag for lhs%face if virtual flag is provided
       lhs%face(faIn)%virtual = .FALSE.
       IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
-      PRINT*, 'lhs%face(faIn)%virtual', lhs%face(faIn)%virtual
 
 !     Set faInCap for lhs%face if faInCap is provided
       lhs%face(faIn)%faInCap = 0
       IF (PRESENT(faInCap)) lhs%face(faIn)%faInCap = faInCap
-      PRINT*, faIn, 'lhs%face(faIn)%faInCap', lhs%face(faIn)%faInCap
 
       ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
      &   lhs%face(faIn)%valM(dof,nNo))
@@ -110,10 +108,10 @@
          lhs%face(faIn)%val = 0._LSRP
       END IF
 
-      DO a=1, nNo
-         PRINT*, 'lhs%face(faIn)%val(:,a) in FSILS_BC_CREATE(): ', 
-     2     faIn, lhs%face(faIn)%val(:,a)
-      END DO
+!      DO a=1, nNo
+!         PRINT*, 'lhs%face(faIn)%val(:,a) in FSILS_BC_CREATE(): ', 
+!     2     faIn, lhs%face(faIn)%val(:,a)
+!      END DO
 
 !     Synchronize val on nodes on boundary between procs
       IF (lhs%commu%nTasks .GT. 1) THEN
@@ -272,6 +270,14 @@
 !      lhs%face(faIn)%nNo  = nNo
 !      lhs%face(faIn)%dof  = dof
 !      lhs%face(faIn)%bGrp = BC_type
+
+!     Set virtual flag for lhs%face if virtual flag is provided
+!      lhs%face(faIn)%virtual = .FALSE.
+!      IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
+
+!     Set faInCap for lhs%face if faInCap is provided
+!      lhs%face(faIn)%faInCap = 0
+!      IF (PRESENT(faInCap)) lhs%face(faIn)%faInCap = faInCap
 
 !      ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
 !     &   lhs%face(faIn)%valM(dof,nNo))

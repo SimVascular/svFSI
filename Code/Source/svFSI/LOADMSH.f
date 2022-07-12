@@ -109,10 +109,10 @@
          END IF
       END DO
 
-      DO iFa=1, lM%nFa
-         PRINT*, lM%fa(iFa)%name, "capFaceName: ",l
-     2    M%fa(iFa)%capFaceName, "capFaceID: ", lM%fa(iFa)%capFaceID
-      END DO
+!      DO iFa=1, lM%nFa
+!         PRINT*, lM%fa(iFa)%name, "capFaceName: ",l
+!     2    M%fa(iFa)%capFaceName, "capFaceID: ", lM%fa(iFa)%capFaceID
+!      END DO
 
       RETURN
       END SUBROUTINE READSV

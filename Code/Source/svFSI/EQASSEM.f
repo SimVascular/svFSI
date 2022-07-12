@@ -403,7 +403,9 @@
 
                   DO a=1, lFa%eNoN ! Loop over nodes  in element
                      Ac = lFa%IEN(a,e) ! Extract global nodal index
-                     sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+                     IF (Ac .NE. 0) THEN 
+                        sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+                     END IF
                   END DO
                END DO
             END DO
