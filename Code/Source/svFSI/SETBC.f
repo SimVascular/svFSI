@@ -998,7 +998,7 @@
      2   relTol = 1.E-5_RKIND
 
       LOGICAL RCRflag
-      INTEGER(KIND=IKIND) iFa, iFaCap, i, j, ptr, iBc, iM
+      INTEGER(KIND=IKIND) iFa, iFaCap, i, j, ptr, iBc, iCapBC, iM
       REAL(KIND=RKIND) diff, area
 
       REAL(KIND=RKIND), ALLOCATABLE :: orgY(:), orgQ(:)
@@ -1088,7 +1088,15 @@
 
 !           Compute finite difference approximation of dP/dQ (eq. 29). r for resistance
             eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY(i))/diff
+            PRINT*, "In CALCDERCPLBC iBc: ", iBc, 'i: ', i, 
+     2            'r: ',  eq(iEq)%bc(iBc)%r
 
+!           Set resistance for cap bc if it exists for this bc. Set it
+!           to be the same resistance as the bc being capped
+            iCapBC = eq(iEq)%bc(iBc)%iCapBC
+            IF (iCapBC .NE. 0) THEN
+               eq(iEq)%bc(iCapBC)%r =  eq(iEq)%bc(iBc)%r
+            END IF
 !           Set pressure and flow rate back to before finite difference increment vals
             cplBC%fa(:)%y  = orgY
             cplBC%fa(:)%Qn = orgQ

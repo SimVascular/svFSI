@@ -41,7 +41,7 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER(KIND=IKIND) iM, iFa, iEq, i, a, iBc, lsPtr
+      INTEGER(KIND=IKIND) iM, iFa, iEq, i, a, iBc, lsPtr, faIn, faInCap
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:)
 
@@ -112,6 +112,27 @@
             iM  = eq(iEq)%bc(iBc)%iM
             eq(iEq)%bc(iBc)%lsPtr = 0
             CALL FSILSINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), lsPtr)
+!           Store mesh and face index in corresponding lhs%face(i)
+            IF (eq(iEq)%bc(iBc)%lsPtr .NE. 0) THEN 
+               lhs%face(eq(iEq)%bc(iBc)%lsPtr)%iM = iM
+               lhs%face(eq(iEq)%bc(iBc)%lsPtr)%iFa = iFa
+            END IF
+         END DO
+      END DO
+!     If any faces in msh(:)%fa(:) are capped, share information with
+!     lhs%face(:)
+      DO iEq=1,nEq
+         DO iBc=1, eq(iEq)%nBc
+            iFa = eq(iEq)%bc(iBc)%iFa
+            iM  = eq(iEq)%bc(iBc)%iM
+            IF (msh(iM)%fa(iFa)%capFaceID .NE. 0) THEN ! If face is capped
+!              Find lhs%face(:) index of face being capped
+               CALL MATCHFACE(iM, iFa, faIn)
+!              Find lhs%face(:) index of capping face
+               CALL MATCHFACE(iM, msh(iM)%fa(iFa)%capFaceID, faInCap)
+!              Store capping relation in lhs%face(faIn)
+               lhs%face(faIn)%faInCap = faInCap
+            END IF
          END DO
       END DO
 
@@ -557,7 +578,7 @@
             lBc%lsPtr = lsPtr
 !           Fills lhs%face(i) variables, including val if sVl exists
             CALL FSILS_BC_CREATE(lhs, lsPtr, lFa%nNo, nsd, BC_TYPE_Neu,
-     2         gNodes, sVl, lFa%virtual, lFa%capFaceID)
+     2         gNodes, sVl, lFa%virtual)
          ELSE
             lBc%lsPtr = 0
          END IF
@@ -771,4 +792,25 @@
 
       RETURN
       END SUBROUTINE SHLBCINI
+!--------------------------------------------------------------------
+!     Find lhs%face(:) index faIn corresponding iM and iFa, which
+!     index msh(:)%fa(:)
+      SUBROUTINE MATCHFACE(iM, iFa, faIn)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: iM, iFa
+      INTEGER(KIND=IKIND), INTENT(OUT) :: faIn
+
+      INTEGER(KIND=IKIND) a
+!     Loop over lhs%faces to find corresonding face
+      DO a=1, lhs%nFaces
+!        If lhs%face matches mesh and face index, 
+         IF ((lhs%face(a)%iFa .EQ. iFa)
+     2      .AND. (lhs%face(a)%iM .EQ. iM)) THEN
+            faIn = a
+         END IF
+      END DO
+      END SUBROUTINE
 !####################################################################
+

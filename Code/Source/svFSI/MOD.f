@@ -184,6 +184,10 @@
          TYPE(fcType), ALLOCATABLE :: gt
 !        Neu: RCR
          TYPE(rcrType) :: RCR
+!        Name of face that caps this surface
+         CHARACTER(LEN=stdL) :: capFaceName = ""
+!        Index of cap BC associated with this BC
+         INTEGER(KIND=IKIND) :: iCapBC = 0
       END TYPE bcType
 
 !     Body force data structure type

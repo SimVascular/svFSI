@@ -82,8 +82,6 @@
             lM%fa(iFa)%virtual = .FALSE.
             lPtr => lPBC%get(lM%fa(iFa)%virtual,"Virtual")
 
-!           AB 7/11/22: Read cap face name for this face
-            lPtr => lPBC%get(lM%fa(iFa)%capFaceName,"Cap")
 
          ELSE
             lPtr => lPBC%get(ftmp,"End nodes face file path")
@@ -93,26 +91,6 @@
          END IF
          CALL SELECTELEB(lM, lM%fa(iFa))
       END DO
-
-!     AB 7/11/22: Find capFaceID of capping faces
-      DO iFa=1, lM%nFa
-         IF (lM%fa(iFa)%capFaceName .NE. "") THEN
-            DO jFa=1, lM%nFa
-               IF (lM%fa(jFa)%name .EQ. lM%fa(iFa)%capFaceName) THEN
-                  lM%fa(iFa)%capFaceID = jFa
-                  EXIT
-               END IF
-            END DO
-            IF (lM%fa(iFa)%capFaceID .EQ. 0) THEN
-               err = "Could not find matching cap face"
-            END IF
-         END IF
-      END DO
-
-!      DO iFa=1, lM%nFa
-!         PRINT*, lM%fa(iFa)%name, "capFaceName: ",l
-!     2    M%fa(iFa)%capFaceName, "capFaceID: ", lM%fa(iFa)%capFaceID
-!      END DO
 
       RETURN
       END SUBROUTINE READSV

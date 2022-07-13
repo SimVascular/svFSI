@@ -48,7 +48,7 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_BC_CREATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
-     &   Val, virtual, faInCap)
+     &   Val, virtual)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
@@ -56,7 +56,6 @@
       INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
       REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
       LOGICAL, INTENT(IN), OPTIONAL :: virtual
-      INTEGER(KIND=LSIP), INTENT(IN), OPTIONAL :: faInCap
 
       INTEGER(KIND=LSIP) a, Ac, i
 
@@ -86,9 +85,6 @@
       lhs%face(faIn)%virtual = .FALSE.
       IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
 
-!     Set faInCap for lhs%face if faInCap is provided
-      lhs%face(faIn)%faInCap = 0
-      IF (PRESENT(faInCap)) lhs%face(faIn)%faInCap = faInCap
 
       ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
      &   lhs%face(faIn)%valM(dof,nNo))
@@ -275,9 +271,6 @@
 !      lhs%face(faIn)%virtual = .FALSE.
 !      IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
 
-!     Set faInCap for lhs%face if faInCap is provided
-!      lhs%face(faIn)%faInCap = 0
-!      IF (PRESENT(faInCap)) lhs%face(faIn)%faInCap = faInCap
 
 !      ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
 !     &   lhs%face(faIn)%valM(dof,nNo))
