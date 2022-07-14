@@ -3225,12 +3225,12 @@ c     2         "can be applied for Neumann boundaries only"
       lEq%bc(iBc)%iCapBC = lEq%nBc
 
 
-
-      DO iFa=1, msh(iM)%nFa
-         PRINT*, msh(iM)%fa(iFa)%name,
-     2"capFaceName: ", msh(iM)%fa(iFa)%capFaceName, 
-     2"capFaceID: ", msh(iM)%fa(iFa)%capFaceID
-      END DO
+!     For DEBUGGING
+!      DO iFa=1, msh(iM)%nFa
+!         PRINT*, msh(iM)%fa(iFa)%name,
+!     2"capFaceName: ", msh(iM)%fa(iFa)%capFaceName, 
+!     2"capFaceID: ", msh(iM)%fa(iFa)%capFaceID
+!      END DO
 
       END SUBROUTINE ADDCAPBC
 

@@ -1088,8 +1088,9 @@
 
 !           Compute finite difference approximation of dP/dQ (eq. 29). r for resistance
             eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY(i))/diff
-            PRINT*, "In CALCDERCPLBC iBc: ", iBc, 'i: ', i, 
-     2            'r: ',  eq(iEq)%bc(iBc)%r
+!           For DEBUGGING
+!            PRINT*, "In CALCDERCPLBC iBc: ", iBc, 'i: ', i, 
+!     2            'r: ',  eq(iEq)%bc(iBc)%r
 
 !           Set resistance for cap bc if it exists for this bc. Set it
 !           to be the same resistance as the bc being capped

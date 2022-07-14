@@ -193,7 +193,6 @@
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sA(:), sV(:,:)
 
-      PRINT*, 'lFa%name: ', lfa%name
 !     Calculating face area
       ALLOCATE(sA(tnNo)) ! Total number of nodes on this proc
       sA   = 1._RKIND
