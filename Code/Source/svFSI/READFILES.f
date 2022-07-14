@@ -896,7 +896,7 @@
             IF (lEq%bc(iBc)%capFaceName .NE. "") THEN ! If coupled BC has a cap
                ! Add a bc to lEq%bc(:) at the end for the cap, and add
                ! cap face info to face being capped (capFaceName and
-               ! capFaceID fields)
+               ! capFaceID fields) 
                CALL ADDCAPBC(lEq, iBc)
             END IF
          END IF 
@@ -3186,25 +3186,31 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     We are adding a new BC for the cap, so we need to update the
 !     the relevant structures
-      ! Store old BCs
+
+!     Store old BCs in oldBcs
       ALLOCATE(oldBcs(lEq%nBc))
-      oldBcs = lEq%bc
+      DO jBc=1, lEq%nBc
+         CALL COPYBC(lEq%bc(jBc), oldBcs(jBc))
+      END DO
+!     Increment number of BCs
       lEq%nBc = lEq%nBc + 1
+
+!     Reallocate lEq%bc with space for extra cap BC
       DEALLOCATE(lEq%bc)
       ALLOCATE(lEq%bc(lEq%nBc))
 
-      ! Copy old BCs to lEq%bc
+!     Copy old BCs to lEq%bc
       DO jBc=1, lEq%nBc-1
-         lEq%bc(jBc) = oldBcs(jBc)
+         CALL COPYBC(oldBcs(jBc), lEq%bc(jBc))
       END DO
 
       ! Add on new BC for cap. Copy BC information from surface being capped
       ! This surface corresponds to iBc
-      lEq%bc(lEq%nBc) = lEq%bc(iBc)
+      CALL COPYBC(lEq%bc(iBc),  lEq%bc(lEq%nBc))
 
       ! Correct some values in cap BC (corresponding to nBc)
       cplBC%nFa = cplBC%nFa + 1
-      lEq%bc(lEq%nBc)%cplBcPtr =cplBC%nFa
+      lEq%bc(lEq%nBc)%cplBcPtr = cplBC%nFa
       CALL FINDFACE(lEq%bc(iBc)%capFaceName, 
      2               lEq%bc(lEq%nBc)%iM, lEq%bc(lEq%nBc)%iFa)
       lEq%bc(lEq%nBC)%capFaceName = ""
@@ -3227,4 +3233,43 @@ c     2         "can be applied for Neumann boundaries only"
       END DO
 
       END SUBROUTINE ADDCAPBC
+
+!#######################################################################
+!     Performs deep copy of old BC (oBc) to new BC (nBc)
+      SUBROUTINE COPYBC(oBc, nBc)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(bcType), INTENT(IN) :: oBc
+      TYPE(bcType), INTENT(OUT) :: nBc
+      INTEGER(KIND=IKIND) jBc, iFa, iM
+
+      nBc%weakDir = oBc%weakDir
+      nBc%flwP = oBc%flwP
+      nBc%rbnN = oBc%rbnN
+      nBc%bType = oBc%bType
+      nBc%cplBCptr = oBc%cplBCptr
+      nBc%iFa = oBc%iFa
+      nBc%iM = oBc%iM
+      nBc%lsPtr = oBc%lsPtr
+      nBc%masN = oBc%masN
+      nBc%g = oBc%g
+      nBc%r = oBc%r
+      nBc%k = oBc%k
+      nBc%c = oBc%c
+      nBc%tauB = oBc%tauB
+
+!     For allocatable types, need to be careful. If it is not allocated in oBc
+!     and we assign to the corresponding member of nBc, we will get a segfault
+!     (at least on Sherlock, although not on my Mac)
+      IF (ALLOCATED(oBc%eDrn)) nBc%eDrn = oBc%eDrn
+      IF (ALLOCATED(oBc%h)) nBc%h = oBc%h
+      IF (ALLOCATED(oBc%gx)) nBc%gx = oBc%gx
+      IF (ALLOCATED(oBc%gm)) nBc%gm = oBc%gm
+      IF (ALLOCATED(oBc%gt)) nBc%gt = oBc%gt
+
+      nBc%RCR = oBc%RCR
+      nBc%capFaceName = oBc%capFaceName
+      nBc%iCapBC = oBc%iCapBC
+      END SUBROUTINE COPYBC
 !####################################################################

@@ -193,6 +193,7 @@
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sA(:), sV(:,:)
 
+      PRINT*, 'lFa%name: ', lfa%name
 !     Calculating face area
       ALLOCATE(sA(tnNo)) ! Total number of nodes on this proc
       sA   = 1._RKIND
@@ -225,10 +226,9 @@
                CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), nV)
                DO a=1, lFa%eNoN
                   Ac       = lFa%IEN(a,e)
-                  sV(:,Ac) = sV(:,Ac) + nV*lFa%N(a,g)*lFa%w(g)
-!                  IF (lFa%name.EQ.'cap' .OR. lFa%name.EQ.'base') THEN
-!                     PRINT*, "Inside FACEINI() node loop: ", e, a, Ac
-!                  END IF
+                  IF (Ac .NE. 0) THEN 
+                     sV(:,Ac) = sV(:,Ac) + nV*lFa%N(a,g)*lFa%w(g)
+                  END IF
                END DO
             END DO
          END DO
@@ -294,7 +294,9 @@
 
                DO a=1, fs%eNoN
                   Ac = lFa%IEN(a,e)
-                  sV(:,Ac) = sV(:,Ac) + fs%w(g)*fs%N(a,g)*nV(:)
+                  IF (Ac .NE. 0) THEN
+                     sV(:,Ac) = sV(:,Ac) + fs%w(g)*fs%N(a,g)*nV(:)
+                  END IF
                END DO
             END DO
 
@@ -303,24 +305,30 @@
             ELSE
                g  = lFa%eNoN - 1
                Ac = lFa%IEN(lFa%eNoN,e)
-               DO b=1, fs%eNoN
-                  Bc = lFa%IEN(b,e)
-                  sV(:,Ac) = sV(:,Ac) + sV(:,Bc)
-               END DO
-               sV(:,Ac) = sV(:,Ac)/REAL(fs%eNoN,KIND=RKIND)
+               IF (Ac .NE. 0) THEN
+                  DO b=1, fs%eNoN
+                     Bc = lFa%IEN(b,e)
+                     IF (Bc .NE. 0) THEN 
+                        sV(:,Ac) = sV(:,Ac) + sV(:,Bc)
+                     END IF
+                  END DO
+                  sV(:,Ac) = sV(:,Ac)/REAL(fs%eNoN,KIND=RKIND)
+               END IF
             END IF
 
             DO a=fs%eNoN+1, g
                b  = a - fs%eNoN
                Ac = lFa%IEN(a,e)
                Bc = lFa%IEN(b,e)
-               nV = sV(:,Bc)
-               IF (b .EQ. fs%eNoN) THEN
-                  Bc = lFa%IEN(1,e)
-               ELSE
-                  Bc = lFa%IEN(b+1,e)
+               IF ((Ac .NE. 0) .AND. (Bc .NE. 0)) THEN
+                  nV = sV(:,Bc)
+                  IF (b .EQ. fs%eNoN) THEN
+                     Bc = lFa%IEN(1,e)
+                  ELSE
+                     Bc = lFa%IEN(b+1,e)
+                  END IF
+                  sV(:,Ac) = (nV + sV(:,Bc))*0.5_RKIND
                END IF
-               sV(:,Ac) = (nV + sV(:,Bc))*0.5_RKIND
             END DO
          END DO
          DEALLOCATE(xl, ptr, setIt)
