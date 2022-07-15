@@ -7,18 +7,18 @@ tags:
   - fluid-structure interaction
   - finite element method
 authors:
- - name: Chi Zhu^[Corresponding author, equal contributions to the paper]
+ - name: Chi Zhu^[equal contributions to the paper]
    orcid: 0000-0002-1099-8893
    affiliation: 1 # (Multiple affiliations must be quoted)
- - name: Vijay Vedula^[Corresponding author, equal contributions to the paper]
+ - name: Vijay Vedula^[equal contributions to the paper]
    affiliation: 2
  - name: Dave Parker
    affiliation: 3
  - name: Nathan Wilson
    affiliation: 4
- - name: Shawn Shadden
+ - name: Shawn Shadden^[Corresponding author]
    affiliation: 1
- - name: Alison Marsden
+ - name: Alison Marsden^[Corresponding author]
    affiliation: 3
 affiliations:
  - name: University of California, Berkeley
@@ -44,7 +44,7 @@ Heart disease is the number one cause of death in the US [@Xu2020]. Many efforts
 
 # Statement of need
 
-Accompanying the growing popularity of studying cardiac physiology with computational modeling, many open-source software tools that specialize in modeling one or two aspects of the multiphysics process in the heart have been developed. For example, `SimVascular` [@Updegrove2017] enables patient-specific blood flow modeling by providing a complete pipeline from medical image segmentation to simulation results. `FEBio` [@Maas2012] specializes in modeling large-deformation structure mechanics in biophysics with fluid-structure interaction (FSI) capability as well. `openCARP` [@Vigmond2003] focuses on modeling cardiac electrophysiology. There are other general-purpose open-source software such as `LifeV` [@Bertagna2017] and `FEniCS` [@Logg2012], that can be flexibly adapted to simulate different physics in the heart, but significant development effort may be required for this purpose.
+Accompanying the growing popularity of studying cardiac physiology with computational modeling, many open-source software tools that specialize in modeling one or two aspects of the multiphysics process in the heart have been developed. For example, `SimVascular` [@Updegrove2017] enables patient-specific blood flow modeling by providing a complete pipeline from medical image segmentation to simulation results. `FEBio` [@Maas2012] specializes in modeling large-deformation structure mechanics in biophysics with fluid-structure interaction (FSI) capability as well. `openCARP` [@Plank2021] focuses on modeling cardiac electrophysiology. There are other general-purpose open-source software such as `LifeV` [@Bertagna2017] and `FEniCS` [@Logg2012], that can be flexibly adapted to simulate different physics in the heart, but significant development effort may be required for this purpose.
 
 `svFSI` is a new multiphysics finite element solver designed specifically for computational modeling of integrative heart dynamics. As the next generation finite element solver for the `SimVascular` software, `svFSI` is capable of modeling hemodynamics, performing large-deformation FSI to capture the motion of cardiac chambers and their interaction with the blood flow, and simulating the complex excitation-contraction coupling between the intracellular ion-exchange processes and tissue contraction. To suit the diverse needs of users, our team has implemented non-Newtonian blood viscosity models, fiber-reinforced nonlinear hyperelastic material models, and both phenomenological and biophysics-based cellular activation models, as well as interfaces to multiple iterative linear solvers and preconditioners. `svFSI` is also capable of resolving the inherent multi-scale phenomena in cardiac physiology such as the interaction between Purkinje fibers and cardiac muscle, and setting up closed-loop multi-scale hemodynamic simulations with physiological boundary conditions. Moreover, it is worth emphasizing that `svFSI` is fully compatibility with `SimVascular`, and thus can take advantage of the existing pipeline for medical image segmentation, anatomic model construction, meshing, boundary condition prescription, etc. `svFSI` is written in Fortran, taking advantage of the object-oriented programming features of Fortran 2003. The code is highly modularized for ease of interoperability and extension. We acknowledge the limited open-source compiler support for Fortran on Windows systems, and there is an ongoing effort to convert `svFSI` into pure C++ software.
 

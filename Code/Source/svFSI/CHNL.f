@@ -230,7 +230,6 @@
       IF (chnl%oTF) THEN
          INQUIRE(UNIT=chnl%fId, OPENED=flag)
          IF (.NOT.flag) THEN
-            IF (appPath .NE. "") CALL SYSTEM("mkdir -p "//TRIM(appPath))
             fName = TRIM(appPath)//TRIM(chnl%fName)
             INQUIRE(FILE=fName, OPENED=flag)
             IF (.NOT.flag) THEN
