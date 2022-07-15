@@ -1,7 +1,7 @@
 
 # **Build svFSI from Source**
 
-Below are the instructions to build svFSI on Ubuntu and MacOS.
+If you are interested in testing the new features in the most recent commit, we recommend you to build and run `svFSI` in [Docker container](./Docker/README.md). Otherwise, please follow the instructions below to build `svFSI` on Ubuntu and MacOS.
 
 <hr style="border:2px solid gray"> </hr>
 
