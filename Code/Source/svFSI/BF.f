@@ -138,7 +138,7 @@
       RETURN
       END SUBROUTINE SETBFL
 !####################################################################
-!     This subroutine is reached only for shell follower pressre loads
+!     This subroutine is reached only for shell follower pressure loads
 !     or applying initialization pressure for CMM method. nsd must be
 !     equal to 3
       SUBROUTINE BFCONSTRUCT(lM, e, eNoN, idof, xl, dl, bfl, ptr)
