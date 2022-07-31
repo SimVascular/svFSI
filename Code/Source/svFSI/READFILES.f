@@ -666,9 +666,12 @@
             propL(3,1) = solid_density
             propL(4,1) = poisson_ratio
             propL(5,1) = damping
+            propL(6,1) = f_x
+            propL(7,1) = f_y
+            IF (nsd .EQ. 3) propL(8,1) = f_z
             IF (.NOT.cmmVarWall) THEN
-               propL(6,1) = shell_thickness
-               propL(7,1) = elasticity_modulus
+               propL(9,1 ) = shell_thickness
+               propL(10,1) = elasticity_modulus
             END IF
 
             nDOP = (/12,4,3,0/)
@@ -686,9 +689,12 @@
             outPuts(12) = out_acceleration
          ELSE
             propL(1,1) = poisson_ratio
+            propL(2,1) = f_x
+            propL(3,1) = f_y
+            IF (nsd .EQ. 3) propL(4,1) = f_z
             IF (.NOT.cmmVarWall) THEN
-               propL(2,1) = shell_thickness
-               propL(3,1) = elasticity_modulus
+               propL(5,1) = shell_thickness
+               propL(6,1) = elasticity_modulus
             END IF
 
             IF (pstEq) THEN
