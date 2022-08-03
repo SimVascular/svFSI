@@ -38,29 +38,42 @@
 !-----------------------------------------------------------------------
 
       MODULE CEPMOD
+      USE TYPEMOD
+      USE ECMOD
       USE APMOD
       USE BOMOD
       USE FNMOD
       USE TTPMOD
+      USE UTILMOD, ONLY : stdL
       IMPLICIT NONE
 
 !     Type of cardiac electrophysiology models: Aliev-Panfilov model,
 !     Bueno-Orovio-Cherry-Fenton model, Fitzhugh-Nagumo model,
 !     tenTusscher-Panfilov 2006 model
-      INTEGER, PARAMETER :: cepModel_NA = 100, cepModel_AP = 101,
-     2   cepModel_BO = 102, cepModel_FN = 103, cepModel_TTP = 104
+      INTEGER(KIND=IKIND), PARAMETER :: cepModel_NA = 100,
+     2   cepModel_AP = 101, cepModel_BO = 102, cepModel_FN = 103,
+     3   cepModel_TTP = 104
 
 !     Time integration scheme: Forward-Euler, Runge-Kutta 4th order,
 !     Crank-Nicholson
-      INTEGER, PARAMETER :: tIntType_NA  = 200, tIntType_FE = 201,
-     2   tIntType_RK4 = 202, tIntType_CN2 = 203
+      INTEGER(KIND=IKIND), PARAMETER :: tIntType_NA  = 200,
+     2   tIntType_FE = 201, tIntType_RK4 = 202, tIntType_CN2 = 203,
+     3   tIntType_BE = 204
+
+!     Type of excitation-contraction coupling for active strain-based
+!     electromechanics formulation: transversely isotropic,
+!     orthotropic activation, and transmurally heterogenous orthotropic
+!     actvation.
+      INTEGER(KIND=IKIND), PARAMETER :: asnType_NA = 300,
+     2   asnType_tiso = 301, asnType_ortho = 302,
+     3   asnType_hetortho = 303
 
 !     Time integration scheme and related parameters
       TYPE odeType
 !        Time integration method type
-         INTEGER :: tIntType = tIntType_NA
+         INTEGER(KIND=IKIND) :: tIntType = tIntType_NA
 !        Max. iterations for Newton-Raphson method
-         INTEGER :: maxItr = 5
+         INTEGER(KIND=IKIND) :: maxItr = 5
 !        Absolute tolerance
          REAL(KIND=RKIND) :: absTol = 1.E-8_RKIND
 !        Relative tolerance
@@ -79,18 +92,45 @@
          REAL(KIND=RKIND) :: A = 0._RKIND
       END TYPE stimType
 
+!     Excitation-contraction model type for electromechanics
+      TYPE eccModelType
+!        IF excitation is coupled with cellular activation model or
+!        imposed excitation
+         LOGICAL :: caCpld = .TRUE.
+!        Active stress coupling
+         LOGICAL :: astress = .FALSE.
+!        Active strain coupling
+         LOGICAL :: astrain = .FALSE.
+!        Type of active strain coupling
+         INTEGER(KIND=IKIND) :: asnType = asnType_NA
+!        Time integration options
+         TYPE(odeType) :: odeS
+
+!        Below options are for decoupled excitation-contraction coupling
+!        Input parameters file path
+         CHARACTER(LEN=stdL) :: fpar_in
+!        Time step for integration
+         REAL(KIND=RKIND) :: dt
+!        State variable for excitation-contraction coupling
+!          := activation force for active stress model
+!          := fiber contraction parameter for active strain model
+         REAL(KIND=RKIND) :: Ya = 0._RKIND
+      END TYPE eccModelType
+
 !     Cardiac electrophysiology model type
       TYPE cepModelType
+!        Input parameters file path
+         CHARACTER(LEN=stdL) :: fpar_in
 !        Type of cardiac electrophysiology model
-         INTEGER :: cepType = cepModel_NA
+         INTEGER(KIND=IKIND) :: cepType = cepModel_NA
 !        Number of state variables
-         INTEGER :: nX
+         INTEGER(KIND=IKIND) :: nX
 !        Number of gating variables
-         INTEGER :: nG
+         INTEGER(KIND=IKIND) :: nG
 !        Number of fiber directions
-         INTEGER :: nFn
+         INTEGER(KIND=IKIND) :: nFn
 !        Myocardium zone id
-         INTEGER :: imyo
+         INTEGER(KIND=IKIND) :: imyo
 !        Time step for integration
          REAL(KIND=RKIND) :: dt
 !        Constant for stretch-activated-currents
@@ -105,28 +145,22 @@
          TYPE(odeType) :: odeS
       END TYPE cepModelType
 
-!     Cardiac electromechanics model type
-      TYPE cemModelType
-!        Whether electrophysiology and mechanics are coupled
-         LOGICAL :: cpld = .FALSE.
-!        Whether active stress formulation is employed
-         LOGICAL :: aStress = .FALSE.
-!        Whether active strain formulation is employed
-         LOGICAL :: aStrain = .FALSE.
-!        Local variable integrated in time
-!          := activation force for active stress model
-!          := fiber stretch for active strain model
-         REAL(KIND=RKIND), ALLOCATABLE :: Ya(:)
-      END TYPE cemModelType
-
 !     Whether cardiac electrophysiology is solved
       LOGICAL cepEq
+
+!     Whether excitation-contraction is coupled
+      LOGICAL ecCpld
+
 !     Max. dof in cellular activation model
-      INTEGER :: nXion = 0
+      INTEGER(KIND=IKIND) :: nXion = 0
+
 !     Unknowns stored at all nodes
       REAL(KIND=RKIND), ALLOCATABLE :: Xion(:,:)
-!     Cardiac electromechanics type
-      TYPE(cemModelType) :: cem
+
+!     State variable for excitation-contraction coupling
+!       := activation force for active stress model
+!       := fiber contraction parameter for active strain model
+      REAL(KIND=RKIND), ALLOCATABLE :: ec_Ya(:)
 
       END MODULE CEPMOD
 !#######################################################################

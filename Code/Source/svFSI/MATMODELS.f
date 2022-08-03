@@ -38,19 +38,19 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, Dm)
+      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, tmX, ya, S, Dm)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), tmX, ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd)
 
       TYPE(stModelType) :: stM
-      REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
-     2   Inv4, Inv6, Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
-     3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
+      REAL(KIND=RKIND) :: nd, Kp, J, Ja, J2d, J4d, trE, p, pl, Inv1,
+     2   Inv2, Inv4, Inv6, Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd),
+     3   E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
      4   PP(nsd,nsd,nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3, rexp
 !     Guccione
@@ -70,21 +70,22 @@
       Kp   = stM%Kpen
 
 !     Fiber-reinforced stress
-      CALL GETFIBSTRESS(stM%Tf, Tfa)
+      CALL GET_FIB_STRESS(stM%Tf, Tfa)
 
 !     Electromechanics coupling - active stress
-      IF (cem%aStress) Tfa = Tfa + ya
+      IF (lDmn%ec%astress) Tfa = Tfa + ya
 
 !     Electromechanics coupling - active strain
       Fe   = F
       Fa   = MAT_ID(nsd)
       Fai  = Fa
-      IF (cem%aStrain) THEN
-         CALL ACTVSTRAIN(ya, nfd, fl, Fa)
+      IF (lDmn%ec%astrain) THEN
+         CALL GET_FIB_SHORTENING(lDmn%ec, nfd, fl, tmX, ya, Fa)
          Fai  = MAT_INV(Fa, nsd)
          Fe   = MATMUL(F, Fai)
       END IF
 
+      Ja   = MAT_DET(Fa, nsd)
       J    = MAT_DET(Fe, nsd)
       J2d  = J**(-2._RKIND/nd)
       J4d  = J2d*J2d
@@ -425,16 +426,6 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
 !     HO (Holzapfel-Ogden) model for myocardium with full invariants
 !     for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HO_ma)
@@ -527,19 +518,18 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g2   = 4._RKIND*stM%ass*g2
          CC   = CC + (g2*TEN_DYADPROD(Hss, Hss, nsd))
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
       CASE DEFAULT
          err = "Undefined material constitutive model"
       END SELECT
+
+!     Contribution from active strain
+      IF (lDmn%ec%astrain) THEN
+         S   = Ja * MATMUL(Fai, S)
+         S   = MATMUL(S, TRANSPOSE(Fai))
+         CCb = TEN_DYADPROD(Fai, Fai, nsd)
+         CC  = TEN_DDOT_3424(CC, CCb, nsd)
+         CC  = Ja * TEN_DDOT_2412(CCb, CC, nsd)
+      END IF
 
 !     Convert to Voigt Notation
       CALL CCTOVOIGT(CC, Dm)
@@ -576,13 +566,13 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, ya, S, Dm, Ja)
+      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, tmX, ya, S, Dm, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), tmX, ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd), Ja
 
       TYPE(stModelType) :: stM
@@ -607,17 +597,17 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       nd   = REAL(nsd, KIND=RKIND)
 
 !     Fiber-reinforced stress
-      CALL GETFIBSTRESS(stM%Tf, Tfa)
+      CALL GET_FIB_STRESS(stM%Tf, Tfa)
 
 !     Electromechanics coupling - active stress
-      IF (cem%aStress) Tfa = Tfa + ya
+      IF (lDmn%ec%astress) Tfa = Tfa + ya
 
 !     Electromechanics coupling - active strain
       Fe   = F
       Fa   = MAT_ID(nsd)
       Fai  = Fa
-      IF (cem%aStrain) THEN
-         CALL ACTVSTRAIN(ya, nfd, fl, Fa)
+      IF (lDmn%ec%astrain) THEN
+         CALL GET_FIB_SHORTENING(lDmn%ec, nfd, fl, tmX, ya, Fa)
          Fai  = MAT_INV(Fa, nsd)
          Fe   = MATMUL(F, Fai)
       END IF
@@ -921,16 +911,6 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
      3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
 !     HO (Holzapfel-Ogden) model for myocardium with full invariants
 !     for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HO_ma)
@@ -1018,19 +998,18 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g2   = 4._RKIND*stM%ass*g2
          CC   = CC + (g2*TEN_DYADPROD(Hss, Hss, nsd))
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
       CASE DEFAULT
          err = "Undefined isochoric material constitutive model"
       END SELECT
+
+!     Contribution from active strain
+      IF (lDmn%ec%astrain) THEN
+         S   = Ja * MATMUL(Fai, S)
+         S   = MATMUL(S, TRANSPOSE(Fai))
+         CCb = TEN_DYADPROD(Fai, Fai, nsd)
+         CC  = TEN_DDOT_3424(CC, CCb, nsd)
+         CC  = Ja * TEN_DDOT_2412(CCb, CC, nsd)
+      END IF
 
 !     Convert to Voigt Notation
       CALL CCTOVOIGT(CC, Dm)
@@ -1373,7 +1352,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       END SUBROUTINE CCTOVOIGT
 !####################################################################
 !     Compute additional fiber-reinforcement stress
-      SUBROUTINE GETFIBSTRESS(Tfl, g)
+      SUBROUTINE GET_FIB_STRESS(Tfl, g)
       USE COMMOD
       IMPLICIT NONE
       TYPE(fibStrsType), INTENT(IN) :: Tfl
@@ -1389,36 +1368,57 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       END IF
 
       RETURN
-      END SUBROUTINE GETFIBSTRESS
+      END SUBROUTINE GET_FIB_STRESS
 !####################################################################
 !     Compute active component of deformation gradient tensor for
 !     electromechanics coupling based on active strain formulation
-      SUBROUTINE ACTVSTRAIN(gf, nfd, fl, Fa)
+      SUBROUTINE GET_FIB_SHORTENING(ec, nfd, fl, lam, gf, Fa)
       USE MATFUN
       USE UTILMOD
-      USE COMMOD, ONLY : nsd
+      USE COMMOD, ONLY : asnType_tiso, asnType_ortho, asnType_hetortho,
+     2   nsd, eccModelType
       IMPLICIT NONE
+      TYPE(eccModelType), INTENT(IN) :: ec
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: gf, fl(nsd,nfd)
-      REAL(KIND=RKIND), INTENT(INOUT) :: Fa(nsd,nsd)
+      REAL(KIND=RKIND), INTENT(IN) :: fl(nsd,nfd), lam, gf
+      REAL(KIND=RKIND), INTENT(OUT) :: Fa(nsd,nsd)
 
-      REAL(KIND=RKIND) :: gs, gn, af(nsd), as(nsd), an(nsd),
-     2   IDm(nsd,nsd), Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
+      REAL(KIND=RKIND) :: gs, gn, kp, af(nsd), as(nsd), an(nsd),
+     2   Im(nsd,nsd), Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
 
-      af  = fl(:,1)
-      as  = fl(:,2)
-      an  = CROSS(fl)
+      af = fl(:,1)
+      as = fl(:,2)
+      an = CROSS(fl)
 
-      gn  = 4._RKIND*gf
-      gs  = 1._RKIND/((1._RKIND+gf)*(1._RKIND+gn)) - 1._RKIND
+      Im = MAT_ID(nsd)
+      Hf = MAT_DYADPROD(af, af, nsd)
 
-      IDm = MAT_ID(nsd)
-      Hf  = MAT_DYADPROD(af, af, nsd)
-      Hs  = MAT_DYADPROD(as, as, nsd)
-      Hn  = MAT_DYADPROD(an, an, nsd)
+!     Transversely isotropic activation
+      IF (ec%asnType .EQ. asnType_tiso) THEN
+         gn = 1._RKIND/SQRT(gf)
+         Fa = gf*Hf + gn*(Im - Hf)
+         RETURN
 
-      Fa = IDm + gf*Hf + gs*Hs + gn*Hn
+!     Orthotropic activation
+      ELSE IF (ec%asnType .EQ. asnType_ortho) THEN
+         kp = 4._RKIND
+         gn = kp*gf
+
+!     Transmurally heteregenous orthotropic activation
+!     lam: transmural coordinate (=0, endo; =1, epi)
+      ELSE IF (ec%asnType .EQ. asnType_hetortho) THEN
+         kp = 5.5_RKIND
+         gn = (1._RKIND - lam)*kp*gf
+     2       + lam*(1._RKIND/SQRT(1._RKIND + gf) - 1._RKIND)
+
+      END IF
+
+      gs = 1._RKIND/((1._RKIND+gf)*(1._RKIND+gn)) - 1._RKIND
+      Hs = MAT_DYADPROD(as, as, nsd)
+      Hn = MAT_DYADPROD(an, an, nsd)
+
+      Fa = Im + gf*Hf + gs*Hs + gn*Hn
 
       RETURN
-      END SUBROUTINE ACTVSTRAIN
+      END SUBROUTINE GET_FIB_SHORTENING
 !####################################################################

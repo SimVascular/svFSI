@@ -274,6 +274,8 @@
          REAL(KIND=RKIND) :: prop(maxNProp) = 0._RKIND
 !        Electrophysiology model
          TYPE(cepModelType) :: cep
+!        Excitation-contraction coupling
+         TYPE(eccModelType) :: ec
 !        Structure material model
          TYPE(stModelType) :: stM
 !        Viscosity model for fluids
@@ -580,6 +582,8 @@
 !        Fiber orientations stored at the element level - used for
 !        electrophysiology and solid mechanics
          REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:)
+!        Transmural coordinate for active strain type coupling
+         REAL(KIND=RKIND), ALLOCATABLE :: tmX(:)
 !        Parent shape functions gradient
          REAL(KIND=RKIND), ALLOCATABLE :: Nx(:,:,:)
 !        Second derivatives of shape functions - used for shells & IGA

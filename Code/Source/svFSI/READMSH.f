@@ -377,6 +377,23 @@
          msh(:)%nFn = 0
       END IF
 
+!     Read transmural coordinate for heterohenous orthotropic active
+!     strain type excitation-contraction coupling
+      DO iM=1, nMsh
+         lPM => list%get(msh(iM)%name,"Add mesh",iM)
+         lPtr => lPM%get(ctmp, "Transmural coordinate file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            ALLOCATE(msh(iM)%tmX(msh(iM)%gnNo),
+     2         msh(iM)%x(1,msh(iM)%gnNo))
+            msh(iM)%x = 0._RKIND
+            CALL READVTUPDATA(msh(iM), ctmp, "trans_mur_coord", 1, 1)
+            DO a=1, msh(iM)%gnNo
+               msh(iM)%tmX(a) = msh(iM)%x(1,a)
+            END DO
+            DEALLOCATE(msh(iM)%x)
+         END IF
+      END DO
+
 !     Read prestress data
       flag = .FALSE.
       DO iM=1, nMsh

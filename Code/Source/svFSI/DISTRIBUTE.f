@@ -188,6 +188,7 @@
          CALL cm%bcast(pstEq)
          CALL cm%bcast(sstEq)
          CALL cm%bcast(cepEq)
+         CALL cm%bcast(ecCpld)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)
@@ -554,6 +555,7 @@
          CALL cm%bcast(lEq%dmn(iDmn)%prop)
          IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP) THEN
             CALL cm%bcast(lEq%dmn(iDmn)%cep%cepType)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%fpar_in)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nX)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nG)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nFn)
@@ -577,6 +579,16 @@
             END IF
          END IF
 
+         IF (ecCpld) THEN
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%caCpld)
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%astress)
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%astrain)
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%asnType)
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%odes%tIntType)
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%fpar_in)
+            CALL cm%bcast(lEq%dmn(iDmn)%ec%dt)
+         END IF
+
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
      2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct) .OR.
      3       (lEq%dmn(iDmn)%phys .EQ. phys_shell)) THEN
@@ -589,13 +601,6 @@
             CALL DIST_VISCMODEL(lEq%dmn(iDmn)%visc)
          END IF
       END DO
-
-!     Distribute cardiac electromechanics parameters
-      CALL cm%bcast(cem%cpld)
-      IF (cem%cpld) THEN
-         CALL cm%bcast(cem%aStress)
-         CALL cm%bcast(cem%aStrain)
-      END IF
 
       IF (ibFlag) THEN
          IF (cm%slv()) ALLOCATE(lEq%dmnIB(lEq%nDmnIB))
@@ -1416,6 +1421,29 @@ c            wrn = " ParMETIS failed to partition the mesh"
       lM%nNo = nNo
       IF (cm%slv()) ALLOCATE(lM%gN(lM%gnNo))
       CALL cm%bcast(lM%gN)
+
+!     Use gtlptr to distribute lM%tmX, if allocated
+      flag = ALLOCATED(lM%tmX)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         ALLOCATE(tmpR(lM%gnNo))
+         IF (cm%mas()) THEN
+            tmpR = lM%tmX
+            DEALLOCATE(lM%tmX)
+         END IF
+
+         CALL cm%bcast(tmpR)
+
+         ALLOCATE(lM%tmX(lM%nNo))
+         DO Ac=1, lM%gnNo
+            a = gtlptr(Ac)
+            IF (a .NE. 0) THEN
+               lM%tmX(a) = tmpR(Ac)
+            END IF
+         END DO
+         DEALLOCATE(tmpR)
+      END IF
+
 !     lM%gN: gnNo --> gtnNo
 !     part:  nNo  --> gtnNo
       ALLOCATE(part(nNo))
@@ -1468,6 +1496,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
                lM%nW(a) = tmpR(Ac)
             END IF
          END DO
+         DEALLOCATE(tmpR)
+
 !     Distributing INN, using tempIEN as tmp array
          IF (cm%mas()) THEN
             ALLOCATE(tempIEN(insd,lM%gnEl))

@@ -110,7 +110,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd)
       REAL(KIND=RKIND) :: D(nd,nd)
 
-      INTEGER(KIND=IKIND) :: trA
+      REAL(KIND=RKIND) :: trA
 
       trA = MAT_TRACE(A,nd)
       D   = A - (trA/REAL(nd,KIND=RKIND)) * MAT_ID(nd)

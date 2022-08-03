@@ -31,7 +31,25 @@
 !
 !--------------------------------------------------------------------
 !
-!     Parameters used for Bueno-Orovio Ventricular Myocyte Model.
+!     Parameters for Bueno-Orovio cellular activation model.
+!     Parameters are chosen based on below references.
+!
+!     Reference for Bueno-Orovio electrophysiology model:
+!        Bueno-Orovio, A., Cherry, E. M., & Fenton, F. H. (2008).
+!        Minimal model for human ventricular action potentials in tissue
+!        Journal of Theoretical Biology, 253(3), 544–560.
+!        https://doi.org/10.1016/j.jtbi.2008.03.029
+!
+!     References for active stress/active strain models:
+!        Garcia-blanco, E., et al. (2019). A new computational framework
+!        for electro-activation in cardiac mechanics. Computer Methods
+!        in Applied Mechanics and Engineering.
+!        https://doi.org/10.1016/j.cma.2019.01.042
+!
+!        Simone Rossi, et al. (2012). Orthotropic active strain models
+!        for the numerical simulation of cardiac biomechanics.
+!        International Journal for Numerical Methods in Biomedical
+!        Engineering, 28, 761–788. https://doi.org/10.1002/cnm.2473
 !
 !--------------------------------------------------------------------
 
@@ -106,8 +124,8 @@
       REAL(KIND=RKIND) :: Vrest = -84._RKIND
 !     Critical voltage (mV)
       REAL(KIND=RKIND) :: Vcrit = -30._RKIND
-!     Saturation potential
-      REAL(KIND=RKIND) :: eta_T = 5.E-3_RKIND
+!     Saturation potential (Pa/mV)
+      REAL(KIND=RKIND) :: K_T = 5.0E3_RKIND
 !     Minimum activation (ms^{-1})
       REAL(KIND=RKIND) :: eps_0 = 0.1_RKIND
 !     Maximum activation (ms^{-1})
@@ -119,9 +137,9 @@
 !     Active force of sacromere (-mM^{-2})
       REAL(KIND=RKIND) :: alFa = -4.E+6_RKIND
 !     Resting Ca concentration (mM) := slow inward current variable (s)
-      REAL(KIND=RKIND) :: c0 = 2.155E-4_RKIND
+      REAL(KIND=RKIND) :: c_0 = 2.155E-4_RKIND
 !     Viscous-type constant (ms-mM^{-2})
-      REAL(KIND=RKIND) :: mu_C = 5.E+6_RKIND
+      REAL(KIND=RKIND) :: mu_c = 5.E9_RKIND
 
 !     Force-length relationship parameters
 !     Initial length of sacromeres (um)
@@ -132,12 +150,12 @@
       REAL(KIND=RKIND) :: SLmax = 2.6_RKIND
 !     Fourier coefficients
       REAL(KIND=RKIND) :: f0  = -4333.618335582119_RKIND
-      REAL(KIND=RKIND) :: fc1 =  2570.395355352195_RKIND
-      REAL(KIND=RKIND) :: fs1 = -2051.827278991976_RKIND
-      REAL(KIND=RKIND) :: fc2 =  1329.53611689133_RKIND
-      REAL(KIND=RKIND) :: fs2 =  302.216784558222_RKIND
-      REAL(KIND=RKIND) :: fc3 =  104.943770305116_RKIND
-      REAL(KIND=RKIND) :: fs3 =  218.375174229422_RKIND
+      REAL(KIND=RKIND) :: fs1 =  2570.395355352195_RKIND
+      REAL(KIND=RKIND) :: fs2 =  1329.53611689133_RKIND
+      REAL(KIND=RKIND) :: fs3 =  104.943770305116_RKIND
+      REAL(KIND=RKIND) :: fc1 = -2051.827278991976_RKIND
+      REAL(KIND=RKIND) :: fc2 =  302.216784558222_RKIND
+      REAL(KIND=RKIND) :: fc3 =  218.375174229422_RKIND
 
 !--------------------------------------------------------------------
 !     Cm: Cell capacitance per unit surface area

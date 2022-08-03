@@ -151,12 +151,12 @@
 
 !     Calculating the record length
       i = 2*tDof
-      IF (dFlag) i = 3*tDof
-      IF (pstEq) i = i + nsymd
-      IF (sstEq) i = i + nsd
+      IF (dFlag)  i = 3*tDof
+      IF (pstEq)  i = i + nsymd
+      IF (sstEq)  i = i + nsd
       IF (cepEq) THEN
          i = i + nXion
-         IF (cem%cpld) i = i + 1
+         IF (ecCpld) i = i + 1
       END IF
       i = IKIND*(1+SIZE(stamp)) + RKIND*(2+nEq+cplBC%nX+i*tnNo)
 
@@ -239,18 +239,31 @@
          pSa = 0._RKIND
       END IF
 
-!     Electrophysiology
+!     Initialize electrophysiology data structures
       IF (cepEq) THEN
          ALLOCATE(Xion(nXion,tnNo))
          Xion(:,:) = 0._RKIND
 
          CALL CEPINIT()
 
-!        Electro-Mechanics
-         IF (cem%cpld) THEN
-            ALLOCATE(cem%Ya(tnNo))
-            cem%Ya = 0._RKIND
+!        Initialize data structure if excitation-contraction coupling is
+!        applied with electrophysiology model
+         IF (ecCpld) THEN
+            ALLOCATE(ec_Ya(tnNo))
+            ec_Ya = 0._RKIND
          END IF
+      END IF
+
+!     Initialize structures for imposed and non-cellular activation type
+!     excitation-contraction coupling
+      IF (ecCpld) THEN
+         DO iEq=1, nEq
+            DO iDmn=1, eq(iEq)%nDmn
+               IF (.NOT.eq(iEq)%dmn(iDmn)%ec%caCpld) THEN
+                  CALL EC_DCPLD_INIT(eq(iEq)%dmn(iDmn)%ec)
+               END IF
+            END DO
+         END DO
       END IF
 
       IF (.NOT.resetSim) THEN
@@ -513,10 +526,13 @@
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0, Ad
                ELSE IF (cepEq) THEN
-                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
-     2               "combination. Cannot load restart files"
-                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Xion, cem%Ya
+                  IF (ecCpld) THEN
+                     READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2                  eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Xion, ec_Ya
+                  ELSE
+                     READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2                  eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad, Xion
+                  END IF
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Ad
@@ -526,10 +542,13 @@
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do, pS0
                ELSE IF (cepEq) THEN
-                  IF (.NOT.cem%cpld) err = "Incorrect equation "//
-     2               "combination. Cannot load restart files"
-                  READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
-     2               eq%iNorm, cplBC%xo, Yo, Ao, Do, Xion, cem%Ya
+                  IF (ecCpld) THEN
+                     READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2                  eq%iNorm, cplBC%xo, Yo, Ao, Do, Xion, ec_Ya
+                  ELSE
+                     READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
+     2                  eq%iNorm, cplBC%xo, Yo, Ao, Do, Xion
+                  END IF
                ELSE
                   READ(fid,REC=cm%tF()) tStamp, cTS, time, timeP(1),
      2               eq%iNorm, cplBC%xo, Yo, Ao, Do
@@ -674,11 +693,12 @@
 
       IF (ALLOCATED(varWallProps)) DEALLOCATE(varWallProps)
 
-!     Electrophysiology and Electromechanics
+!     Electrophysiology
       IF (cepEq) THEN
          IF (ALLOCATED(Xion))  DEALLOCATE(Xion)
-         IF (cem%cpld) THEN
-            IF (ALLOCATED(cem%Ya))  DEALLOCATE(cem%Ya)
+!        Excitation-contraction coupling
+         IF (ecCpld) THEN
+            IF (ALLOCATED(ec_Ya))  DEALLOCATE(ec_Ya)
          END IF
       END IF
 

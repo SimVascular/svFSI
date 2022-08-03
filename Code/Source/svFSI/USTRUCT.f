@@ -51,8 +51,8 @@
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
-     2   dl(:,:), bfl(:,:), fN(:,:), ya_l(:), lR(:,:), lK(:,:,:),
-     3   lKd(:,:,:)
+     2   dl(:,:), bfl(:,:), fN(:,:), tmXl(:), ya_l(:), lR(:,:),
+     3   lK(:,:,:), lKd(:,:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: xwl(:,:), xql(:,:), Nwx(:,:),
      2   Nqx(:,:)
 
@@ -71,8 +71,9 @@
 
 !     USTRUCT: dof = nsd+1
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), ya_l(eNoN),
-     3   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), tmXl(eNoN),
+     3   ya_l(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
+     4   lKd(dof*nsd,eNoN,eNoN))
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
@@ -86,6 +87,7 @@
 
 !        Create local copies
          fN   = 0._RKIND
+         tmXl = 0._RKIND
          ya_l = 0._RKIND
          DO a=1, eNoN
             Ac = lM%IEN(a,e)
@@ -95,12 +97,23 @@
             yl(:,a)  = Yg(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
+
             IF (ALLOCATED(lM%fN)) THEN
                DO iFn=1, nFn
                   fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
                END DO
             END IF
-            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
+
+            IF (ecCpld) THEN
+               IF (ALLOCATED(lM%tmX)) THEN
+                  tmXl(a) = lM%tmX(lM%lN(Ac))
+               END IF
+               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+                  ya_l(a) = ec_Ya(Ac)
+               ELSE
+                  ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya
+               END IF
+            END IF
          END DO
 
 !        Initialize residue and tangents
@@ -131,12 +144,12 @@
             IF (nsd .EQ. 3) THEN
                CALL USTRUCT3D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn, w,
      2            Jac, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, al, yl, dl, bfl,
-     3            fN, ya_l, lR, lK, lKd)
+     3            fN, tmXl, ya_l, lR, lK, lKd)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL USTRUCT2D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn, w,
      2            Jac, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, al, yl, dl, bfl,
-     3            fN, ya_l, lR, lK, lKd)
+     3            fN, tmXl, ya_l, lR, lK, lKd)
 
             END IF
          END DO ! g: loop
@@ -181,7 +194,7 @@
          CALL USTRUCT_DOASSEM(eNoN, ptr, lKd, lK, lR)
       END DO ! e: loop
 
-      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd)
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, tmXl, ya_l, lR, lK, lKd)
 
       CALL DESTROY(fs(1))
       CALL DESTROY(fs(2))
@@ -190,7 +203,7 @@
       END SUBROUTINE CONSTRUCT_uSOLID
 !####################################################################
       SUBROUTINE USTRUCT3D_M(vmsFlag, eNoNw, eNoNq, nFn, w, Je, Nw, Nq,
-     2   Nwx, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd)
+     2   Nwx, al, yl, dl, bfl, fN, tmXl, ya_l, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -198,7 +211,7 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(3,eNoNw), al(tDof,eNoNw), yl(tDof,eNoNw), dl(tDof,eNoNw),
-     3   bfl(3,eNoNw), fN(3,nFn), ya_l(eNoNw)
+     3   bfl(3,eNoNw), fN(3,nFn), tmXl(eNoNw), ya_l(eNoNw)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lKd(dof*3,eNoNw,eNoNw), lK(dof*dof,eNoNw,eNoNw)
 
@@ -207,7 +220,7 @@
      2   pd, F(3,3), Jac, Fi(3,3), mu, rho, beta, drho, dbeta, ya_g, Ja,
      3   Siso(3,3), Dm(6,6), tauM, tauC, rC, rCl, Pdev(3,3), DBm(6,3),
      4   Bm(6,3,eNoNw), NxFi(3,eNoNw), VxFi(3,3), VxNx(3,eNoNw), BtDB,
-     5   NxSNx, NxNx, Ku, T1, T2, T3, T4, r13, r23, ddev(3,3),
+     5   NxSNx, NxNx, Ku, tmXg, T1, T2, T3, T4, r13, r23, ddev(3,3),
      6   Pvis(3,3), PvNx(3,eNoNw)
 
 !     Define parameters
@@ -234,6 +247,7 @@
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
       F(3,3) = 1._RKIND
+      tmXg   = 0._RKIND
       ya_g   = 0._RKIND
       DO a=1, eNoNw
          v(1)    = v(1)  + Nw(a)*yl(i,a)
@@ -264,6 +278,7 @@
          F(3,2)  = F(3,2) + Nwx(2,a)*dl(k,a)
          F(3,3)  = F(3,3) + Nwx(3,a)*dl(k,a)
 
+         tmXg    = tmXg + Nw(a)*tmXl(a)
          ya_g    = ya_g + Nw(a)*ya_l(a)
       END DO
       Jac = MAT_DET(F, 3)
@@ -279,7 +294,8 @@
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     isochoric elasticity tensor in Voigt notation (Dm)
-      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, Dm,Ja)
+      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, Siso,
+     2   Dm, Ja)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
@@ -568,7 +584,7 @@
       END SUBROUTINE USTRUCT3D_M
 !--------------------------------------------------------------------
       SUBROUTINE USTRUCT2D_M(vmsFlag, eNoNw, eNoNq, nFn, w, Je, Nw, Nq,
-     2   Nwx, al, yl, dl, bfl, fN, ya_l, lR, lK, lKd)
+     2   Nwx, al, yl, dl, bfl, fN, tmXl, ya_l, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -576,7 +592,7 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(2,eNoNw), al(tDof,eNoNw), yl(tDof,eNoNw), dl(tDof,eNoNw),
-     3   bfl(2,eNoNw), fN(2,nFn), ya_l(eNoNw)
+     3   bfl(2,eNoNw), fN(2,nFn), tmXl(eNoNw), ya_l(eNoNw)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lKd(dof*2,eNoNw,eNoNw), lK(dof*dof,eNoNw,eNoNw)
 
@@ -585,7 +601,7 @@
      2   pd, F(2,2), Jac, Fi(2,2), mu, rho, beta, drho, dbeta, ya_g, Ja,
      3   Siso(2,2), Dm(3,3), tauM, tauC, rC, rCl, Pdev(2,2), DBm(3,2),
      4   Bm(3,2,eNoNw), NxFi(2,eNoNw), VxFi(2,2), VxNx(2,eNoNw), BtDB,
-     5   NxSNx, NxNx, Ku, T1, T2, T3, T4, ddev(2,2), Pvis(2,2),
+     5   NxSNx, NxNx, Ku, tmXg, T1, T2, T3, T4, ddev(2,2), Pvis(2,2),
      6   PvNx(2,eNoNw)
 
 !     Define parameters
@@ -609,6 +625,7 @@
       F  = 0._RKIND
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
+      tmXg   = 0._RKIND
       ya_g   = 0._RKIND
       DO a=1, eNoNw
          v(1)    = v(1)  + Nw(a)*yl(i,a)
@@ -627,6 +644,7 @@
          F(2,1)  = F(2,1) + Nwx(1,a)*dl(j,a)
          F(2,2)  = F(2,2) + Nwx(2,a)*dl(j,a)
 
+         tmXg    = tmXg + Nw(a)*tmXl(a)
          ya_g    = ya_g + Nw(a)*ya_l(a)
       END DO
       Jac = MAT_DET(F, 2)
@@ -642,7 +660,8 @@
 
 !     Compute deviatoric 2nd Piola-Kirchhoff stress tensor (Siso) and
 !     isochoric elasticity tensor in Voigt notation (Dm)
-      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, Siso, Dm,Ja)
+      CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, Siso,
+     2   Dm, Ja)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)

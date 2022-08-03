@@ -141,8 +141,8 @@
 
       INTEGER(KIND=IKIND) a, b, i
       REAL(KIND=RKIND) :: T1, amd, wl, Diso, Dani(nFn), Vd, Vx(3),
-     2   F(3,3), C(3,3), Jac, fl(3,nFn), Ls(nFn), D(3,3), DVx(3),
-     3   DNx(3,eNoN)
+     2   F(3,3), C(3,3), Ci(3,3), Jac, fl(3,nFn), Lf(nFn), D(3,3),
+     3   DVx(3), DNx(3,eNoN)
 
       IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
      2   "No. of anisotropic conductivies exceed mesh fibers"
@@ -163,8 +163,8 @@
 !     Compute the isotropic part of diffusion tensor based on spatial
 !     isotropy for electromechanics. This models stretch induced changes
 !     in conduction velocities
-      Ls(:) = 1._RKIND
-      IF (cem%cpld) THEN
+      Lf(:) = 1._RKIND
+      IF (ecCpld) THEN
 !        Get the displacement degrees of freedom
          DO a=1, nEq
             IF (eq(a)%phys .EQ. phys_struct .OR.
@@ -193,16 +193,15 @@
 !        Jacobian
          Jac = MAT_DET(F, 3)
 
-!        Compute Cauchy-Green tensor and its inverse
-         C = MATMUL(TRANSPOSE(F), F)
-         C = MAT_INV(C, 3)
+!        Compute the Cauchy-Green tensor and its inverse
+         C  = MATMUL(TRANSPOSE(F), F)
+         Ci = MAT_INV(C, 3)
 
 !        Compute fiber stretch
          DO i=1, nFn
-            Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
-            fl(:,i) = fN(:,i) / Ls(i)
+            Lf(i)   = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
+            fl(:,i) = fN(:,i) / Lf(i)
          END DO
-         IF (Ls(1) .LE. 1._RKIND) Ls(1) = 1._RKIND
 
 !        Diffusion tensor - spatial isotropy
          Diso    = Diso * Jac
@@ -275,8 +274,8 @@
 
       INTEGER(KIND=IKIND) a, b, i
       REAL(KIND=RKIND) :: T1, amd, wl, Diso, Dani(nFn), Vd, Vx(2),
-     2   F(2,2), C(2,2), Jac, fl(2,nFn), Ls(nFn), D(2,2), DVx(2),
-     3   DNx(2,eNoN)
+     2   F(2,2), C(2,2), Ci(2,2), Jac, fl(2,nFn), Lf(nFn), D(2,2),
+     3   DVx(2), DNx(2,eNoN)
 
       IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
      2   "No. of anisotropic conductivies exceed mesh fibers"
@@ -297,8 +296,8 @@
 !     Compute the isotropic part of diffusion tensor based on spatial
 !     isotropy for electromechanics. This models stretch induced changes
 !     in conduction velocities
-      Ls(:) = 1._RKIND
-      IF (cem%cpld) THEN
+      Lf(:) = 1._RKIND
+      IF (ecCpld) THEN
          DO a=1, nEq
             IF (eq(a)%phys .EQ. phys_struct .OR.
      2          eq(a)%phys .EQ. phys_ustruct) THEN
@@ -321,15 +320,14 @@
          Jac = MAT_DET(F, 2)
 
 !        Compute Cauchy-Green tensor and its inverse
-         C = MATMUL(TRANSPOSE(F), F)
-         C = MAT_INV(C, 2)
+         C  = MATMUL(TRANSPOSE(F), F)
+         Ci = MAT_INV(C, 2)
 
 !        Compute fiber stretch
          DO i=1, nFn
-            Ls(i) = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
-            fl(:,i) = fN(:,i) / Ls(i)
+            Lf(i)   = SQRT(NORM(fN(:,i), MATMUL(C, fN(:,i))))
+            fl(:,i) = fN(:,i) / Lf(i)
          END DO
-         IF (Ls(1) .LE. 1._RKIND) Ls(1) = 1._RKIND
 
 !        Diffusion tensor - spatial isotropy
          Diso    = Diso * Jac

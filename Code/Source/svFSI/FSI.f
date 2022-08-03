@@ -104,7 +104,13 @@
                END DO
             END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
-            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
+            IF (ecCpld) THEN
+               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+                  ya_l(a) = ec_Ya(Ac)
+               ELSE
+                  ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya
+               END IF
+            END IF
          END DO
 
 !        For FSI, fluid domain should be in the current configuration

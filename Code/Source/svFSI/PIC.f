@@ -41,7 +41,7 @@
       USE COMMOD
       IMPLICIT NONE
 
-      INTEGER(KIND=IKIND) iEq, s, e
+      INTEGER(KIND=IKIND) iEq, iDmn, s, e
       REAL(KIND=RKIND) coef
 
 !     Prestress initialization
@@ -83,9 +83,19 @@
          coef = (eq(iEq)%gam - 1._RKIND)/eq(iEq)%gam
          An(s:e,:) = Ao(s:e,:)*coef
 
-!        electrophysiology
+!        Electrophysiology
          IF (eq(iEq)%phys .EQ. phys_CEP) THEN
             CALL CEPINTEG(iEq, e, Do)
+         END IF
+
+!        Non-CEP excitation-contraction coupling
+         IF (eq(iEq)%phys .EQ. phys_struct .OR.
+     2       eq(iEq)%phys .EQ. phys_ustruct) THEN
+            DO iDmn=1, eq(iEq)%nDmn
+               IF (.NOT.eq(iEq)%dmn(iDmn)%ec%caCpld) THEN
+                  CALL EC_DCPLD_GETY(eq(iEq)%dmn(iDmn)%ec)
+               END IF
+            END DO
          END IF
 
          Yn(s:e,:) = Yo(s:e,:)

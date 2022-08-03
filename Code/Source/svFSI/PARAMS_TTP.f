@@ -31,7 +31,36 @@
 !
 !--------------------------------------------------------------------
 !
-!     Constants for TenTusscher-Panfilov Ventricular Myocyte Model.
+!     Parameters for TenTusscher-Panfilov Ventricular Myocyte Model.
+!     Parameters are chosen based on below references:
+!
+!     Reference for tenTusscher-Panfilov electrophysiology model:
+!        ten Tusscher, et al. (2004). A model for human ventricular
+!        tissue. American Journal of Physiology - Heart and Circulatory
+!        Physiology, 286(4), H1573–H1589.
+!
+!        ten Tusscher, K. H. W. J., & Panfilov, A. V. (2006).
+!        Alternans and spiral breakup in a human ventricular tissue
+!        model. American Journal of Physiology. Heart and Circulatory
+!        Physiology, 291(3), H1088–H1100.
+!        https://doi.org/10.1152/ajpheart.00109.2006
+!
+!     References for active stress/active strain models:
+!        Garcia-blanco, E., et al. (2019). A new computational framework
+!        for electro-activation in cardiac mechanics. Computer Methods
+!        in Applied Mechanics and Engineering.
+!        https://doi.org/10.1016/j.cma.2019.01.042
+!
+!        Wong, J., Goketepe, S., & Kuhl, E. (2013). Computational
+!        modeling of chemo-electro-mechanical coupling: A novel implicit
+!        monolithic finite element approach. International Journal for
+!        Numerical Methods in Biomedical Engineering, 29, 1104–1133.
+!        https://doi.org/10.1002/cnm.2565
+!
+!        Simone Rossi, et al. (2012). Orthotropic active strain models
+!        for the numerical simulation of cardiac biomechanics.
+!        International Journal for Numerical Methods in Biomedical
+!        Engineering, 28, 761–788. https://doi.org/10.1002/cnm.2473
 !
 !--------------------------------------------------------------------
 
@@ -157,8 +186,8 @@ c      REAL(KIND=RKIND) :: G_pCa = 0.8666_RKIND     ! units: pA/pF
       REAL(KIND=RKIND) :: Ca_rest = 5.E-5_RKIND    ! units: mM
 !     Ca_crit: Critical Ca concentration
       REAL(KIND=RKIND) :: Ca_crit = 8.E-4_RKIND    ! units: mM
-!     eta_T: Saturation of concentration
-      REAL(KIND=RKIND) :: eta_T = 12.5_RKIND       ! units: MPa/mM
+!     K_T: Saturation of concentration
+      REAL(KIND=RKIND) :: K_T = 12.5_RKIND         ! units: MPa/mM
 !     eps_0: Minimum activation
       REAL(KIND=RKIND) :: eps_0 = 0.1_RKIND        ! units: ms^{-1}
 !     eps_i: Maximum activation
@@ -168,11 +197,11 @@ c      REAL(KIND=RKIND) :: G_pCa = 0.8666_RKIND     ! units: pA/pF
 !-----------------------------------------------------------------------
 !     Electromechanics coupling parameters: active strain model
 !     Active force of sacromere (-mM^{-2})
-      REAL(KIND=RKIND) :: alFa = -4.E6_RKIND
+      REAL(KIND=RKIND) :: alfa = -4.E6_RKIND
 !     Resting Ca concentration (mM)
       REAL(KIND=RKIND) :: c_Ca0 = 2.155E-4_RKIND
 !     Viscous-type constant (ms-mM^{-2})
-      REAL(KIND=RKIND) :: mu_Ca = 5.E6_RKIND
+      REAL(KIND=RKIND) :: mu_Ca = 5.E9_RKIND
 
 !     Force-length relationship parameters
 !     Initial length of sacromeres (um)
@@ -183,12 +212,12 @@ c      REAL(KIND=RKIND) :: G_pCa = 0.8666_RKIND     ! units: pA/pF
       REAL(KIND=RKIND) :: SLmax = 2.6_RKIND
 !     Fourier coefficients
       REAL(KIND=RKIND) :: f0  = -4333.618335582119_RKIND
-      REAL(KIND=RKIND) :: fc1 =  2570.395355352195_RKIND
-      REAL(KIND=RKIND) :: fs1 = -2051.827278991976_RKIND
-      REAL(KIND=RKIND) :: fc2 =  1329.53611689133_RKIND
-      REAL(KIND=RKIND) :: fs2 =  302.216784558222_RKIND
-      REAL(KIND=RKIND) :: fc3 =  104.943770305116_RKIND
-      REAL(KIND=RKIND) :: fs3 =  218.375174229422_RKIND
+      REAL(KIND=RKIND) :: fs1 =  2570.395355352195_RKIND
+      REAL(KIND=RKIND) :: fs2 =  1329.53611689133_RKIND
+      REAL(KIND=RKIND) :: fs3 =  104.943770305116_RKIND
+      REAL(KIND=RKIND) :: fc1 = -2051.827278991976_RKIND
+      REAL(KIND=RKIND) :: fc2 =  302.216784558222_RKIND
+      REAL(KIND=RKIND) :: fc3 =  218.375174229422_RKIND
 
 !-----------------------------------------------------------------------
 !     Scaling factors

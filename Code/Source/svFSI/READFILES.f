@@ -96,6 +96,8 @@
          shlEq        = .FALSE.
          pstEq        = .FALSE.
          sstEq        = .FALSE.
+         cepEq        = .FALSE.
+         ecCpld       = .FALSE.
          ibFlag       = .FALSE.
 
          i = IARGC()
@@ -274,35 +276,72 @@
          END IF
       END DO
 
-      IF (cem%cpld) THEN
-         IF (nEq .EQ. 1) err = "Min equations (2) not solved for"//
-     2      " electro-mechanics coupling"
-         i = 0
-
-         DO iEq=1, nEq
-            IF (eq(iEq)%phys .EQ. phys_CEP .OR.
-     2          eq(iEq)%phys .EQ. phys_struct .OR.
-     3          eq(iEq)%phys .EQ. phys_ustruct) i = i + 1
-         END DO
-         IF (i .NE. 2) err = "Both electrophysiology and struct have"//
-     2      " to be solved for electro-mechanics"
-
-         IF (cem%aStress .AND. cem%aStrain) err = "Cannot set "//
-     2      "both active strain and active stress coupling"
-
-         IF (cem%aStrain) THEN
-            IF (nsd .NE. 3) err = "Active strain coupling is allowed"//
-     2         " only for 3D bodies"
-            DO iEq=1, nEq
-               DO i=1, eq(iEq)%nDmn
-                  IF (eq(iEq)%dmn(i)%phys .NE. phys_ustruct .AND.
-     2                eq(iEq)%dmn(i)%phys .NE. phys_struct) CYCLE
-                  IF (eq(iEq)%dmn(i)%stM%isoType .NE. stIso_HO_d) err =
-     2               "Active strain is allowed with Holzapfel-Ogden "//
-     3               "passive constitutive model only"
+!     Check for inconsistencies in excitation-contraction model inputs
+!     for electromechanics simulations
+      IF (ecCpld) THEN
+         IF (nEq .EQ. 1) THEN
+!           Only struct/ustruct is allowed when nEq = 1
+            IF (eq(1)%phys.NE.phys_struct .AND.
+     2          eq(1)%phys.NE.phys_ustruct) THEN
+               err = " Min equations not solved for excitation-"//
+     2            "contraction coupling"
+            ELSE
+!              Only decoupled EC-coupling is allowed for pure struct
+!              and ustruct simulations
+               DO i=1, eq(1)%nDmn
+                  IF (eq(1)%dmn(i)%ec%caCpld) THEN
+                     err = " Invalid excitation-contraction coupling"
+                  END IF
                END DO
-            END DO
+            END IF
+         ELSE
+!           One of the equations solved must be `cep'
+            IF (.NOT.cepEq) THEN
+               err = " Electrophysiology equations should be solved"//
+     2            " for excitation-contraction coupling"
+            END IF
          END IF
+
+!        Check for inconsistencies in domain inputs with EC coupling
+         DO iEq=1, nEq
+            DO i=1, eq(iEq)%nDmn
+               flag = (eq(iEq)%dmn(i)%ec%astrain .OR.
+     2                 eq(iEq)%dmn(i)%ec%astress) .AND.
+     3                eq(iEq)%dmn(i)%cep%cepType .EQ. cepModel_FN
+               IF (flag) THEN
+                  err = " Excitation-contraction coupling is not"//
+     2               " allowed for Fitzhugh-Nagumo model"
+               END IF
+
+!        Note: Active strain should be used with TTP activation model
+!              or in a decoupled way
+               flag = eq(iEq)%dmn(i)%ec%astrain .AND.
+     2               (eq(iEq)%dmn(i)%cep%cepType.EQ.cepModel_AP)
+               IF (flag) THEN
+                  err = " Active-strain coupling is allowed for TTP"//
+     2               " and BO activation models only"
+               END IF
+               flag = eq(iEq)%dmn(i)%ec%astrain .AND.
+     2               (eq(iEq)%dmn(i)%cep%cepType.EQ.cepModel_BO)
+               IF (flag) THEN
+                  wrn = " Active-strain coupling with Bueno-Orovio"//
+     2               " model can lead to unexpected results"
+               END IF
+
+               IF (eq(iEq)%dmn(i)%ec%astrain .AND. nsd.NE.3) THEN
+                  err = " Active strain coupling is allowed only for"//
+     2               " 3D bodies"
+               END IF
+
+               flag = (cepEq) .AND. (eq(iEq)%dmn(i)%cep%imyo.GT.1) .AND.
+     2                (eq(iEq)%dmn(i)%cep%cepType.NE.cepModel_TTP) .AND.
+     3                (eq(iEq)%dmn(i)%cep%cepType.NE.cepModel_BO)
+               IF (flag) THEN
+                  err = " Mid-myocardium and endocardium zones are"//
+     2               " allowed only for TTP and BO activation models"
+               END IF
+            END DO
+         END DO
       END IF
 
       IF (.NOT.ALLOCATED(cplBC%xo)) THEN
@@ -810,20 +849,6 @@
          lEq%phys = phys_CEP
          cepEq    = .TRUE.
 
-         lPtr => list%get(ctmp, "Coupling with mechanics")
-         IF (ASSOCIATED(lPtr)) THEN
-            cem%cpld = .TRUE.
-            CALL TO_LOWER(ctmp)
-            SELECT CASE (TRIM(ctmp))
-            CASE ("active stress", "active_stress")
-               cem%aStress = .TRUE.
-            CASE ("active strain", "active_strain")
-               cem%aStrain = .TRUE.
-            CASE DEFAULT
-               err = "Undefined coupling for cardiac electromechanics"
-            END SELECT
-         END IF
-
          CALL READDOMAIN(lEq, propL, list)
 
          nDOP = (/1,1,0,0/)
@@ -1071,10 +1096,14 @@
             lEq%dmn(iDmn)%prop(prop) = rtmp
          END DO
 
+!        Read cellular activation model inputs for cardiac electro-
+!        physiology simulations
          IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP) THEN
             CALL READCEP(lEq%dmn(iDmn), lPD)
          END IF
 
+!        Read material/constitutive model parameters for nonlinear
+!        elastodynamics simulations (both solids and shells)
          IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
      2       lEq%dmn(iDmn)%phys.EQ.phys_ustruct .OR.
      3       lEq%dmn(iDmn)%phys.EQ.phys_shell) THEN
@@ -1088,6 +1117,15 @@
             END IF
          END IF
 
+!        Read excitation-contraction coupling parameters for electro-
+!        mechanics modeling
+         IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP   .OR.
+     2       lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
+     3       lEq%dmn(iDmn)%phys.EQ.phys_ustruct ) THEN
+            CALL READECCPL(lEq%dmn(iDmn)%ec, lPD)
+         END IF
+
+!        Read fluid viscosity model parameters
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
      2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
      3       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
@@ -2237,31 +2275,28 @@ c     2         "can be applied for Neumann boundaries only"
 
       TYPE(listType), POINTER :: lPtr, list
 
+      LOGICAL flag
       INTEGER(KIND=IKIND) i
       REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
 
-      lPtr => lPD%get(ctmp, "Electrophysiology model")
+      list => lPD%get(ctmp, "Electrophysiology model")
       lDmn%cep%nG = 0
       CALL TO_LOWER(ctmp)
       SELECT CASE(TRIM(ctmp))
-      CASE ("ap", "aliev-panfilov")
+      CASE ("ap", "aliev_panfilov")
          lDmn%cep%cepType = cepModel_AP
          lDmn%cep%nX = 2
-         IF (cem%aStrain) err = " Active strain is not formulated "//
-     2      "Aliev-Panfilov model"
 
-      CASE ("bo", "bueno-orovio")
+      CASE ("bo", "bueno_orovio")
          lDmn%cep%cepType = cepModel_BO
          lDmn%cep%nX = 4
 
-      CASE ("fn", "fitzhugh-nagumo")
+      CASE ("fn", "fitzhugh_nagumo")
          lDmn%cep%cepType = cepModel_FN
          lDmn%cep%nX = 2
-         IF (cem%cpld) err = " Electromechanics is not formulated "//
-     2      "Fitzhugh-Nagumo model"
 
-      CASE ("ttp", "tentusscher-panfilov")
+      CASE ("ttp", "tentusscher_panfilov")
          lDmn%cep%cepType = cepModel_TTP
          lDmn%cep%nX = 7
          lDmn%cep%nG = 12
@@ -2274,6 +2309,20 @@ c     2         "can be applied for Neumann boundaries only"
          nXion = lDmn%cep%nX + lDmn%cep%nG
       END IF
 
+!     Parameters file path to overwrite default parameters
+      lDmn%cep%fpar_in = ""
+      lPtr => list%get(ctmp, "CEP model parameters file path")
+      IF (ASSOCIATED(lPtr)) THEN
+         flag = .FALSE.
+         INQUIRE(FILE=TRIM(ctmp), EXIST=flag)
+         IF (flag) THEN
+            lDmn%cep%fpar_in = TRIM(ctmp)
+         ELSE
+            err = " CEP model parameters file doesn't exist"
+         END IF
+      END IF
+
+!     Conductivity (isotropic, anisotropic)
       lPtr => lPD%get(lDmn%cep%Diso,"Conductivity (iso)",ll=0._RKIND)
       i = lPD%srch("Conductivity (ani)")
       lDmn%cep%nFn = i
@@ -2287,6 +2336,7 @@ c     2         "can be applied for Neumann boundaries only"
          END DO
       END IF
 
+!     Myocardial zone
       lDmn%cep%imyo = 1
       lPtr => lPD%get(ctmp, "Myocardial zone")
       IF (ASSOCIATED(lPtr)) THEN
@@ -2302,10 +2352,11 @@ c     2         "can be applied for Neumann boundaries only"
             lDmn%cep%imyo = 3
 
          CASE DEFAULT
-            err = "Undefined myocardium zone"
+            err = " Undefined myocardium zone"
          END SELECT
       END IF
 
+!     Stimulus parameters
       lDmn%cep%Istim%A  = 0._RKIND
       lDmn%cep%Istim%Ts = 99999._RKIND
       lDmn%cep%Istim%CL = 99999._RKIND
@@ -2325,13 +2376,14 @@ c     2         "can be applied for Neumann boundaries only"
       END IF
 
 !     Dual time stepping for cellular activation model
-      lPtr => lPD%get(rtmp, "Time step for integration")
+      lPtr => lPD%get(rtmp, "Time step size")
       IF (ASSOCIATED(lPtr)) THEN
          lDmn%cep%dt = rtmp
       ELSE
          lDmn%cep%dt = dt
       END IF
 
+!     ODE solver options for the cellular activation model
       lDmn%cep%odes%tIntType = tIntType_FE
       lPtr => lPD%get(ctmp, "ODE solver")
       IF (ASSOCIATED(lPtr)) THEN
@@ -2370,10 +2422,113 @@ c     2         "can be applied for Neumann boundaries only"
       lPtr => lPD%get(rtmp, "Feedback parameter for "//
      2   "stretch-activated-currents")
       IF (ASSOCIATED(lPtr)) lDmn%cep%Ksac = rtmp
-      IF (.NOT.cem%cpld) lDmn%cep%Ksac = 0._RKIND
 
       RETURN
       END SUBROUTINE READCEP
+!####################################################################
+!     Read excitation-contraction coupling inputs for cardiac
+!     electromechanics modeling
+      SUBROUTINE READECCPL(lEc, lPD)
+      USE COMMOD
+      USE LISTMOD
+      IMPLICIT NONE
+      TYPE(eccModelType), INTENT(INOUT) :: lEc
+      TYPE(listType), INTENT(INOUT) :: lPD
+
+      TYPE(listType), POINTER :: lPtr, list
+
+      LOGICAL flag
+      REAL(KIND=RKIND) rtmp
+      CHARACTER(LEN=stdL) ctmp
+
+      list => lPD%get(ctmp, "Excitation-contraction coupling")
+      IF (.NOT.ASSOCIATED(list)) RETURN
+
+      ecCpld = .TRUE.
+      CALL TO_LOWER(ctmp)
+      SELECT CASE (TRIM(ctmp))
+      CASE ("active_stress", "stress")
+         lEc%astress = .TRUE.
+
+      CASE ("active_strain", "strain")
+         lEc%astrain = .TRUE.
+
+         lPtr => list%get(ctmp,"Active strain coupling type")
+         CALL TO_LOWER(ctmp)
+         SELECT CASE (TRIM(ctmp))
+         CASE ("trans_iso", "transverse_isotropy")
+            lEc%asnType = asnType_tiso
+
+         CASE ("ortho", "orthotropy")
+            lEc%asnType = asnType_ortho
+
+         CASE ("hetero_ortho", "heterogenous_orthotropy")
+            lEc%asnType = asnType_hetortho
+
+         CASE DEFAULT
+            err = " Invalid active strain coupling type"
+         END SELECT
+
+      CASE DEFAULT
+         err = " Unknown excitation-contraction coupling"
+      END SELECT
+
+      lPtr => list%get(lEc%caCpld,
+     2   "Coupled with cellular activation model")
+
+      flag = lEc%astrain .AND. .NOT.lEc%caCpld
+      IF (.NOT.flag) THEN
+         lPtr => list%get(ctmp, "ODE solver for EC coupling")
+         SELECT CASE (TRIM(ctmp))
+         CASE ("fe", "euler", "forward_euler", "explicit")
+            lEc%odeS%tIntType = tIntType_FE
+
+         CASE ("rk", "rk4", "runge")
+            lEc%odeS%tIntType = tIntType_RK4
+
+         CASE ("be", "backward_euler", "implicit")
+            lEc%odeS%tIntType = tIntType_BE
+
+         CASE ("cn", "cn2")
+            err = " Crank-Nicholson time integration cannot "//
+     2         "be used for excitation-contraction coupling"
+
+         CASE DEFAULT
+            err = " Unknown ODE time integration scheme"
+         END SELECT
+      END IF
+
+!     Read additional options for decoupled excitation-contraction
+!     coupling (uniform activation and no coupling with cellular
+!     activation model)
+      IF (.NOT.lEc%caCpld) THEN
+!        Parameters file path to overwrite default parameters
+         lEc%fpar_in = ""
+         lPtr => list%get(ctmp, "Parameters file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            flag = .FALSE.
+            INQUIRE(FILE=TRIM(ctmp), EXIST=flag)
+            IF (flag) THEN
+               lEc%fpar_in = TRIM(ctmp)
+            ELSE
+               err = " Decoupled EC model parameters file doesn't exist"
+            END IF
+         END IF
+
+!        Dual time stepping for excitation-contraction coupling
+         lPtr => list%get(rtmp, "Time step size")
+         IF (ASSOCIATED(lPtr)) THEN
+            lEc%dt = rtmp
+         ELSE
+            lEc%dt = dt
+         END IF
+      ELSE
+         lEc%fpar_in = ""
+         lEc%dt = dt
+      END IF
+
+      RETURN
+      END SUBROUTINE READECCPL
 !####################################################################
 !     This subroutine reads properties of structure constitutive model
       SUBROUTINE READMATMODEL(lDmn, lPD)

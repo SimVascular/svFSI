@@ -34,19 +34,32 @@
 !     This module defines data structures for Fitzhugh-Nagumo cellular
 !     activation model for cardiac electrophysiology.
 !
+!     Reference for Aliev-Panfilov electrophysiology model:
+!        Goktepe, S., & Kuhl, E. (2009). Computational modeling of
+!        cardiac electrophysiology: A novel finite element approach.
+!        Int. J. Numer. Meth. Engng, 79, 156–178.
+!        https://doi.org/10.1002/nme
+!
 !-----------------------------------------------------------------------
 
       MODULE FNMOD
       USE TYPEMOD
+      USE UTILMOD, ONLY : stdL
       IMPLICIT NONE
 
-      INTERFACE FN_INIT
-         MODULE PROCEDURE :: FN_INIT0, FN_INITS, FN_INITV
-      END INTERFACE FN_INIT
+      PRIVATE
+
+      INCLUDE "PARAMS_FN.f"
+
+      PUBLIC :: FN_INIT
+      PUBLIC :: FN_READPARFF
+      PUBLIC :: FN_INTEGFE
+      PUBLIC :: FN_INTEGRK
+      PUBLIC :: FN_INTEGCN2
 
       CONTAINS
 !-----------------------------------------------------------------------
-      SUBROUTINE FN_INIT0(nX, X)
+      SUBROUTINE FN_INIT(nX, X)
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: nX
       REAL(KIND=RKIND), INTENT(INOUT) :: X(nX)
@@ -54,32 +67,34 @@
       X(:) = 1.E-3_RKIND
 
       RETURN
-      END SUBROUTINE FN_INIT0
+      END SUBROUTINE FN_INIT
 !-----------------------------------------------------------------------
-      SUBROUTINE FN_INITS(nX, X, X0)
+      SUBROUTINE FN_READPARFF(fname)
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: nX
-      REAL(KIND=RKIND), INTENT(INOUT) :: X(nX)
-      REAL(KIND=RKIND), INTENT(IN) :: X0
+      CHARACTER(LEN=*), INTENT(IN) :: fname
 
-      X(:) = X0
+      INTEGER fid
+
+      fid = 1528
+
+      OPEN(fid, FILE=TRIM(fname))
+
+!     Scaling factors
+      CALL GETRVAL(fid, "Vscale", Vscale)
+      CALL GETRVAL(fid, "Tscale", Tscale)
+      CALL GETRVAL(fid, "Voffset", Voffset)
+
+!     Cellular activation model parameters
+      CALL GETRVAL(fid, "alpha", alpha)
+      CALL GETRVAL(fid, "a", a)
+      CALL GETRVAL(fid, "b", b)
+      CALL GETRVAL(fid, "c", c)
+
+      CLOSE(fid)
 
       RETURN
-      END SUBROUTINE FN_INITS
+      END SUBROUTINE FN_READPARFF
 !-----------------------------------------------------------------------
-      SUBROUTINE FN_INITV(nX, X, X0)
-      IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: nX
-      REAL(KIND=RKIND), INTENT(INOUT) :: X(nX)
-      REAL(KIND=RKIND), INTENT(IN) :: X0(:)
-
-      IF (SIZE(X0,1) .NE. nX) THEN
-         STOP "ERROR: inconsistent array size (AP initialization)"
-      END IF
-      X(:) = X0(:)
-
-      RETURN
-      END SUBROUTINE FN_INITV
 !-----------------------------------------------------------------------
 !     Time integration performed using Forward Euler method
       SUBROUTINE FN_INTEGFE(nX, X, Ts, Ti, Istim)
@@ -87,8 +102,6 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: nX
       REAL(KIND=RKIND), INTENT(INOUT) :: X(nX)
       REAL(KIND=RKIND), INTENT(IN) :: Ts, Ti, Istim
-
-      INCLUDE "PARAMS_FN.f"
 
       REAL(KIND=RKIND) :: t, dt, f(nX), fext
 
@@ -110,8 +123,6 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: nX
       REAL(KIND=RKIND), INTENT(INOUT) :: X(nX)
       REAL(KIND=RKIND), INTENT(IN) :: Ts, Ti, Istim
-
-      INCLUDE "PARAMS_FN.f"
 
       REAL(KIND=RKIND) :: t, dt, dt6, fext, Xrk(nX), frk(nX,4)
 
@@ -153,8 +164,6 @@
       INTEGER(KIND=IKIND), INTENT(INOUT) :: IPAR(2)
       REAL(KIND=RKIND), INTENT(INOUT) :: Xn(nX), RPAR(2)
       REAL(KIND=RKIND), INTENT(IN) :: Ts, Ti, Istim
-
-      INCLUDE "PARAMS_FN.f"
 
       REAL(KIND=RKIND), PARAMETER :: eps = EPSILON(eps)
 
@@ -221,8 +230,6 @@
       REAL(KIND=RKIND), INTENT(IN) :: X(n), fext
       REAL(KIND=RKIND), INTENT(OUT) :: f(n)
 
-      INCLUDE "PARAMS_FN.f"
-
       f(1) = c * ( X(1)*(X(1)-alpha)*(1._RKIND-X(1)) - X(2) ) + fext
 
       f(2) = X(1) - b*X(2) + a
@@ -236,8 +243,6 @@
       REAL(KIND=RKIND), INTENT(IN) :: X(n)
       REAL(KIND=RKIND), INTENT(OUT) :: JAC(n,n)
 
-      INCLUDE "PARAMS_FN.f"
-
       REAL(KIND=RKIND) :: n1, n2
 
       n1 = -3._RKIND*X(1)**2._RKIND
@@ -249,6 +254,78 @@
 
       RETURN
       END SUBROUTINE FN_GETJ
+!-----------------------------------------------------------------------
+      SUBROUTINE GETRVAL(fileId, skwrd, rVal)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: fileId
+      CHARACTER(LEN=*), INTENT(IN) :: skwrd
+      REAL(KIND=RKIND), INTENT(INOUT) :: rVal
+
+      INTEGER(KIND=IKIND) :: slen, i, ios
+      CHARACTER(LEN=stdL) :: sline, scmd, sval
+
+      REWIND(fileId)
+      slen = LEN(TRIM(skwrd))
+      DO
+         READ(fileId,'(A)',END=001) sline
+         sline = ADJUSTC(sline)
+         slen  = LEN(TRIM(sline))
+         IF (sline(1:1).EQ.'#' .OR. slen.EQ.0) CYCLE
+
+         DO i=1, slen
+            IF (sline(i:i) .EQ. ':') EXIT
+         END DO
+
+         IF (i .GE. slen) THEN
+            STOP "Error: inconsistent input file format"
+         END IF
+
+         scmd = sline(1:i-1)
+         sval = sline(i+1:slen)
+         sval = ADJUSTC(sval)
+
+!        Remove any trailing comments
+         slen = LEN(TRIM(sval))
+         DO i=1, slen
+            IF (sval(i:i) .EQ. '#') EXIT
+         END DO
+         sval = TRIM(ADJUSTC(sval(1:i-1)))
+
+         IF (TRIM(skwrd) .EQ. TRIM(scmd)) THEN
+            READ(sval,*,IOSTAT=ios) rval
+            IF (ios .NE. 0) THEN
+               STOP " Error: while reading "//TRIM(skwrd)
+            END IF
+            EXIT
+         END IF
+      END DO
+
+ 001  RETURN
+
+!  001  STOP " Error: EOF reached while finding command <"//
+!     2   TRIM(skwrd)//">"
+
+      END SUBROUTINE GETRVAL
+!-----------------------------------------------------------------------
+!     Removes any leading spaces or tabs
+      PURE FUNCTION ADJUSTC(str)
+      IMPLICIT NONE
+      CHARACTER(LEN=*), INTENT(IN) :: str
+      CHARACTER(LEN=LEN(str)) ADJUSTC
+
+      INTEGER(KIND=IKIND) i
+
+      DO i=1, LEN(str)
+         IF (str(i:i) .NE. " " .AND. str(i:i) .NE. "  ") EXIT
+      END DO
+      IF (i .GT. LEN(str)) THEN
+         ADJUSTC = ""
+      ELSE
+         ADJUSTC = str(i:)
+      END IF
+
+      RETURN
+      END FUNCTION ADJUSTC
 !-----------------------------------------------------------------------
       END MODULE FNMOD
 !#######################################################################

@@ -49,8 +49,8 @@
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
-     2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), ya_l(:), N(:),
-     3   Nx(:,:), lR(:,:), lK(:,:,:)
+     2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), tmXl(:),ya_l(:),
+     3   N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
       eNoN = lM%eNoN
       nFn  = lM%nFn
@@ -62,8 +62,8 @@
 !     STRUCT: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
-     3   pSl(nsymd), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN), lR(dof,eNoN),
-     4   lK(dof*dof,eNoN,eNoN))
+     3   pSl(nsymd), tmXl(eNoN), ya_l(eNoN), N(eNoN), Nx(nsd,eNoN),
+     4   lR(dof,eNoN), lK(dof*dof,eNoN,eNoN))
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
@@ -78,6 +78,7 @@
 !        Create local copies
          fN   = 0._RKIND
          pS0l = 0._RKIND
+         tmXl = 0._RKIND
          ya_l = 0._RKIND
          DO a=1, eNoN
             Ac = lM%IEN(a,e)
@@ -87,13 +88,27 @@
             yl(:,a)  = Yg(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
+
             IF (ALLOCATED(lM%fN)) THEN
                DO iFn=1, nFn
                   fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
                END DO
             END IF
-            IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
-            IF (cem%cpld) ya_l(a) = cem%Ya(Ac)
+
+            IF (ALLOCATED(pS0)) THEN
+               pS0l(:,a) = pS0(:,Ac)
+            END IF
+
+            IF (ecCpld) THEN
+               IF (ALLOCATED(lM%tmX)) THEN
+                  tmXl(a) = lM%tmX(lM%lN(Ac))
+               END IF
+               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+                  ya_l(a) = ec_Ya(Ac)
+               ELSE
+                  ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya
+               END IF
+            END IF
          END DO
 
 !        Gauss integration
@@ -110,11 +125,11 @@
             pSl = 0._RKIND
             IF (nsd .EQ. 3) THEN
                CALL STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2            pS0l, pSl, ya_l, lR, lK)
+     2            pS0l, pSl, tmXl, ya_l, lR, lK)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2            pS0l, pSl, ya_l, lR, lK)
+     2            pS0l, pSl, tmXl, ya_l, lR, lK)
 
             END IF
 
@@ -140,30 +155,31 @@
 #endif
       END DO ! e: loop
 
-      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, N, Nx,
-     2   lR, lK)
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, tmXl, ya_l, N,
+     2   Nx, lR, lK)
 
       RETURN
       END SUBROUTINE CONSTRUCT_dSOLID
 !####################################################################
       SUBROUTINE STRUCT3D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2   pS0l, pSl, ya_l, lR, lK)
+     2   pS0l, pSl, tmXl, ya_l, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(3,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(3,eNoN),
-     3   fN(3,nFn), pS0l(6,eNoN), ya_l(eNoN)
+     3   fN(3,nFn), pS0l(6,eNoN), tmXl(eNoN), ya_l(eNoN)
       REAL(KIND=RKIND), INTENT(OUT) :: pSl(6)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, i, j, k
-      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, ya_g, fb(3),
-     2   ud(3), NxSNx, NxNx, BmDBm, vx(3,3), F(3,3), Fi(3,3), ddev(3,3),
-     3   Svis(3,3), S(3,3), P(3,3), S0(3,3), Dm(6,6), DBm(6,3),
-     4   Bm(6,3,eNoN), NxFi(3,eNoN), PvNx(3,eNoN), r13, r23, T1, T2
+      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, tmXg, ya_g,
+     2   fb(3), ud(3), NxSNx, NxNx, BmDBm, vx(3,3), F(3,3), Fi(3,3),
+     3   ddev(3,3), Svis(3,3), S(3,3), P(3,3), S0(3,3), Dm(6,6),
+     4   DBm(6,3), Bm(6,3,eNoN), NxFi(3,eNoN), PvNx(3,eNoN), r13, r23,
+     5   T1, T2
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -187,6 +203,7 @@
       F(2,2) = 1._RKIND
       F(3,3) = 1._RKIND
       S0     = 0._RKIND
+      tmXg   = 0._RKIND
       ya_g   = 0._RKIND
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
@@ -220,6 +237,7 @@
          S0(2,3) = S0(2,3) + N(a)*pS0l(5,a)
          S0(3,1) = S0(3,1) + N(a)*pS0l(6,a)
 
+         tmXg    = tmXg + N(a)*tmXl(a)
          ya_g    = ya_g + N(a)*ya_l(a)
       END DO
       S0(2,1) = S0(1,2)
@@ -236,7 +254,7 @@
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notationa (Dm)
-      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, S, Dm)
 
 !     Elastic + Viscous stresses
       S = S + Svis
@@ -401,23 +419,23 @@
       END SUBROUTINE STRUCT3D
 !####################################################################
       SUBROUTINE STRUCT2D(eNoN, nFn, w, N, Nx, al, yl, dl, bfl, fN,
-     2   pS0l, pSl, ya_l, lR, lK)
+     2   pS0l, pSl, tmXl, ya_l, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: w, N(eNoN), Nx(2,eNoN),
      2   al(tDof,eNoN), yl(tDof,eNoN), dl(tDof,eNoN), bfl(2,eNoN),
-     3   fN(2,nFn), pS0l(3,eNoN), ya_l(eNoN)
+     3   fN(2,nFn), pS0l(3,eNoN), tmXl(eNoN), ya_l(eNoN)
       REAL(KIND=RKIND), INTENT(OUT) :: pSl(3)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, i, j
-      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, ya_g, fb(2),
-     2   ud(2), NxSNx, NxNx, BmDBm, vx(2,2), F(2,2), Fi(2,2), ddev(2,2),
-     3   Svis(2,2), S(2,2), P(2,2), S0(2,2), Dm(3,3), Dbm(3,2),
-     4   Bm(3,2,eNoN), NxFi(2,eNoN), PvNx(2,eNoN), T1, T2
+      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, tmXg, ya_g,
+     2   fb(2), ud(2), NxSNx, NxNx, BmDBm, vx(2,2), F(2,2), Fi(2,2),
+     3   ddev(2,2), Svis(2,2), S(2,2), P(2,2), S0(2,2), Dm(3,3),
+     4   Dbm(3,2), Bm(3,2,eNoN), NxFi(2,eNoN), PvNx(2,eNoN), T1, T2
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -438,6 +456,7 @@
       F(1,1) = 1._RKIND
       F(2,2) = 1._RKIND
       S0     = 0._RKIND
+      tmXg   = 0._RKIND
       ya_g   = 0._RKIND
       DO a=1, eNoN
          ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
@@ -457,6 +476,7 @@
          S0(2,2) = S0(2,2) + N(a)*pS0l(2,a)
          S0(1,2) = S0(1,2) + N(a)*pS0l(3,a)
 
+         tmXg    = tmXg + N(a)*tmXl(a)
          ya_g    = ya_g + N(a)*ya_l(a)
       END DO
       S0(2,1) = S0(1,2)
@@ -471,7 +491,7 @@
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notation
-      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, ya_g, S, Dm)
+      CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, S, Dm)
 
 !     Elastic + Viscous stresses
       S = S + Svis
