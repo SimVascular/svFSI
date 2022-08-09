@@ -51,7 +51,8 @@
 !     Overwrite parameters with user-provided input file
       slen = LEN(TRIM(ec%fpar_in))
       IF (slen .GT. 0) THEN
-         std = " Reading parameters from input file"
+         std = " Reading decoupled excitation-contraction parameters"//
+     2      " from input file"
          CALL EC_READPARFF(ec%fpar_in)
       END IF
 

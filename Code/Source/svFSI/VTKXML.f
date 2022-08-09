@@ -572,8 +572,9 @@
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nFn*nsd,msh(iM)%nNo))
                   tmpV = 0._RKIND
-                  IF (msh(iM)%nFn .NE. 0)
-     2               CALL FIBDIRPOST(msh(iM), nFn, tmpV, lD, iEq)
+                  IF (msh(iM)%nFn .NE. 0) THEN
+                     CALL FIBDIRPOST(msh(iM), nFn, tmpV, lD, iEq)
+                  END IF
                   DO iFn=1, nFn
                      cOut = cOut + 1
                      is   = outS(cOut)
@@ -590,11 +591,13 @@
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
 
                CASE (outGrp_fA)
+!                 Fiber alignment computed only for 2 fibers (nFn = 2)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
                   tmpV = 0._RKIND
-                  IF (msh(iM)%nFn .EQ. 2)
-     2               CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
+                  IF (msh(iM)%nFn .EQ. 2) THEN
+                     CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
+                  END IF
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is,a) = tmpV(1,a)
                   END DO

@@ -194,6 +194,7 @@
       public :: getVTK_numElemData
       public :: getVTK_elemDataNames
       public :: getVTK_elemData
+
       public :: putVTK_pointData
       public :: putVTK_elemData
 
@@ -2281,6 +2282,11 @@
 
          nPtData = vtk%pcAtt(1)%n
 
+         if (nPtData .eq. 0) then
+            write(stdout,ftab4) " ERROR: no point data found"
+            istat = -1; return
+         end if
+
          return
          end subroutine getVTK_numPointData
 
@@ -2347,8 +2353,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in PointData attribute"
             istat=-1; return
          end if
@@ -2407,8 +2412,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in PointData attribute"
             istat=-1; return
          end if
@@ -2454,8 +2458,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in PointData attribute"
             istat=-1; return
          end if
@@ -2514,8 +2517,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in PointData attribute"
             istat=-1; return
          end if
@@ -2531,6 +2533,11 @@
          integer(IK), intent(inout) :: istat
 
          nElData = vtk%pcAtt(2)%n
+
+         if (nElData .eq. 0) then
+            write(stdout,ftab4) " ERROR: no element data found"
+            istat = -1; return
+         end if
 
          return
          end subroutine getVTK_numElemData
@@ -2597,8 +2604,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in CellData attribute"
             istat=-1; return
          end if
@@ -2657,8 +2663,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in CellData attribute"
             istat=-1; return
          end if
@@ -2705,8 +2710,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in CellData attribute"
             istat=-1; return
          end if
@@ -2765,8 +2769,7 @@
          end do
 
          if ( .not.flag ) then
-            write(stdout,ftab4) &
-               "ERROR: could not find <"//trim(kwrd)// &
+            write(stdout,ftab4) " Could not find <"//trim(kwrd)// &
                "> in CellData attribute"
             istat=-1; return
          end if

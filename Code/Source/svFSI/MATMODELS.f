@@ -174,7 +174,7 @@
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with isochoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HGO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
@@ -223,7 +223,7 @@
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with full
 !     invariants for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HGO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv1 = MAT_TRACE(C,nsd)
@@ -271,7 +271,7 @@
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Guccione material model (2)"
 !        Compute isochoric component of E
          E = 0.5_RKIND * (J2d*C - Idm)
@@ -342,7 +342,7 @@
 !     HO (Holzapfel-Ogden) model for myocardium with isoschoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based invariants
@@ -429,7 +429,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HO (Holzapfel-Ogden) model for myocardium with full invariants
 !     for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based full invariants (not isochoric)
@@ -670,7 +670,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with isochoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HGO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
@@ -717,7 +717,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with full
 !     invariants for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HGO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv1 = MAT_TRACE(C,nsd)
@@ -762,7 +762,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Guccione material model (2)"
 !        Compute isochoric component of E
          E = 0.5_RKIND * (J2d*C - Idm)
@@ -830,7 +830,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HO (Holzapfel-Ogden) model for myocardium with isoschoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based invariants
@@ -914,7 +914,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HO (Holzapfel-Ogden) model for myocardium with full invariants
 !     for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based invariants

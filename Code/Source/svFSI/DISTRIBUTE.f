@@ -1435,6 +1435,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          CALL cm%bcast(tmpR)
 
          ALLOCATE(lM%tmX(lM%nNo))
+         lM%tmX = 0._RKIND
          DO Ac=1, lM%gnNo
             a = gtlptr(Ac)
             IF (a .NE. 0) THEN

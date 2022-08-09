@@ -46,7 +46,7 @@
 
       CHARACTER, PARAMETER :: dSym(3) = (/"X","Y","Z"/)
 
-      LOGICAL :: flag
+      LOGICAL :: flag, fib_dir
       INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e, lDof, lnNo
       REAL(KIND=RKIND) :: maxX(nsd), minX(nsd), fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp, fExt
@@ -330,52 +330,95 @@
          END DO
       END IF
 
-!     Read fiber orientation
-      flag = .FALSE.
+!     Read fiber orientation. Here we will try to load fibers in
+!     multiple ways. First we will attempt to read fibers from a single
+!     file. The code will look for variables named as "FIB_DIR1",
+!     "FIB_DIR2", etc. in a single vtu file.
+!     If not found, the code will then search for multiple fiber files
+!     (vtu format) with fiber direction variable named as "FIB_DIR".
+!     Otherwise, we will search for a uniform fiber vector with the
+!     keyword "Fiber direction".
+      dbg = " Checking for any fiber directions"
       DO iM=1, nMsh
-         lPM => list%get(msh(iM)%name,"Add mesh",iM)
-         j = lPM%srch("Fiber direction file path")
-         IF (j .EQ. 0) j = lPM%srch("Fiber direction")
-         IF (j .NE. 0) THEN
-            flag = .TRUE.
-            EXIT
-         END IF
-      END DO
-      IF (flag) THEN
-         DO iM=1, nMsh
-            lPM => list%get(msh(iM)%name,"Add mesh",iM)
+         msh(iM)%nFn = 0
 
+!        First attempt to read fibers from a single vtu file.
+         fib_dir = .FALSE.
+         lPM => list%get(msh(iM)%name, "Add mesh", iM)
+
+!        Check if num fiber directions are provided by the user
+         lPtr => lPM%get(msh(iM)%nFn, "Number of fiber directions")
+
+!        If not, the code will try to compute nFn from the variable
+!        names in the vtu file
+         lPtr => lPM%get(ctmp, "Fiber directions file path")
+         IF (ASSOCIATED(lPtr)) THEN
+            IF (rmsh%isReqd) err = "Fiber directions read from"//
+     2         " a file is not allowed with remeshing"
+            CALL READFIBNFSF(msh(iM), ctmp)
+            IF (ALLOCATED(msh(iM)%fN)) fib_dir = .TRUE.
+         END IF
+
+!        If the fibers are not found, we will try searching for multiple
+!        fiber files
+         IF (.NOT.fib_dir) THEN
+            lPM => list%get(msh(iM)%name, "Add mesh", iM)
             msh(iM)%nFn = lPM%srch("Fiber direction file path")
+
             IF (msh(iM)%nFn .NE. 0) THEN
+               fib_dir = .TRUE.
                IF (rmsh%isReqd) err = "Fiber directions read from "//
      2            "file is not allowed with remeshing"
-               ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
+               ALLOCATE(msh(iM)%fN(nsd*msh(iM)%nFn,msh(iM)%gnEl))
                msh(iM)%fN = 0._RKIND
+
                DO i=1, msh(iM)%nFn
-                  lPtr => lPM%get(cTmp,
-     2               "Fiber direction file path", i)
-                  IF (ASSOCIATED(lPtr))
-     2               CALL READFIBNFF(msh(iM), cTmp, "FIB_DIR", i)
+                  lPtr => lPM%get(cTmp, "Fiber direction file path", i)
+                  CALL READFIBNFF(msh(iM), cTmp, "FIB_DIR", i)
                END DO
-            ELSE
-               msh(iM)%nFn = lPM%srch("Fiber direction")
-               IF (msh(iM)%nFn .NE. 0) THEN
-                  ALLOCATE(msh(iM)%fN(msh(iM)%nFn*nsd,msh(iM)%gnEl))
-                  msh(iM)%fN = 0._RKIND
-                  DO i=1, msh(iM)%nFn
-                     lPtr => lPM%get(fibN, "Fiber direction", i)
-                     rtmp = SQRT(NORM(fibN))
-                     IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
-                     DO e=1, msh(iM)%gnEl
-                        msh(iM)%fN((i-1)*nsd+1:i*nsd,e) = fibN(1:nsd)
+            END IF ! msh%nFn
+         END IF ! fib_dir
+
+!        If fibers are still not found, look for a prescribed constant
+!        vector
+         IF (.NOT.fib_dir) THEN
+            lPM => list%get(msh(iM)%name, "Add mesh", iM)
+            msh(iM)%nFn = lPM%srch("Fiber direction")
+
+            IF (msh(iM)%nFn .NE. 0) THEN
+               fib_dir = .TRUE.
+               ALLOCATE(msh(iM)%fN(nsd*msh(iM)%nFn,msh(iM)%gnEl))
+               msh(iM)%fN = 0._RKIND
+
+               DO i=1, msh(iM)%nFn
+                  lPtr => lPM%get(fibN, "Fiber direction", i)
+                  b = (i-1)*nsd
+                  DO e=1, msh(iM)%gnEl
+                     DO j=1, nsd
+                        msh(iM)%fN(b+j,a) = fibN(j)
                      END DO
                   END DO
-               END IF
-            END IF
-         END DO
-      ELSE
-         msh(:)%nFn = 0
-      END IF
+               END DO
+            END IF ! msh(iM)%fN
+         END IF ! fib_dir
+
+         IF (fib_dir) THEN
+            std = " Found "//STR(msh(iM)%nFn)//" fiber directions"//
+     2         " for mesh <"//TRIM(msh(iM)%name)//">"
+
+!           Normalizing fiber directions
+            DO e=1, msh(iM)%gnEl
+               DO i=1, msh(iM)%nFn
+                  b = (i-1)*nsd
+                  fibN = msh(iM)%fN(b+1:i*nsd,e)
+                  rtmp = SQRT(NORM(fibN))
+                  IF (.NOT.ISZERO(rtmp)) THEN
+                     msh(iM)%fN(b+1:i*nsd,e) = fibN / rtmp
+                  END IF
+               END DO
+            END DO
+         END IF
+      END DO
 
 !     Read transmural coordinate for heterohenous orthotropic active
 !     strain type excitation-contraction coupling
@@ -832,6 +875,79 @@
       RETURN
       END SUBROUTINE SETDMNIDFF
 !####################################################################
+!     Read multiple fiber directions from a single vtu file
+      SUBROUTINE READFIBNFSF(lM, fName)
+      USE COMMOD
+      USE LISTMOD
+      USE ALLFUN
+      USE vtkXMLMod
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      CHARACTER(LEN=*) :: fName
+
+      TYPE(vtkXMLType) :: vtu
+      INTEGER(KIND=IKIND) :: i, e, is, ie, nvar, istat
+      CHARACTER(LEN=stdL) :: stmp
+
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
+      CHARACTER(LEN=stdL), ALLOCATABLE :: varNames(:)
+
+      istat = 0;
+      std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
+      CALL loadVTK(vtu, fName, istat)
+      IF (istat .LT. 0) err = " VTU file read error (init)"
+
+      CALL getVTK_numElems(vtu, e, istat)
+      IF (e .NE. lM%gnEl) THEN
+         err = " Mismatch in num elems while loading fibers"
+      END IF
+
+      CALL getVTK_numElemData(vtu, nvar, istat)
+      IF (istat .LT. 0) err = " VTU file read error (numElemData)"
+
+      IF (lM%nFn .EQ. 0) THEN
+         ALLOCATE(varNames(nvar))
+         CALL getVTK_elemDataNames(vtu, varNames, istat)
+         IF (istat .LT. 0) err = " VTU file read error (elemDataNames)"
+
+         DO i=1, nvar
+            stmp = varNames(i)
+            IF (stmp(1:7) .EQ. 'FIB_DIR') THEN
+               READ(stmp(8:8),*,IOSTAT=istat) e
+               IF (istat .NE. 0) err = " Cannot find fiber directions"
+               IF (e .GT. lM%nFn) lM%nFn = e
+            END IF
+         END DO
+         DEALLOCATE(varNames)
+
+!        Return if no fiber directions are found
+         IF (lM%nFn .EQ. 0) THEN
+            RETURN
+         END IF
+      END IF
+
+      ALLOCATE(lM%fN(nsd*lM%nFn,lM%gnEl))
+      lM%fN = 0._RKIND
+
+      ALLOCATE(tmpR(maxNSD,lM%gnEl))
+      DO i=1, lM%nFn
+         WRITE(stmp,'(A)') "FIB_DIR"//STR(i)
+         CALL getVTK_elemData(vtu, TRIM(stmp), tmpR, istat)
+         IF (istat .LT. 0) err = " VTU file read error "//TRIM(stmp)
+
+         is = (i-1)*nsd + 1
+         ie = i*nsd
+         DO e=1, lM%gnEl
+            lM%fN(is:ie,e) = tmpR(1:nsd,e)
+         END DO
+      END DO
+
+      DEALLOCATE(tmpR)
+      CALL flushVTK(vtu)
+
+      RETURN
+      END SUBROUTINE READFIBNFSF
+!####################################################################
 !     Read fiber direction from a vtu file
       SUBROUTINE READFIBNFF(lM, fName, kwrd, idx)
       USE COMMOD
@@ -843,7 +959,7 @@
       CHARACTER(LEN=*) :: fName, kwrd
       INTEGER(KIND=IKIND), INTENT(IN) :: idx
 
-      INTEGER(KIND=IKIND) :: iStat, e
+      INTEGER(KIND=IKIND) :: iStat, is, ie, e
       TYPE(vtkXMLType) :: vtu
 
       REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:,:)
@@ -851,21 +967,24 @@
       iStat = 0;
       std = " <VTK XML Parser> Loading file <"//TRIM(fName)//">"
       CALL loadVTK(vtu, fName, iStat)
-      IF (iStat .LT. 0) err = "VTU file read error (init)"
+      IF (iStat .LT. 0) err = " VTU file read error (init)"
 
       CALL getVTK_numElems(vtu, e, iStat)
-      IF (e .NE. lM%gnEl) err = "Mismatch in num elems for "//
+      IF (e .NE. lM%gnEl) err = " Mismatch in num elems for "//
      2   TRIM(kwrd)
 
       ALLOCATE(tmpR(maxNSD,lM%gnEl))
       tmpR = 0._RKIND
       CALL getVTK_elemData(vtu, TRIM(kwrd), tmpR, iStat)
-      IF (iStat .LT. 0) err = "VTU file read error "//TRIM(kwrd)
-      DO e=1, lM%gnEl
-         lM%fN((idx-1)*nsd+1:idx*nsd,e) = tmpR(1:nsd,e)
-      END DO
-      DEALLOCATE(tmpR)
+      IF (iStat .LT. 0) err = " VTU file read error "//TRIM(kwrd)
 
+      is = (idx-1)*nsd + 1
+      ie = idx*nsd
+      DO e=1, lM%gnEl
+         lM%fN(is:ie,e) = tmpR(1:nsd,e)
+      END DO
+
+      DEALLOCATE(tmpR)
       CALL flushVTK(vtu)
 
       RETURN

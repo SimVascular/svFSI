@@ -106,27 +106,38 @@
 
       INTEGER(KIND=IKIND) slen
 
-      slen = LEN(TRIM(cep%fpar_in))
-      IF (slen .GT. 0) THEN
-         std = " Reading parameters from input file"
-      END IF
-
       SELECT CASE (cep%cepType)
       CASE (cepModel_AP)
          CALL AP_INIT(nX, X)
-         IF (slen .GT. 0) CALL AP_READPARFF(cep%fpar_in)
+         IF (slen .GT. 0) THEN
+            CALL AP_READPARFF(cep%fpar_in)
+            std = " Reading Aliev-Panfilov model parameters"//
+     2         " from input file"
+         END IF
 
       CASE (cepModel_BO)
          CALL BO_INIT(nX, X)
-         IF (slen .GT. 0) CALL BO_READPARFF(cep%fpar_in)
+         IF (slen .GT. 0) THEN
+            CALL BO_READPARFF(cep%fpar_in)
+            std = " Reading Bueno-Orovio model parameters"//
+     2         " from input file"
+         END IF
 
       CASE (cepModel_FN)
          CALL FN_INIT(nX, X)
-         IF (slen .GT. 0) CALL FN_READPARFF(cep%fpar_in)
+         IF (slen .GT. 0) THEN
+            CALL FN_READPARFF(cep%fpar_in)
+            std = " Reading Fitzhugh-Nagumo model parameters"//
+     2         " from input file"
+         END IF
 
       CASE (cepModel_TTP)
          CALL TTP_INIT(cep%imyo, nX, nG, X, Xg)
-         IF (slen .GT. 0) CALL TTP_READPARFF(cep%fpar_in)
+         IF (slen .GT. 0) THEN
+            CALL TTP_READPARFF(cep%fpar_in)
+            std = " Reading tenTusscher-Panfilov model parameters"//
+     2         " from input file"
+         END IF
 
       END SELECT
 

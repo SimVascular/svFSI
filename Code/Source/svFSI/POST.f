@@ -516,8 +516,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo), lY(tDof,tnNo)
 
       LOGICAL flag
-      INTEGER(KIND=IKIND) a, e, g, Ac, i, j, k, l, cPhys, insd,
-     2   nFn
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, i, j, k, l, cPhys, insd, nFn
       REAL(KIND=RKIND) w, Jac, detF, Je, tmX, ya, Ja, elM, nu, lambda,
      2   mu, p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nsymd),
      3   Im(nsd,nsd), F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd),
@@ -526,7 +525,8 @@
 
       INTEGER, ALLOCATABLE :: eNds(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), yl(:,:),
-     2   fN(:,:), resl(:), Nx(:,:), N(:), sA(:), sF(:,:), sE(:)
+     2   tmXl(:), ya_l(:), fN(:,:), resl(:), Nx(:,:), N(:), sA(:),
+     3   sF(:,:), sE(:)
 
       dof  = eq(iEq)%dof
       i    = eq(iEq)%s
@@ -554,14 +554,12 @@
       CALL INITFS(fs, nsd)
 
       ALLOCATE (sA(tnNo), sF(m,tnNo), sE(lM%nEl), xl(nsd,fs%eNoN),
-     2   dl(tDof,fs%eNoN), yl(tDof,fs%eNoN), fN(nsd,nFn), resl(m),
-     3   Nx(nsd,fs%eNoN), N(fs%eNoN))
+     2   dl(tDof,fs%eNoN), yl(tDof,fs%eNoN), fN(nsd,nFn), tmXl(fs%eNoN),
+     3   ya_l(fs%eNoN), resl(m), Nx(nsd,fs%eNoN), N(fs%eNoN))
 
       sA   = 0._RKIND
       sF   = 0._RKIND
       sE   = 0._RKIND
-      tmX  = 0._RKIND
-      ya   = 0._RKIND
 
       insd = nsd
       IF (lM%lShl) insd = 2
@@ -594,13 +592,26 @@
             END DO
          END IF
 
-         dl = 0._RKIND
-         yl = 0._RKIND
+         dl   = 0._RKIND
+         yl   = 0._RKIND
+         tmXl = 0._RKIND
+         ya_l = 0._RKIND
          DO a=1, fs%eNoN
-            Ac      = lM%IEN(a,e)
+            Ac = lM%IEN(a,e)
+            b  = lM%lN(Ac)
             xl(:,a) = x(:,Ac)
             dl(:,a) = lD(:,Ac)
             yl(:,a) = lY(:,Ac)
+            IF (ecCpld) THEN
+               IF (ALLOCATED(lM%tmX)) THEN
+                  tmXl(a) = lM%tmX(b)
+               END IF
+               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+                  ya_l(a) = ec_Ya(Ac)
+               ELSE
+                  ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya
+               END IF
+            END IF
          END DO
 
          Je = 0._RKIND
@@ -612,8 +623,10 @@
             N  = fs%N(:,g)
             Je = Je + w
 
-            Im = MAT_ID(nsd)
-            F  = Im
+            Im  = MAT_ID(nsd)
+            F   = Im
+            tmX = 0._RKIND
+            ya  = 0._RKIND
             DO a=1, fs%eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
@@ -631,6 +644,9 @@
                   F(2,1) = F(2,1) + Nx(1,a)*dl(j,a)
                   F(2,2) = F(2,2) + Nx(2,a)*dl(j,a)
                END IF
+
+               tmX = tmX + N(a)*tmXl(a)
+               ya  = ya  + N(a)*ya_l(a)
             END DO
             detF = MAT_DET(F, nsd)
 
@@ -883,7 +899,7 @@
          DEALLOCATE(eNds)
       END IF
 
-      DEALLOCATE (sA, sF, sE, xl, dl, yl, fN, resl, N, Nx)
+      DEALLOCATE (sA, sF, sE, xl, dl, yl, tmXl, ya_l, fN, resl, N, Nx)
       CALL DESTROY(fs)
 
       RETURN

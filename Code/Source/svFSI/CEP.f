@@ -52,10 +52,12 @@
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
      2   dl(:,:), fN(:,:), N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
-      insd = nsd
       eNoN = lM%eNoN
-      nFn  = lM%nFn
+
+      insd = nsd
       IF (lM%lFib) insd = 1
+
+      nFn  = lM%nFn
       IF (nFn .EQ. 0) nFn = 1
 
 !     CEP: dof = 1
@@ -145,7 +147,7 @@
      3   DVx(3), DNx(3,eNoN)
 
       IF (nFn .LT. eq(cEq)%dmn(cDmn)%cep%nFn) err =
-     2   "No. of anisotropic conductivies exceed mesh fibers"
+     2   " No. of anisotropic conductivies exceed mesh fibers"
 
       T1   = eq(cEq)%af*eq(cEq)%gam*dt
       amd  = eq(cEq)%am/T1
