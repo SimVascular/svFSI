@@ -43,7 +43,7 @@
       IMPLICIT NONE
 
       LOGICAL :: flag
-      INTEGER(KIND=IKIND) :: i, iEq
+      INTEGER(KIND=IKIND) :: i, e, iEq, iM
       INTEGER(KIND=IKIND) :: tArray(8)
       REAL(KIND=RKIND) :: roInf
       CHARACTER(LEN=8) :: date
@@ -340,6 +340,18 @@
                   err = " Mid-myocardium and endocardium zones are"//
      2               " allowed only for TTP and BO activation models"
                END IF
+            END DO
+
+            DO iM=1, nMsh
+               DO e=1, msh(iM)%gnEl
+                  i = DOMAIN(msh(iM), iEq, e)
+                  IF (eq(iEq)%dmn(i)%ec%asnType .EQ. asnType_hetortho
+     2                .AND. .NOT.ALLOCATED(msh(iM)%tmX)) THEN
+                     err = " Transmural coordinate not provided for"//
+     2                   " transmurally heterogenous orthotropic"//
+     3                   " excitation-contraction coupling"
+                  END IF
+               END DO
             END DO
          END DO
       END IF
@@ -2631,7 +2643,7 @@ c     2         "can be applied for Neumann boundaries only"
          lDmn%stM%isoType = stIso_Gucci
          lPtr => lSt%get(lDmn%stM%C10, "C")
          lPtr => lSt%get(lDmn%stM%bff, "bf")
-         lPtr => lSt%get(lDmn%stM%bss, "bt")
+         lPtr => lSt%get(lDmn%stM%bss, "bs")
          lPtr => lSt%get(lDmn%stM%bfs, "bfs")
          IF (nsd .NE. 3) THEN
             err = "Guccione material model is used for 3D problems "//
