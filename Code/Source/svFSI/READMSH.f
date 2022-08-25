@@ -395,7 +395,7 @@
                   b = (i-1)*nsd
                   DO e=1, msh(iM)%gnEl
                      DO j=1, nsd
-                        msh(iM)%fN(b+j,a) = fibN(j)
+                        msh(iM)%fN(b+j,e) = fibN(j)
                      END DO
                   END DO
                END DO

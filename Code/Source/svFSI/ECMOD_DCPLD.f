@@ -62,7 +62,7 @@
       PUBLIC :: EC_ACTVSTRS_FE
       PUBLIC :: EC_ACTVSTRS_RK
       PUBLIC :: EC_ACTVSTRS_BE
-      PUBLIC :: EC_ACTVSTRN
+      PUBLIC :: EC_ACTVSTRN_SIN2
 
       CONTAINS
 !-----------------------------------------------------------------------
@@ -184,7 +184,7 @@
 !-----------------------------------------------------------------------
 !     Compute activation force for electromechanics based on active
 !     strain model (prescribed sine-squared function)
-      SUBROUTINE EC_ACTVSTRN(t, gf)
+      SUBROUTINE EC_ACTVSTRN_SIN2(t, gf)
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: t
       REAL(KIND=RKIND), INTENT(INOUT) :: gf
@@ -198,7 +198,7 @@
       END IF
 
       RETURN
-      END SUBROUTINE EC_ACTVSTRN
+      END SUBROUTINE EC_ACTVSTRN_SIN2
 !-----------------------------------------------------------------------
       SUBROUTINE GETRVAL(fileId, skwrd, rVal)
       IMPLICIT NONE

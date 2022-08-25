@@ -1131,8 +1131,7 @@
 
 !        Read excitation-contraction coupling parameters for electro-
 !        mechanics modeling
-         IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP   .OR.
-     2       lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
+         IF (lEq%dmn(iDmn)%phys.EQ.phys_struct  .OR.
      3       lEq%dmn(iDmn)%phys.EQ.phys_ustruct ) THEN
             CALL READECCPL(lEq%dmn(iDmn)%ec, lPD)
          END IF
@@ -2447,11 +2446,14 @@ c     2         "can be applied for Neumann boundaries only"
       TYPE(eccModelType), INTENT(INOUT) :: lEc
       TYPE(listType), INTENT(INOUT) :: lPD
 
-      TYPE(listType), POINTER :: lPtr, list
+      TYPE(listType), POINTER :: lPtr, lSub, list
 
       LOGICAL flag
+      INTEGER(KIND=IKIND) fid, i, j
       REAL(KIND=RKIND) rtmp
       CHARACTER(LEN=stdL) ctmp
+
+      TYPE(fileType) fTmp
 
       list => lPD%get(ctmp, "Excitation-contraction coupling")
       IF (.NOT.ASSOCIATED(list)) RETURN
@@ -2473,9 +2475,13 @@ c     2         "can be applied for Neumann boundaries only"
 
          CASE ("ortho", "orthotropy")
             lEc%asnType = asnType_ortho
+            lEc%k = 4._RKIND
+            lPtr => list%get(lEc%k ,"Orthotropy parameter", ll=1._RKIND)
 
          CASE ("hetero_ortho", "heterogenous_orthotropy")
             lEc%asnType = asnType_hetortho
+            lEc%k = 5.5_RKIND
+            lPtr => list%get(lEc%k, "Orthotropy parameter", ll=1._RKIND)
 
          CASE DEFAULT
             err = " Invalid active strain coupling type"
@@ -2488,9 +2494,45 @@ c     2         "can be applied for Neumann boundaries only"
       lPtr => list%get(lEc%caCpld,
      2   "Coupled with cellular activation model")
 
+      lSub => list%get(ctmp, "Prescribed fiber shortening")
+      IF (ASSOCIATED(lSub)) THEN
+         lEc%caCpld = .FALSE.
+         CALL TO_LOWER(ctmp)
+         SELECT CASE (TRIM(ctmp))
+         CASE ("steady")
+            lEc%dType = IBSET(lEc%dType, bType_std)
+            lPtr => lSub%get(lEc%Ya, "Value")
+
+         CASE ("unsteady")
+            lEc%dType = IBSET(lEc%dType, bType_ustd)
+            lPtr => lSub%get(fTmp, "Temporal values file path")
+            flag = .FALSE.
+            lPtr => lSub%get(flag, "Ramp function")
+            lEc%Yat%lrmp = flag
+            fid = fTmp%open()
+            READ(fid,*) i, j
+            IF (i .LT. 2) THEN
+               std = " Enter nPts nFCoef; nPts*(t Q)"
+               err = " Wrong format in: "//fTmp%fname
+            END IF
+            lEc%Yat%d = 1
+            lEc%Yat%n = j
+            IF (lEc%Yat%lrmp) lEc%Yat%n = 1
+            ALLOCATE(lEc%Yat%qi(lEc%Yat%d), lEc%Yat%qs(lEc%Yat%d),
+     3         lEc%Yat%r(lEc%Yat%d,lEc%Yat%n),
+     4         lEc%Yat%i(lEc%Yat%d,lEc%Yat%n))
+            CALL FFT(fid, i, lEc%Yat)
+            CLOSE(fid)
+
+         CASE DEFAULT
+            err = " Undefined time dependence for fiber shortening"
+         END SELECT
+      END IF
+
       flag = lEc%astrain .AND. .NOT.lEc%caCpld
       IF (.NOT.flag) THEN
          lPtr => list%get(ctmp, "ODE solver for EC coupling")
+         CALL TO_LOWER(ctmp)
          SELECT CASE (TRIM(ctmp))
          CASE ("fe", "euler", "forward_euler", "explicit")
             lEc%odeS%tIntType = tIntType_FE

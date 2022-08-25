@@ -106,6 +106,7 @@
 
       INTEGER(KIND=IKIND) slen
 
+      slen = LEN(TRIM(cep%fpar_in))
       SELECT CASE (cep%cepType)
       CASE (cepModel_AP)
          CALL AP_INIT(nX, X)
@@ -292,7 +293,7 @@
       SUBROUTINE CEPINTEGL(t1, nX, nG, cep, ec, I4f, X, Xg, yl)
       USE CEPMOD
       USE UTILMOD, ONLY : eps
-      USE COMMOD, ONLY : dt, err
+      USE COMMOD, ONLY : dt, err, eccModelType
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: t1, I4f
       INTEGER(KIND=IKIND), INTENT(IN) :: nX, nG

@@ -195,6 +195,14 @@
       INTEGER(KIND=IKIND), PARAMETER :: viscType_NA = 699,
      2   viscType_Const = 698, viscType_CY = 697, viscType_Cass = 696
 !--------------------------------------------------------------------
+!     Type of excitation-contraction coupling for active strain-based
+!     electromechanics formulation: transversely isotropic,
+!     orthotropic activation, and transmurally heterogenous orthotropic
+!     actvation.
+      INTEGER(KIND=IKIND), PARAMETER :: asnType_NA = 300,
+     2   asnType_tiso = 301, asnType_ortho = 302,
+     3   asnType_hetortho = 303
+!--------------------------------------------------------------------
 !     Preconditioner definitions
       INTEGER(KIND=IKIND), PARAMETER :: PREC_NONE = 700,
      2   PREC_FSILS = 701, PREC_TRILINOS_DIAGONAL = 702,

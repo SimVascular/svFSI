@@ -60,14 +60,6 @@
      2   tIntType_FE = 201, tIntType_RK4 = 202, tIntType_CN2 = 203,
      3   tIntType_BE = 204
 
-!     Type of excitation-contraction coupling for active strain-based
-!     electromechanics formulation: transversely isotropic,
-!     orthotropic activation, and transmurally heterogenous orthotropic
-!     actvation.
-      INTEGER(KIND=IKIND), PARAMETER :: asnType_NA = 300,
-     2   asnType_tiso = 301, asnType_ortho = 302,
-     3   asnType_hetortho = 303
-
 !     Time integration scheme and related parameters
       TYPE odeType
 !        Time integration method type
@@ -91,31 +83,6 @@
 !        stimulus amplitude
          REAL(KIND=RKIND) :: A = 0._RKIND
       END TYPE stimType
-
-!     Excitation-contraction model type for electromechanics
-      TYPE eccModelType
-!        IF excitation is coupled with cellular activation model or
-!        imposed excitation
-         LOGICAL :: caCpld = .TRUE.
-!        Active stress coupling
-         LOGICAL :: astress = .FALSE.
-!        Active strain coupling
-         LOGICAL :: astrain = .FALSE.
-!        Type of active strain coupling
-         INTEGER(KIND=IKIND) :: asnType = asnType_NA
-!        Time integration options
-         TYPE(odeType) :: odeS
-
-!        Below options are for decoupled excitation-contraction coupling
-!        Input parameters file path
-         CHARACTER(LEN=stdL) :: fpar_in
-!        Time step for integration
-         REAL(KIND=RKIND) :: dt
-!        State variable for excitation-contraction coupling
-!          := activation force for active stress model
-!          := fiber contraction parameter for active strain model
-         REAL(KIND=RKIND) :: Ya = 0._RKIND
-      END TYPE eccModelType
 
 !     Cardiac electrophysiology model type
       TYPE cepModelType
@@ -148,19 +115,11 @@
 !     Whether cardiac electrophysiology is solved
       LOGICAL cepEq
 
-!     Whether excitation-contraction is coupled
-      LOGICAL ecCpld
-
 !     Max. dof in cellular activation model
       INTEGER(KIND=IKIND) :: nXion = 0
 
 !     Unknowns stored at all nodes
       REAL(KIND=RKIND), ALLOCATABLE :: Xion(:,:)
-
-!     State variable for excitation-contraction coupling
-!       := activation force for active stress model
-!       := fiber contraction parameter for active strain model
-      REAL(KIND=RKIND), ALLOCATABLE :: ec_Ya(:)
 
       END MODULE CEPMOD
 !#######################################################################

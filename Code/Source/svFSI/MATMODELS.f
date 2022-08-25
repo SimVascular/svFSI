@@ -80,7 +80,7 @@
       Fa   = MAT_ID(nsd)
       Fai  = Fa
       IF (lDmn%ec%astrain) THEN
-         CALL GET_FIB_SHORTENING(lDmn%ec, nfd, fl, tmX, ya, Fa)
+         CALL GET_ACTV_DEFGRAD(lDmn%ec, nfd, fl, tmX, ya, Fa)
          Fai  = MAT_INV(Fa, nsd)
          Fe   = MATMUL(F, Fai)
       END IF
@@ -600,7 +600,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       Fa   = MAT_ID(nsd)
       Fai  = Fa
       IF (lDmn%ec%astrain) THEN
-         CALL GET_FIB_SHORTENING(lDmn%ec, nfd, fl, tmX, ya, Fa)
+         CALL GET_ACTV_DEFGRAD(lDmn%ec, nfd, fl, tmX, ya, Fa)
          Fai  = MAT_INV(Fa, nsd)
          Fe   = MATMUL(F, Fai)
       END IF
@@ -1358,7 +1358,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !####################################################################
 !     Compute active component of deformation gradient tensor for
 !     electromechanics coupling based on active strain formulation
-      SUBROUTINE GET_FIB_SHORTENING(ec, nfd, fl, lam, gf, Fa)
+      SUBROUTINE GET_ACTV_DEFGRAD(ec, nfd, fl, lam, yf, Fa)
       USE MATFUN
       USE UTILMOD
       USE COMMOD, ONLY : asnType_tiso, asnType_ortho, asnType_hetortho,
@@ -1366,45 +1366,41 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       IMPLICIT NONE
       TYPE(eccModelType), INTENT(IN) :: ec
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: fl(nsd,nfd), lam, gf
+      REAL(KIND=RKIND), INTENT(IN) :: fl(nsd,nfd), lam, yf
       REAL(KIND=RKIND), INTENT(OUT) :: Fa(nsd,nsd)
 
-      REAL(KIND=RKIND) :: gs, gn, kp, af(nsd), as(nsd), an(nsd),
-     2   Im(nsd,nsd), Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
+      REAL(KIND=RKIND) :: ys, yn, f(nsd), s(nsd), n(nsd), Hf(nsd,nsd),
+     2   Hs(nsd,nsd), Hn(nsd,nsd)
 
-      af = fl(:,1)
-      as = fl(:,2)
-      an = CROSS(fl)
+      f  = fl(:,1)
+      s  = fl(:,2)
+      n  = CROSS(fl)
 
-      Im = MAT_ID(nsd)
-      Hf = MAT_DYADPROD(af, af, nsd)
+      Hf = MAT_DYADPROD(f, f, nsd)
 
 !     Transversely isotropic activation
       IF (ec%asnType .EQ. asnType_tiso) THEN
-         gn = 1._RKIND/SQRT(gf)
-         Fa = gf*Hf + gn*(Im - Hf)
-         RETURN
+         yn = (1._RKIND/SQRT(1._RKIND+yf)) - 1._RKIND
 
 !     Orthotropic activation
       ELSE IF (ec%asnType .EQ. asnType_ortho) THEN
-         kp = 4._RKIND
-         gn = kp*gf
+         yn = ec%k*yf
 
 !     Transmurally heteregenous orthotropic activation
 !     lam: transmural coordinate (=0, endo; =1, epi)
       ELSE IF (ec%asnType .EQ. asnType_hetortho) THEN
-         kp = 5.5_RKIND
-         gn = (1._RKIND - lam)*kp*gf
-     2       + lam*(1._RKIND/SQRT(1._RKIND + gf) - 1._RKIND)
+         yn = (1._RKIND - lam)*ec%k*yf
+     2      + lam*(1._RKIND/SQRT(1._RKIND + yf) - 1._RKIND)
 
       END IF
 
-      gs = 1._RKIND/((1._RKIND+gf)*(1._RKIND+gn)) - 1._RKIND
-      Hs = MAT_DYADPROD(as, as, nsd)
-      Hn = MAT_DYADPROD(an, an, nsd)
+      ys = 1._RKIND/((1._RKIND+yf)*(1._RKIND+yn)) - 1._RKIND
+      Hs = MAT_DYADPROD(s, s, nsd)
+      Hn = MAT_DYADPROD(n, n, nsd)
 
-      Fa = Im + gf*Hf + gs*Hs + gn*Hn
+      Fa = (1._RKIND+yf)*Hf + (1._RKIND+ys)*Hs + (1._RKIND+yn)*Hn
+!      Fa = MAT_ID(nsd) + (yf*Hf) + (ys*Hs) + (yn*Hn)
 
       RETURN
-      END SUBROUTINE GET_FIB_SHORTENING
+      END SUBROUTINE GET_ACTV_DEFGRAD
 !####################################################################

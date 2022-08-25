@@ -204,9 +204,9 @@
          TYPE(MBType), ALLOCATABLE :: bm
       END TYPE bfType
 
-!     Fiber stress type
+!     Imposed fiber stress type
       TYPE fibStrsType
-!        Type of fiber stress
+!        Time dependence of fiber stress (steady/unsteady)
          INTEGER(KIND=IKIND) :: fType = 0
 !        Constant steady value
          REAL(KIND=8) :: g = 0._RKIND
@@ -245,6 +245,37 @@
          TYPE(fibStrsType) :: Tf
       END TYPE stModelType
 
+!     Excitation-contraction model type for electromechanics
+      TYPE eccModelType
+!        If excitation is coupled with cellular activation model or
+!        imposed using an analytical function
+         LOGICAL :: caCpld = .TRUE.
+!        Active stress coupling
+         LOGICAL :: astress = .FALSE.
+!        Active strain coupling
+         LOGICAL :: astrain = .FALSE.
+!        Type of active strain coupling
+         INTEGER(KIND=IKIND) :: asnType = asnType_NA
+!        Orthotropy parameter for active strain
+         REAL(KIND=RKIND) :: k = 1._RKIND
+!        Time integration options
+         TYPE(odeType) :: odeS
+
+!        Below options are for decoupled excitation-contraction coupling
+!        Type of decoupling: analytically integrated or prescribed
+         INTEGER :: dType = 0
+!        Input parameters file path
+         CHARACTER(LEN=stdL) :: fpar_in
+!        Time step for integration
+         REAL(KIND=RKIND) :: dt
+!        State variable for excitation-contraction coupling
+!          := activation force for active stress model
+!          := fiber contraction parameter for active strain model
+         REAL(KIND=RKIND) :: Ya = 0._RKIND
+!        Unsteady time-dependent values for prescribed fiber-shortening
+         TYPE(fcType) :: Yat
+      END TYPE eccModelType
+
 !     Fluid viscosity model type
       TYPE viscModelType
 !        Type of constitutive model for fluid viscosity
@@ -274,10 +305,10 @@
          REAL(KIND=RKIND) :: prop(maxNProp) = 0._RKIND
 !        Electrophysiology model
          TYPE(cepModelType) :: cep
-!        Excitation-contraction coupling
-         TYPE(eccModelType) :: ec
 !        Structure material model
          TYPE(stModelType) :: stM
+!        Excitation-contraction coupling
+         TYPE(eccModelType) :: ec
 !        Viscosity model for fluids
          TYPE(viscModelType) :: visc
       END TYPE dmnType
@@ -850,6 +881,8 @@
       LOGICAL pstEq
 !     Whether velocity-pressure based structural dynamics solver is used
       LOGICAL sstEq
+!     Whether excitation-contraction is coupled
+      LOGICAL ecCpld
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required
@@ -975,6 +1008,11 @@
       REAL(KIND=RKIND), ALLOCATABLE :: Pinit(:)
       REAL(KIND=RKIND), ALLOCATABLE :: Vinit(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: Dinit(:,:)
+
+!     State variable for excitation-contraction coupling
+!       := activation force for active stress model
+!       := fiber contraction parameter for active strain model
+      REAL(KIND=RKIND), ALLOCATABLE :: ec_Ya(:)
 
 !     CMM-variable wall properties: 1-thickness, 2-Elasticity modulus
       REAL(KIND=RKIND), ALLOCATABLE :: varWallProps(:,:)
