@@ -91,6 +91,11 @@
          i    = INT(20._RKIND*LOG10(tmp1), KIND=IKIND)
       END IF
 
+!      IF (cm%mas()) THEN
+!         WRITE(*,'(4(2X,1pE24.18))') eq(iEq)%pNorm, eq(iEq)%iNorm,
+!     2      eq(iEq)%FSILS%RI%iNorm, eq(iEq)%FSILS%RI%fNorm
+!      END IF
+
       IF (i .GT. 20) THEN
          c1 = "!"; c2 = "!"
       ELSE

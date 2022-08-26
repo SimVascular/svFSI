@@ -85,13 +85,14 @@
 
 !        Electrophysiology
          IF (eq(iEq)%phys .EQ. phys_CEP) THEN
-            CALL CEPINTEG(iEq, e, Do)
+            CALL CEPINTEG(iEq, Do)
          END IF
 
 !        Non-CEP excitation-contraction coupling
-         IF (eq(iEq)%phys .EQ. phys_struct .OR.
-     2       eq(iEq)%phys .EQ. phys_ustruct) THEN
+         IF (ecCpld) THEN
             DO iDmn=1, eq(iEq)%nDmn
+               IF ((eq(iEq)%dmn(iDmn)%phys .NE. phys_struct) .AND.
+     2             (eq(iEq)%dmn(iDmn)%phys .NE. phys_ustruct)) CYCLE
                IF (.NOT.eq(iEq)%dmn(iDmn)%ec%caCpld) THEN
                   CALL EC_DCPLD_GETY(eq(iEq)%dmn(iDmn)%ec)
                END IF
@@ -170,7 +171,7 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      LOGICAL :: l1, l2, l3, l4
+      LOGICAL :: l1, l2, l3, l4, l5
       INTEGER(KIND=IKIND) :: s, e, a, Ac
       REAL(KIND=RKIND) :: coef(4), r1, dUl(nsd)
 
@@ -266,11 +267,12 @@
       END IF
       r1 = eq(cEq)%FSILS%RI%iNorm/eq(cEq)%iNorm
 
-      l1 = eq(cEq)%itr .GE. eq(cEq)%maxItr
-      l2 = r1 .LE. eq(cEq)%tol
-      l3 = r1 .LE. eq(cEq)%tol*eq(cEq)%pNorm
-      l4 = eq(cEq)%itr .GE. eq(cEq)%minItr
-      IF (l1 .OR. ((l2.OR.l3).AND.l4)) eq(cEq)%ok = .TRUE.
+      l1 = eq(cEq)%iNorm .LE. eq(cEq)%absTol
+      l2 = eq(cEq)%itr .GE. eq(cEq)%maxItr
+      l3 = r1 .LE. eq(cEq)%tol
+      l4 = r1 .LE. eq(cEq)%tol*eq(cEq)%pNorm
+      l5 = eq(cEq)%itr .GE. eq(cEq)%minItr
+      IF (l1 .OR. l2 .OR. ((l3.OR.l4).AND.l5)) eq(cEq)%ok = .TRUE.
       IF (ALL(eq%ok)) RETURN
 
       IF (eq(cEq)%coupled) THEN

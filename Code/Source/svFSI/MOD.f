@@ -247,27 +247,28 @@
 
 !     Excitation-contraction model type for electromechanics
       TYPE eccModelType
-!        If excitation is coupled with cellular activation model or
-!        imposed using an analytical function
-         LOGICAL :: caCpld = .TRUE.
 !        Active stress coupling
          LOGICAL :: astress = .FALSE.
 !        Active strain coupling
          LOGICAL :: astrain = .FALSE.
+
+!        If excitation is coupled with cellular activation model or
+!        imposed using an analytical function
+         LOGICAL :: caCpld = .TRUE.
 !        Type of active strain coupling
          INTEGER(KIND=IKIND) :: asnType = asnType_NA
 !        Orthotropy parameter for active strain
          REAL(KIND=RKIND) :: k = 1._RKIND
-!        Time integration options
-         TYPE(odeType) :: odeS
 
-!        Below options are for decoupled excitation-contraction coupling
-!        Type of decoupling: analytically integrated or prescribed
+!        Below variables are for decoupled excitation-contraction
+!        Type of decoupling: analytically function or prescribed
          INTEGER :: dType = 0
 !        Input parameters file path
          CHARACTER(LEN=stdL) :: fpar_in
 !        Time step for integration
          REAL(KIND=RKIND) :: dt
+!        Time integration options
+         TYPE(odeType) :: odeS
 !        State variable for excitation-contraction coupling
 !          := activation force for active stress model
 !          := fiber contraction parameter for active strain model
@@ -442,7 +443,7 @@
 !        Only for data alignment       (-)
          INTEGER(KIND=IKIND) reserve
 !        Absolute tolerance            (IN)
-         REAL(KIND=RKIND) :: absTol = 1.E-8_RKIND
+         REAL(KIND=RKIND) :: absTol = 1.E-12_RKIND
 !        Relative tolerance            (IN)
          REAL(KIND=RKIND) :: relTol = 1.E-8_RKIND
 !        Initial norm of residual      (OUT)
@@ -683,12 +684,14 @@
          REAL(KIND=RKIND) gam
 !        Initial norm of residual
          REAL(KIND=RKIND) iNorm
-!        First iteration norm
+!        First iteration relative residual norm
          REAL(KIND=RKIND) pNorm
 !        \rho_{infinity}
          REAL(KIND=RKIND) roInf
 !        Accepted relative tolerance
          REAL(KIND=RKIND) :: tol
+!        Accepted absolute tolerance
+         REAL(KIND=RKIND) :: absTol = 1.E-15_RKIND
 !        Equation symbol
          CHARACTER(LEN=2) :: sym = "NA"
 !        type of linear solver

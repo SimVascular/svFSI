@@ -42,9 +42,9 @@
       USE ALLFUN
       IMPLICIT NONE
 
-      INTEGER(KIND=IKIND) a, iEq, iDmn, cPhys, dID, nX, nG
+      INTEGER(KIND=IKIND) a, iEq, iDmn, cPhys, dID, nX, nG, maxNx, maxNg
 
-      REAL(KIND=RKIND), ALLOCATABLE :: Xl(:), Xgl(:), sA(:), sF(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: Xl(:,:), Xgl(:,:), sA(:), sF(:,:)
 
       DO iEq=1, nEq
          IF (eq(iEq)%phys .NE. phys_CEP) CYCLE
@@ -52,6 +52,25 @@
 !        Average cellular activation state variables at domain
 !        interfaces for multi-domain problem
          IF (ALLOCATED(dmnId)) THEN
+            maxNx = 0
+            maxNg = 0
+            DO iDmn=1, eq(iEq)%nDmn
+               nX = eq(iEq)%dmn(iDmn)%cep%nX
+               nG = eq(iEq)%dmn(iDmn)%cep%nG
+               IF (maxNx .LT. nX) maxNx = nX
+               IF (maxNg .LT. nG) maxNg = nG
+            END DO
+
+            ALLOCATE(Xl(maxNx,eq(iEq)%nDmn), Xgl(maxNg,eq(iEq)%nDmn))
+            Xl  = 0._RKIND
+            Xgl = 0._RKIND
+            DO iDmn=1, eq(iEq)%nDmn
+               nX = eq(iEq)%dmn(iDmn)%cep%nX
+               nG = eq(iEq)%dmn(iDmn)%cep%nG
+               CALL CEPINITL(eq(iEq)%dmn(iDmn)%cep, nX, nG,
+     2            Xl(1:nX,iDmn), Xgl(1:nG,iDmn))
+            END DO
+
             ALLOCATE(sA(tnNo), sF(nXion,tnNo))
             sA = 0._RKIND
             sF = 0._RKIND
@@ -62,14 +81,9 @@
                   dID   = eq(iEq)%dmn(iDmn)%Id
                   IF (cPhys.NE.phys_CEP .OR. .NOT.BTEST(dmnId(a),dID))
      2                CYCLE
-                  nX = eq(iEq)%dmn(iDmn)%cep%nX
-                  nG = eq(iEq)%dmn(iDmn)%cep%nG
-                  ALLOCATE(Xl(nX), Xgl(nG))
-                  CALL CEPINITL(eq(iEq)%dmn(iDmn)%cep, nX, nG, Xl, Xgl)
                   sA(a) = sA(a) + 1._RKIND
-                  sF(1:nX,a)  = sF(1:nX,a) + Xl(:)
-                  sF(nX+1:nX+nG,a) = sF(nX+1:nX+nG,a) + Xgl(:)
-                  DEALLOCATE(Xl, Xgl)
+                  sF(1:nX,a)  = sF(1:nX,a) + Xl(1:nX,iDmn)
+                  sF(nX+1:nX+nG,a) = sF(nX+1:nX+nG,a) + Xgl(1:nG,iDmn)
                END DO
             END DO
             CALL COMMU(sA)
@@ -78,18 +92,18 @@
                IF (.NOT.ISZERO(sA(a)))
      2            Xion(:,a) = sF(:,a)/sA(a)
             END DO
-            DEALLOCATE(sA, sF)
+            DEALLOCATE(Xl, Xgl, sA, sF)
          ELSE
+            nX = eq(iEq)%dmn(1)%cep%nX
+            nG = eq(iEq)%dmn(1)%cep%nG
+            ALLOCATE(Xl(nX,1), Xgl(nG,1))
+            CALL CEPINITL(eq(iEq)%dmn(1)%cep, nX, nG, Xl(:,1), Xgl(:,1))
             DO a=1, tnNo
                IF (.NOT.ISDOMAIN(iEq, a, phys_CEP)) CYCLE
-               nX = eq(iEq)%dmn(1)%cep%nX
-               nG = eq(iEq)%dmn(1)%cep%nG
-               ALLOCATE(Xl(nX), Xgl(nG))
-               CALL CEPINITL(eq(iEq)%dmn(1)%cep, nX, nG, Xl, Xgl)
-               Xion(1:nX,a) = Xl(:)
-               Xion(nX+1:nX+nG,a) = Xgl(:)
-               DEALLOCATE(Xl, Xgl)
+               Xion(1:nX,a) = Xl(:,1)
+               Xion(nX+1:nX+nG,a) = Xgl(:,1)
             END DO
+            DEALLOCATE(Xl, Xgl)
          END IF
       END DO
 
@@ -149,32 +163,46 @@
 !     model for cardiac electrophysiology. This function is called
 !     during the predictor step in PIC.f (subroutine PICP) and only
 !     when the equation solved is `cep'.
-      SUBROUTINE CEPINTEG(iEq, iDof, Dg)
+      SUBROUTINE CEPINTEG(iEq, Dg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      INTEGER(KIND=IKIND), INTENT(IN) :: iEq, iDof
+      INTEGER(KIND=IKIND), INTENT(IN) :: iEq
       REAL(KIND=RKIND), INTENT(IN) :: Dg(tDof,tnNo)
 
       LOGICAL :: flag, IPASS = .TRUE.
-      INTEGER(KIND=IKIND) :: a, Ac, iM, iDmn, cPhys, dID, nX, nG
+      INTEGER(KIND=IKIND) :: a, Ac, iM, iDmn, vDof, stEq, cPhys, dID,
+     2   nX, nG
       REAL(KIND=RKIND) :: yl
 
       REAL(KIND=RKIND), ALLOCATABLE :: I4f(:), Xl(:), Xgl(:), sA(:),
      2   sY(:), sF(:,:)
       SAVE IPASS
 
+!     Voltage degree of freedom for the CEP equation
+      vDof = eq(iEq)%s
+
+!     Fiber stretch invariant
       ALLOCATE(I4f(tnNo))
       I4f = 0._RKIND
 
 !     Excitation-contraction coupling: get fiber stretch (I4f) for
 !     stretch activated currents and also for active strain model
       IF (ecCpld) THEN
+!        Get the struct/ustruct equation for fiber stretch computation
+         DO stEq=1, nEq
+            IF ((eq(stEq)%phys .EQ. phys_struct)   .OR.
+     2          (eq(stEq)%phys .EQ. phys_ustruct)) THEN
+               EXIT
+            END IF
+         END DO
+
+!        Compute fiber stretch at all the nodes
          DO iM=1, nMsh
             IF (msh(iM)%nFn .NE. 0) THEN
                ALLOCATE(sA(msh(iM)%nNo))
                sA = 0._RKIND
-               CALL FIBSTRETCH(iEq, msh(iM), Dg, sA)
+               CALL FIBSTRETCH(stEq, msh(iM), Dg, sA)
                DO a=1, msh(iM)%nNo
                   Ac = msh(iM)%gN(a)
                   I4f(Ac) = sA(a)
@@ -190,7 +218,7 @@
       ELSE
 !     Copy action potential after diffusion as the first state variable
          DO Ac=1, tnNo
-            Xion(1,Ac) = Yo(iDof,Ac)
+            Xion(1,Ac) = Yo(vDof,Ac)
          END DO
       END IF
 
@@ -210,7 +238,6 @@
 
                flag = (cPhys .NE. phys_CEP)
      2           .OR. (.NOT.BTEST(dmnId(Ac),dID))
-     3           .OR. (.NOT.eq(iEq)%dmn(iDmn)%ec%caCpld)
                IF (flag) CYCLE
 
                nX = eq(iEq)%dmn(iDmn)%cep%nX
@@ -251,9 +278,7 @@
          DEALLOCATE(sA, sF, sY)
       ELSE
          DO Ac=1, tnNo
-            flag = (.NOT.ISDOMAIN(iEq, Ac, phys_CEP))
-     2        .OR. (.NOT.eq(iEq)%dmn(1)%ec%caCpld)
-            IF (flag) CYCLE
+            IF (.NOT.ISDOMAIN(iEq, Ac, phys_CEP)) CYCLE
 
             nX = eq(iEq)%dmn(1)%cep%nX
             nG = eq(iEq)%dmn(1)%cep%nG
@@ -278,8 +303,9 @@
          END DO
       END IF
 
+!     Update voltage degree of freedom for subsequent diffusion
       DO Ac=1, tnNo
-         Yo(iDof,Ac) = Xion(1,Ac)
+         Yo(vDof,Ac) = Xion(1,Ac)
       END DO
 
       DEALLOCATE(I4f)
@@ -346,16 +372,7 @@
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL AP_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL AP_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(1)
-                     CALL AP_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL AP_ACTVSTRS_FE(X0, cep%dt, yl)
                END IF
             END DO
 
@@ -373,16 +390,7 @@
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL AP_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL AP_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(1)
-                     CALL AP_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL AP_ACTVSTRS_RK(X0, cep%dt, yl)
                END IF
             END DO
 
@@ -395,22 +403,12 @@
                   Istim = 0._RKIND
                END IF
 
-               X0 = X(1)
                CALL AP_INTEGCN2(nX, X, t, cep%dt, Istim, Ksac, IPAR,
      2            RPAR)
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL AP_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL AP_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(1)
-                     CALL AP_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL AP_ACTVSTRS_BE(X(1), cep%dt, yl)
                END IF
             END DO
          END SELECT
@@ -446,31 +444,12 @@
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL BO_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL BO_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(1)
-                     CALL BO_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL BO_ACTVSTRS_FE(X0, cep%dt, yl)
                END IF
 
 !              Excitation-contraction coupling due to active strain
                IF (ec%astrain) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL BO_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL BO_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL BO_ACTVSTRN_BE(X0, cep%dt, I4f, yl,
-     2                  ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
-                  END IF
+                  CALL BO_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
                END IF
             END DO
 
@@ -496,31 +475,12 @@
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL BO_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL BO_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(1)
-                     CALL BO_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL BO_ACTVSTRS_RK(X0, cep%dt, yl)
                END IF
 
 !              Excitation-contraction coupling due to active strain
                IF (ec%astrain) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL BO_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL BO_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL BO_ACTVSTRN_BE(X0, cep%dt, I4f, yl,
-     2                  ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
-                  END IF
+                  CALL BO_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
                END IF
             END DO
 
@@ -533,44 +493,18 @@
                   Istim = 0._RKIND
                END IF
 
-!              Copy old state variable for explicit coupling with
-!              excitation-contraction model
-               IF (ec%astress) THEN
-                  X0 = X(1)
-               ELSE IF (ec%astrain) THEN
-                  X0 = X(4)
-               END IF
-
                CALL BO_INTEGCN2(cep%imyo, nX, X, t, cep%dt, Istim, Ksac,
      2            IPAR, RPAR)
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL BO_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL BO_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(1)
-                     CALL BO_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL BO_ACTVSTRS_BE(X(1), cep%dt, yl)
                END IF
 
 !              Excitation-contraction coupling due to active strain
                IF (ec%astrain) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL BO_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL BO_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL BO_ACTVSTRN_BE(X0, cep%dt, I4f, yl,
-     2                  ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
-                  END IF
+                  CALL BO_ACTVSTRN_BE(X(4), cep%dt, I4f, yl,
+     2               ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
                END IF
             END DO
 
@@ -644,31 +578,12 @@
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL TTP_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL TTP_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL TTP_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL TTP_ACTVSTRS_FE(X0, cep%dt, yl)
                END IF
 
 !              Excitation-contraction coupling due to active strain
                IF (ec%astrain) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL TTP_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL TTP_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL TTP_ACTVSTRN_BE(X0, cep%dt, I4f, yl,
-     2                  ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
-                  END IF
+                  CALL TTP_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
                END IF
             END DO
 
@@ -688,31 +603,12 @@
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL TTP_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL TTP_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL TTP_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL TTP_ACTVSTRS_RK(X0, cep%dt, yl)
                END IF
 
 !              Excitation-contraction coupling due to active strain
                IF (ec%astrain) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL TTP_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL TTP_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL TTP_ACTVSTRN_BE(X0, cep%dt, I4f, yl,
-     2                  ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
-                  END IF
+                  CALL TTP_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
                END IF
             END DO
 
@@ -726,37 +622,18 @@
                END IF
 
 !              Integrate local state variables
-               X0 = X(4)
                CALL TTP_INTEGCN2(cep%imyo, nX, nG, X, Xg, cep%dt, Istim,
      2            Ksac, IPAR, RPAR)
 
 !              Excitation-contraction coupling due to active stress
                IF (ec%astress) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL TTP_ACTVSTRS_FE(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL TTP_ACTVSTRS_RK(X0, cep%dt, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL TTP_ACTVSTRS_BE(X0, cep%dt, yl)
-                  END IF
+                  CALL TTP_ACTVSTRS_BE(X(4), cep%dt, yl)
                END IF
 
 !              Excitation-contraction coupling due to active strain
                IF (ec%astrain) THEN
-                  IF (ec%odeS%tIntType .EQ. tIntType_FE) THEN
-                     CALL TTP_ACTVSTRN_FE(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_RK4) THEN
-                     CALL TTP_ACTVSTRN_RK(X0, cep%dt, I4f, yl)
-
-                  ELSE IF (ec%odeS%tIntType .EQ. tIntType_BE) THEN
-                     X0 = X(4)
-                     CALL TTP_ACTVSTRN_BE(X0, cep%dt, I4f, yl,
-     2                  ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
-                  END IF
+                  CALL TTP_ACTVSTRN_BE(X(4), cep%dt, I4f, yl,
+     2               ec%odeS%maxItr, ec%odeS%absTol, ec%odeS%relTol)
                END IF
             END DO
          END SELECT
