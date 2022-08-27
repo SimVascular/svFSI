@@ -563,7 +563,7 @@
             outPuts(3)  = out_cauchy
             outPuts(4)  = out_strain
          ELSE
-            nDOP = (/12,2,0,0/)
+            nDOP = (/13,2,0,0/)
             outPuts(1)  = out_displacement
             outPuts(2)  = out_mises
             outPuts(3)  = out_stress
@@ -576,6 +576,7 @@
             outPuts(10) = out_fibAlign
             outPuts(11) = out_velocity
             outPuts(12) = out_acceleration
+            outPuts(13) = out_fibStrn
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -600,7 +601,7 @@
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) err = "Prestress for USTRUCT is not implemented yet"
 
-         nDOP = (/14,2,0,0/)
+         nDOP = (/15,2,0,0/)
          outPuts(1)  = out_displacement
          outPuts(2)  = out_mises
          outPuts(3)  = out_stress
@@ -615,6 +616,7 @@
          outPuts(12) = out_pressure
          outPuts(13) = out_acceleration
          outPuts(14) = out_divergence
+         outPuts(15) = out_fibStrn
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1457,6 +1459,11 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1
             lEq%output(iOut)%name = "Viscosity"
+         CASE (out_fibStrn)
+            lEq%output(iOut)%grp  = outGrp_fS
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "Fiber_shortening"
          CASE DEFAULT
             err = "Internal output undefined"
          END SELECT

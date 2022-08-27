@@ -208,7 +208,7 @@
 !        Diffusion tensor - spatial isotropy
          Diso    = Diso * Jac
          Dani(:) = Dani(:) * Jac
-         D(:,:)  = Diso * C(:,:)
+         D(:,:)  = Diso * Ci(:,:)
       ELSE
          D(:,:)  = 0._RKIND
          D(1,1)  = Diso

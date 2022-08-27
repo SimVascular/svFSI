@@ -684,7 +684,7 @@
          REAL(KIND=RKIND) gam
 !        Initial norm of residual
          REAL(KIND=RKIND) iNorm
-!        First iteration relative residual norm
+!        First iteration preconditioned relative residual norm
          REAL(KIND=RKIND) pNorm
 !        \rho_{infinity}
          REAL(KIND=RKIND) roInf

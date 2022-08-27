@@ -193,7 +193,7 @@
                Ad(:,a)     = Ad(:,a)     - dUl(:)
                Dn(s:e-1,a) = Dn(s:e-1,a) - dUl(:)*coef(1)
             END DO
-         ELSE IF (eq(cEq)%phys .EQ. phys_mesh) THEN
+         ELSE
             DO a=1, tnNo
                An(s:e,a)   = An(s:e,a) - R(:,a)
                Yn(s:e,a)   = Yn(s:e,a) - R(:,a)*coef(1)

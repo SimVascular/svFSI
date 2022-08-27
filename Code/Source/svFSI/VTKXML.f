@@ -526,7 +526,7 @@
                outNames(cOut) = TRIM(eq(iEq)%output(iOut)%name)
 
                SELECT CASE (oGrp)
-                  CASE (outGrp_NA)
+               CASE (outGrp_NA)
                   err = "Undefined output grp in VTK"
 
                CASE (outGrp_A)
@@ -633,7 +633,7 @@
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
 
-               CASE (outGrp_J, outGrp_F, outGrp_strain)
+               CASE (outGrp_J, outGrp_F, outGrp_strain, outGrp_fS)
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
                   tmpV  = 0._RKIND
