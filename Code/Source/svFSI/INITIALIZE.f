@@ -68,6 +68,8 @@
 !     For initializing CMM, LS pointer to fixed edge nodes
       IF (cmmInit) nFacesLS = nFacesLS + 1
 
+!     Setting cplBC%coupled based on the first equation (typically
+!     fluid / FSI / CMM)
       IF (ANY(eq(1)%bc%cplBCptr .NE. 0)) cplBC%coupled = .TRUE.
 
       flag = .FALSE.

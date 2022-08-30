@@ -484,15 +484,15 @@
 !        Internal genBC use
          INTEGER(KIND=IKIND) :: eqv = 0
 !        Flow rates at t
-         REAL(KIND=RKIND) Qo
+         REAL(KIND=RKIND) :: Qo = 0._RKIND
 !        Flow rates at t+dt
-         REAL(KIND=RKIND) Qn
+         REAL(KIND=RKIND) :: Qn = 0._RKIND
 !        Pressures at t
-         REAL(KIND=RKIND) Po
+         REAL(KIND=RKIND) :: Po = 0._RKIND
 !        Pressures at t+dt
-         REAL(KIND=RKIND) Pn
+         REAL(KIND=RKIND) :: Pn = 0._RKIND
 !        Imposed flow/pressure
-         REAL(KIND=RKIND) y
+         REAL(KIND=RKIND) :: y = 0._RKIND
 !        Name of the face
          CHARACTER(LEN=128) name
 !        RCR type BC

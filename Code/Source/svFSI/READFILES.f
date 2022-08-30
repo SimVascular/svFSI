@@ -440,6 +440,7 @@
      2            "File name for saving unknowns")
                cplBC%saveName = TRIM(appPath)//cplBC%saveName
 
+               cplBC%nXp = cplBC%nX
                lPtr => lPBC%get(cplBC%nXp,
      2            "Number of user-defined outputs")
                ALLOCATE(cplBC%xp(cplBC%nXp))
@@ -924,7 +925,7 @@
             cplBC%schm = cplBC_E
          END IF
          cplBC%nX   = cplBC%nFa
-         cplBC%nXp  = cplBC%nFa + 1
+         cplBC%nXp  = cplBC%nX + 1
          IF (ALLOCATED(cplBC%xo)) err = "ERROR: cplBC structure is "//
      2      "already initialized. Unexpected behavior."
          ALLOCATE(cplBc%xo(cplBc%nX), cplBC%xp(cplBC%nXp))
