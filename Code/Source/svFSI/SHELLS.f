@@ -976,7 +976,7 @@
      3   Nx(2,eNoN), Nxx(3,eNoN), aCov0(3,2), aCov(3,2), aCnv0(3,2),
      4   aCnv(3,2), r0_xx(2,2,3), r_xx(2,2,3), aa_0(2,2), aa_x(2,2),
      5   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Kc(3,3), Nm(3,3),
-     6   Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN), fl(2,2,nFn),
+     6   Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN),
      7   D0Bm(3,3,eNoN), D1Bm(3,3,eNoN), D1Bb(3,3,eNoN), D2Bb(3,3,eNoN),
      8   T1, BmS, BbS, NxSNx, BmDBm, BmDBb, BbDBm, BbDBb, fNa0(2,nFn)
 

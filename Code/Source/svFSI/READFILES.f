@@ -2485,6 +2485,7 @@ c     2         "can be applied for Neumann boundaries only"
       SELECT CASE (TRIM(ctmp))
       CASE ("active_stress", "stress")
          lDmn%ec%astress = .TRUE.
+         lPtr => list%get(lDmn%ec%eta_s, "Cross-fiber stress parameter")
 
       CASE ("active_strain", "strain")
          lDmn%ec%astrain = .TRUE.
@@ -2786,6 +2787,8 @@ c     2         "can be applied for Neumann boundaries only"
          CASE DEFAULT
             err = "Undefined type of fiber reinforcement stress"
          END SELECT
+         lPtr => lFib%get(lDmn%stM%Tf%eta_s,
+     2      "Cross-fiber stress parameter")
       END IF
 
 !     Check for shell model

@@ -1081,6 +1081,7 @@
          CALL cm%bcast(lStM%Tf%gt%r)
          CALL cm%bcast(lStM%Tf%gt%i)
       END IF
+      CALL cm%bcast(lStM%Tf%eta_s)
 
       RETURN
       END SUBROUTINE DIST_MATCONSTS
@@ -1123,6 +1124,7 @@
             CALL cm%bcast(lEc%Yat%i)
          END IF
       END IF
+      CALL cm%bcast(lEc%eta_s)
 
       RETURN
       END SUBROUTINE DIST_ECMODEL
