@@ -1298,6 +1298,10 @@
       lDmn%stM%afs     = 0._RKIND
       lDmn%stM%bfs     = 0._RKIND
       lDmn%stM%khs     = 100._RKIND
+      lDmn%stM%a0      = 0._RKIND
+      lDmn%stM%b1      = 0._RKIND
+      lDmn%stM%b2      = 0._RKIND
+      lDmn%stM%mu0     = 0._RKIND
 
       lDmn%stM%Tf%g     = 0._RKIND
       lDmn%stM%Tf%fType = 0
