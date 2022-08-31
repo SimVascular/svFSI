@@ -116,6 +116,7 @@
          DO
             iEqOld = cEq
 
+!           cplBC is invoked only for the first equation
             IF (cplBC%coupled .AND. cEq.EQ.1) THEN
                CALL SETBCCPL
                CALL SETBCDIR(An, Yn, Dn)

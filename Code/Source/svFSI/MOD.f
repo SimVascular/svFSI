@@ -204,9 +204,9 @@
          TYPE(MBType), ALLOCATABLE :: bm
       END TYPE bfType
 
-!     Fiber stress type
+!     Imposed fiber stress type
       TYPE fibStrsType
-!        Type of fiber stress
+!        Time dependence of fiber stress (steady/unsteady)
          INTEGER(KIND=IKIND) :: fType = 0
 !        Constant steady value
          REAL(KIND=8) :: g = 0._RKIND
@@ -250,6 +250,38 @@
          TYPE(fibStrsType) :: Tf
       END TYPE stModelType
 
+!     Excitation-contraction model type for electromechanics
+      TYPE eccModelType
+!        Active stress coupling
+         LOGICAL :: astress = .FALSE.
+!        Active strain coupling
+         LOGICAL :: astrain = .FALSE.
+
+!        If excitation is coupled with cellular activation model or
+!        imposed using an analytical function
+         LOGICAL :: caCpld = .TRUE.
+!        Type of active strain coupling
+         INTEGER(KIND=IKIND) :: asnType = asnType_NA
+!        Orthotropy parameter for active strain
+         REAL(KIND=RKIND) :: k = 1._RKIND
+
+!        Below variables are for decoupled excitation-contraction
+!        Type of decoupling: analytically function or prescribed
+         INTEGER :: dType = 0
+!        Input parameters file path
+         CHARACTER(LEN=stdL) :: fpar_in
+!        Time step for integration
+         REAL(KIND=RKIND) :: dt
+!        Time integration options
+         TYPE(odeType) :: odeS
+!        State variable for excitation-contraction coupling
+!          := activation force for active stress model
+!          := fiber contraction parameter for active strain model
+         REAL(KIND=RKIND) :: Ya = 0._RKIND
+!        Unsteady time-dependent values for prescribed fiber-shortening
+         TYPE(fcType) :: Yat
+      END TYPE eccModelType
+
 !     Fluid viscosity model type
       TYPE viscModelType
 !        Type of constitutive model for fluid viscosity
@@ -279,10 +311,10 @@
          REAL(KIND=RKIND) :: prop(maxNProp) = 0._RKIND
 !        Electrophysiology model
          TYPE(cepModelType) :: cep
-!        Excitation-contraction coupling
-         TYPE(eccModelType) :: ec
 !        Structure material model
          TYPE(stModelType) :: stM
+!        Excitation-contraction coupling
+         TYPE(eccModelType) :: ec
 !        Viscosity model for fluids
          TYPE(viscModelType) :: visc
       END TYPE dmnType
@@ -416,7 +448,7 @@
 !        Only for data alignment       (-)
          INTEGER(KIND=IKIND) reserve
 !        Absolute tolerance            (IN)
-         REAL(KIND=RKIND) :: absTol = 1.E-8_RKIND
+         REAL(KIND=RKIND) :: absTol = 1.E-12_RKIND
 !        Relative tolerance            (IN)
          REAL(KIND=RKIND) :: relTol = 1.E-8_RKIND
 !        Initial norm of residual      (OUT)
@@ -457,15 +489,15 @@
 !        Internal genBC use
          INTEGER(KIND=IKIND) :: eqv = 0
 !        Flow rates at t
-         REAL(KIND=RKIND) Qo
+         REAL(KIND=RKIND) :: Qo = 0._RKIND
 !        Flow rates at t+dt
-         REAL(KIND=RKIND) Qn
+         REAL(KIND=RKIND) :: Qn = 0._RKIND
 !        Pressures at t
-         REAL(KIND=RKIND) Po
+         REAL(KIND=RKIND) :: Po = 0._RKIND
 !        Pressures at t+dt
-         REAL(KIND=RKIND) Pn
+         REAL(KIND=RKIND) :: Pn = 0._RKIND
 !        Imposed flow/pressure
-         REAL(KIND=RKIND) y
+         REAL(KIND=RKIND) :: y = 0._RKIND
 !        Name of the face
          CHARACTER(LEN=128) name
 !        RCR type BC
@@ -657,12 +689,14 @@
          REAL(KIND=RKIND) gam
 !        Initial norm of residual
          REAL(KIND=RKIND) iNorm
-!        First iteration norm
+!        First iteration preconditioned relative residual norm
          REAL(KIND=RKIND) pNorm
 !        \rho_{infinity}
          REAL(KIND=RKIND) roInf
 !        Accepted relative tolerance
          REAL(KIND=RKIND) :: tol
+!        Accepted absolute tolerance
+         REAL(KIND=RKIND) :: absTol = 1.E-15_RKIND
 !        Equation symbol
          CHARACTER(LEN=2) :: sym = "NA"
 !        type of linear solver
@@ -855,6 +889,8 @@
       LOGICAL pstEq
 !     Whether velocity-pressure based structural dynamics solver is used
       LOGICAL sstEq
+!     Whether excitation-contraction is coupled
+      LOGICAL ecCpld
 !     Whether to detect and apply any contact model
       LOGICAL iCntct
 !     Whether any Immersed Boundary (IB) treatment is required
@@ -980,6 +1016,11 @@
       REAL(KIND=RKIND), ALLOCATABLE :: Pinit(:)
       REAL(KIND=RKIND), ALLOCATABLE :: Vinit(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: Dinit(:,:)
+
+!     State variable for excitation-contraction coupling
+!       := activation force for active stress model
+!       := fiber contraction parameter for active strain model
+      REAL(KIND=RKIND), ALLOCATABLE :: ec_Ya(:)
 
 !     CMM-variable wall properties: 1-thickness, 2-Elasticity modulus
       REAL(KIND=RKIND), ALLOCATABLE :: varWallProps(:,:)

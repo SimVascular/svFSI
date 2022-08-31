@@ -96,7 +96,6 @@
 
    int def ( unsigned char* in, int nin, unsigned char* out, int* nout, int level ) {
       int ret, flush;
-      char c;
 
       z_stream strm;
       strm.zalloc = 0;

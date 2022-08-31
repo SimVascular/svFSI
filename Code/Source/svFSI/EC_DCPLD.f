@@ -46,8 +46,6 @@
 
       INTEGER(KIND=IKIND) slen
 
-      ec%Ya = 0._RKIND
-
 !     Overwrite parameters with user-provided input file
       slen = LEN(TRIM(ec%fpar_in))
       IF (slen .GT. 0) THEN
@@ -65,12 +63,12 @@
       SUBROUTINE EC_DCPLD_GETY(ec)
       USE ECMOD
       USE COMMOD, ONLY : eccModelType, IKIND, RKIND, tIntType_FE,
-     2   tIntType_RK4, tIntType_BE, err, dt, time
+     2   tIntType_RK4, tIntType_BE, bType_std, bType_ustd, err, dt, time
       IMPLICIT NONE
       TYPE(eccModelType), INTENT(INOUT) :: ec
 
       INTEGER i, nt
-      REAL(KIND=RKIND) :: t, ts
+      REAL(KIND=RKIND) :: t, ts, rtmp
 
 !     Total time steps
       nt = NINT(dt/ec%dt, KIND=IKIND)
@@ -106,9 +104,17 @@
          END IF
 
 !     Excitation-contraction coupling due to active strain
+!     Compute prescribed fiber shortening value
       ELSE IF (ec%astrain) THEN
-         CALL EC_ACTVSTRN(time, ec%Ya)
+         IF (BTEST(ec%dType, bType_std)) THEN
+            RETURN
 
+         ELSE IF (BTEST(ec%dType, bType_ustd)) THEN
+            CALL IFFT(ec%Yat, ec%Ya, rtmp)
+
+         ELSE
+            CALL EC_ACTVSTRN_SIN2(time, ec%Ya)
+         END IF
       END IF
 
       RETURN

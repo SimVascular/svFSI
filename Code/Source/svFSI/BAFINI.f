@@ -66,7 +66,8 @@
          END DO
       END DO
 
-!     cplBC faces are initialized here
+!     cplBC faces are initialized here. Assuming that cplBC is always
+!     in the first equation
       iEq = 1
       IF (ALLOCATED(cplBC%fa)) DEALLOCATE(cplBC%fa)
       IF (ALLOCATED(cplBC%xn)) DEALLOCATE(cplBC%xn)
@@ -94,7 +95,7 @@
                   cplBC%fa(i)%RCR%Pd = eq(iEq)%bc(iBc)%RCR%Pd
                   cplBC%fa(i)%RCR%Xo = eq(iEq)%bc(iBc)%RCR%Xo
                ELSE
-                  err = "Not a compatible cplBC_type"
+                  err = " Not a compatible cplBC_type"
                END IF
             END IF
          END DO

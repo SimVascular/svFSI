@@ -517,6 +517,7 @@
       CALL cm%bcast(lEq%nBc)
       CALL cm%bcast(lEq%nBf)
       CALL cm%bcast(lEq%tol)
+      CALL cm%bcast(lEq%absTol)
       CALL cm%bcast(lEq%useTLS)
       CALL cm%bcast(lEq%assmTLS)
       IF (ibFlag) THEN
@@ -579,20 +580,14 @@
             END IF
          END IF
 
-         IF (ecCpld) THEN
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%caCpld)
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%astress)
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%astrain)
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%asnType)
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%odes%tIntType)
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%fpar_in)
-            CALL cm%bcast(lEq%dmn(iDmn)%ec%dt)
-         END IF
-
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
      2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct) .OR.
      3       (lEq%dmn(iDmn)%phys .EQ. phys_shell)) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
+         END IF
+
+         IF (ecCpld) THEN
+            CALL DIST_ECMODEL(lEq%dmn(iDmn)%ec)
          END IF
 
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
@@ -1034,7 +1029,7 @@
       END SUBROUTINE DISTBF
 !--------------------------------------------------------------------
 !     This subroutine distributes constants and parameters of the
-!     constitutive model to all processes
+!     structural constitutive model to all processes
       SUBROUTINE DIST_MATCONSTS(lStM)
       USE COMMOD
       USE ALLFUN
@@ -1091,7 +1086,49 @@
       END SUBROUTINE DIST_MATCONSTS
 !--------------------------------------------------------------------
 !     This subroutine distributes constants and parameters of the
-!     constitutive model to all processes
+!     excitation-contraction coupling model
+      SUBROUTINE DIST_ECMODEL(lEc)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(eccModelType), INTENT(INOUT) :: lEc
+
+      CALL cm%bcast(lEc%astress)
+      CALL cm%bcast(lEc%astrain)
+      CALL cm%bcast(lEc%asnType)
+      CALL cm%bcast(lEc%k)
+      CALL cm%bcast(lEc%caCpld)
+      CALL cm%bcast(lEc%fpar_in)
+      IF (.NOT.lEc%caCpld) THEN
+         CALL cm%bcast(lEc%odes%tIntType)
+         CALL cm%bcast(lEc%dt)
+         CALL cm%bcast(lEc%dType)
+         IF (BTEST(lEc%dType, bType_std)) THEN
+            CALL cm%bcast(lEc%Ya)
+         ELSE IF (BTEST(lEc%dType, bType_ustd)) THEN
+            CALL cm%bcast(lEc%Yat%lrmp)
+            CALL cm%bcast(lEc%Yat%d)
+            CALL cm%bcast(lEc%Yat%n)
+            IF (cm%slv()) THEN
+               ALLOCATE(lEc%Yat%qi(lEc%Yat%d))
+               ALLOCATE(lEc%Yat%qs(lEc%Yat%d))
+               ALLOCATE(lEc%Yat%r(lEc%Yat%d,lEc%Yat%n))
+               ALLOCATE(lEc%Yat%i(lEc%Yat%d,lEc%Yat%n))
+            END IF
+            CALL cm%bcast(lEc%Yat%ti)
+            CALL cm%bcast(lEc%Yat%T)
+            CALL cm%bcast(lEc%Yat%qi)
+            CALL cm%bcast(lEc%Yat%qs)
+            CALL cm%bcast(lEc%Yat%r)
+            CALL cm%bcast(lEc%Yat%i)
+         END IF
+      END IF
+
+      RETURN
+      END SUBROUTINE DIST_ECMODEL
+!--------------------------------------------------------------------
+!     This subroutine distributes constants and parameters of the
+!     fluid viscosity constitutive model to all processes
       SUBROUTINE DIST_VISCMODEL(lVis)
       USE COMMOD
       USE ALLFUN
