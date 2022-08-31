@@ -102,7 +102,7 @@
          IF (lM%eType .EQ. eType_TRI3) THEN
 !           Constant strain triangles, no numerical integration
             CALL SHELLCST(lM, e, eNoN, nFn, fN, al, yl, dl, xl, bfl,
-     2                     ptr)
+     2         ptr)
 
          ELSE
             lR = 0._RKIND
@@ -113,8 +113,8 @@
 
 !           Gauss integration
             DO g=1, lM%nG
-               CALL SHELL3D(lM, g, eNoN, nFn, fN, al, yl, dl, xl, 
-     2               bfl, lR, lK)
+               CALL SHELL3D(lM, g, eNoN, nFn, fN, al, yl, dl, xl,
+     2            bfl, lR, lK)
             END DO
 
 !           Assembly
@@ -137,7 +137,7 @@
 !####################################################################
 !     Construct shell mechanics for constant strain triangle elements
       SUBROUTINE SHELLCST (lM, e, eNoN, nFn, fN, al, yl, dl, xl, bfl,
-     2                     ptr)
+     2   ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -147,14 +147,13 @@
      2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN), fN(3,nFn)
 
       LOGICAL :: setIt(3)
-      INTEGER(KIND=IKIND) :: i, j, k, l, a, b, g
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b, g, iFn
       REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, Jac0, Jac, fb(3),
      2   ud(3), nV0(3), nV(3), x0(3,eNoN), xc(3,eNoN), aCov(3,2),
      3   aCov0(3,2), aCnv(3,2), aCnv0(3,2), aa_0(2,2), aa_x(2,2),
      4   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Bm(3,3,lM%eNoN),
      5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN),
-     6   D1Bb(3,3,eNoN), D2Bb(3,3,eNoN), BtS, NxSNx, BtDB, iFn,
-     7   fNa0(2,nFn)
+     6   D1Bb(3,3,eNoN), D2Bb(3,3,eNoN), BtS, NxSNx, BtDB, fNa0(2,nFn)
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:),
      2   lK(:,:,:), tmpX(:,:)
@@ -229,12 +228,6 @@
             fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
          END DO
       END DO
-!       fNa0(1,1) = 0.70710678118_RKIND
-!       fNa0(2,1) = 0.70710678118_RKIND
-!       fNa0(1,2) = 0.70710678118_RKIND
-!       fNa0(2,2) = -0.70710678118_RKIND
-!       PRINT *, aCov0
-!       PRINT *, "++++++++++++++++++++++++++++++"
 
 !---------------------------------------------------------------------
 !     Define variation in membrane strain only for the main element
@@ -283,7 +276,7 @@
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2     bb_x, Sm, Dm)
+     2   bb_x, Sm, Dm)
 
 !---------------------------------------------------------------------
 !     Contribution to tangent matrices: Dm * Bm, Dm*Bb
@@ -966,7 +959,7 @@
 !####################################################################
 !     Construct shell mechanics for higher order elements/NURBS
       SUBROUTINE SHELL3D (lM, g, eNoN, nFn, fN, al, yl, dl, xl, bfl,
-     2        lR, lK)
+     2   lR, lK)
       USE COMMOD
       USE MATFUN
       IMPLICIT NONE
@@ -977,7 +970,7 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
      2   lK(dof*dof,eNoN,eNoN)
 
-      INTEGER(KIND=IKIND) :: i, j, k, l, a, b
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b, iFn
       REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, wh, Jac0, Jac,
      2   fb(3), ud(3), nV0(3), nV(3), N(eNoN), x0(3,eNoN), xc(3,eNoN),
      3   Nx(2,eNoN), Nxx(3,eNoN), aCov0(3,2), aCov(3,2), aCnv0(3,2),
@@ -985,8 +978,7 @@
      5   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Kc(3,3), Nm(3,3),
      6   Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN), fl(2,2,nFn),
      7   D0Bm(3,3,eNoN), D1Bm(3,3,eNoN), D1Bb(3,3,eNoN), D2Bb(3,3,eNoN),
-     8   T1, BmS, BbS, NxSNx, BmDBm, BmDBb, BbDBm, BbDBb, iFn, 
-     9   fNa0(2,nFn)
+     8   T1, BmS, BbS, NxSNx, BmDBm, BmDBb, BbDBm, BbDBb, fNa0(2,nFn)
 
 !     Define parameters
       rho   = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -1073,9 +1065,6 @@ c=====================================================================
          END DO
       END DO
 
-!       PRINT *, aCov0
-!       PRINT *, "++++++++++++++++++++++++++++++"
-
 !---------------------------------------------------------------------
 !     Now compute preliminaries on the current configuration
 !     Covariant and contravariant bases (current/spatial config)
@@ -1112,7 +1101,7 @@ c=====================================================================
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2     bb_x, Sm, Dm)
+     2   bb_x, Sm, Dm)
 
 !---------------------------------------------------------------------
 !     Variation in the membrane strain
@@ -1326,7 +1315,7 @@ c=====================================================================
 !####################################################################
 !     Compute stress resultants for shell elements
       SUBROUTINE SHL_STRS_RES(lDmn, nFn, fNa0, aa_0, aa_x, bb_0, bb_x,
-     2        Sm, Dm)
+     2   Sm, Dm)
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
