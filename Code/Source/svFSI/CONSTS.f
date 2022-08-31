@@ -181,11 +181,13 @@
 !     Kirchhoff, NeoHookean, Mooney-Rivlin, Holzapfel-Gasser-Ogden with
 !     dispersion (decoupled), HGO model with modified anisotropic
 !     components, Guccione (1995), Holzapfel-Ogden (HO) model for
-!     myocardium (decoupled), HO model with modified anisotropy
+!     myocardium (decoupled), HO model with modified anisotropy,
+!     Lee-Sacks model for valve
       INTEGER(KIND=IKIND), PARAMETER :: stIso_NA = 600, stIso_lin = 601,
      2   stIso_StVK = 602, stIso_mStVK = 603, stIso_nHook = 604,
      3   stIso_MR = 605, stIso_HGO_d = 606, stIso_HGO_ma = 607,
-     4   stIso_Gucci = 608, stIso_HO_d = 609, stIso_HO_ma = 610
+     4   stIso_Gucci = 608, stIso_HO_d = 609, stIso_HO_ma = 610,
+     5   stIso_LS = 611
 !--------------------------------------------------------------------
 !     Type of constitutive model (volumetric) for structure eqn:
 !     Quadratic, Simo-Taylor91, Miehe94

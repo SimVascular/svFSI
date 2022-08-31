@@ -241,6 +241,11 @@
          REAL(KIND=RKIND) :: kap = 0._RKIND
 !        Heaviside function parameter (Holzapfel-Ogden model)
          REAL(KIND=RKIND) :: khs = 100._RKIND
+!        Lee-Sacks model
+         REAL(KIND=RKIND) :: a0   = 0._RKIND
+         REAL(KIND=RKIND) :: b1   = 0._RKIND
+         REAL(KIND=RKIND) :: b2   = 0._RKIND
+         REAL(KIND=RKIND) :: mu0  = 0._RKIND
 !        Fiber reinforcement stress
          TYPE(fibStrsType) :: Tf
       END TYPE stModelType
