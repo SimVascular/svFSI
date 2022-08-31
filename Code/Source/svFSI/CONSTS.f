@@ -150,7 +150,8 @@
 !     strain invariants (fluid), energy flux, heat flux, absolute
 !     velocity (for FSI), fiber directions, fiber alignment, 2nd Piola-
 !     Kirchhoff stress, Cauchy stress, von Mises stress, Jacobian,
-!     Def. grad. tensor, Green strain, divergence of velocity, viscosity
+!     Def. grad. tensor, Green strain, divergence of velocity,viscosity,
+!     fiber shortening (active strain)
       INTEGER(KIND=IKIND), PARAMETER :: outGrp_NA = 500, outGrp_A = 501,
      2   outGrp_Y = 502, outGrp_D = 503, outGrp_I = 504, outGrp_WSS =
      3   505, outGrp_trac = 506, outGrp_vort = 507, outGrp_vortex = 508,
@@ -158,7 +159,7 @@
      5   outGrp_absV = 512, outGrp_fN = 513, outGrp_fA = 514,
      6   outGrp_stress = 515, outGrp_cauchy = 516, outGrp_mises = 517,
      7   outGrp_J = 518, outGrp_F = 519, outGrp_strain = 520,
-     8   outGrp_divV = 521, outGrp_Visc = 522
+     8   outGrp_divV = 521, outGrp_Visc = 522, outGrp_fS = 523
 !--------------------------------------------------------------------
       INTEGER(KIND=IKIND), PARAMETER :: out_velocity = 599,
      2   out_pressure = 598, out_temperature = 597, out_voltage = 596,
@@ -168,7 +169,8 @@
      6   out_heatFlux = 586, out_absVelocity = 585, out_fibDir = 584,
      7   out_fibAlign = 583, out_stress = 582, out_cauchy = 581,
      8   out_mises = 580, out_jacobian = 579, out_defGrad = 578,
-     9   out_strain = 577, out_divergence = 576, out_viscosity = 575
+     9   out_strain = 577, out_divergence = 576, out_viscosity = 575,
+     1   out_fibStrn = 574
 !--------------------------------------------------------------------
 !     Mesher choice for remeshing for moving wall problems
       INTEGER(KIND=IKIND), PARAMETER :: RMSH_TETGEN = 1,
@@ -179,12 +181,13 @@
 !     Kirchhoff, NeoHookean, Mooney-Rivlin, Holzapfel-Gasser-Ogden with
 !     dispersion (decoupled), HGO model with modified anisotropic
 !     components, Guccione (1995), Holzapfel-Ogden (HO) model for
-!     myocardium (decoupled), HO model with modified anisotropy
+!     myocardium (decoupled), HO model with modified anisotropy,
+!     Lee-Sacks model for valve
       INTEGER(KIND=IKIND), PARAMETER :: stIso_NA = 600, stIso_lin = 601,
      2   stIso_StVK = 602, stIso_mStVK = 603, stIso_nHook = 604,
      3   stIso_MR = 605, stIso_HGO_d = 606, stIso_HGO_ma = 607,
      4   stIso_Gucci = 608, stIso_HO_d = 609, stIso_HO_ma = 610,
-     5   stIso_L_Scks = 611
+     5   stIso_LS = 611
 !--------------------------------------------------------------------
 !     Type of constitutive model (volumetric) for structure eqn:
 !     Quadratic, Simo-Taylor91, Miehe94
@@ -195,6 +198,14 @@
 !     model, Cassons non-Newtonian model
       INTEGER(KIND=IKIND), PARAMETER :: viscType_NA = 699,
      2   viscType_Const = 698, viscType_CY = 697, viscType_Cass = 696
+!--------------------------------------------------------------------
+!     Type of excitation-contraction coupling for active strain-based
+!     electromechanics formulation: transversely isotropic,
+!     orthotropic activation, and transmurally heterogenous orthotropic
+!     actvation.
+      INTEGER(KIND=IKIND), PARAMETER :: asnType_NA = 300,
+     2   asnType_tiso = 301, asnType_ortho = 302,
+     3   asnType_hetortho = 303
 !--------------------------------------------------------------------
 !     Preconditioner definitions
       INTEGER(KIND=IKIND), PARAMETER :: PREC_NONE = 700,

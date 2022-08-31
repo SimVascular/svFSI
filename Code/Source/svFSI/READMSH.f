@@ -429,7 +429,7 @@
             ALLOCATE(msh(iM)%tmX(msh(iM)%gnNo),
      2         msh(iM)%x(1,msh(iM)%gnNo))
             msh(iM)%x = 0._RKIND
-            CALL READVTUPDATA(msh(iM), ctmp, "trans_mur_coord", 1, 1)
+            CALL READVTUPDATA(msh(iM), ctmp, "Phi_EPI", 1, 1)
             DO a=1, msh(iM)%gnNo
                msh(iM)%tmX(a) = msh(iM)%x(1,a)
             END DO

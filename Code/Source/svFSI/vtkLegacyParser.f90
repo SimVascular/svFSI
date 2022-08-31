@@ -92,7 +92,7 @@
          character(len=strL), dimension(maxToks) :: tokenList
          character :: c
 
-         integer(IK) :: i,j,k,fid,iPos,n1,n2
+         integer(IK) :: i,j,fid,iPos,n1,n2
          integer(IK) :: itmp,ntoks,slen
          real(RK)    :: rtmp
 
@@ -479,7 +479,7 @@
          character(len=*), intent(in) :: sKwrd
          character(len=strL), intent(out) :: sLine
 
-         integer :: i,kwrdL,cnt
+         integer :: kwrdL,cnt
          character :: c
 
          kwrdL = len(trim(sKwrd))
@@ -528,7 +528,7 @@
          integer, intent(inout) :: fid,iPos,istat
          character(len=*), intent(inout) :: rLine
 
-         integer :: i,j,k
+         integer :: i,j
          integer :: ist,iend,vecl
          character(len=strL) :: vType
          integer, dimension(:), allocatable :: tmpI

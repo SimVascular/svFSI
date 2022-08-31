@@ -59,21 +59,9 @@
                res(:,Ac) = tmpV(:,a)
             END DO
 
-         ELSE IF (outGrp .EQ. outGrp_J) THEN
-            IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
-            ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
-            tmpV  = 0._RKIND
-            tmpVe = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq, outGrp)
-            res  = 0._RKIND
-            DO a=1, msh(iM)%nNo
-               Ac = msh(iM)%gN(a)
-               res(1,Ac) = tmpV(1,a)
-            END DO
-            DEALLOCATE(tmpV, tmpVe)
-            ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
-
-         ELSE IF (outGrp .EQ. outGrp_mises) THEN
+         ELSE IF ((outGrp .EQ. outGrp_J)  .OR.
+     2            (outGrp .EQ. outGrp_fS) .OR.
+     3            (outGrp .EQ. outGrp_mises) ) THEN
             IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
             ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
             tmpV  = 0._RKIND
@@ -606,7 +594,7 @@
                IF (ALLOCATED(lM%tmX)) THEN
                   tmXl(a) = lM%tmX(b)
                END IF
-               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+               IF (ALLOCATED(ec_Ya)) THEN
                   ya_l(a) = ec_Ya(Ac)
                ELSE
                   ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya
@@ -614,6 +602,7 @@
             END IF
          END DO
 
+!        Gauss integration
          Je = 0._RKIND
          DO g=1, fs%nG
             IF (g.EQ.1 .OR. .NOT.fs%lShpF) THEN
@@ -627,6 +616,7 @@
             F   = Im
             tmX = 0._RKIND
             ya  = 0._RKIND
+!           Interpolate quantities at the integration point
             DO a=1, fs%eNoN
                IF (nsd .EQ. 3) THEN
                   F(1,1) = F(1,1) + Nx(1,a)*dl(i,a)
@@ -805,6 +795,10 @@
                   resl(1) = vmises
                   sE(e)   = sE(e) + w*vmises
                END IF
+
+            CASE (outGrp_fS)
+!           Fiber shortening (active strain model)
+               resl(1) = ya
 
             END SELECT
 

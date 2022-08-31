@@ -103,7 +103,7 @@
                IF (ALLOCATED(lM%tmX)) THEN
                   tmXl(a) = lM%tmX(lM%lN(Ac))
                END IF
-               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+               IF (ALLOCATED(ec_Ya)) THEN
                   ya_l(a) = ec_Ya(Ac)
                ELSE
                   ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya

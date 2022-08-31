@@ -105,7 +105,7 @@
             END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
             IF (ecCpld) THEN
-               IF (eq(cEq)%dmn(cDmn)%ec%caCpld) THEN
+               IF (ALLOCATED(ec_Ya)) THEN
                   ya_l(a) = ec_Ya(Ac)
                ELSE
                   ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya

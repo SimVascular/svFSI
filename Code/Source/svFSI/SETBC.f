@@ -922,16 +922,13 @@
       REAL(KIND=RKIND) tmp
 
       IF (cplBC%schm .EQ. cplBC_I) THEN
-         CALL CALCDERCPLBC
+         CALL CALCDERCPLBC()
+
       ELSE
-         RCRflag = .FALSE.
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
             ptr = eq(iEq)%bc(iBc)%cplBCptr
-            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
-               IF (.NOT.RCRflag) RCRflag = .TRUE.
-            END IF
             IF (ptr .NE. 0) THEN
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
@@ -947,9 +944,15 @@
                END IF
             END IF
          END DO
+
          IF (cplBC%useGenBC) THEN
             CALL genBC_Integ_X('T')
          ELSE
+            RCRflag = .FALSE.
+            IF (ANY(BTEST(eq(iEq)%bc(:)%bType,bType_RCR))) THEN
+               IF (.NOT.RCRflag) RCRflag = .TRUE.
+            END IF
+
             CALL cplBC_Integ_X(RCRflag)
          END IF
       END IF
@@ -978,16 +981,12 @@
 
       REAL(KIND=RKIND), ALLOCATABLE :: orgY(:), orgQ(:)
 
-      IF (ALL(cplBC%fa%bGrp.EQ.cplBC_Dir)) RETURN
+      IF (ALL(cplBC%fa%bGrp .EQ. cplBC_Dir)) RETURN
 
-      RCRflag = .FALSE.
       DO iBc=1, eq(iEq)%nBc
          iFa = eq(iEq)%bc(iBc)%iFa
          iM  = eq(iEq)%bc(iBc)%iM
          ptr = eq(iEq)%bc(iBc)%cplBCptr
-         IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
-            IF (.NOT.RCRflag) RCRflag = .TRUE.
-         END IF
          IF (ptr .NE. 0) THEN
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
@@ -1007,6 +1006,11 @@
       IF (cplBC%useGenBC) THEN
          CALL genBC_Integ_X('D')
       ELSE
+         RCRflag = .FALSE.
+         IF (ANY(BTEST(eq(iEq)%bc(:)%bType, bType_RCR))) THEN
+            RCRflag = .TRUE.
+         END IF
+
          CALL cplBC_Integ_X(RCRflag)
       END IF
 
@@ -1073,7 +1077,7 @@
             END IF
          END DO
          fid = 1
-         OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
+         OPEN(fid, FILE=TRIM(cplBC%commuName), FORM='UNFORMATTED')
          WRITE(fid) genFlag
          WRITE(fid) dt
          WRITE(fid) nDir
