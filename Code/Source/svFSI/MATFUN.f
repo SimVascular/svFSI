@@ -520,7 +520,30 @@
       END DO
 
       RETURN
-      END FUNCTION TEN_ASYMPROD
+      END FUNCTION TEN_ASYMPROD12
+!--------------------------------------------------------------------
+!     Create a 4th order tensor from antisymmetric outer product of
+!     two matrices
+!     Cijkl = Aij*Bkl-Aik*Bjl
+      FUNCTION TEN_ASYMPROD13(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nd
+      REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd), B(nd,nd)
+      REAL(KIND=RKIND) :: C(nd,nd,nd,nd)
+
+      INTEGER(KIND=IKIND) :: ii, nn, i, j, k, l
+
+      nn = nd**4
+      DO ii=1, nn
+         i = t_ind(1,ii)
+         j = t_ind(2,ii)
+         k = t_ind(3,ii)
+         l = t_ind(4,ii)
+         C(i,j,k,l) = 0.5_RKIND * ( A(i,j)*B(k,l) - A(i,k)*B(j,l) )
+      END DO
+
+      RETURN
+      END FUNCTION TEN_ASYMPROD13
 !--------------------------------------------------------------------
 !     Transpose of a 4th order tensor [A^T]_ijkl = [A]_klij
       FUNCTION TEN_TRANSPOSE(A, nd) RESULT(B)

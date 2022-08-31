@@ -1100,9 +1100,10 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
       REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
 
+      INTEGER(KIND=IKIND) :: iFn, a, b
       REAL(KIND=RKIND) :: Jg2i, I1, mu, gi_0(2,2), gi_x(2,2), S(2,2),
-     2   CC(2,2,2,2), SN(2,2), CCN(2,2,2,2), a, b, Inv4, Inv6, Inv8,
-     3   Eff, Ess, Efs, flM(2,2), c4f, c4s, dc4f, dc4s, d1, iFn,
+     2   CC(2,2,2,2), SN(2,2), CCN(2,2,2,2), Inv4, Inv6, Inv8,
+     3   Eff, Ess, Efs, flM(2,2), c4f, c4s, dc4f, dc4s, d1,
      4   fl(2,2,nfd), Hfs(2,2), EI1, I1T, g1, g2
       TYPE(stModelType) :: stM
 
@@ -1302,10 +1303,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       INTEGER(KIND=IKIND), PARAMETER :: MAXITR = 20
       REAL(KIND=RKIND), PARAMETER :: ATOL = 1E-10
 
-      INTEGER(KIND=IKIND) :: itr, i, j, k, l
+      INTEGER(KIND=IKIND) :: itr, i, j, k, l, iFn
       REAL(KIND=RKIND) :: Jg2, J2, J23, f13, f23, trC3, C33, kap, mu,
      2   pJ, plJ, gi_x(2,2), gi_0(3,3), Ci(3,3), S(3,3), CC(3,3,3,3),
-     3   fl(2,2,nfd), iFn, C1, C2, J43, Gi4AS
+     3   fl(2,2,nfd), C1, C2, J43, Gi4AS(3,3,3,3), I2, I2ij(3,3),
+     4   I2ijkl(3,3,3,3), Cikl(3,3,3,3)
       TYPE(stModelType) :: stM
 
       Sml  = 0._RKIND
@@ -1373,17 +1375,42 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
             J43 = J2**(-f23)
             Gi4AS = TEN_ASYMPROD12(gi_0, gi_0, 3)
             I2  = MAT_DDOT(Ci, TEN_MDDOT(Gi4AS, Ci, 3), 3)
-            I2ij = TEN_MDDOT(, Ci, 3)
+            I2ijkl = TEN_DYADPROD(gi_0, gi_0, 3) - 
+     2                              TEN_SYMMPROD(gi_0, gi_0, 3)          
+            I2ij = TEN_MDDOT(I2ijkl, Ci, 3)
+            Cikl = -0.5_RKIND*TEN_SYMMPROD(Ci, Ci, 3)
 
             S  = C1*J23*(gi_0 - trC3*Ci) + pJ*Ci
-            S  = S + C2*J43*(-f23*J43*Ci)
+            S  = S + C2*J43*(-f23*I2*Ci + I2ij)
 
 !           Elasticity tensor
             CC = (C1*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
      2         + (C1*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
      3         - f23*C1*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
      4                       TEN_DYADPROD(Ci, gi_0, 3))
+            CC = CC + 2._RKIND*f23*C2*J43*( 
+     2               TEN_DYADPROD((f23*I2*Ci-I2ij), Ci, 3) - I2*Cikl
+     3                - TEN_DYADPROD(Ci, I2ij, 3) + I2ijkl)
+                     
+         CASE (stIso_HO_ma)
+!           2nd Piola Kirchhoff stress
+            S  = mu*J23*(gi_0 - trC3*Ci) + pJ*Ci
 
+!           Elasticity tensor
+            CC = (mu*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (mu*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*mu*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+     4                       TEN_DYADPROD(Ci, gi_0, 3))
+
+         CASE (stIso_LS)
+!           2nd Piola Kirchhoff stress
+            S  = mu*J23*(gi_0 - trC3*Ci) + pJ*Ci
+
+!           Elasticity tensor
+            CC = (mu*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (mu*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*mu*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+     4                       TEN_DYADPROD(Ci, gi_0, 3))
             
 
          CASE DEFAULT
@@ -1398,7 +1425,10 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          END IF
 
          C33 = C33 - (2._RKIND*S(3,3)/CC(3,3,3,3))
+      !    PRINT *, S(3,3)
+      !    PRINT *, "++++++++++++++++++++++++"
       END DO
+      ! PRINT *, "====================================="
 
 !     Statically condense CC
       DO i=1, 2

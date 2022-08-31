@@ -59,7 +59,7 @@ option(SV_USE_NOTIMER "Use notimer" ON)
 option(SV_USE_METIS_SVFSI "Use metis_svfsi Library" ON)
 option(SV_USE_PARMETIS_SVFSI "Use parmetis_svfsi Library" ON)
 option(SV_USE_TETGEN "Use tetgen Library" ON)
-option(SV_USE_TRILINOS "Use Trilinos Library with svFSI" OFF)
+option(SV_USE_TRILINOS "Use Trilinos Library with svFSI" ON)
 #-----------------------------------------------------------------------------
 
 #-----------------------------------------------------------------------------
