@@ -1058,6 +1058,10 @@
       CALL cm%bcast(lStM%bfs)
       CALL cm%bcast(lStM%kap)
       CALL cm%bcast(lStM%khs)
+      CALL cm%bcast(lStM%a0)
+      CALL cm%bcast(lStM%b1)
+      CALL cm%bcast(lStM%b2)
+      CALL cm%bcast(lStM%mu0)
 
 !     Distribute fiber stress
       CALL cm%bcast(lStM%Tf%fType)

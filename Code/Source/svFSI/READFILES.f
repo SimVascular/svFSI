@@ -2664,6 +2664,15 @@ c     2         "can be applied for Neumann boundaries only"
          lPtr => lSt%get(lDmn%stM%bfs, "bfs")
          lPtr => lSt%get(lDmn%stM%khs, "k")
 
+      CASE ("Lee-Sacks", "L-Scks")
+      ! Holzapefel and Ogden model for myocardium !
+         lDmn%stM%isoType = stIso_L_Scks
+         lPtr => lSt%get(lDmn%stM%a, "a")
+         lPtr => lSt%get(lDmn%stM%a0, "a0")
+         lPtr => lSt%get(lDmn%stM%b1, "b1")
+         lPtr => lSt%get(lDmn%stM%b2, "b2")
+         lPtr => lSt%get(lDmn%stM%mu0, "mu0")
+
       CASE DEFAULT
          lDmn%stM%isoType = stIso_nHook
          lDmn%stM%C10 = mu*0.5_RKIND
@@ -2707,9 +2716,9 @@ c     2         "can be applied for Neumann boundaries only"
 
 !     Check for shell model
       IF (lDmn%phys .EQ. phys_shell) THEN
-         IF (lDmn%stM%isoType .NE. stIso_nHook) THEN
-            err = "Only Neo-Hookean model is allowed for shell elements"
-         END IF
+         ! IF (lDmn%stM%isoType .NE. stIso_nHook) THEN
+         !    err = "Only Neo-Hookean model is allowed for shell elements"
+         ! END IF
 
 !        ST91 is the default and the only dilational penalty model for
 !        compressible shell elements. This is set to avoid any square-
