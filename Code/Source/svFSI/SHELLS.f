@@ -229,12 +229,6 @@
             fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
          END DO
       END DO
-!       fNa0(1,1) = 0.70710678118_RKIND
-!       fNa0(2,1) = 0.70710678118_RKIND
-!       fNa0(1,2) = 0.70710678118_RKIND
-!       fNa0(2,2) = -0.70710678118_RKIND
-!       PRINT *, aCov0
-!       PRINT *, "++++++++++++++++++++++++++++++"
 
 !---------------------------------------------------------------------
 !     Define variation in membrane strain only for the main element
@@ -1072,9 +1066,6 @@ c=====================================================================
             fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
          END DO
       END DO
-
-!       PRINT *, aCov0
-!       PRINT *, "++++++++++++++++++++++++++++++"
 
 !---------------------------------------------------------------------
 !     Now compute preliminaries on the current configuration

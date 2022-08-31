@@ -477,6 +477,51 @@
       RETURN
       END FUNCTION TEN_SYMMPROD
 !--------------------------------------------------------------------
+!     Create a 4th order tensor from antisymmetric outer product of
+!     two matrices
+      FUNCTION TEN_ASYMPROD(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nd
+      REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd), B(nd,nd)
+      REAL(KIND=RKIND) :: C(nd,nd,nd,nd)
+
+      INTEGER(KIND=IKIND) :: ii, nn, i, j, k, l
+
+      nn = nd**4
+      DO ii=1, nn
+         i = t_ind(1,ii)
+         j = t_ind(2,ii)
+         k = t_ind(3,ii)
+         l = t_ind(4,ii)
+         C(i,j,k,l) = 0.5_RKIND * ( A(i,k)*B(j,l) - A(i,l)*B(j,k) )
+      END DO
+
+      RETURN
+      END FUNCTION TEN_ASYMPROD
+!--------------------------------------------------------------------
+!     Create a 4th order tensor from antisymmetric outer product of
+!     two matrices
+!     Cijkl = Aij*Bkl-Ail*Bjk
+      FUNCTION TEN_ASYMPROD12(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nd
+      REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd), B(nd,nd)
+      REAL(KIND=RKIND) :: C(nd,nd,nd,nd)
+
+      INTEGER(KIND=IKIND) :: ii, nn, i, j, k, l
+
+      nn = nd**4
+      DO ii=1, nn
+         i = t_ind(1,ii)
+         j = t_ind(2,ii)
+         k = t_ind(3,ii)
+         l = t_ind(4,ii)
+         C(i,j,k,l) = 0.5_RKIND * ( A(i,j)*B(k,l) - A(i,l)*B(j,k) )
+      END DO
+
+      RETURN
+      END FUNCTION TEN_ASYMPROD
+!--------------------------------------------------------------------
 !     Transpose of a 4th order tensor [A^T]_ijkl = [A]_klij
       FUNCTION TEN_TRANSPOSE(A, nd) RESULT(B)
       IMPLICIT NONE
@@ -529,6 +574,38 @@
 
       RETURN
       END FUNCTION TEN_MDDOT
+!--------------------------------------------------------------------
+!     Double dot product of a 4th order tensor and a 2nd order tensor
+!     C_ij = (A_mn * B_mnij)
+      FUNCTION TEN_MDDOT2(A, B, nd) RESULT(C)
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: nd
+      REAL(KIND=RKIND), INTENT(IN) :: A(nd,nd), B(nd,nd,nd,nd)
+      REAL(KIND=RKIND) :: C(nd,nd)
+
+      INTEGER(KIND=IKIND) :: i, j
+
+      IF (nd .EQ. 2) THEN
+         DO i=1, nd
+            DO j=1, nd
+               C(i,j) = A(1,1)*B(1,1,i,j) + A(1,2)*B(1,2,i,j)
+     2                + A(2,1)*B(2,1,i,j) + A(2,2)*B(2,2,i,j)
+            END DO
+         END DO
+      ELSE
+         DO i=1, nd
+            DO j=1, nd
+               C(i,j) = A(1,1)*B(1,1,i,j) + A(1,2)*B(1,2,i,j)
+     2                + A(1,3)*B(1,3,i,j) + A(2,1)*B(2,1,i,j)
+     3                + A(2,2)*B(2,2,i,j) + A(2,3)*B(2,3,i,j)
+     4                + A(3,1)*B(3,1,i,j) + A(3,2)*B(3,2,i,j)
+     5                + A(3,3)*B(3,3,i,j)
+            END DO
+         END DO
+      END IF
+
+      RETURN
+      END FUNCTION TEN_MDDOT2
 !--------------------------------------------------------------------
 !     Double dot product of 2 4th order tensors
 !     T_ijkl = A_ijmn * B_klmn

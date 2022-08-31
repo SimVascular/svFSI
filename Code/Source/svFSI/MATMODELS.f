@@ -1314,7 +1314,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       INTEGER(KIND=IKIND) :: itr, i, j, k, l
       REAL(KIND=RKIND) :: Jg2, J2, J23, f13, f23, trC3, C33, kap, mu,
      2   pJ, plJ, gi_x(2,2), gi_0(3,3), Ci(3,3), S(3,3), CC(3,3,3,3),
-     3   fl(2,2,nfd), iFn
+     3   fl(2,2,nfd), iFn, C1, C2, J43, Gi4AS
       TYPE(stModelType) :: stM
 
       Sml  = 0._RKIND
@@ -1377,13 +1377,23 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
          CASE (stIso_MR)
 !           2nd Piola Kirchhoff stress
-            S  = mu*J23*(gi_0 - trC3*Ci) + pJ*Ci
+            C1 = stM%C10
+            C2 = stM%C01
+            J43 = J2**(-f23)
+            Gi4AS = TEN_ASYMPROD12(gi_0, gi_0, 3)
+            I2  = MAT_DDOT(Ci, TEN_MDDOT(Gi4AS, Ci, 3), 3)
+            I2ij = TEN_MDDOT(, Ci, 3)
+
+            S  = C1*J23*(gi_0 - trC3*Ci) + pJ*Ci
+            S  = S + C2*J43*(-f23*J43*Ci)
 
 !           Elasticity tensor
-            CC = (mu*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
-     2         + (mu*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
-     3         - f23*mu*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+            CC = (C1*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (C1*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*C1*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
      4                       TEN_DYADPROD(Ci, gi_0, 3))
+
+            
 
          CASE DEFAULT
             err = "Undefined material constitutive model"
