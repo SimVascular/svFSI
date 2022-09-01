@@ -132,11 +132,14 @@
 !     Set valM(i,a) = val(i,a) * W(i,Ac)
       DO faIn=1, lhs%nFaces
          IF (lhs%face(faIn)%coupledFlag) THEN
+!            PRINT*, "Under coupledFlag faIn", faIn
             DO a=1, lhs%face(faIn)%nNo
                Ac = lhs%face(faIn)%glob(a)
                DO i=1, MIN(lhs%face(faIn)%dof,dof)
                   lhs%face(faIn)%valM(i,a) =                            &
      &               lhs%face(faIn)%val(i,a)*W(i,Ac)
+!                PRINT*, 'lhs%face(faIn)%val(:,a) in PRECONDIAG():', 
+!     2               faIn, lhs%nFaces, lhs%face(faIn)%val(:,a)
                END DO
             END DO
          END IF

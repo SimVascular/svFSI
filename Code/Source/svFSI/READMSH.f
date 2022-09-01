@@ -458,12 +458,6 @@ c               END IF
             END SELECT
          END IF
       END IF
-
-      DO iM=1, nMsh
-         DO iFa=1, msh(iM)%nFa
-            PRINT*, "msh(iM)%fa(iFa)%nEl", msh(iM)%fa(iFa)%nEl
-         END DO
-      END DO
       RETURN
       END SUBROUTINE READMSH
 !####################################################################

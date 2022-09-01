@@ -122,6 +122,7 @@
             saveName = ""
             appPath = STR(cm%np())//"-procs"//delimiter
          END IF
+         IF (appPath .NE. "") CALL SYSTEM("mkdir -p "//TRIM(appPath))
 
          lPtr => list%get(std%oTS,"Verbose")
          lPtr => list%get(wrn%oTS,"Warning")
@@ -888,6 +889,20 @@
          CALL READBC(lEq%bc(iBc), lPBC, lEq%phys)
       END DO
 
+!     If an LPN-coupled face has a cap, automatically create a BC
+!     for the cap face. This is necessary because we need svFSI to process
+!     the cap face as a coupled BC to add its contribution to the tangent
+      DO iBc=1, lEq%nBc
+         IF (BTEST(lEq%bc(iBc)%bType, bType_cpl)) THEN
+            IF (lEq%bc(iBc)%capFaceName .NE. "") THEN ! If coupled BC has a cap
+               ! Add a bc to lEq%bc(:) at the end for the cap, and add
+               ! cap face info to face being capped (capFaceName and
+               ! capFaceID fields) 
+               CALL ADDCAPBC(lEq, iBc)
+            END IF
+         END IF 
+      END DO
+
 !     Initialize cplBC for RCR-type BC
       IF (ANY(BTEST(lEq%bc(:)%bType,bType_RCR))) THEN
          IF ((lEq%phys .NE. phys_fluid) .AND.
@@ -1621,6 +1636,9 @@
             err = "'Couple to cplBC' must be specified before"//
      2         " using Coupled BC"
          END IF
+
+!        AB 7/13/22: Read cap face name for this coupled BC
+         lPtr => list%get(lBc%capFaceName,"Cap")
       CASE ('Resistance')
          lBc%bType = IBSET(lBc%bType,bType_res)
          IF (.NOT.BTEST(lBc%bType,bType_Neu)) err = "Resistance"//
@@ -3153,4 +3171,106 @@ c     2         "can be applied for Neumann boundaries only"
 
       RETURN
       END SUBROUTINE READWALLPROPSFF
+!#######################################################################
+!     Adds a bc to lEq%bc(:) at the end for a cap. Copies most of bc info
+!     from lEq%bc(iBc), which corresponds to the surface being capped.
+!     Also, sets info about cap face in face being capped (capFaceName 
+!     and capFaceID fields)
+      SUBROUTINE ADDCAPBC(lEq, iBc)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(eqType), INTENT(INOUT) :: lEq
+      INTEGER(KIND=IKIND), INTENT(IN) :: iBc
+      TYPE(bcType), ALLOCATABLE :: oldBcs(:)
+      INTEGER(KIND=IKIND) jBc, iFa, iM
+
+!     We are adding a new BC for the cap, so we need to update the
+!     the relevant structures
+
+!     Store old BCs in oldBcs
+      ALLOCATE(oldBcs(lEq%nBc))
+      DO jBc=1, lEq%nBc
+         CALL COPYBC(lEq%bc(jBc), oldBcs(jBc))
+      END DO
+!     Increment number of BCs
+      lEq%nBc = lEq%nBc + 1
+
+!     Reallocate lEq%bc with space for extra cap BC
+      DEALLOCATE(lEq%bc)
+      ALLOCATE(lEq%bc(lEq%nBc))
+
+!     Copy old BCs to lEq%bc
+      DO jBc=1, lEq%nBc-1
+         CALL COPYBC(oldBcs(jBc), lEq%bc(jBc))
+      END DO
+
+      ! Add on new BC for cap. Copy BC information from surface being capped
+      ! This surface corresponds to iBc
+      CALL COPYBC(lEq%bc(iBc),  lEq%bc(lEq%nBc))
+
+      ! Correct some values in cap BC (corresponding to nBc)
+      cplBC%nFa = cplBC%nFa + 1
+      lEq%bc(lEq%nBc)%cplBcPtr = cplBC%nFa
+      CALL FINDFACE(lEq%bc(iBc)%capFaceName, 
+     2               lEq%bc(lEq%nBc)%iM, lEq%bc(lEq%nBc)%iFa)
+      lEq%bc(lEq%nBC)%capFaceName = ""
+
+!     Store info of capping face in face being capped
+      iFa = lEq%bc(iBc)%iFa ! face being capped
+      iM = lEq%bc(iBc)%iM   ! mesh containing face being capped
+      msh(iM)%fa(iFa)%capFaceName = lEq%bc(iBc)%capFaceName ! Copy cap face name
+      msh(iM)%fa(iFa)%capFaceID = lEq%bc(lEq%nBc)%iFa ! Copy cap face ID
+
+!     Store BcID of capping bc in bc being capped
+      lEq%bc(iBc)%iCapBC = lEq%nBc
+
+
+!     For DEBUGGING
+!      DO iFa=1, msh(iM)%nFa
+!         PRINT*, msh(iM)%fa(iFa)%name,
+!     2"capFaceName: ", msh(iM)%fa(iFa)%capFaceName, 
+!     2"capFaceID: ", msh(iM)%fa(iFa)%capFaceID
+!      END DO
+
+      END SUBROUTINE ADDCAPBC
+
+!#######################################################################
+!     Performs deep copy of old BC (oBc) to new BC (nBc)
+      SUBROUTINE COPYBC(oBc, nBc)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(bcType), INTENT(IN) :: oBc
+      TYPE(bcType), INTENT(OUT) :: nBc
+      INTEGER(KIND=IKIND) jBc, iFa, iM
+
+      nBc%weakDir = oBc%weakDir
+      nBc%flwP = oBc%flwP
+      nBc%rbnN = oBc%rbnN
+      nBc%bType = oBc%bType
+      nBc%cplBCptr = oBc%cplBCptr
+      nBc%iFa = oBc%iFa
+      nBc%iM = oBc%iM
+      nBc%lsPtr = oBc%lsPtr
+      nBc%masN = oBc%masN
+      nBc%g = oBc%g
+      nBc%r = oBc%r
+      nBc%k = oBc%k
+      nBc%c = oBc%c
+      nBc%tauB = oBc%tauB
+
+!     For allocatable types, need to be careful. If it is not allocated in oBc
+!     and we assign to the corresponding member of nBc, we will get a segfault
+!     (at least on Sherlock, although not on my Mac)
+      IF (ALLOCATED(oBc%eDrn)) nBc%eDrn = oBc%eDrn
+      IF (ALLOCATED(oBc%h)) nBc%h = oBc%h
+      IF (ALLOCATED(oBc%gx)) nBc%gx = oBc%gx
+      IF (ALLOCATED(oBc%gm)) nBc%gm = oBc%gm
+      IF (ALLOCATED(oBc%gt)) nBc%gt = oBc%gt
+
+      nBc%RCR = oBc%RCR
+      nBc%capFaceName = oBc%capFaceName
+      nBc%iCapBC = oBc%iCapBC
+      END SUBROUTINE COPYBC
 !####################################################################

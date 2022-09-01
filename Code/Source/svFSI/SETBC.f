@@ -238,6 +238,10 @@
       DO iBc=1, eq(cEq)%nBc
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
+
+!        If face is virtual, don't add contribution of associated BC
+         IF  (msh(iM)%fa(iFa)%virtual) CYCLE
+
          IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_Neu)) THEN ! If Neumann BC
             CALL SETBCNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa), Yg, Dg)
          ELSE IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_trac)) THEN ! If Traction BC
@@ -267,7 +271,7 @@
 !     Geting the contribution of Neu BC
       IF (BTEST(lBc%bType,bType_cpl) .OR.
      2    BTEST(lBc%bType,bType_RCR)) THEN
-         h(1) = lBc%g ! g contains the updated pressures from cplBC, genBC, or RCR
+         h(1) = lBc%g ! g contains the updated pressures from cplBC, genBC, or RCR (SETBCCPL())
       ELSE
          IF (BTEST(lBc%bType,bType_gen)) THEN
 !     Using "hl" as a temporary variable here
@@ -919,7 +923,7 @@
       INTEGER(KIND=IKIND), PARAMETER :: iEq = 1
 
       LOGICAL RCRflag
-      INTEGER(KIND=IKIND) iFa, ptr, iBc, iM
+      INTEGER(KIND=IKIND) iFa, iFaCap, ptr, iBc, iM
       REAL(KIND=RKIND) tmp
 
 !     If coupling scheme is implicit, calculate the coupling derivative (M matrix in Moghadam 2013)
@@ -942,6 +946,16 @@
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
                   cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
+
+!                 Add velocity flux from cap if face is capped
+                  iFaCap = msh(iM)%fa(iFa)%capFaceID
+                  IF (iFaCap .NE. 0) THEN ! If face is capped
+                     cplBC%fa(ptr)%Qo = cplBC%fa(ptr)%Qo + 
+     2                           Integ(msh(iM)%fa(iFaCap),Yo,1,nsd)
+                     cplBC%fa(ptr)%Qn = cplBC%fa(ptr)%Qn + 
+     2                           Integ(msh(iM)%fa(iFaCap),Yn,1,nsd)
+                  END IF
+
                   cplBC%fa(ptr)%Po = 0._RKIND
                   cplBC%fa(ptr)%Pn = 0._RKIND
 !              Compute avg pressures from 3D on Dirichlet boundaries
@@ -984,7 +998,7 @@
      2   relTol = 1.E-5_RKIND
 
       LOGICAL RCRflag
-      INTEGER(KIND=IKIND) iFa, i, j, ptr, iBc, iM
+      INTEGER(KIND=IKIND) iFa, iFaCap, i, j, ptr, iBc, iCapBC, iM
       REAL(KIND=RKIND) diff, area
 
       REAL(KIND=RKIND), ALLOCATABLE :: orgY(:), orgQ(:)
@@ -1008,6 +1022,16 @@
                ! Calls IntegG()->IntegV to integrate velocities (Yo) over face
                cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd) 
                cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
+
+!              Add velocity flux from cap if face is capped
+               iFaCap = msh(iM)%fa(iFa)%capFaceID
+               IF (iFaCap .NE. 0) THEN ! If face is capped
+                  cplBC%fa(ptr)%Qo = cplBC%fa(ptr)%Qo + 
+     2                        Integ(msh(iM)%fa(iFaCap),Yo,1,nsd)
+                  cplBC%fa(ptr)%Qn = cplBC%fa(ptr)%Qn + 
+     2                        Integ(msh(iM)%fa(iFaCap),Yn,1,nsd)
+               END IF
+
                cplBC%fa(ptr)%Po = 0._RKIND
                cplBC%fa(ptr)%Pn = 0._RKIND
 !           If Dirichlet boundary, compute avg pressure (at t and at t+1)
@@ -1064,7 +1088,16 @@
 
 !           Compute finite difference approximation of dP/dQ (eq. 29). r for resistance
             eq(iEq)%bc(iBc)%r = (cplBC%fa(i)%y - orgY(i))/diff
+!           For DEBUGGING
+!            PRINT*, "In CALCDERCPLBC iBc: ", iBc, 'i: ', i, 
+!     2            'r: ',  eq(iEq)%bc(iBc)%r
 
+!           Set resistance for cap bc if it exists for this bc. Set it
+!           to be the same resistance as the bc being capped
+            iCapBC = eq(iEq)%bc(iBc)%iCapBC
+            IF (iCapBC .NE. 0) THEN
+               eq(iEq)%bc(iCapBC)%r =  eq(iEq)%bc(iBc)%r
+            END IF
 !           Set pressure and flow rate back to before finite difference increment vals
             cplBC%fa(:)%y  = orgY
             cplBC%fa(:)%Qn = orgQ

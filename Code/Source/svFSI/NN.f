@@ -1875,7 +1875,7 @@ c        N(8) = lx*my*0.5_RKIND
       eNoN = msh(iM)%eNoN
 
 !     If this is a virtual face, then this face element does not lie on a volume 
-!     element, and we should just compute the area weighted normal vector anyway.
+!     element, and we compute the normal vector slightly differently.
       IF (lFa%virtual) THEN
 !         WRITE(*,'(A)') "Face element not on volume element."
 !         WRITE(*,'(A)') "Calculate normal vector anyway."
@@ -2035,7 +2035,7 @@ c        N(8) = lx*my*0.5_RKIND
       eNoN = msh(iM)%eNoN
 
 !     If this is a virtual face, then this face element does not lie on a volume 
-!     element, and we should just compute the area weighted normal vector anyway.
+!     element, and we compute the normal vector slightly differently.
       IF (lFa%virtual) THEN
          !WRITE(*,'(A)') "Face element not on volume element."
          !WRITE(*,'(A)') "Calculate normal vector anyway."
@@ -2193,21 +2193,37 @@ c        N(8) = lx*my*0.5_RKIND
       LOGICAL, ALLOCATABLE :: setIt(:)
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
+      INTEGER(KIND=IKIND) ierr, p
 
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+      ! Arrays to hold nodal positions for MPI gather operation
+      ALLOCATE(tmpX(nsd))
 
-!     Correcting the position vector if mesh is moving
+!     Communicating nodal positions and correcting the position vector if mesh is moving
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
-!         Ac = msh(iM)%IEN(a,Ec)
-         Ac = lFa%IEN(a,e)
-         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
+         Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
+         ! Collect node position onto Master. On slaves
+         ! set both (tmpX and tmpDn) to zero.
+         CALL GatherMasterV(x, Ac, tmpX)
+
+         ! Transfer nodal position to lX array
+         lX(:,a) = tmpX(:)
+
 !        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
          IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
       END DO
+
+!     If slave, don't perform calculation of n. Wait for master to complete
+!     calculation and broadcast value of n
+      IF (cm%slv()) THEN 
+         CALL MPI_BCAST(n, nsd, mpreal, master, cm%com(), ierr)
+         RETURN 
+      END IF
 
 !     Calculating surface deflation
       IF (msh(iM)%lShl) THEN ! If mesh is a shell. I think this is unnecessary in this function
@@ -2266,7 +2282,13 @@ c        N(8) = lx*my*0.5_RKIND
          n = CROSS(xXi)
          DEALLOCATE(xXi)
       END IF
-      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(setIt, ptr, lX, tmpX)
+
+
+      ! If master, broadcast value of n to slaves
+      IF (cm%mas()) THEN 
+         CALL MPI_Bcast(n, nsd, mpreal, master, cm%com(), ierr)
+      END IF
 
       RETURN
       END SUBROUTINE GNNBSURF
@@ -2277,7 +2299,8 @@ c        N(8) = lx*my*0.5_RKIND
 !     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
 !     current configuration surface element.
 !     This function is called for virtual face elements (face elements that do 
-!     not lie on a volume element).
+!     not lie on a volume element). For virtual elements, we must communicate
+!     node information.
 !     For these elements, the direction of the normal vector is assumed from the
 !     nodal ordering.
 !     Same as GNNBSURF(), except uses current configuration nodal positions.
@@ -2296,21 +2319,39 @@ c        N(8) = lx*my*0.5_RKIND
       LOGICAL, ALLOCATABLE :: setIt(:)
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDn(:)
+      INTEGER(KIND=IKIND) ierr, p
 
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+      ! Arrays to hold nodal positions and displacements for MPI gather operation
+      ALLOCATE(tmpX(nsd))
+      ALLOCATE(tmpDn(nsd))
 
-!     Correcting the position vector if mesh is moving
+!     Collecting node information on master, so master can compute the normal
+!     Also, updating nodal position with nodal displacement, so that we
+!     are computing the surface normal in the current configuration
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
-!         Ac = msh(iM)%IEN(a,Ec)
-         Ac = lFa%IEN(a,e)
-         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
-!        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
-         lX(:,a) = lX(:,a) + Dn(:,Ac) 
+         Ac = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
+         ! Collect node position and node displacement onto Master. On slaves
+         ! set both (tmpX and tmpDn) to zero.
+         CALL GatherMasterV(x, Ac, tmpX)
+         CALL GatherMasterV(Dn, Ac, tmpDn)
+
+!        Update local position with displacement for normal computation
+         lX(:,a) = tmpX(:) + tmpDn(:) 
       END DO
+
+!     If slave, don't perform calculation of n. Wait for master to complete
+!     calculation and broadcast value of n
+      IF (cm%slv()) THEN 
+         CALL MPI_BCAST(n, nsd, mpreal, master, cm%com(), ierr)
+         RETURN 
+      END IF
 
 !     Calculating surface deflation
       IF (msh(iM)%lShl) THEN ! If mesh is a shell. I think this is unnecessary in this function
@@ -2369,7 +2410,13 @@ c        N(8) = lx*my*0.5_RKIND
          n = CROSS(xXi)
          DEALLOCATE(xXi)
       END IF
-      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(setIt, ptr, lX, tmpX, tmpDn)
+
+
+      ! If master, broadcast value of n to slaves
+      IF (cm%mas()) THEN 
+         CALL MPI_Bcast(n, nsd, mpreal, master, cm%com(), ierr)
+      END IF
 
       RETURN
       END SUBROUTINE GNNBSURFT

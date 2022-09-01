@@ -65,7 +65,8 @@
       nNo    = lhs%nNo
       nnz    = lhs%nnz
       nFaces = lhs%nFaces
-
+!     For DEBUGGING
+!      PRINT*, "lhs%nFaces: ", lhs%nFaces
       IF (lhs%nFaces .NE. 0) THEN
          lhs%face%incFlag = .TRUE.
          IF (PRESENT(incL)) THEN
@@ -88,6 +89,8 @@
             IF (flag .AND. res(faIn).NE.0._LSRP) THEN
                lhs%face(faIn)%res = res(faIn)
                lhs%face(faIn)%coupledFlag = .TRUE.
+!               For DEBUGGING
+!               PRINT*, "faIn: ", faIn, "res", lhs%face(faIn)%res
             END IF
          END DO
       END IF

@@ -48,13 +48,14 @@
 !--------------------------------------------------------------------
 
       SUBROUTINE FSILS_BC_CREATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
-     &   Val)
+     &   Val, virtual)
       INCLUDE "FSILS_STD.h"
       TYPE(FSILS_lhsType), INTENT(INOUT) :: lhs
       INTEGER(KIND=LSIP), INTENT(IN) :: faIn, nNo, dof
       INTEGER(KIND=LSIP), INTENT(IN) :: BC_type
       INTEGER(KIND=LSIP), INTENT(IN) :: gNodes(nNo)
       REAL(KIND=LSRP), INTENT(IN), OPTIONAL :: Val(dof,nNo)
+      LOGICAL, INTENT(IN), OPTIONAL :: virtual
 
       INTEGER(KIND=LSIP) a, Ac, i
 
@@ -80,10 +81,17 @@
       lhs%face(faIn)%dof  = dof
       lhs%face(faIn)%bGrp = BC_type
 
+!     Set virtual flag for lhs%face if virtual flag is provided
+      lhs%face(faIn)%virtual = .FALSE.
+      IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
+
+
       ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
      &   lhs%face(faIn)%valM(dof,nNo))
 
       DO a=1, nNo
+!        gNodes(a) gives the proc local node id of face node a. gNodes(a) in 1:tnNo
+!        map() gives a reordering of proc local node ids, I think. map(a) in 1:tnNo
          Ac = lhs%map(gNodes(a))
          lhs%face(faIn)%glob(a) = Ac
       END DO
@@ -96,16 +104,22 @@
          lhs%face(faIn)%val = 0._LSRP
       END IF
 
+!      DO a=1, nNo
+!         PRINT*, 'lhs%face(faIn)%val(:,a) in FSILS_BC_CREATE(): ', 
+!     2     faIn, lhs%face(faIn)%val(:,a)
+!      END DO
+
+!     Synchronize val on nodes on boundary between procs
       IF (lhs%commu%nTasks .GT. 1) THEN
          a = 0
          IF (lhs%face(faIn)%nNo .NE. 0) a = 1
          CALL MPI_ALLREDUCE(a, Ac, 1, mpint, MPI_SUM, lhs%commu%comm, i)
-         IF (Ac .GT. 1) THEN
+         IF (Ac .GT. 1) THEN ! This face is shared by multiple procs
             lhs%face(faIn)%sharedFlag = .TRUE.
             IF (.NOT.ALLOCATED(v)) ALLOCATE(v(dof,lhs%nNo))
             v = 0._LSRP
-            DO a=1, nNo
-               Ac = lhs%face(faIn)%glob(a)
+            DO a=1, nNo ! Loop over nodes on face on this proc
+               Ac = lhs%face(faIn)%glob(a) ! Ac in 1:tnNo
                v(:,Ac) = lhs%face(faIn)%val(:,a)
             END DO
             CALL FSILS_COMMUV(lhs, dof, v)
@@ -252,6 +266,11 @@
 !      lhs%face(faIn)%nNo  = nNo
 !      lhs%face(faIn)%dof  = dof
 !      lhs%face(faIn)%bGrp = BC_type
+
+!     Set virtual flag for lhs%face if virtual flag is provided
+!      lhs%face(faIn)%virtual = .FALSE.
+!      IF (PRESENT(virtual)) lhs%face(faIn)%virtual = virtual
+
 
 !      ALLOCATE(lhs%face(faIn)%glob(nNo), lhs%face(faIn)%val(dof,nNo),   &
 !     &   lhs%face(faIn)%valM(dof,nNo))

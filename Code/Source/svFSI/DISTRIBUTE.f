@@ -1327,7 +1327,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          ALLOCATE(tempIEN(eNoN,lM%gnEl), lM%otnIEN(lM%gnEl))
 !     Making the lM%IEN array in order, based on the cm%id() number in
 !     master. lM%otnIEN maps old IEN order to new IEN order.
-!     Why does the IEN order change?
+!     Why does the IEN order change? I think to facilitate scattering later.
          disp = 0
          DO e=1, lM%gnEl ! Loop over global elements in mesh
 !           gPart(e) = proc that owns e
@@ -1420,15 +1420,15 @@ c            wrn = " ParMETIS failed to partition the mesh"
       DEALLOCATE(tempIEN)
 
 !     Constructing the initial global to local pointer
-!     lM%IEN: eNoN,nEl --> gnNo
-!     gtlPtr: gnNo     --> nNo
-!     lM%IEN: eNoN,nEl --> nNo
+!     lM%IEN: eNoN,nEl --> gnNo. Maps node a of element e (local to proc and mesh) to global node A on mesh
+!     gtlPtr: gnNo     --> nNo. Maps global node A on mesh to local node a on proc and mesh
+!     lM%IEN: eNoN,nEl --> nNo. Reconstructing IEN to map node a of element e (local to proc and mesh) to local node a on proc and mesh
       ALLOCATE(gtlPtr(lM%gnNo)) ! global number of nodes on this mesh
       nNo    = 0
       gtlPtr = 0
       DO e=1, nEl ! Loop over num elements on this proc on this mesh
          DO a=1, eNoN ! Loop over nodes in element
-            Ac = lM%IEN(a,e) ! Get global node Ac on this mesh
+            Ac = lM%IEN(a,e) ! Get global node Ac on this mesh. This is the global node ID in Paraview
 !           If Ac has not be seen yet, add it to this proc. Increment the number
 !           of nodes on this proc, and update gtlPtr
             IF (gtlPtr(Ac) .EQ. 0) THEN
@@ -1447,7 +1447,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     part:  nNo  --> gtnNo. Maps local node index on this proc on this mesh to global
       ALLOCATE(part(nNo))
       DO Ac=1, lM%gnNo ! Loop over nodes on this mesh
-         a = gtlPtr(Ac) ! get local node index on this proc 
+         a = gtlPtr(Ac) ! get local node index on this proc and mesh
          ! If a is non-zero, then this proc owns global node Ac, so assign the
          ! corresponding global total node gN(Ac) to part(a).
          ! At this point, gN(Ac) maps global node index on this mesh to
@@ -1457,7 +1457,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     mapping and converting other parameters.
 !     I will use an upper bound for gPart as a container for ltg,
 !     since there can be repeated nodes. gPart is just a temp variable.
-!     gmtl:  gtnNo --> tnNo. Maps global node index across all meshes to local node index (across all meshes or parts of meshes belong to this proc)
+!     gmtl:  gtnNo --> tnNo. Maps global node index across all meshes to local node index (across all meshes or parts of meshes belong to this proc). gmtl is zero global node Ac does not belong to this proc
 !     gPart: tnNo  --> gtnNo. Maps local node index on this proc (across multiple parts of meshes) to global node index across all meshes. Inverse of gmtl
 !     ltg:   tnNo  --> gtnNo. How is this different from gPart, if at all? I think they contain the same info, gPart is just temporary as we assemble the info
 !     lM%gN: nNo   --> tnNo. Changing gN to map local node index on this proc and this mesh to local node index on this proc across all meshes or parts of meshes belonging to this proc
@@ -1552,6 +1552,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !        gFa%gnEL = gFa%nEl = lFa%gnEl, right?
          gFa%nNo  = lFa%nNo  ! number of nodes on this face
          gFa%virtual = lFa%virtual ! Is this face virtual
+         gFa%capFaceName = lFa%capFaceName ! Name of capping face
+         gFa%capFaceID = lFa%capFaceID ! ID number of capping face
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(1+gFa%eNoN,gFa%gnEl))
       ELSE
          IF (rmsh%isReqd) ALLOCATE(gFa%gebc(0,0))
@@ -1563,6 +1565,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
       CALL cm%bcast(gFa%gnEl)
       CALL cm%bcast(gFa%nNo)
       CALL cm%bcast(gFa%virtual)
+      CALL cm%bcast(gFa%capFaceName)
+      CALL cm%bcast(gFa%capFaceID)
 !     Selects face mesh element type (linear triangle, quadratic quad, etc.)
 !     Also sets up Gauss points and shape functions
 !     All procs call this and individually populate their global face object gFa
@@ -1587,6 +1591,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          gFa = lFa
          CALL DESTROY(lFa)
       END IF
+
 !     Set local face structure info according to broadcasted global face structure
       CALL cm%bcast(gFa%name)
       lFa%name = gFa%name ! Name of face
@@ -1597,13 +1602,15 @@ c            wrn = " ParMETIS failed to partition the mesh"
       CALL SELECTELEB(lM, lFa)
       lFa%iM   = iM
       lFa%virtual = gFa%virtual
+      lFa%capFaceName = gFa%capFaceName
+      lFa%capFaceID = gFa%capFaceID
 
-!     AB 5/23/22: If face is virtual, cannot partition it according to the already 
-!     partitioned mesh. Instead, separately partition this face
-!      IF (lFa%virtual) THEN
-!         CALL PARTFACEV(lM, lFa, gFa, gmtl)
-!         RETURN
-!      END IF
+!     AB 7/7/22: If face is virtual, cannot partition it according to the already 
+!     partitioned mesh. Instead, separately partition this face.
+      IF (lFa%virtual) THEN
+         CALL PARTFACEV(lM, lFa, gFa, gmtl)
+         RETURN
+      END IF
 
 !     Create and fill a structure (part) to communicate global face data among
 !     all procs
@@ -1612,7 +1619,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       IF (cm%mas()) THEN ! if master, fill part array with global face data
          DO e=1, gFa%nEl
             j  = (e-1)*(2+eNoNb) + 1
-            Ec = gFa%gE(e)             ! Global element index. For virtual, this is 0 for all e
+            Ec = gFa%gE(e)             ! Global element index. For virtual, this is 0 for all e. See READVTP.f
 !           gIEN mapper from old to new. Was set in PARTMESH(). 
 !           lM%otnIEN maps old IEN order to new IEN order. Indexing should start
 !           at 1, so for virtual face (for which Ec = 0), otnIEN(Ec) = trash
@@ -1643,6 +1650,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       END IF
       DEALLOCATE(part)
 
+
 !     Finding the number of lM%fas to allocate required space, also
 !     maping global element number to processor element number
       lFa%nEl = 0
@@ -1657,21 +1665,6 @@ c            wrn = " ParMETIS failed to partition the mesh"
          END IF
       END DO
 
-!     AB 5/23/22: If face is virtual, then the Ec = trash for every element and the
-!     above loop results in lFa%nEl = 0 for all procs. In this case, set lFa%nEl
-!     equal to gFa%nEl for the master proc. We will let the master proc handle
-!     the virtual surface. Also, set gFa%gE(e) = -1 so we don't get confused
-!     and behavior will be defined.
-      IF (lFa%virtual) THEN
-         IF(cm%mas()) THEN
-            lFa%nEl = gFa%nEl
-         ELSE
-            lFa%nEl = 0
-         END IF
-         DO e=1, gFa%nEl
-            gFa%gE(e) = -1
-         END DO
-      END IF
 
       ALLOCATE(lFa%gE(lFa%nEl), lFa%IEN(eNoNb,lFa%nEl))
 
@@ -1686,37 +1679,6 @@ c            wrn = " ParMETIS failed to partition the mesh"
          END IF
       END DO
 
-!     AB 5/24/22: Since master in general does not own all virtual face nodes,
-!     update the number of nodes and other key data structure. Use part to hold
-!     temporary data and rebuild ltg array
-      ALLOCATE(part(tnNo + gFa%nNo))
-      IF (lFa%virtual .AND. cm%mas()) THEN
-         DO a=1, tnNo ! Loop over nodes on this proc
-            Ac = ltg(a)
-            part(a) = Ac ! Store existing local-to-global map in part
-         END DO 
-         DO a=1, gFa%nNo ! Loop over nodes on virtual face
-            Ac = gmtl(gFa%gN(a)) ! Get local node on this proc corresponding to global node gN(a)
-            IF (Ac .EQ. 0) THEN
-               lFa%nNo  = lFa%nNo + 1 ! Increment number of nodes on this proc for this face
-               tnNo     = tnNo + 1 ! increment number of nodes on this proc
-               gmtl(gFa%gN(a)) = tnNo ! Map global node to local node on proc
-               part(tnNo) = gFa%gN(a) ! Map local node on this proc to global node
-            END IF
-         END DO 
-!        Rebuild loical-to-global map ltg
-         IF (ALLOCATED(ltg)) DEALLOCATE(ltg)
-         ALLOCATE(ltg(tnNo))
-         ltg = part(1:tnNo) ! Set ltg array, which maps the local node index on this proc across all meshes to the global index across all meshes
-         DEALLOCATE(part) ! Destroy temporary structure part
-      END IF
-
-
-
-!     Since the nodes of a virtual face do lie on the mesh, global nodes Ac
-!     are found correctly and lFa%nNo is computed correctly. It is non zero
-!     for procs who already own the boundary nodes (for which gmtl is non-zero)
-
       ALLOCATE(lFa%gN(lFa%nNo))
 
 !     Time to form "face" structure in each processor
@@ -1724,9 +1686,6 @@ c            wrn = " ParMETIS failed to partition the mesh"
       j = 0
       DO e=1, gFa%nEl ! Loop over global number of elements
          Ec = gFa%gE(e) ! Get global element index (trash for virtual surface)
-         IF (gFa%name .EQ. "cap") THEN
-            PRINT*, "Ec", Ec
-         END IF
 !        If the element index falls into the range of elements assigned to this
 !        proc, add this face elements info to the local face structure on this proc
          IF (Ec.LE.lM%eDist(cm%id()+1) .AND.
@@ -1739,32 +1698,11 @@ c            wrn = " ParMETIS failed to partition the mesh"
          END IF
       END DO
 
-!     AB 5/23/22: If face is virtual, then the Ec = -1, Thus, lFa%IEN() is not
-!     populated above. In this case, IEN has been allocated but not populated, so 
-!     accessing it leads to undefined behavior. To fix this, for a virtual face
-!     we give all the responsbility to master, so perform a similar assignment
-!     as above, but for master only
-      IF (lFa%virtual .AND. cm%mas()) THEN
-         j = 0
-         DO e=1, lFa%nEl
-            j = j + 1
-            DO a=1, eNoNb
-               lFa%IEN(a,j) = gmtl(gFa%IEN(a,e))
-               PRINT*, 'a: ', a, 'e: ', e, 'gFa%IEN(a,e): ', 
-     2         gFa%IEN(a,e), 'lFa%IEN(a,j): ', lFa%IEN(a,j)
-
-            END DO
-         END DO
-      END IF
-
 !     Analogously copying the nodes which belong to this processor
       j = 0
       DO a=1, gFa%nNo
          Ac = gmtl(gFa%gN(a))
-         IF (gFa%name .EQ. "cap" .AND. cm%mas()) THEN
-            PRINT*, 'gN(a): ', gFa%gN(a), "Ac", Ac
-         END IF
-         IF (Ac .NE. 0) THEN
+         IF (Ac .NE. 0) THEN ! If Ac is 0, then the node does not belong to this proc
             j = j + 1
             lFa%gN(j) = Ac
          END IF
@@ -1801,14 +1739,142 @@ c            wrn = " ParMETIS failed to partition the mesh"
       INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), ePtr(:)
 
 
-!     If the face is virtual,
-!     just let master take responsbility for the entire face
-      PRINT*, 'Virtual flag in PARTFACEV()', lFa%virtual
-      IF (lFa%virtual .AND. cm%mas()) THEN
-         lFa = gFa
+!     Define some useful variables
+      eNoNb = gFa%eNoN ! number of nodes in an element on this face
+      iM = gFa%iM      ! index of mesh that this face belongs to
+
+      ALLOCATE(ePtr(gFa%nEl))
+
+!     Create and fill a structure (part) to communicate global face data among
+!     all procs. This synchronizes gFa across all procs
+      i = gFa%nEl*(2+eNoNb) + gFa%nNo
+      ALLOCATE(part(i)) 
+!     If master proc, fill part array with global face data
+      IF (cm%mas()) THEN 
+         !  Add element information to part
+         DO e=1, gFa%nEl
+            j  = (e-1)*(2+eNoNb) + 1
+            Ec = gFa%gE(e)             ! Global element index. For virtual, this is 0 for all e. See READVTP.f
+!           gIEN mapper from old to new. Was set in PARTMESH(). 
+!           lM%otnIEN maps old IEN order to new IEN order. Indexing should start
+!           at 1, so for virtual face (for which Ec = 0), otnIEN(Ec) = trash
+!           Instead, just set ePtr(e) = 0
+!            ePtr(e)   = lM%otnIEN(Ec)  
+            ePtr(e)   = 0
+            part(j)   = Ec             ! 0 for virtual face 
+            part(j+1) = ePtr(e)        ! New element index for element e
+            part(j+2:j+1+eNoNb) = gFa%IEN(:,e)  ! IEN array for this element
+         END DO
+
+         ! Add nodal information to part
+         DO a=1, gFa%nNo
+            j = gFa%nEl*(2+eNoNb) + a
+            part(j) = gFa%gN(a) ! gN(a) maps node a on this face to global node Ac across all meshes
+         END DO
       END IF
-      PRINT*, "Inside PARTFACEV():", cm%id(), lFa%eNoN, lFa%iM, 
-     2      lFa%nEl, lFa%gnEl, lFa%nNo
+
+!     Broadcast part array to all processors
+      CALL cm%bcast(part)
+
+!     If slave proc, extract face data from part(:) and place into proper structures
+      IF (cm%slv()) THEN
+         ! Extract element information from part
+         DO e=1, gFa%nEl
+            j = (e-1)*(2+eNoNb) + 1
+            gFa%gE(e)    = part(j)     ! (old?) global element index. 0 for virtual face
+            ePtr(e)      = part(j+1)   ! New global element index. 0 for virtual face
+            gFa%IEN(:,e) = part(j+2:j+1+eNoNb) ! IEN array for element e
+         END DO
+         ! Extract nodal information from part
+         DO a=1, gFa%nNo
+            j = gFa%nEl*(2+eNoNb) + a
+            gFa%gN(a) = part(j) 
+         END DO
+      END IF
+      DEALLOCATE(part)
+
+!     At this point, gFa is the same across all procs, and contains all
+!     the face information
+
+!     If face is virtual, then we can't partition the face according
+!     to the element partition of the mesh, since the element of the
+!     virtual face do not lie on the mesh. In this case, set lFa%nEl
+!     equal to gFa%nEl for all procs. We'll deal with the parallelization
+!     and communication when we need to integrate (in IntegS and IntegV)
+!     Also, set gFa%gE(e) = -1 so we don't get confused
+!     and behavior will be defined.
+      lFa%nEl = gFa%nEl
+!     This loop is not necessary, but including to match PARTFACE()
+      DO e=1, gFa%nEl ! Loop over global number of elements on face
+         Ec = ePtr(e) ! New global element index. 0 for virtual face
+         gFa%gE(e) = Ec ! Set gE as new global element index (changing gE(e) in general).
+         ! This was 0 before, and we're setting it to 0 again
+      END DO
+
+!     Allocate local face global element list and IEN array
+      ALLOCATE(lFa%gE(lFa%nEl), lFa%IEN(eNoNb,lFa%nEl))
+
+!     Compute the number of nodes on face that belong to this proc
+      lFa%nNo = 0
+      DO a=1, gFa%nNo ! Loop over global number of nodes on face
+!     gmtl maps global node index across all meshes to local index on 
+!     this proc (potentially across multiple meshes)
+!     For a global node A, gmtl is non-zero if node A lies in the mesh parition of this proc
+         Ac = gmtl(gFa%gN(a)) 
+         IF (Ac .NE. 0) THEN
+            lFa%nNo = lFa%nNo + 1
+         END IF
+      END DO
+
+!     Allocate local face global node list
+      ALLOCATE(lFa%gN(lFa%nNo))
+
+!     Time to form "face" structure in each processor
+
+!     To integrate later on, we need to fill in the lFa%IEN(a,e) array, which
+!     gives the local (to processor) node index of the ath node of 
+!     element e on the virtual face. To do this, we loop through
+!     all elements and fill in what we can of IEN on each processor. On a single
+!     processor, IEN will not be completely populated. For example, if a global
+!     node A, which corresponds to node a on global face element e, does not
+!     belong to processor 1 (this partition was done in PARTMESH and embodied in
+!     gmtl), then lFa%IEN(a,e) = 0 on processor 1.
+      DO e=1, lFa%nEl ! Loop over all elements of face (lFa%nEl = gFa%nEl)
+!        Set lFa%gE(e) = 0, since for a virtual face, element e does not
+!        lie on any element of the mesh
+         lFa%gE(e) = 0
+         DO a=1, eNoNb ! Loop over nodes on element
+!           gmtl maps global node index (across all meshes and procs) to local
+!           node index on this proc (across all parts of meshes belong to this proc)          
+!           gmtl is zero if global node Ac does not belong to this proc
+            lFa%IEN(a,e) = gmtl(gFa%IEN(a,e)) 
+         END DO
+      END DO
+
+!     Analogously copying the nodes which belong to this processor
+      j = 0
+      DO a=1, gFa%nNo
+         Ac = gmtl(gFa%gN(a))
+         IF (Ac .NE. 0) THEN ! If Ac is 0, then the node does not belong to this proc
+            j = j + 1
+            lFa%gN(j) = Ac
+         END IF
+      END DO
+
+      lFa%gnEl = gFa%gnEl
+      IF (rmsh%isReqd) THEN
+         IF(cm%mas()) THEN
+            ALLOCATE(lFa%gebc(1+eNoNb,lFa%gnEl))
+            DO e=1, gFa%gnEl
+               lFa%gebc(1,e) = gFa%gebc(1,e)
+               lFa%gebc(2:1+eNoNb,e) = gFa%gebc(2:1+eNoNb,e)
+            END DO
+         ELSE
+            ALLOCATE(lFa%gebc(0,0))
+         END IF
+      END IF
+
+
       RETURN
       END SUBROUTINE PARTFACEV
 !####################################################################

@@ -6,8 +6,9 @@ make all --print-data-base --no-builtin-variables --no-builtin-rules --question
 # PARTICULAR PURPOSE.
 
 # This program built for i386-apple-darwin11.3.0
+ 
 
-# Make data base, printed on Wed May 11 09:04:58 2022
+# Make data base, printed on Tue May 31 17:19:28 2022
 
 # Variables
 
@@ -38,7 +39,7 @@ VSCODE_VERBOSE_LOGGING = true
 # environment
 __CFBundleIdentifier = com.microsoft.VSCode
 # environment
-VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-0643c15d-3cc7-4e79-b9c8-70b452b2a250.sock
+VSCODE_IPC_HOOK_EXTHOST = /var/folders/ch/w_30q3qs1pg5bl7k8v6qzb_00000gn/T/vscode-ipc-a14369a2-790b-4e2e-adce-7d966f8c3232.sock
 # environment
 VSCODE_CWD = /
 # environment
@@ -54,7 +55,7 @@ ELECTRON_RUN_AS_NODE = 1
 # default
 .FEATURES := target-specific order-only second-expansion else-if archives jobserver check-symlink
 # environment
-SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.TydzQHqA1U/Listeners
+SSH_AUTH_SOCK = /private/tmp/com.apple.launchd.NcSP0h5zmH/Listeners
 # automatic
 %F = $(notdir $%)
 # environment
@@ -160,7 +161,7 @@ MAKELEVEL := 0
 # environment
 CONDA_PREFIX = /Users/aaronbrown/opt/miniconda3
 # environment
-VSCODE_PID = 98504
+VSCODE_PID = 3606
 # environment
 _CE_CONDA = 
 # environment
@@ -174,7 +175,7 @@ LANG = C
 
 # Directories
 
-# . (device 16777223, inode 48604360): 18 files, no impossibilities.
+# . (device 16777221, inode 48604360): 18 files, no impossibilities.
 
 # 18 files, no impossibilities in 1 directories.
 
@@ -248,7 +249,7 @@ GNUmakefile:
 # strcache size: total = 0 / max = 0 / min = 4096 / avg = 0
 # strcache free: total = 0 / max = 0 / min = 4096 / avg = 0
 
-# Finished Make data base on Wed May 11 09:04:58 2022
+# Finished Make data base on Tue May 31 17:19:28 2022
 
  
 make: *** No rule to make target `all'.  Stop.
