@@ -1103,7 +1103,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !####################################################################
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     for incompressible shell elements
-      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml, 
+      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml,
      2  Dml)
       USE MATFUN
       USE COMMOD
@@ -1113,11 +1113,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
       REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
 
-      INTEGER(KIND=IKIND) :: iFn, a, b
+      INTEGER a, b, iFn
       REAL(KIND=RKIND) :: Jg2i, I1, mu, gi_0(2,2), gi_x(2,2), S(2,2),
-     2   CC(2,2,2,2), SN(2,2), CCN(2,2,2,2), Inv4, Inv6, Inv8,
-     3   Eff, Ess, Efs, flM(2,2), c4f, c4s, dc4f, dc4s, d1,
-     4   fl(2,2,nfd), Hfs(2,2), EI1, I1T, g1, g2
+     2   CC(2,2,2,2), SN(2,2), CCN(2,2,2,2), Inv4, Inv6, Inv8, Eff, Ess,
+     3   Efs, flM(2,2), c4f, c4s, dc4f, dc4s, d1, fl(2,2,nfd), Hfs(2,2),
+     4   EI1, g1, g2
       TYPE(stModelType) :: stM
 
       Sml  = 0._RKIND
@@ -1443,6 +1443,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
          C33 = C33 - (2._RKIND*S(3,3)/CC(3,3,3,3))
       END DO
+
+      g33 = C33
 
 !     Statically condense CC
       DO i=1, 2

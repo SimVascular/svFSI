@@ -149,8 +149,8 @@
 
       LOGICAL :: setIt(3)
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b, g, iFn
-      REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, Jac0, Jac, fb(3),
-     2   ud(3), nV0(3), nV(3), x0(3,eNoN), xc(3,eNoN), aCov(3,2),
+      REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, Jac0, Jac, lam3,
+     2   fb(3), ud(3), nV0(3), nV(3), x0(3,eNoN), xc(3,eNoN), aCov(3,2),
      3   aCov0(3,2), aCnv(3,2), aCnv0(3,2), aa_0(2,2), aa_x(2,2),
      4   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Bm(3,3,lM%eNoN),
      5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN),
@@ -270,13 +270,14 @@
 !---------------------------------------------------------------------
 !     Compute curvature coefficients for bending strain and its
 !     variation for CST elements
-      CALL SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb)
+      CALL SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb, .TRUE.)
+
 !---------------------------------------------------------------------
 !     Compute stress resultants by integrating 2nd Piola Kirchhoff
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, Sm, Dm, e)
+     2   bb_x, lam3, Sm, Dm)
 
 !---------------------------------------------------------------------
 !     Contribution to tangent matrices: Dm * Bm, Dm*Bb
@@ -539,10 +540,11 @@
 !--------------------------------------------------------------------
 !     This subroutine computes bending strain, Eb, and its variational
 !     derivative, Bb, for CST elements
-      SUBROUTINE SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb)
+      SUBROUTINE SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb, vflag)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      LOGICAL, INTENT(IN) :: vflag
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER(KIND=IKIND), INTENT(IN) :: e, ptr(6)
       REAL(KIND=RKIND), INTENT(INOUT) ::  x0(3,6), xc(3,6)
@@ -721,6 +723,11 @@
       bb_x(2,2) = 2._RKIND*v(2)
       bb_x(1,2) = v(3)
       bb_x(2,1) = bb_x(1,2)
+
+      IF (.NOT.vflag) THEN
+         Bb(:,:,:) = 0._RKIND
+         RETURN
+      END IF
 
 !     Now compute variation in bending strain
 !     B1 bar
@@ -972,11 +979,11 @@
 
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b, iFn
       REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, wh, Jac0, Jac,
-     2   fb(3), ud(3), nV0(3), nV(3), N(eNoN), x0(3,eNoN), xc(3,eNoN),
-     3   Nx(2,eNoN), Nxx(3,eNoN), aCov0(3,2), aCov(3,2), aCnv0(3,2),
-     4   aCnv(3,2), r0_xx(2,2,3), r_xx(2,2,3), aa_0(2,2), aa_x(2,2),
-     5   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Kc(3,3), Nm(3,3),
-     6   Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN),
+     2   lam3, fb(3), ud(3), nV0(3), nV(3), N(eNoN), x0(3,eNoN),
+     3   xc(3,eNoN), Nx(2,eNoN), Nxx(3,eNoN), aCov0(3,2), aCov(3,2),
+     4   aCnv0(3,2), aCnv(3,2), r0_xx(2,2,3), r_xx(2,2,3), aa_0(2,2),
+     5   aa_x(2,2), bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Kc(3,3),
+     6   Nm(3,3), Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN),
      7   D0Bm(3,3,eNoN), D1Bm(3,3,eNoN), D1Bb(3,3,eNoN), D2Bb(3,3,eNoN),
      8   T1, BmS, BbS, NxSNx, BmDBm, BmDBb, BbDBm, BbDBb, fNa0(2,nFn)
 
@@ -1101,7 +1108,7 @@ c=====================================================================
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, Sm, Dm, e)
+     2   bb_x, lam3, Sm, Dm)
 
 !---------------------------------------------------------------------
 !     Variation in the membrane strain
@@ -1315,19 +1322,19 @@ c=====================================================================
 !####################################################################
 !     Compute stress resultants for shell elements
       SUBROUTINE SHL_STRS_RES(lDmn, nFn, fNa0, aa_0, aa_x, bb_0, bb_x,
-     2   Sm, Dm, e)
+     2   lam3, Sm, Dm)
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nFn, e
       REAL(KIND=RKIND), INTENT(IN) :: aa_0(2,2), aa_x(2,2), bb_0(2,2),
      2   bb_x(2,2), fNa0(2,nFn)
-      REAL(KIND=RKIND), INTENT(OUT) :: Sm(3,2), Dm(3,3,3)
+      REAL(KIND=RKIND), INTENT(OUT) :: lam3, Sm(3,2), Dm(3,3,3)
 
       LOGICAL :: flag
       INTEGER(KIND=IKIND) :: g
-      REAL(KIND=RKIND) :: ht, nu, xis, xi(3), wh(3), wl(3), gg_0(2,2),
-     2   gg_x(2,2), g33, Sml(3), Dml(3,3)
+      REAL(KIND=RKIND) :: ht, nu, xis, g33, xi(3), wh(3), wl(3),
+     2   gg_0(2,2), gg_x(2,2), Sml(3), Dml(3,3)
 
 !     Set shell thickness
       ht = lDmn%prop(shell_thickness)
@@ -1347,11 +1354,14 @@ c=====================================================================
       xi(3) =  0._RKIND
 
 !     Initialize stress-resultants
-      Sm = 0._RKIND
-      Dm = 0._RKIND
+      Sm   = 0._RKIND
+      Dm   = 0._RKIND
 
-      Sml = 0._RKIND
-      Dml = 0._RKIND
+      Sml  = 0._RKIND
+      Dml  = 0._RKIND
+
+!     Averaged SQRT(g33) over the thickness
+      lam3 = 0._RKIND
 
 !     Gauss integration through shell thickness
       DO g=1, 3
@@ -1366,16 +1376,18 @@ c=====================================================================
          IF (flag) THEN
 !           For incompressible materials
             CALL GETPK2CC_SHLi(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml,
-     2       Dml)
+     2         Dml)
          ELSE
 !           For compressible materials
-            CALL GETPK2CC_SHLc(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml, 
-     2       Dml)
+            CALL GETPK2CC_SHLc(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml,
+     2         Dml)
          END IF
 
          wl(1) = .5_RKIND*wh(g)*ht
          wl(2) = wl(1) * xis
          wl(3) = wl(2) * xis
+
+         lam3  = lam3 + wl(1)*SQRT(g33)
 
          Sm(:,1) = Sm(:,1) + wl(1)*Sml(:)
          Sm(:,2) = Sm(:,2) + wl(2)*Sml(:)
@@ -1384,6 +1396,7 @@ c=====================================================================
          Dm(:,:,2) = Dm(:,:,2) + wl(2)*Dml(:,:)
          Dm(:,:,3) = Dm(:,:,3) + wl(3)*Dml(:,:)
       END DO
+      lam3 = lam3 / ht
 
       RETURN
       END SUBROUTINE SHL_STRS_RES
