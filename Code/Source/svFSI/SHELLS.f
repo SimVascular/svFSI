@@ -92,12 +92,13 @@
             yl(:,a)  = Yg(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
-            IF (ALLOCATED(lM%fN)) THEN
-               DO iFn=1, nFn
-                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-               END DO
-            END IF
          END DO
+
+         IF (ALLOCATED(lM%fN)) THEN
+            DO iFn=1, nFn
+               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+            END DO
+         END IF
 
          IF (lM%eType .EQ. eType_TRI3) THEN
 !           Constant strain triangles, no numerical integration
@@ -114,7 +115,7 @@
 !           Gauss integration
             DO g=1, lM%nG
                CALL SHELL3D(lM, g, eNoN, nFn, fN, al, yl, dl, xl,
-     2            bfl, lR, lK)
+     2            bfl, lR, lK, e)
             END DO
 
 !           Assembly
@@ -270,13 +271,12 @@
 !     Compute curvature coefficients for bending strain and its
 !     variation for CST elements
       CALL SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb)
-
 !---------------------------------------------------------------------
 !     Compute stress resultants by integrating 2nd Piola Kirchhoff
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, Sm, Dm)
+     2   bb_x, Sm, Dm, e)
 
 !---------------------------------------------------------------------
 !     Contribution to tangent matrices: Dm * Bm, Dm*Bb
@@ -616,7 +616,7 @@
      2         nInI(2,3)*a0(3,p)) + x0(2,i)
             x0(3,j) = 2._RKIND*(nInI(3,1)*a0(1,p) + nInI(3,2)*a0(2,p) +
      2         nInI(3,3)*a0(3,p)) + x0(3,i)
-
+      
 !           Current config
 !           eI = aI/|aI| (current config)
             aIi   = 1._RKIND/SQRT(NORM(a(:,i)))
@@ -704,7 +704,7 @@
       v0(1) = Tm0(1,1)*xi0(3,1) + Tm0(1,2)*xi0(3,2) + Tm0(1,3)*xi0(3,3)
       v0(2) = Tm0(2,1)*xi0(3,1) + Tm0(2,2)*xi0(3,2) + Tm0(2,3)*xi0(3,3)
       v0(3) = Tm0(3,1)*xi0(3,1) + Tm0(3,2)*xi0(3,2) + Tm0(3,3)*xi0(3,3)
-
+ 
 !     Curvature coefficients (ref. config)
       bb_0(1,1) = 2._RKIND*v0(1)
       bb_0(2,2) = 2._RKIND*v0(2)
@@ -959,12 +959,12 @@
 !####################################################################
 !     Construct shell mechanics for higher order elements/NURBS
       SUBROUTINE SHELL3D (lM, g, eNoN, nFn, fN, al, yl, dl, xl, bfl,
-     2   lR, lK)
+     2   lR, lK, e)
       USE COMMOD
       USE MATFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN, nFn
+      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN, nFn, e
       REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN), fN(3,nFn)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
@@ -976,7 +976,7 @@
      3   Nx(2,eNoN), Nxx(3,eNoN), aCov0(3,2), aCov(3,2), aCnv0(3,2),
      4   aCnv(3,2), r0_xx(2,2,3), r_xx(2,2,3), aa_0(2,2), aa_x(2,2),
      5   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Kc(3,3), Nm(3,3),
-     6   Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN), fl(2,2,nFn),
+     6   Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN),
      7   D0Bm(3,3,eNoN), D1Bm(3,3,eNoN), D1Bb(3,3,eNoN), D2Bb(3,3,eNoN),
      8   T1, BmS, BbS, NxSNx, BmDBm, BmDBb, BbDBm, BbDBb, fNa0(2,nFn)
 
@@ -1101,7 +1101,7 @@ c=====================================================================
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, Sm, Dm)
+     2   bb_x, Sm, Dm, e)
 
 !---------------------------------------------------------------------
 !     Variation in the membrane strain
@@ -1315,11 +1315,11 @@ c=====================================================================
 !####################################################################
 !     Compute stress resultants for shell elements
       SUBROUTINE SHL_STRS_RES(lDmn, nFn, fNa0, aa_0, aa_x, bb_0, bb_x,
-     2   Sm, Dm)
+     2   Sm, Dm, e)
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
-      INTEGER(KIND=IKIND), INTENT(IN) :: nFn
+      INTEGER(KIND=IKIND), INTENT(IN) :: nFn, e
       REAL(KIND=RKIND), INTENT(IN) :: aa_0(2,2), aa_x(2,2), bb_0(2,2),
      2   bb_x(2,2), fNa0(2,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: Sm(3,2), Dm(3,3,3)
@@ -1327,7 +1327,7 @@ c=====================================================================
       LOGICAL :: flag
       INTEGER(KIND=IKIND) :: g
       REAL(KIND=RKIND) :: ht, nu, xis, xi(3), wh(3), wl(3), gg_0(2,2),
-     2   gg_x(2,2), Sml(3), Dml(3,3)
+     2   gg_x(2,2), g33, Sml(3), Dml(3,3)
 
 !     Set shell thickness
       ht = lDmn%prop(shell_thickness)
@@ -1365,10 +1365,12 @@ c=====================================================================
 !        Get 2nd Piola-Kirchhoff and elasticity tensors
          IF (flag) THEN
 !           For incompressible materials
-            CALL GETPK2CC_SHLi(lDmn, nFn, fNa0, gg_0, gg_x, Sml, Dml)
+            CALL GETPK2CC_SHLi(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml,
+     2       Dml)
          ELSE
 !           For compressible materials
-            CALL GETPK2CC_SHLc(lDmn, nFn, fNa0, gg_0, gg_x, Sml, Dml)
+            CALL GETPK2CC_SHLc(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml, 
+     2       Dml)
          END IF
 
          wl(1) = .5_RKIND*wh(g)*ht

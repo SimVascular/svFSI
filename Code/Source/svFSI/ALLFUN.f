@@ -1309,6 +1309,7 @@
       IF (ALLOCATED(lDmn%stM%Tf%gt%qs)) DEALLOCATE(lDmn%stM%Tf%gt%qs)
       IF (ALLOCATED(lDmn%stM%Tf%gt%r))  DEALLOCATE(lDmn%stM%Tf%gt%r)
       IF (ALLOCATED(lDmn%stM%Tf%gt%i))  DEALLOCATE(lDmn%stM%Tf%gt%i)
+      lDmn%stM%Tf%eta_s = 0._RKIND
 
       ! lDmn%cep
       lDmn%cep%cepType  = cepModel_NA

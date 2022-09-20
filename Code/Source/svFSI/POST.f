@@ -66,7 +66,13 @@
             ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
             tmpV  = 0._RKIND
             tmpVe = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq, outGrp)
+            IF (msh(iM)%lShl) THEN
+               CALL SHLTPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, 
+     2          iEq, outGrp)
+            ELSE
+               CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq,
+     2          outGrp)
+            END IF
             res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
@@ -873,29 +879,23 @@
                DO i=1, fs%eNoN
                   resl(:) = resl(:) + N(i)*yl(:,i)
                END DO
-
                IF (eNds(Ac) .EQ. 0) eNds(Ac) = 1
                sF(:,Ac) = sF(:,Ac) + resl(:)*Je
                sA(Ac)   = sA(Ac)   + Je
             END DO
          END DO
-
          CALL COMMU(sF)
          CALL COMMU(sA)
-
          DO a=1, lM%nNo
             Ac = lM%gN(a)
             IF (eNds(Ac).EQ.1 .AND. .NOT.ISZERO(sA(Ac))) THEN
                res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
             END IF
          END DO
-
          DEALLOCATE(eNds)
       END IF
-
       DEALLOCATE (sA, sF, sE, xl, dl, yl, tmXl, ya_l, fN, resl, N, Nx)
       CALL DESTROY(fs)
-
       RETURN
       END SUBROUTINE TPOST
 !####################################################################
@@ -1383,4 +1383,584 @@
       STOP
 
       END SUBROUTINE PPBIN2VTK
+!####################################################################
+!     Routine for post processing shell stress tensor
+      SUBROUTINE SHLTPOST(lM, m, res, resE, lD, lY, iEq, outGrp)
+      USE COMMOD
+      USE ALLFUN
+      USE MATFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER(KIND=IKIND), INTENT(IN) :: m, iEq, outGrp
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo), lY(tDof,tnNo)
+
+      LOGICAL flag
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, i, j, k, l, cPhys, insd, nFn,
+     2   gs, iFn, li, lj, nwg, eNoN 
+      REAL(KIND=RKIND) w, Jac, Jac0, detF, Je, tmX, ya, nu, mu, p, trS,
+     2   vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nsymd), Im(nsd,nsd),
+     3   F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd), S(nsd,nsd),
+     4   sigma(nsd,nsd), aa_0(2,2), aa_x(2,2), aCov0(3,2), aCov(3,2),
+     5   aCnv0(3,2), aCnv(3,2), nV0(3), nV(3), r0_xx(2,2,3), 
+     6   r_xx(2,2,3), Sml(3), Dml(3,3), ht, wh(3), xis, gg_0(2,2),
+     7   gg_x(2,2), bb_0(2,2), bb_x(2,2), xXi(3,2), Gmat(2,2), g33
+      TYPE(fsType) :: fs
+
+      INTEGER, ALLOCATABLE :: eNds(:), ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), yl(:,:),
+     2   tmXl(:), ya_l(:), fN(:,:), resl(:), Nx(:,:), N(:), sA(:),
+     3   sF(:,:), sE(:), x0(:,:), xc(:,:), fNa0(:,:), Nxx(:,:),
+     4   tmpX(:,:)
+
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
+!     For higher order elements, we lower the order of shape functions
+!     to compute the quantities at corner nodes of elements. We then
+!     use these lower order shape functions to interpolate the values
+!     at edge nodes and elements centers (if applicable)
+      flag = .FALSE.
+      IF (lM%eType.EQ.eType_TRI6  .OR. lM%eType.EQ.eType_QUD8  .OR.
+     2    lM%eType.EQ.eType_QUD9  .OR. lM%eType.EQ.eType_TET10 .OR.
+     3    lM%eType.EQ.eType_HEX20 .OR. lM%eType .EQ. eType_HEX27) THEN
+         flag =.TRUE.
+         CALL SETTHOODFS(fs, lM%eType)
+      ELSE
+         fs%eType = lM%eType
+         fs%lShpF = lM%lShpF
+         fs%eNoN  = lM%eNoN
+         fs%nG    = lM%nG
+      END IF
+      CALL INITFS(fs, 2)
+
+      eNoN = fs%eNoN
+      IF (fs%eType .EQ. eType_TRI3) eNoN = 2*eNoN
+
+      ALLOCATE(sA(tnNo), sF(m,tnNo), sE(lM%nEl), xl(nsd,eNoN),
+     2   dl(tDof,eNoN), yl(tDof,eNoN), fN(nsd,nFn), tmXl(eNoN),
+     3   ya_l(eNoN), resl(m), Nx(2,fs%eNoN), N(fs%eNoN),
+     4   ptr(eNoN), x0(3,eNoN),xc(3,eNoN),fNa0(2,nFn),
+     5                   Nxx(3,fs%eNoN))
+
+      sA   = 0._RKIND
+      sF   = 0._RKIND
+      sE   = 0._RKIND
+
+      insd = nsd
+      IF (lM%lShl) insd = 2
+
+!     Initialize tensor operations
+      CALL TEN_INIT(insd)
+
+      IF (lM%lFib) insd = 1
+
+      DO e=1, lM%nEl
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_shell) CYCLE
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+         fN = 0._RKIND
+         IF (ALLOCATED(lM%fN)) THEN
+            DO l=1, nFn
+               fN(:,l) = lM%fN((l-1)*nsd+1:l*nsd,e)
+            END DO
+         END IF
+         dl   = 0._RKIND
+         yl   = 0._RKIND
+         tmXl = 0._RKIND
+         ya_l = 0._RKIND
+         DO a=1, eNoN
+            IF (a .LE. lM%eNoN) THEN
+               Ac = lM%IEN(a,e)
+               ptr(a) = Ac
+            ELSE
+               b  = a - lM%eNoN
+               Ac = lM%eIEN(b,e)
+               ptr(a) = Ac
+               IF (Ac .EQ. 0) CYCLE
+            END IF
+            b  = lM%lN(Ac)
+            xl(:,a) = x(:,Ac)
+            dl(:,a) = lD(:,Ac)
+            yl(:,a) = lY(:,Ac)
+            IF (ecCpld) THEN
+               IF (ALLOCATED(lM%tmX)) THEN
+                  tmXl(a) = lM%tmX(b)
+               END IF
+               IF (ALLOCATED(ec_Ya)) THEN
+                  ya_l(a) = ec_Ya(Ac)
+               ELSE
+                  ya_l(a) = eq(cEq)%dmn(cDmn)%ec%Ya
+               END IF
+            END IF
+         END DO
+
+         x0(:,:) = xl(:,:)
+
+         DO a=1, eNoN
+            xc(1,a) = x0(1,a) + dl(i,a)
+            xc(2,a) = x0(2,a) + dl(j,a)
+            xc(3,a) = x0(3,a) + dl(k,a)
+         END DO
+
+!        Gauss integration
+         Je = 0._RKIND
+
+         IF (fs%eType .NE. eType_TRI3) THEN
+            nwg =  fs%nG
+         ELSE
+            nwg =  1
+         END IF
+         
+         DO g=1, nwg
+            IF (fs%eType .NE. eType_TRI3) THEN
+            ! Post processing SHELL3D
+               IF (lM%eType .EQ. eType_NRB) THEN
+                  N   = lM%N(:,g)
+                  Nx  = lM%Nx(:,:,g)
+                  Nxx = lM%Nxx(:,:,g)
+               ELSE
+                  N   = lM%fs(1)%N(:,g)
+                  Nx  = lM%fs(1)%Nx(:,:,g)
+                  Nxx = lM%fs(1)%Nxx(:,:,g)
+               END IF
+
+               CALL GNNS(fs%eNoN, Nx, x0, nV0, aCov0, aCnv0)
+               Jac0 = SQRT(NORM(nV0))
+               nV0  = nV0/Jac0
+               
+               CALL GNNS(fs%eNoN, Nx, xc, nV, aCov, aCnv)
+               Jac = SQRT(NORM(nV))
+               nV  = nV/Jac
+               r0_xx(:,:,:) = 0._RKIND
+               r_xx(:,:,:) = 0._RKIND
+               DO a=1, fs%eNoN
+                  r0_xx(1,1,:) = r0_xx(1,1,:) + Nxx(1,a)*x0(:,a)
+                  r0_xx(2,2,:) = r0_xx(2,2,:) + Nxx(2,a)*x0(:,a)
+                  r0_xx(1,2,:) = r0_xx(1,2,:) + Nxx(3,a)*x0(:,a)
+                        
+                  r_xx(1,1,:) = r_xx(1,1,:) + Nxx(1,a)*xc(:,a)
+                  r_xx(2,2,:) = r_xx(2,2,:) + Nxx(2,a)*xc(:,a)
+                  r_xx(1,2,:) = r_xx(1,2,:) + Nxx(3,a)*xc(:,a)
+               END DO
+               r0_xx(2,1,:) = r0_xx(1,2,:)
+               r_xx(2,1,:) = r_xx(1,2,:)
+               aa_0 = 0._RKIND
+               aa_x = 0._RKIND
+               bb_0 = 0._RKIND
+               bb_x = 0._RKIND
+               DO l=1, nsd
+                  aa_0(1,1) = aa_0(1,1) + aCov0(l,1)*aCov0(l,1)
+                  aa_0(1,2) = aa_0(1,2) + aCov0(l,1)*aCov0(l,2)
+                  aa_0(2,1) = aa_0(2,1) + aCov0(l,2)*aCov0(l,1)
+                  aa_0(2,2) = aa_0(2,2) + aCov0(l,2)*aCov0(l,2)
+
+                  aa_x(1,1) = aa_x(1,1) + aCov(l,1)*aCov(l,1)
+                  aa_x(1,2) = aa_x(1,2) + aCov(l,1)*aCov(l,2)
+                  aa_x(2,1) = aa_x(2,1) + aCov(l,2)*aCov(l,1)
+                  aa_x(2,2) = aa_x(2,2) + aCov(l,2)*aCov(l,2)
+                  
+                  bb_0(1,1) = bb_0(1,1) + r0_xx(1,1,l)*nV0(l)
+                  bb_0(1,2) = bb_0(1,2) + r0_xx(1,2,l)*nV0(l)
+                  bb_0(2,1) = bb_0(2,1) + r0_xx(2,1,l)*nV0(l)
+                  bb_0(2,2) = bb_0(2,2) + r0_xx(2,2,l)*nV0(l)
+
+                  bb_x(1,1) = bb_x(1,1) + r_xx(1,1,l)*nV(l)
+                  bb_x(1,2) = bb_x(1,2) + r_xx(1,2,l)*nV(l)
+                  bb_x(2,1) = bb_x(2,1) + r_xx(2,1,l)*nV(l)
+                  bb_x(2,2) = bb_x(2,2) + r_xx(2,2,l)*nV(l)
+               END DO
+            ! END Post processing SHELL3D
+            ELSE
+            ! Post processing SHELLCST
+               N = lM%N(:,g)
+               Nx(:,:) = lM%Nx(:,:,1)
+               ALLOCATE(tmpX(nsd,fs%eNoN))
+               tmpX = x0(:,1:fs%eNoN)
+               CALL GNNS(fs%eNoN, Nx, tmpX, nV0, aCov0, aCnv0)
+               Jac0 = SQRT(NORM(nV0))
+               nV0  = nV0/Jac0
+
+               tmpX = xc(:,1:lM%eNoN)
+               CALL GNNS(fs%eNoN, Nx, tmpX, nV, aCov, aCnv)
+               Jac = SQRT(NORM(nV))
+               nV  = nV/Jac
+               DEALLOCATE(tmpX)
+
+               aa_0 = 0._RKIND
+               aa_x = 0._RKIND
+               DO l=1, nsd
+                  aa_0(1,1) = aa_0(1,1) + aCov0(l,1)*aCov0(l,1)
+                  aa_0(1,2) = aa_0(1,2) + aCov0(l,1)*aCov0(l,2)
+                  aa_0(2,1) = aa_0(2,1) + aCov0(l,2)*aCov0(l,1)
+                  aa_0(2,2) = aa_0(2,2) + aCov0(l,2)*aCov0(l,2)
+
+                  aa_x(1,1) = aa_x(1,1) + aCov(l,1)*aCov(l,1)
+                  aa_x(1,2) = aa_x(1,2) + aCov(l,1)*aCov(l,2)
+                  aa_x(2,1) = aa_x(2,1) + aCov(l,2)*aCov(l,1)
+                  aa_x(2,2) = aa_x(2,2) + aCov(l,2)*aCov(l,2)
+               END DO
+
+               CALL PSHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x)
+            ! END Post processing SHELLCST
+            END IF
+
+            fNa0 = 0._RKIND
+            DO iFn=1, nFn
+               DO l=1, 3
+                  fNa0(1,iFn) = fNa0(1,iFn) + fN(l,iFn)*aCnv0(l,1)
+                  fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
+               END DO
+            END DO
+
+            ht = eq(iEq)%dmn(cDmn)%prop(shell_thickness)
+            nu = eq(iEq)%dmn(cDmn)%prop(poisson_ratio)
+            gg_0(:,:) = aa_0(:,:)
+            gg_x(:,:) = aa_x(:,:)
+            IF (ISZERO(nu-0.5_RKIND)) THEN
+               CALL GETPK2CC_SHLi(eq(iEq)%dmn(cDmn), nFn, fNa0, 
+     2               gg_0, gg_x, g33, Sml, Dml)
+            ELSE
+               CALL GETPK2CC_SHLc(eq(iEq)%dmn(cDmn), nFn, fNa0, 
+     2               gg_0, gg_x, g33, Sml, Dml)
+            END IF
+
+            F = 0._RKIND
+            F = F + MAT_DYADPROD(aCov(:,1),aCnv0(:,1),3)
+            F = F + MAT_DYADPROD(aCov(:,2),aCnv0(:,2),3)
+            F = F + SQRT(g33) * MAT_DYADPROD(nV0,nV,3)
+            detF = MAT_DET(F, nsd)
+            w  = fs%w(g)*Jac0
+            Je = Je + w
+            Im = MAT_ID(nsd)
+
+            ed = 0._RKIND
+            
+            SELECT CASE (outGrp)
+            CASE (outGrp_J)
+!           Jacobian := determinant of deformation gradient tensor
+               resl(1) = detF
+               sE(e)   = sE(e) + w*detF
+
+            CASE (outGrp_F)
+!           Deformation gradient tensor (F)
+               IF (nsd .EQ. 3) THEN
+                  resl(1) = F(1,1)
+                  resl(2) = F(1,2)
+                  resl(3) = F(1,3)
+                  resl(4) = F(2,1)
+                  resl(5) = F(2,2)
+                  resl(6) = F(2,3)
+                  resl(7) = F(3,1)
+                  resl(8) = F(3,2)
+                  resl(9) = F(3,3)
+               ELSE
+                  resl(1) = F(1,1)
+                  resl(2) = F(1,2)
+                  resl(3) = F(2,1)
+                  resl(4) = F(2,2)
+               END IF
+
+            CASE (outGrp_strain)
+!           Green-Lagrange strain tensor
+               C  = MATMUL(TRANSPOSE(F), F)
+               Eg = 0.5_RKIND * (C - Im)
+               ! resl is used to remap Eg
+               IF (nsd .EQ. 3) THEN
+                  resl(1) = Eg(1,1)
+                  resl(2) = Eg(2,2)
+                  resl(3) = Eg(3,3)
+                  resl(4) = Eg(1,2)
+                  resl(5) = Eg(2,3)
+                  resl(6) = Eg(3,1)
+               ELSE
+                  resl(1) = Eg(1,1)
+                  resl(2) = Eg(2,2)
+                  resl(3) = Eg(1,2)
+               END IF
+
+            CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
+               sigma = 0._RKIND
+
+               S(1,1) = Sml(1)
+               S(1,2) = Sml(3)
+               S(2,1) = S(1,2)
+               S(2,2) = Sml(2)
+               S(1,3) = 0._RKIND
+               S(3,1) = S(1,3)
+               S(2,3) = 0._RKIND
+               S(3,2) = S(2,3)
+               S(3,3) = 0._RKIND
+               P1 = MATMUL(F, S)
+               sigma = MATMUL(P1, TRANSPOSE(F))
+               IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
+
+!        2nd Piola-Kirchhoff stress tensor
+               IF (outGrp .EQ. outGrp_stress) THEN
+                  IF (nsd .EQ. 3) THEN
+                     resl(1) = S(1,1)
+                     resl(2) = S(2,2)
+                     resl(3) = S(3,3)
+                     resl(4) = S(1,2)
+                     resl(5) = S(2,3)
+                     resl(6) = S(3,1)
+                  ELSE
+                     resl(1) = S(1,1)
+                     resl(2) = S(2,2)
+                     resl(3) = S(1,2)
+                  END IF
+
+!        Cauchy stress tensor
+               ELSE IF (outGrp .EQ. outGrp_cauchy) THEN
+                  IF (nsd .EQ. 3) THEN
+                     resl(1) = sigma(1,1)
+                     resl(2) = sigma(2,2)
+                     resl(3) = sigma(3,3)
+                     resl(4) = sigma(1,2)
+                     resl(5) = sigma(2,3)
+                     resl(6) = sigma(3,1)
+                  ELSE
+                     resl(1) = sigma(1,1)
+                     resl(2) = sigma(2,2)
+                     resl(3) = sigma(1,2)
+                  END IF
+
+!        Von Mises stress
+               ELSE IF (outGrp .EQ. outGrp_mises) THEN
+                  trS = MAT_TRACE(sigma, nsd) / REAL(nsd,KIND=RKIND)
+                  DO l=1, nsd
+                     sigma(l,l) = sigma(l,l) - trS
+                  END DO
+                  vmises  = SQRT(MAT_DDOT(sigma, sigma, nsd))
+                  resl(1) = vmises
+                  sE(e)   = sE(e) + w*vmises
+               END IF
+
+            CASE (outGrp_fS)
+!           Fiber shortening (active strain model)
+               resl(1) = ya
+
+            END SELECT
+
+            DO a=1, fs%eNoN
+               Ac       = lM%IEN(a,e)
+               sA(Ac)   = sA(Ac)   + w*N(a)
+               sF(:,Ac) = sF(:,Ac) + w*N(a)*resl(:)
+            END DO
+         END DO
+         IF (.NOT.ISZERO(Je)) sE(e) = sE(e)/Je
+      END DO
+      resE(:) = sE(:)
+
+      CALL COMMU(sF)
+      CALL COMMU(sA)
+
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         IF (.NOT. iszero(sA(Ac))) THEN
+           res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
+         ENDIF
+      END DO
+
+      DEALLOCATE (sA, sF, sE, xl, dl, yl, tmXl, ya_l, fN, resl, N, Nx,
+     2                  x0, xc, fNa0, Nxx)
+      CALL DESTROY(fs)
+
+      RETURN
+      END SUBROUTINE SHLTPOST
+!####################################################################
+!     This subroutine computes bending strain bb_0 and bb_x for CST
+      SUBROUTINE PSHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, ptr(6)
+      REAL(KIND=RKIND), INTENT(INOUT) ::  x0(3,6), xc(3,6)
+      REAL(KIND=RKIND), INTENT(OUT) :: bb_0(2,2), bb_x(2,2)
+
+      LOGICAL :: bFlag, lFix(3)
+      INTEGER(KIND=IKIND) :: i, j, p, f, eNoN
+
+      REAL(KIND=RKIND) :: Jac0, Jac, cI, aIi, nV0(3), nV(3), eI(3),
+     2   nI(3), eIeI(3,3), nInI(3,3), eIaP(3,3), Im(3,3), aCov(3,2),
+     3   aCnv(3,2), aCov0(3,2), aCnv0(3,2)
+
+      REAL(KIND=RKIND) :: a0(3,6), a(3,6), adg0(3,3), adg(3,3),
+     2   xi0(3,3), xi(3,3), Tm0(3,3), Tm(3,3), v0(3), v(3), B1b(3,6),
+     3   Nm(3,3), Mm(3,3,2), H1(6,18), H2(18,18), H3(3,18), H1H2(6,18),
+     4   H3H2(3,18), Bb1(3,18), tmpA(3,3)
+
+      eNoN = 2*lM%eNoN
+!     Boundary element check
+      bFlag = .FALSE.
+      DO j=lM%eNoN+1, eNoN
+         IF (ptr(j) .EQ. 0) THEN
+            bFlag = .TRUE.
+            EXIT
+         END IF
+      END DO
+
+!     Edge vectors of the main element (reference config)
+      a0(:,1) = x0(:,3) - x0(:,2)
+      a0(:,2) = x0(:,1) - x0(:,3)
+      a0(:,3) = x0(:,2) - x0(:,1)
+
+!     Edge vectors of the main element (current config)
+      a(:,1)  = xc(:,3) - xc(:,2)
+      a(:,2)  = xc(:,1) - xc(:,3)
+      a(:,3)  = xc(:,2) - xc(:,1)
+
+!     Covariant and contravariant bases in reference config
+      tmpA = x0(:,1:lM%eNoN)
+      CALL GNNS(lM%eNoN, lM%Nx(:,:,1), tmpA, nV0, aCov0, aCnv0)
+      Jac0 = SQRT(NORM(nV0))
+      nV0  = nV0/Jac0
+
+!     Covariant and contravariant bases in current config
+      tmpA = xc(:,1:lM%eNoN)
+      CALL GNNS(lM%eNoN, lM%Nx(:,:,1), tmpA, nV, aCov, aCnv)
+      Jac = SQRT(NORM(nV))
+      nV  = nV/Jac
+
+!     Update the position vector of the `artificial' or `ghost' nodes
+!     depending on the boundary condition.
+      IF (bFlag) THEN
+         DO j=lM%eNoN+1, eNoN
+            IF (ptr(j) .NE. 0) CYCLE
+            i = j - lM%eNoN
+            p = i - 1
+            IF (i .EQ. 1) p = 3
+!           Reference config
+!           eI = eI0 = aI0/|aI0| (reference config)
+            aIi   = 1._RKIND/SQRT(NORM(a0(:,i)))
+            eI(:) = a0(:,i) * aIi
+!           nI = nI0 = eI0 x n0 (reference config)
+            nI(1) = eI(2)*nV0(3) - eI(3)*nV0(2)
+            nI(2) = eI(3)*nV0(1) - eI(1)*nV0(3)
+            nI(3) = eI(1)*nV0(2) - eI(2)*nV0(1)
+!           xJ = xI + 2(nI \ctimes nI)aP
+            nInI    = MAT_DYADPROD(nI, nI, 3)
+            x0(1,j) = 2._RKIND*(nInI(1,1)*a0(1,p) + nInI(1,2)*a0(2,p) +
+     2         nInI(1,3)*a0(3,p)) + x0(1,i)
+            x0(2,j) = 2._RKIND*(nInI(2,1)*a0(1,p) + nInI(2,2)*a0(2,p) +
+     2         nInI(2,3)*a0(3,p)) + x0(2,i)
+            x0(3,j) = 2._RKIND*(nInI(3,1)*a0(1,p) + nInI(3,2)*a0(2,p) +
+     2         nInI(3,3)*a0(3,p)) + x0(3,i)
+
+!           Current config
+!           eI = aI/|aI| (current config)
+            aIi   = 1._RKIND/SQRT(NORM(a(:,i)))
+            eI(:) = a(:,i)*aIi
+!           nI = eI x n (currnt config)
+            nI(1) = eI(2)*nV(3) - eI(3)*nV(2)
+            nI(2) = eI(3)*nV(1) - eI(1)*nV(3)
+            nI(3) = eI(1)*nV(2) - eI(2)*nV(1)
+!           xJ = xI + 2(nI \ctimes nI)aP
+            nInI    = MAT_DYADPROD(nI, nI, 3)
+            xc(1,j) = 2._RKIND*(nInI(1,1)*a(1,p) + nInI(1,2)*a(2,p) +
+     2         nInI(1,3)*a(3,p)) + xc(1,i)
+            xc(2,j) = 2._RKIND*(nInI(2,1)*a(1,p) + nInI(2,2)*a(2,p) +
+     2         nInI(2,3)*a(3,p)) + xc(2,i)
+            xc(3,j) = 2._RKIND*(nInI(3,1)*a(1,p) + nInI(3,2)*a(2,p) +
+     2         nInI(3,3)*a(3,p)) + xc(3,i)
+
+            IF (BTEST(lM%sbc(i,e),bType_fix)) xc(:,j) = x0(:,j)
+         END DO
+      END IF
+
+!     Edge vector of surrounding nodes (reference config)
+      a0(:,4)   = x0(:,4) - x0(:,2)
+      a0(:,5)   = x0(:,5) - x0(:,3)
+      a0(:,6)   = x0(:,6) - x0(:,1)
+
+!     Edge vector of surrounding nodes (current config)
+      a(:,4)    = xc(:,4) - xc(:,2)
+      a(:,5)    = xc(:,5) - xc(:,3)
+      a(:,6)    = xc(:,6) - xc(:,1)
+
+!     a.gCnv (reference config)
+      adg0(1,1) = NORM(a0(:,4), aCnv0(:,1)) ! xi_4
+      adg0(1,2) = NORM(a0(:,5), aCnv0(:,1)) ! xi_5
+      adg0(1,3) = NORM(a0(:,6), aCnv0(:,1)) ! xi_6
+
+      adg0(2,1) = NORM(a0(:,4), aCnv0(:,2)) ! eta_4
+      adg0(2,2) = NORM(a0(:,5), aCnv0(:,2)) ! eta_5
+      adg0(2,3) = NORM(a0(:,6), aCnv0(:,2)) ! eta_6
+
+      adg0(3,1) = NORM(a0(:,4), nV0)        ! z_4
+      adg0(3,2) = NORM(a0(:,5), nV0)        ! z_5
+      adg0(3,3) = NORM(a0(:,6), nV0)        ! z_6
+
+!     a.gCnv (current config)
+      adg(1,1)  = NORM(a(:,4), aCnv(:,1)) ! xi_4
+      adg(1,2)  = NORM(a(:,5), aCnv(:,1)) ! xi_5
+      adg(1,3)  = NORM(a(:,6), aCnv(:,1)) ! xi_6
+
+      adg(2,1)  = NORM(a(:,4), aCnv(:,2)) ! eta_4
+      adg(2,2)  = NORM(a(:,5), aCnv(:,2)) ! eta_5
+      adg(2,3)  = NORM(a(:,6), aCnv(:,2)) ! eta_6
+
+      adg(3,1)  = NORM(a(:,4), nV)        ! z_4
+      adg(3,2)  = NORM(a(:,5), nV)        ! z_5
+      adg(3,3)  = NORM(a(:,6), nV)        ! z_6
+
+!     Xi matrix (reference config)
+      xi0(:,:)  = adg0(:,:)
+      xi0(1,3)  = adg0(1,3) + 1._RKIND    ! xi_6
+      xi0(2,1)  = adg0(2,1) + 1._RKIND    ! eta_4
+
+!     Xi matrix (current config)
+      xi(:,:)   = adg(:,:)
+      xi(1,3)   = adg(1,3) + 1._RKIND     ! xi_6
+      xi(2,1)   = adg(2,1) + 1._RKIND     ! eta_4
+
+!     Tmat and inverse (reference config)
+      DO i=1, 3
+         Tm0(i,1) = xi0(1,i)*(xi0(1,i) - 1._RKIND) ! xi**2 - xi
+         Tm0(i,2) = xi0(2,i)*(xi0(2,i) - 1._RKIND) ! eta**2 - eta
+         Tm0(i,3) = xi0(1,i)*xi0(2,i)              ! xi * eta
+      END DO
+      Tm0 = MAT_INV(Tm0, 3)
+
+      ! IF (e.EQ.1) THEN
+      !    PRINT *, "POST+++++++++++++++"
+      !    PRINT *, x0
+      ! END IF 
+!     Tmat and inverse (current config)
+      DO i=1, 3
+         Tm(i,1) = xi(1,i)*(xi(1,i) - 1._RKIND)    ! xi**2 - xi
+         Tm(i,2) = xi(2,i)*(xi(2,i) - 1._RKIND)    ! eta**2 - eta
+         Tm(i,3) = xi(1,i)*xi(2,i)                 ! xi * eta
+      END DO
+      Tm = MAT_INV(Tm, 3)
+
+!     v = Inv(T) * z (reference config)
+      v0(1) = Tm0(1,1)*xi0(3,1) + Tm0(1,2)*xi0(3,2) + Tm0(1,3)*xi0(3,3)
+      v0(2) = Tm0(2,1)*xi0(3,1) + Tm0(2,2)*xi0(3,2) + Tm0(2,3)*xi0(3,3)
+      v0(3) = Tm0(3,1)*xi0(3,1) + Tm0(3,2)*xi0(3,2) + Tm0(3,3)*xi0(3,3)
+ 
+!     Curvature coefficients (ref. config)
+      bb_0(1,1) = 2._RKIND*v0(1)
+      bb_0(2,2) = 2._RKIND*v0(2)
+      bb_0(1,2) = v0(3)
+      bb_0(2,1) = bb_0(1,2)
+
+!     v = Inv(T) * z (current config)
+      v(1) = Tm(1,1)*xi(3,1) + Tm(1,2)*xi(3,2) + Tm(1,3)*xi(3,3)
+      v(2) = Tm(2,1)*xi(3,1) + Tm(2,2)*xi(3,2) + Tm(2,3)*xi(3,3)
+      v(3) = Tm(3,1)*xi(3,1) + Tm(3,2)*xi(3,2) + Tm(3,3)*xi(3,3)
+
+!     Curvature coefficients (current config)
+      bb_x(1,1) = 2._RKIND*v(1)
+      bb_x(2,2) = 2._RKIND*v(2)
+      bb_x(1,2) = v(3)
+      bb_x(2,1) = bb_x(1,2)
+      END SUBROUTINE PSHELLBENDCST
 !####################################################################

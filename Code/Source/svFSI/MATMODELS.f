@@ -49,7 +49,7 @@
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, Kp, J, Ja, J2d, J4d, trE, p, pl, Inv1,
-     2   Inv2, Inv4, Inv6, Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd),
+     2   Inv2, Inv4, Inv6, Inv8, Tfa, Tsa, IDm(nsd,nsd), C(nsd,nsd),
      3   E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
      4   PP(nsd,nsd,nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3, rexp
@@ -71,9 +71,13 @@
 
 !     Fiber-reinforced stress
       CALL GET_FIB_STRESS(stM%Tf, Tfa)
+      Tsa = Tfa*stM%Tf%eta_s
 
 !     Electromechanics coupling - active stress
-      IF (lDmn%ec%astress) Tfa = Tfa + ya
+      IF (lDmn%ec%astress) THEN
+         Tfa = Tfa + ya
+         Tsa = Tsa + ya*lDmn%ec%eta_s
+      END IF
 
 !     Electromechanics coupling - active strain
       Fe   = F
@@ -193,8 +197,9 @@
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + additional cross-fiber stresses
          Sb   = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2             + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
      2      EXP(stM%bff*Eff*Eff)
@@ -258,12 +263,12 @@
          g1   = 4._RKIND*stM%aff*g1*rexp
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-Sheet interaction
+!        Sheet-Sheet interaction + additional cross-fiber stress
          rexp = EXP(stM%bss*Ess*Ess)
          g2   = 2._RKIND*stM%ass*Ess*rexp
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Hss  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hss
-         S    = S + (g2*Hss)
+         S    = S + (g2*Hss) + (Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd))
 
          g2   = (1._RKIND + (2._RKIND*stM%bss*Ess*Ess))
          g2   = 4._RKIND*stM%ass*g2*rexp
@@ -313,8 +318,9 @@
          CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
          Sb  = Sb * r2
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + additional cross-fiber stresses
          Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2            + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -392,11 +398,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*J4d*stM%aff*g1
          CCb  = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Sb   = Sb + g2*Hss
 
@@ -497,11 +503,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*stM%aff*g1
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          S    = S + (g2*Hss)
 
@@ -571,7 +577,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,
      2   Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
-     3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
+     3   Tsa, Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
      4   CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3, rexp
       ! Guccione !
@@ -591,9 +597,13 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
 !     Fiber-reinforced stress
       CALL GET_FIB_STRESS(stM%Tf, Tfa)
+      Tsa = Tfa*stM%Tf%eta_s
 
 !     Electromechanics coupling - active stress
-      IF (lDmn%ec%astress) Tfa = Tfa + ya
+      IF (lDmn%ec%astress) THEN
+         Tfa = Tfa + ya
+         Tsa = Tsa + ya*lDmn%ec%eta_s
+      END IF
 
 !     Electromechanics coupling - active strain
       Fe   = F
@@ -682,8 +692,9 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + additional cross-fiber stresses
          Sb   = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2             + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
      2      EXP(stM%bff*Eff*Eff)
@@ -742,12 +753,12 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*stM%aff*g1*rexp
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-Sheet interaction
+!        Sheet-Sheet interaction + additional cross-fiber stress
          rexp = EXP(stM%bss*Ess*Ess)
          g2   = 2._RKIND*stM%ass*Ess*rexp
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Hss  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hss
-         S    = S + (g2*Hss)
+         S    = S + (g2*Hss) + (Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd))
 
          g2   = (1._RKIND + (2._RKIND*stM%bss*Ess*Ess))
          g2   = 4._RKIND*stM%ass*g2*rexp
@@ -797,8 +808,9 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
          Sb  = Sb * r2
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + addtional cross-fiber stresses
          Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2            + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -873,11 +885,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*J4d*stM%aff*g1
          CCb  = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Sb   = Sb + g2*Hss
 
@@ -970,11 +982,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*stM%aff*g1
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          S    = S + (g2*Hss)
 
@@ -1091,14 +1103,15 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !####################################################################
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     for incompressible shell elements
-      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, Sml, Dml)
+      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml, 
+     2  Dml)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
-      REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
+      REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
 
       INTEGER(KIND=IKIND) :: iFn, a, b
       REAL(KIND=RKIND) :: Jg2i, I1, mu, gi_0(2,2), gi_x(2,2), S(2,2),
@@ -1268,6 +1281,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          err = "Undefined material constitutive model"
       END SELECT
 
+      g33 = Jg2i
+
 !     Convert to Voigt notation
       Sml(1) = S(1,1)
       Sml(2) = S(2,2)
@@ -1291,14 +1306,15 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !--------------------------------------------------------------------
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     for compressible shell elements
-      SUBROUTINE GETPK2CC_SHLc(lDmn, nfd, fNa0, gg_0, gg_x, Sml, Dml)
+      SUBROUTINE GETPK2CC_SHLc(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml, 
+     2  Dml)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
-      REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
+      REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
 
       INTEGER(KIND=IKIND), PARAMETER :: MAXITR = 20
       REAL(KIND=RKIND), PARAMETER :: ATOL = 1E-10
@@ -1373,12 +1389,13 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
             C1 = stM%C10
             C2 = stM%C01
             J43 = J2**(-f23)
-            Gi4AS = TEN_ASYMPROD12(gi_0, gi_0, 3)
-            I2  = MAT_DDOT(Ci, TEN_MDDOT(Gi4AS, Ci, 3), 3)
             I2ijkl = TEN_DYADPROD(gi_0, gi_0, 3) - 
      2                              TEN_SYMMPROD(gi_0, gi_0, 3)          
             I2ij = TEN_MDDOT(I2ijkl, Ci, 3)
-            Cikl = -0.5_RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+            Gi4AS = TEN_ASYMPROD12(gi_0, gi_0, 3)
+            I2  = MAT_DDOT(Ci, TEN_MDDOT(Gi4AS, Ci, 3), 3)
+            ! I2  = MAT_DDOT(Ci, I2ij, 3)
+            Cikl = - TEN_SYMMPROD(Ci, Ci, 3)
 
             S  = C1*J23*(gi_0 - trC3*Ci) + pJ*Ci
             S  = S + C2*J43*(-f23*I2*Ci + I2ij)
@@ -1425,10 +1442,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          END IF
 
          C33 = C33 - (2._RKIND*S(3,3)/CC(3,3,3,3))
-      !    PRINT *, S(3,3)
-      !    PRINT *, "++++++++++++++++++++++++"
       END DO
-      ! PRINT *, "====================================="
 
 !     Statically condense CC
       DO i=1, 2
@@ -1441,6 +1455,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
             END DO
          END DO
       END DO
+
+      g33 = C33
 
 !     Convert the in-plane components to Voigt notation
       Sml(1) = S(1,1)

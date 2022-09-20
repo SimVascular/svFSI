@@ -207,6 +207,10 @@
             CALL cm%bcast(cntctM%c)
             CALL cm%bcast(cntctM%h)
             CALL cm%bcast(cntctM%al)
+            CALL cm%bcast(cntctM%p)
+            CALL cm%bcast(cntctM%Rin)
+            CALL cm%bcast(cntctM%Rout)
+            CALL cm%bcast(cntctM%gap)
          END IF
          CALL cm%bcast(ibFlag)
          IF (ibFlag) CALL DISTIB()
@@ -1081,6 +1085,7 @@
          CALL cm%bcast(lStM%Tf%gt%r)
          CALL cm%bcast(lStM%Tf%gt%i)
       END IF
+      CALL cm%bcast(lStM%Tf%eta_s)
 
       RETURN
       END SUBROUTINE DIST_MATCONSTS
@@ -1123,6 +1128,7 @@
             CALL cm%bcast(lEc%Yat%i)
          END IF
       END IF
+      CALL cm%bcast(lEc%eta_s)
 
       RETURN
       END SUBROUTINE DIST_ECMODEL

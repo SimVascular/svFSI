@@ -616,8 +616,13 @@
                      END DO
                   END IF
 
-                  IF (.NOT.cmmInit) CALL TPOST(msh(iM), l, tmpV, tmpVe,
-     2               lD, lY, iEq, oGrp)
+                  IF (msh(iM)%lShl) THEN
+                     CALL SHLTPOST(msh(iM), l, tmpV, tmpVe, lD,
+     2                lY, iEq, oGrp)
+                  ELSE 
+                     IF (.NOT.cmmInit) CALL TPOST(msh(iM), l, tmpV, 
+     2                tmpVe, lD, lY, iEq, oGrp)
+                  END IF
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
@@ -639,7 +644,13 @@
                   tmpV  = 0._RKIND
                   tmpVe = 0._RKIND
 
-                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, lY, iEq, oGrp)
+                  IF (msh(iM)%lShl) THEN
+                     CALL SHLTPOST(msh(iM), l, tmpV, tmpVe, lD, lY, 
+     2                iEq, oGrp)
+                  ELSE
+                     CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, lY, iEq,
+     2                oGrp)
+                  END IF
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO

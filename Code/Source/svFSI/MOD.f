@@ -212,6 +212,8 @@
          REAL(KIND=8) :: g = 0._RKIND
 !        Unsteady time-dependent values
          TYPE(fcType) :: gt
+!        Cross-fiber (sheet) stress parameter
+         REAL(KIND=RKIND) :: eta_s = 0._RKIND
       END TYPE fibStrsType
 
 !     Structural domain type
@@ -278,6 +280,8 @@
 !          := activation force for active stress model
 !          := fiber contraction parameter for active strain model
          REAL(KIND=RKIND) :: Ya = 0._RKIND
+!        Cross-fiber stress component for active stress coupling
+         REAL(KIND=RKIND) :: eta_s = 0._RKIND
 !        Unsteady time-dependent values for prescribed fiber-shortening
          TYPE(fcType) :: Yat
       END TYPE eccModelType
@@ -473,6 +477,14 @@
          REAL(KIND=RKIND) c
 !        Min norm of face normals in contact
          REAL(KIND=RKIND) al
+!        Potentail exponential index 
+         REAL(KIND=RKIND) p
+!        Rin 
+         REAL(KIND=RKIND) Rin
+!        Rout 
+         REAL(KIND=RKIND) Rout
+!        Gap
+         REAL(KIND=RKIND) gap
 !        Tolerance
          REAL(KIND=RKIND) :: tol = 1.E-6_RKIND
       END TYPE cntctModelType

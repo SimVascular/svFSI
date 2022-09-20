@@ -641,10 +641,14 @@
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) err = "Prestress for SHELLS is not implemented yet"
 
-         nDOP = (/3,1,0,0/)
+         nDOP = (/7,1,0,0/)
          outPuts(1) = out_displacement
          outPuts(2) = out_velocity
-         outPuts(3) = out_integ
+         outPuts(3) = out_strain
+         outPuts(4) = out_stress
+         outPuts(5) = out_integ
+         outPuts(6) = out_cauchy
+         outPuts(7) = out_mises
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -2485,6 +2489,7 @@ c     2         "can be applied for Neumann boundaries only"
       SELECT CASE (TRIM(ctmp))
       CASE ("active_stress", "stress")
          lDmn%ec%astress = .TRUE.
+         lPtr => list%get(lDmn%ec%eta_s, "Cross-fiber stress parameter")
 
       CASE ("active_strain", "strain")
          lDmn%ec%astrain = .TRUE.
@@ -2786,6 +2791,8 @@ c     2         "can be applied for Neumann boundaries only"
          CASE DEFAULT
             err = "Undefined type of fiber reinforcement stress"
          END SELECT
+         lPtr => lFib%get(lDmn%stM%Tf%eta_s,
+     2      "Cross-fiber stress parameter")
       END IF
 
 !     Check for shell model
