@@ -66,7 +66,13 @@
             ALLOCATE(tmpV(1,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
             tmpV  = 0._RKIND
             tmpVe = 0._RKIND
-            CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq, outGrp)
+
+            IF (msh(iM)%lShl) THEN
+               CALL SHLPOST(msh(iM), 1, tmpV, tmpVe, lD, iEq, outGrp)
+            ELSE
+               CALL TPOST(msh(iM), 1, tmpV, tmpVe, lD, lY, iEq, outGrp)
+            END  IF
+
             res  = 0._RKIND
             DO a=1, msh(iM)%nNo
                Ac = msh(iM)%gN(a)
@@ -898,6 +904,371 @@
 
       RETURN
       END SUBROUTINE TPOST
+!####################################################################
+!     Routine for post processing shell-based quantities
+      SUBROUTINE SHLPOST(lM, m, res, resE, lD, iEq, outGrp)
+      USE COMMOD
+      USE ALLFUN
+      USE MATFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(INOUT) :: lM
+      INTEGER(KIND=IKIND), INTENT(IN) :: m, iEq, outGrp
+      REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
+      REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
+
+      LOGICAL incompFlag
+      INTEGER(KIND=IKIND) a, b, e, g, i, j, k, l, iFn, Ac, nFn, insd,
+     2   eNoN, cPhys, nwg
+      REAL(KIND=RKIND) :: w, nu, Jac0, Jac, Je, lam3, detF, trS, vmises,
+     2   nV0(3), nV(3), aCov0(3,2), aCov(3,2), aCnv0(3,2), aCnv(3,2),
+     3   aa_0(2,2), aa_x(2,2), bb_0(2,2), bb_x(2,2), r0_xx(2,2,3),
+     4   r_xx(2,2,3), Sm(3,2), Dm(3,3,3), Im(3,3), F(3,3), C(3,3),
+     5   Eg(3,3), S(3,3), PK1(3,3), sigma(3,3)
+
+      INTEGER, ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), sE(:), resl(:),
+     2   dl(:,:), x0(:,:), xc(:,:), fN(:,:), fNa0(:,:), N(:), Nx(:,:),
+     3   Nxx(:,:), Bb(:,:,:), tmpX(:,:)
+
+      dof  = eq(iEq)%dof
+      i    = eq(iEq)%s
+      j    = i + 1
+      k    = j + 1
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
+!     Set shell dimension := 2
+      insd = nsd-1
+
+!     Initialize tensor operations
+      CALL TEN_INIT(insd)
+
+!     Set eNoN (number of nodes per element)
+      eNoN = lM%eNoN
+      IF (lM%eType .EQ. eType_TRI3) eNoN = 2*eNoN
+
+!     Allocate arrays
+      ALLOCATE(sA(tnNo), sF(m,tnNo), sE(lM%nEl), resl(m), dl(tDof,eNoN),
+     2   x0(3,eNoN), xc(3,eNoN), fN(3,nFn), fNa0(2,eNoN), ptr(eNoN),
+     3   N(lM%eNoN), Nx(2,lM%eNoN), Nxx(3,lM%eNoN), Bb(3,3,6))
+
+!     Initialize arrays
+      sA  = 0._RKIND
+      sF  = 0._RKIND
+      sE  = 0._RKIND
+      Bb  = 0._RKIND
+      Nxx = 0._RKIND
+
+!     Compute quantities at the element level and project them to nodes
+      DO e=1, lM%nEl
+         cDmn  = DOMAIN(lM, iEq, e)
+         cPhys = eq(iEq)%dmn(cDmn)%phys
+         IF (cPhys .NE. phys_shell) CYCLE
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+!        Get shell properties
+         nu = eq(iEq)%dmn(cDmn)%prop(poisson_ratio)
+
+!        Check for incompressibility
+         incompFlag = .FALSE.
+         IF (ISZERO(nu-0.5_RKIND)) incompFlag = .TRUE.
+
+!        Get the reference configuration and displacement field
+         x0 = 0._RKIND
+         dl = 0._RKIND
+         DO a=1, eNoN
+            IF (a .LE. lM%eNoN) THEN
+               Ac = lM%IEN(a,e)
+               ptr(a) = Ac
+            ELSE
+               b  = a - lM%eNoN
+               Ac = lM%eIEN(b,e)
+               ptr(a) = Ac
+               IF (Ac .EQ. 0) CYCLE
+            END IF
+            x0(:,a) = x(:,Ac)
+            dl(:,a) = lD(:,Ac)
+         END DO
+
+!        Get the current configuration
+         xc = 0._RKIND
+         DO a=1, eNoN
+            xc(1,a) = x0(1,a) + dl(i,a)
+            xc(2,a) = x0(2,a) + dl(j,a)
+            xc(3,a) = x0(3,a) + dl(k,a)
+         END DO
+
+!        Get fiber directions
+         fN = 0._RKIND
+         IF (ALLOCATED(lM%fN)) THEN
+            DO iFn=1, nFn
+               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+            END DO
+         END IF
+
+!        Set number of integration points.
+!        Note: Gauss integration performed for NURBS elements
+!        Not required for constant-strain triangle elements
+         IF (lM%eType .EQ. eType_TRI3) THEN
+            nwg = 1
+         ELSE
+            nwg = lM%nG
+         END IF
+
+!        Update shapefunctions for NURBS elements
+         IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
+
+         Je   = 0._RKIND
+         resl = 0._RKIND
+         DO g=1, nwg
+            IF (lM%eType .NE. eType_TRI3) THEN
+               ! Set element shape functions and their derivatives
+               IF (lM%eType .EQ. eType_NRB) THEN
+                  N   = lM%N(:,g)
+                  Nx  = lM%Nx(:,:,g)
+                  Nxx = lM%Nxx(:,:,g)
+               ELSE
+                  N   = lM%fs(1)%N(:,g)
+                  Nx  = lM%fs(1)%Nx(:,:,g)
+                  Nxx = lM%fs(1)%Nxx(:,:,g)
+               END IF
+
+!              Covariant and contravariant bases (ref. config.)
+               CALL GNNS(eNoN, Nx, x0, nV0, aCov0, aCnv0)
+               Jac0 = SQRT(NORM(nV0))
+               nV0  = nV0/Jac0
+
+!              Covariant and contravariant bases (spatial config.)
+               CALL GNNS(eNoN, Nx, xc, nV, aCov, aCnv)
+               Jac  = SQRT(NORM(nV))
+               nV   = nV/Jac
+
+!              Second derivatives for curvature coeffs. (ref. config)
+               r0_xx(:,:,:) = 0._RKIND
+               r_xx(:,:,:)  = 0._RKIND
+               DO a=1, eNoN
+                  r0_xx(1,1,:) = r0_xx(1,1,:) + Nxx(1,a)*x0(:,a)
+                  r0_xx(2,2,:) = r0_xx(2,2,:) + Nxx(2,a)*x0(:,a)
+                  r0_xx(1,2,:) = r0_xx(1,2,:) + Nxx(3,a)*x0(:,a)
+
+                  r_xx(1,1,:) = r_xx(1,1,:) + Nxx(1,a)*xc(:,a)
+                  r_xx(2,2,:) = r_xx(2,2,:) + Nxx(2,a)*xc(:,a)
+                  r_xx(1,2,:) = r_xx(1,2,:) + Nxx(3,a)*xc(:,a)
+               END DO
+               r0_xx(2,1,:) = r0_xx(1,2,:)
+               r_xx(2,1,:)  = r_xx(1,2,:)
+
+!              Compute metric tensor (aa) and curvature coefficients(bb)
+               aa_0 = 0._RKIND
+               aa_x = 0._RKIND
+               bb_0 = 0._RKIND
+               bb_x = 0._RKIND
+               DO l=1, nsd
+                  aa_0(1,1) = aa_0(1,1) + aCov0(l,1)*aCov0(l,1)
+                  aa_0(1,2) = aa_0(1,2) + aCov0(l,1)*aCov0(l,2)
+                  aa_0(2,1) = aa_0(2,1) + aCov0(l,2)*aCov0(l,1)
+                  aa_0(2,2) = aa_0(2,2) + aCov0(l,2)*aCov0(l,2)
+
+                  aa_x(1,1) = aa_x(1,1) + aCov(l,1)*aCov(l,1)
+                  aa_x(1,2) = aa_x(1,2) + aCov(l,1)*aCov(l,2)
+                  aa_x(2,1) = aa_x(2,1) + aCov(l,2)*aCov(l,1)
+                  aa_x(2,2) = aa_x(2,2) + aCov(l,2)*aCov(l,2)
+
+                  bb_0(1,1) = bb_0(1,1) + r0_xx(1,1,l)*nV0(l)
+                  bb_0(1,2) = bb_0(1,2) + r0_xx(1,2,l)*nV0(l)
+                  bb_0(2,1) = bb_0(2,1) + r0_xx(2,1,l)*nV0(l)
+                  bb_0(2,2) = bb_0(2,2) + r0_xx(2,2,l)*nV0(l)
+
+                  bb_x(1,1) = bb_x(1,1) + r_xx(1,1,l)*nV(l)
+                  bb_x(1,2) = bb_x(1,2) + r_xx(1,2,l)*nV(l)
+                  bb_x(2,1) = bb_x(2,1) + r_xx(2,1,l)*nV(l)
+                  bb_x(2,2) = bb_x(2,2) + r_xx(2,2,l)*nV(l)
+               END DO
+
+!              Set weight of the Gauss point
+               w  = lM%w(g)*Jac0
+
+            ELSE    ! for constant strain triangles
+!              Set element shape functions and their derivatives
+               N = lM%N(:,g)
+               Nx(:,:) = lM%Nx(:,:,1)
+
+!              Covariant and contravariant bases (ref. config.)
+               ALLOCATE(tmpX(nsd,lM%eNoN))
+               tmpX = x0(:,1:lM%eNoN)
+               CALL GNNS(lM%eNoN, Nx, tmpX, nV0, aCov0, aCnv0)
+               Jac0 = SQRT(NORM(nV0))
+               nV0  = nV0/Jac0
+
+!              Covariant and contravariant bases (spatial config.)
+               tmpX = xc(:,1:lM%eNoN)
+               CALL GNNS(lM%eNoN, Nx, tmpX, nV, aCov, aCnv)
+               Jac = SQRT(NORM(nV))
+               nV  = nV/Jac
+               DEALLOCATE(tmpX)
+
+!              Compute metric tensor (aa)
+               aa_0 = 0._RKIND
+               aa_x = 0._RKIND
+               DO l=1, nsd
+                  aa_0(1,1) = aa_0(1,1) + aCov0(l,1)*aCov0(l,1)
+                  aa_0(1,2) = aa_0(1,2) + aCov0(l,1)*aCov0(l,2)
+                  aa_0(2,1) = aa_0(2,1) + aCov0(l,2)*aCov0(l,1)
+                  aa_0(2,2) = aa_0(2,2) + aCov0(l,2)*aCov0(l,2)
+
+                  aa_x(1,1) = aa_x(1,1) + aCov(l,1)*aCov(l,1)
+                  aa_x(1,2) = aa_x(1,2) + aCov(l,1)*aCov(l,2)
+                  aa_x(2,1) = aa_x(2,1) + aCov(l,2)*aCov(l,1)
+                  aa_x(2,2) = aa_x(2,2) + aCov(l,2)*aCov(l,2)
+               END DO
+
+               CALL SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb,
+     2            .FALSE.)
+
+!              Set weight of the Gauss point
+               w  = Jac0*0.5_RKIND
+            END IF
+
+!           Compute fiber direction in curvature coordinates
+            fNa0 = 0._RKIND
+            DO iFn=1, nFn
+               DO l=1, nsd
+                  fNa0(1,iFn) = fNa0(1,iFn) + fN(l,iFn)*aCnv0(l,1)
+                  fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
+               END DO
+            END DO
+
+!           Compute stress resultants and lambda3 (integrated through
+!           the shell thickness)
+            CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x,
+     2         bb_0, bb_x, lam3, Sm, Dm)
+
+!           Compute 3D deformation gradient tensor in shell continuum
+            F = MAT_DYADPROD(aCov(:,1), aCnv0(:,1), 3)
+     2        + MAT_DYADPROD(aCov(:,2), aCnv0(:,2), 3)
+     3        + lam3*MAT_DYADPROD(nV, nV0, 3)
+
+            detF = MAT_DET(F, nsd)
+
+            Je = Je + w
+            Im = MAT_ID(nsd)
+
+            SELECT CASE (outGrp)
+            CASE (outGrp_J)
+!              Jacobian := determinant of deformation gradient tensor
+               resl(1) = detF
+               sE(e)   = sE(e) + w*detF
+
+            CASE (outGrp_F)
+!              Deformation gradient tensor (F)
+               IF (nsd .EQ. 3) THEN
+                  resl(1) = F(1,1)
+                  resl(2) = F(1,2)
+                  resl(3) = F(1,3)
+                  resl(4) = F(2,1)
+                  resl(5) = F(2,2)
+                  resl(6) = F(2,3)
+                  resl(7) = F(3,1)
+                  resl(8) = F(3,2)
+                  resl(9) = F(3,3)
+               ELSE
+                  resl(1) = F(1,1)
+                  resl(2) = F(1,2)
+                  resl(3) = F(2,1)
+                  resl(4) = F(2,2)
+               END IF
+
+            CASE (outGrp_strain)
+!              Cauchy-Green deformation (3D shell continuum)
+               C  = MATMUL(TRANSPOSE(F), F)
+
+!              Green-Lagrange strain tensor (3D shell continuum)
+               Eg = 0.5_RKIND * (C - Im)
+
+               ! resl is used to remap Eg
+               IF (nsd .EQ. 3) THEN
+                  resl(1) = Eg(1,1)
+                  resl(2) = Eg(2,2)
+                  resl(3) = Eg(3,3)
+                  resl(4) = Eg(1,2)
+                  resl(5) = Eg(2,3)
+                  resl(6) = Eg(3,1)
+               ELSE
+                  resl(1) = Eg(1,1)
+                  resl(2) = Eg(2,2)
+                  resl(3) = Eg(1,2)
+               END IF
+
+            CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
+               sigma  = 0._RKIND
+               S(:,:) = 0._RKIND
+
+!              2nd Piola-Kirchhoff stress (membrane + bending)
+               S(1,1) = Sm(1,1) + Sm(1,2)
+               S(2,2) = Sm(2,1) + Sm(2,2)
+               S(1,2) = Sm(3,1) + Sm(3,2)
+               S(2,1) = S(1,2)
+
+!              Cauchy stress
+               PK1 = MATMUL(F, S)
+               sigma = MATMUL(PK1, TRANSPOSE(F))
+               IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
+
+!        2nd Piola-Kirchhoff stress tensor
+               IF (outGrp .EQ. outGrp_stress) THEN
+                  resl(1) = S(1,1)
+                  resl(2) = S(2,2)
+                  resl(3) = S(3,3)
+                  resl(4) = S(1,2)
+                  resl(5) = S(2,3)
+                  resl(6) = S(3,1)
+
+!        Cauchy stress tensor
+               ELSE IF (outGrp .EQ. outGrp_cauchy) THEN
+                  resl(1) = sigma(1,1)
+                  resl(2) = sigma(2,2)
+                  resl(3) = sigma(3,3)
+                  resl(4) = sigma(1,2)
+                  resl(5) = sigma(2,3)
+                  resl(6) = sigma(3,1)
+
+!        Von Mises stress
+               ELSE IF (outGrp .EQ. outGrp_mises) THEN
+                  trS = MAT_TRACE(sigma, nsd) / REAL(nsd,KIND=RKIND)
+                  DO l=1, nsd
+                     sigma(l,l) = sigma(l,l) - trS
+                  END DO
+                  vmises  = SQRT(MAT_DDOT(sigma, sigma, nsd))
+                  resl(1) = vmises
+                  sE(e)   = sE(e) + w*vmises
+               END IF
+            END SELECT
+
+            DO a=1, lM%eNoN
+               Ac       = lM%IEN(a,e)
+               sA(Ac)   = sA(Ac)   + w*N(a)
+               sF(:,Ac) = sF(:,Ac) + w*N(a)*resl(:)
+            END DO
+         END DO
+         IF (.NOT.ISZERO(Je)) sE(e) = sE(e)/Je
+      END DO
+      resE(:) = sE(:)
+
+!     Exchange data at the shared nodes across processes
+      CALL COMMU(sF)
+      CALL COMMU(sA)
+
+      DO a=1, lM%nNo
+         Ac = lM%gN(a)
+         IF (.NOT. iszero(sA(Ac))) THEN
+           res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
+         ENDIF
+      END DO
+
+      DEALLOCATE(sA, sF, sE, resl, dl, x0, xc, fN, fNa0, ptr, N, Nx)
+
+      RETURN
+      END SUBROUTINE SHLPOST
 !####################################################################
 !     Routine for post processing fiber directions
       SUBROUTINE FIBDIRPOST(lM, nFn, res, lD, iEq)

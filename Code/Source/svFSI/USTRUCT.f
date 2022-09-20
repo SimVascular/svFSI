@@ -98,12 +98,6 @@
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
 
-            IF (ALLOCATED(lM%fN)) THEN
-               DO iFn=1, nFn
-                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-               END DO
-            END IF
-
             IF (ecCpld) THEN
                IF (ALLOCATED(lM%tmX)) THEN
                   tmXl(a) = lM%tmX(lM%lN(Ac))
@@ -115,6 +109,12 @@
                END IF
             END IF
          END DO
+
+         IF (ALLOCATED(lM%fN)) THEN
+            DO iFn=1, nFn
+               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+            END DO
+         END IF
 
 !        Initialize residue and tangents
          lR  = 0._RKIND

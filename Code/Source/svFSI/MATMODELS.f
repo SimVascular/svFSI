@@ -1103,14 +1103,15 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !####################################################################
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     for incompressible shell elements
-      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, Sml, Dml)
+      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml,
+     2  Dml)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
-      REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
+      REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
 
       INTEGER a, b, iFn
       REAL(KIND=RKIND) :: Jg2i, I1, mu, gi_0(2,2), gi_x(2,2), S(2,2),
@@ -1280,6 +1281,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          err = "Undefined material constitutive model"
       END SELECT
 
+      g33 = Jg2i
+
 !     Convert to Voigt notation
       Sml(1) = S(1,1)
       Sml(2) = S(2,2)
@@ -1303,14 +1306,15 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !--------------------------------------------------------------------
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     for compressible shell elements
-      SUBROUTINE GETPK2CC_SHLc(lDmn, nfd, fNa0, gg_0, gg_x, Sml, Dml)
+      SUBROUTINE GETPK2CC_SHLc(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml,
+     3   Dml)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
       REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
-      REAL(KIND=RKIND), INTENT(OUT) :: Sml(3), Dml(3,3)
+      REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
 
       INTEGER(KIND=IKIND), PARAMETER :: MAXITR = 20
       REAL(KIND=RKIND), PARAMETER :: ATOL = 1E-10
@@ -1401,6 +1405,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
          C33 = C33 - (2._RKIND*S(3,3)/CC(3,3,3,3))
       END DO
+
+      g33 = C33
 
 !     Statically condense CC
       DO i=1, 2
