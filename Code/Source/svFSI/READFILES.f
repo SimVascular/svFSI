@@ -641,10 +641,16 @@
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) err = "Prestress for SHELLS is not implemented yet"
 
-         nDOP = (/3,1,0,0/)
+         nDOP = (/9,1,0,0/)
          outPuts(1) = out_displacement
-         outPuts(2) = out_velocity
-         outPuts(3) = out_integ
+         outPuts(2) = out_mises
+         outPuts(3) = out_stress
+         outPuts(4) = out_cauchy
+         outPuts(5) = out_strain
+         outPuts(6) = out_jacobian
+         outPuts(7) = out_defGrad
+         outPuts(8) = out_velocity
+         outPuts(9) = out_integ
 
          CALL READLS(lSolver_CG, lEq, list)
 

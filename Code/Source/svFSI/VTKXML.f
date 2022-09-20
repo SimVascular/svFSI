@@ -616,8 +616,13 @@
                      END DO
                   END IF
 
-                  IF (.NOT.cmmInit) CALL TPOST(msh(iM), l, tmpV, tmpVe,
-     2               lD, lY, iEq, oGrp)
+                  IF (msh(iM)%lShl) THEN
+                     CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD, iEq,oGrp)
+                  ELSE
+                     IF (.NOT.cmmInit) CALL TPOST(msh(iM), l, tmpV,
+     2                  tmpVe, lD, lY, iEq, oGrp)
+                  END IF
+
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
@@ -639,7 +644,13 @@
                   tmpV  = 0._RKIND
                   tmpVe = 0._RKIND
 
-                  CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, lY, iEq, oGrp)
+                  IF (msh(iM)%lShl) THEN
+                     CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD, iEq,oGrp)
+                  ELSE
+                     CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, lY, iEq,
+     2                  oGrp)
+                  END IF
+
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is:ie,a) = tmpV(1:l,a)
                   END DO
@@ -1281,25 +1292,36 @@
       END IF
 
       IF (ALLOCATED(lDe)) THEN
-         sCe = sCe*nOute
-         dise = dise*nOute
-         IF (cm%mas()) THEN
-            ALLOCATE(gDe(nOute,d%nEl))
-         ELSE
-            ALLOCATE(gDe(0,0))
-         END IF
-
-         CALL MPI_GATHERV(lDe, sCe(cm%tF()), mpreal, gDe, sCe, dise,
-     2      mpreal, master, cm%com(), ierr)
-
-         IF (cm%mas()) THEN
+         IF (cm%seq()) THEN
             DO e=1, d%nEl
                DO i=1, nOute
-                  d%xe(i,m+1) = gDe(i,e)
+                  d%xe(i,m+1) = lDe(i,e)
                END DO
             END DO
+            DEALLOCATE(lDe)
+         ELSE
+            sCe = sCe*nOute
+            dise = dise*nOute
+            IF (cm%mas()) THEN
+               ALLOCATE(gDe(nOute,d%nEl))
+            ELSE
+               ALLOCATE(gDe(0,0))
+            END IF
+
+            CALL MPI_GATHERV(lDe, sCe(cm%tF()), mpreal, gDe, sCe, dise,
+     2         mpreal, master, cm%com(), ierr)
+
+            IF (cm%mas()) THEN
+               DO e=1, d%nEl
+                  DO i=1, nOute
+                     d%xe(i,m+1) = gDe(i,e)
+                  END DO
+               END DO
+            END IF
+            DEALLOCATE(lDe, gDe)
+            sCe  = sCe/nOute
+            dise = dise/nOute
          END IF
-         DEALLOCATE(lDe, gDe)
       END IF
 
       RETURN

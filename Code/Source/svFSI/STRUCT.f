@@ -89,12 +89,6 @@
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
 
-            IF (ALLOCATED(lM%fN)) THEN
-               DO iFn=1, nFn
-                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-               END DO
-            END IF
-
             IF (ALLOCATED(pS0)) THEN
                pS0l(:,a) = pS0(:,Ac)
             END IF
@@ -110,6 +104,12 @@
                END IF
             END IF
          END DO
+
+         IF (ALLOCATED(lM%fN)) THEN
+            DO iFn=1, nFn
+               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+            END DO
+         END IF
 
 !        Gauss integration
          lR = 0._RKIND
