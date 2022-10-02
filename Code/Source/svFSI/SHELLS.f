@@ -153,7 +153,7 @@
      2   fb(3), ud(3), nV0(3), nV(3), x0(3,eNoN), xc(3,eNoN), aCov(3,2),
      3   aCov0(3,2), aCnv(3,2), aCnv0(3,2), aa_0(2,2), aa_x(2,2),
      4   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Bm(3,3,lM%eNoN),
-     5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN),
+     5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN), F(3,3),
      6   D1Bb(3,3,eNoN), D2Bb(3,3,eNoN), BtS, NxSNx, BtDB, fNa0(2,nFn)
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:),
@@ -277,7 +277,14 @@
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, lam3, Sm, Dm)
+     2   bb_x, lam3, Sm, Dm, e)
+
+      F = MAT_DYADPROD(aCov(:,1), aCnv0(:,1), 3)
+     2        + MAT_DYADPROD(aCov(:,2), aCnv0(:,2), 3)
+     3        + lam3*MAT_DYADPROD(nV, nV0, 3)
+
+!       IF (e.EQ.463) PRINT *, e, aCov0
+!       IF (e.EQ.465) PRINT *, e, aCov0
 
 !---------------------------------------------------------------------
 !     Contribution to tangent matrices: Dm * Bm, Dm*Bb
@@ -1108,7 +1115,7 @@ c=====================================================================
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, lam3, Sm, Dm)
+     2   bb_x, lam3, Sm, Dm, e)
 
 !---------------------------------------------------------------------
 !     Variation in the membrane strain
@@ -1322,7 +1329,7 @@ c=====================================================================
 !####################################################################
 !     Compute stress resultants for shell elements
       SUBROUTINE SHL_STRS_RES(lDmn, nFn, fNa0, aa_0, aa_x, bb_0, bb_x,
-     2   lam3, Sm, Dm)
+     2   lam3, Sm, Dm, e)
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
