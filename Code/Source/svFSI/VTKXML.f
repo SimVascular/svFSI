@@ -462,7 +462,7 @@
             END IF
 
             IF (oGrp.EQ.outGrp_J .OR. oGrp.EQ.outGrp_Mises .OR.
-     2         oGrp.EQ.outGrp_I1 )  nOute = nOute + 1
+     2          oGrp.EQ.outGrp_I1) nOute = nOute + 1
          END DO
       END DO
 
@@ -617,7 +617,7 @@
                   END IF
 
                   IF (msh(iM)%lShl) THEN
-                     CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD,iEq,oGrp)
+                     CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD, iEq,oGrp)
                   ELSE
                      IF (.NOT.cmmInit) CALL TPOST(msh(iM), l, tmpV,
      2                  tmpVe, lD, lY, iEq, oGrp)
@@ -638,7 +638,7 @@
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
 
-               CASE (outGrp_J, outGrp_F, outGrp_strain, outGrp_fS, 
+               CASE (outGrp_J, outGrp_F, outGrp_strain, outGrp_fS,
      2               outGrp_C, outGrp_I1 )
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
@@ -646,7 +646,7 @@
                   tmpVe = 0._RKIND
 
                   IF (msh(iM)%lShl) THEN
-                     CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD,iEq,oGrp)
+                     CALL SHLPOST(msh(iM), l, tmpV, tmpVe, lD, iEq,oGrp)
                   ELSE
                      CALL TPOST(msh(iM), l, tmpV, tmpVe, lD, lY, iEq,
      2                  oGrp)
@@ -726,12 +726,8 @@
 
 !     Writing to vtu file (master only)
       IF (cTS.GE.1000 .OR. lAve) THEN
-         ! For printing newtwon iterations 
-         ! fName = STR(cTS)//"."//STR(Eq(ceq)%itr)
          fName = STR(cTS)
       ELSE
-         ! For printing newtwon iterations
-         ! WRITE(fName,'(I3.3,A,I2.2)') cTS, ".", eq(cEq)%itr
          WRITE(fName,'(I3.3)') cTS
       END IF
 

@@ -477,11 +477,11 @@
          REAL(KIND=RKIND) c
 !        Min norm of face normals in contact
          REAL(KIND=RKIND) al
-!        Potentail exponential index 
+!        Potentail exponential index
          REAL(KIND=RKIND) p
-!        Rin 
+!        Rin
          REAL(KIND=RKIND) Rin
-!        Rout 
+!        Rout
          REAL(KIND=RKIND) Rout
 !        Gap
          REAL(KIND=RKIND) gap

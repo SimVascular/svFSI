@@ -151,7 +151,8 @@
 !     velocity (for FSI), fiber directions, fiber alignment, 2nd Piola-
 !     Kirchhoff stress, Cauchy stress, von Mises stress, Jacobian,
 !     Def. grad. tensor, Green strain, divergence of velocity,viscosity,
-!     fiber shortening (active strain)
+!     fiber shortening (active strain), Cauchy-Green strain tensor,
+!     1st Invariant of Cauchy-Green strain tensor
       INTEGER(KIND=IKIND), PARAMETER :: outGrp_NA = 500, outGrp_A = 501,
      2   outGrp_Y = 502, outGrp_D = 503, outGrp_I = 504, outGrp_WSS =
      3   505, outGrp_trac = 506, outGrp_vort = 507, outGrp_vortex = 508,
@@ -159,7 +160,7 @@
      5   outGrp_absV = 512, outGrp_fN = 513, outGrp_fA = 514,
      6   outGrp_stress = 515, outGrp_cauchy = 516, outGrp_mises = 517,
      7   outGrp_J = 518, outGrp_F = 519, outGrp_strain = 520,
-     8   outGrp_divV = 521, outGrp_Visc = 522, outGrp_fS = 523, 
+     8   outGrp_divV = 521, outGrp_Visc = 522, outGrp_fS = 523,
      9   outGrp_C = 524, outGrp_I1 = 525
 !--------------------------------------------------------------------
       INTEGER(KIND=IKIND), PARAMETER :: out_velocity = 599,
