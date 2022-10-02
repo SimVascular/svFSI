@@ -511,6 +511,22 @@
                lPtr => lPM%get(cntctM%al,
      2            "Min norm of face normals (alpha)",1,lb=0._RKIND,
      3            ub=1._RKIND)
+            CASE ("potential")
+               cntctM%cType = cntctM_potential
+               lPtr => lPM%get(cntctM%k,
+     2            "k", 1, ll=0._RKIND)
+               lPtr => lPM%get(cntctM%p,
+     2            "p", 1, lb=4._RKIND)
+               lPtr => lPM%get(cntctM%Rin,
+     2            "Rin", 1, lb=0._RKIND)
+               lPtr => lPM%get(cntctM%Rout,
+     2            "Rout", 1, lb=0._RKIND)
+               IF (cntctM%Rout .LT. cntctM%Rin) err =
+     2            "Choose Rout > Rin for proper contact penalization"
+               lPtr => lPM%get(cntctM%gap,
+     2            "gap", 1, lb=0._RKIND)
+               lPtr => lPM%get(cntctM%c,
+     2            "c", 1, lb=0._RKIND)
             CASE DEFAULT
                err = "Undefined contact model"
             END SELECT

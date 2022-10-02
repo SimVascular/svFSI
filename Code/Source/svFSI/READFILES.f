@@ -368,7 +368,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 22
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 24
 
       LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
@@ -564,7 +564,7 @@
             outPuts(3)  = out_cauchy
             outPuts(4)  = out_strain
          ELSE
-            nDOP = (/13,2,0,0/)
+            nDOP = (/15,2,0,0/)
             outPuts(1)  = out_displacement
             outPuts(2)  = out_mises
             outPuts(3)  = out_stress
@@ -578,6 +578,8 @@
             outPuts(11) = out_velocity
             outPuts(12) = out_acceleration
             outPuts(13) = out_fibStrn
+            outPuts(14) = out_CGstrain
+            outPuts(15) = out_CGInv1
          END IF
 
          CALL READLS(lSolver_CG, lEq, list)
@@ -602,7 +604,7 @@
          lPtr => list%get(pstEq, "Prestress")
          IF (pstEq) err = "Prestress for USTRUCT is not implemented yet"
 
-         nDOP = (/15,2,0,0/)
+         nDOP = (/17,2,0,0/)
          outPuts(1)  = out_displacement
          outPuts(2)  = out_mises
          outPuts(3)  = out_stress
@@ -618,6 +620,8 @@
          outPuts(13) = out_acceleration
          outPuts(14) = out_divergence
          outPuts(15) = out_fibStrn
+         outPuts(16) = out_CGstrain
+         outPuts(17) = out_CGInv1
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -643,14 +647,14 @@
 
          nDOP = (/9,1,0,0/)
          outPuts(1) = out_displacement
-         outPuts(2) = out_mises
-         outPuts(3) = out_stress
-         outPuts(4) = out_cauchy
-         outPuts(5) = out_strain
-         outPuts(6) = out_jacobian
-         outPuts(7) = out_defGrad
-         outPuts(8) = out_velocity
-         outPuts(9) = out_integ
+         outPuts(2) = out_stress
+         outPuts(3) = out_strain
+         outPuts(4) = out_jacobian
+         outPuts(5) = out_defGrad
+         outPuts(6) = out_velocity
+         outPuts(7) = out_integ
+         outPuts(8) = out_CGstrain
+         outPuts(9) = out_CGInv1
 
          CALL READLS(lSolver_CG, lEq, list)
 
@@ -799,7 +803,7 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/22,4,2,0/)
+         nDOP = (/24,4,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
@@ -822,9 +826,11 @@
          outPuts(18) = out_integ
          outPuts(19) = out_fibDir
          outPuts(20) = out_fibAlign
+         outPuts(21) = out_CGstrain
+         outPuts(22) = out_CGInv1
 
-         outPuts(21) = out_divergence
-         outPuts(22) = out_acceleration
+         outPuts(23) = out_divergence
+         outPuts(24) = out_acceleration
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1456,6 +1462,16 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsymd
             lEq%output(iOut)%name = "Strain"
+         CASE (out_CGstrain)
+            lEq%output(iOut)%grp  = outGrp_C
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = nsymd
+            lEq%output(iOut)%name = "CG_Strain"
+         CASE (out_CGInv1)
+            lEq%output(iOut)%grp  = outGrp_I1
+            lEq%output(iOut)%o    = 0
+            lEq%output(iOut)%l    = 1
+            lEq%output(iOut)%name = "CG_Strain_Trace"
          CASE (out_divergence)
             lEq%output(iOut)%grp  = outGrp_divV
             lEq%output(iOut)%o    = 0

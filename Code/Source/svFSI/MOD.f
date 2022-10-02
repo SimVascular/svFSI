@@ -477,6 +477,14 @@
          REAL(KIND=RKIND) c
 !        Min norm of face normals in contact
          REAL(KIND=RKIND) al
+!        Potentail exponential index
+         REAL(KIND=RKIND) p
+!        Rin
+         REAL(KIND=RKIND) Rin
+!        Rout
+         REAL(KIND=RKIND) Rout
+!        Gap
+         REAL(KIND=RKIND) gap
 !        Tolerance
          REAL(KIND=RKIND) :: tol = 1.E-6_RKIND
       END TYPE cntctModelType

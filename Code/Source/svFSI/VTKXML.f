@@ -461,8 +461,8 @@
                outDof = outDof + eq(iEq)%output(iOut)%l
             END IF
 
-            IF (oGrp.EQ.outGrp_J .OR. oGrp.EQ.outGrp_Mises)
-     2         nOute = nOute + 1
+            IF (oGrp.EQ.outGrp_J .OR. oGrp.EQ.outGrp_Mises .OR.
+     2          oGrp.EQ.outGrp_I1) nOute = nOute + 1
          END DO
       END DO
 
@@ -638,7 +638,8 @@
                   DEALLOCATE(tmpV, tmpVe)
                   ALLOCATE(tmpV(maxnsd,msh(iM)%nNo))
 
-               CASE (outGrp_J, outGrp_F, outGrp_strain, outGrp_fS)
+               CASE (outGrp_J, outGrp_F, outGrp_strain, outGrp_fS,
+     2               outGrp_C, outGrp_I1 )
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(l,msh(iM)%nNo), tmpVe(msh(iM)%nEl))
                   tmpV  = 0._RKIND
@@ -658,6 +659,14 @@
                   IF (oGrp .EQ. outGrp_J) THEN
                      nOute = nOute + 1
                      outNamesE(nOute) = "E_Jacobian"
+                     DO a=1, msh(iM)%nEl
+                        d(iM)%xe(nOute,a) = tmpVe(a)
+                     END DO
+                  END IF
+
+                  IF (oGrp .EQ. outGrp_I1) THEN
+                     nOute = nOute + 1
+                     outNamesE(nOute) = "E_CG_I1"
                      DO a=1, msh(iM)%nEl
                         d(iM)%xe(nOute,a) = tmpVe(a)
                      END DO

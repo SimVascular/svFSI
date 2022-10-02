@@ -509,12 +509,14 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
       REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo), lY(tDof,tnNo)
 
+      REAL(KIND=RKIND), PARAMETER :: r32 = 1.224744871391590_RKIND
+
       LOGICAL flag
       INTEGER(KIND=IKIND) a, b, e, g, Ac, i, j, k, l, cPhys, insd, nFn
       REAL(KIND=RKIND) w, Jac, detF, Je, tmX, ya, Ja, elM, nu, lambda,
      2   mu, p, trS, vmises, xi(nsd), xi0(nsd), xp(nsd), ed(nsymd),
      3   Im(nsd,nsd), F(nsd,nsd), C(nsd,nsd), Eg(nsd,nsd), P1(nsd,nsd),
-     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd)
+     4   S(nsd,nsd), sigma(nsd,nsd), Dm(nsymd,nsymd), I1
       TYPE(fsType) :: fs
 
       INTEGER, ALLOCATABLE :: eNds(:)
@@ -689,26 +691,45 @@
                   resl(4) = F(2,2)
                END IF
 
-            CASE (outGrp_strain)
-!           Green-Lagrange strain tensor
-               IF (cPhys .EQ. phys_lElas) THEN
-                  resl(:) = ed(:)
-               ELSE
-                  C  = MATMUL(TRANSPOSE(F), F)
-                  Eg = 0.5_RKIND * (C - Im)
-                  ! resl is used to remap Eg
-                  IF (nsd .EQ. 3) THEN
-                     resl(1) = Eg(1,1)
-                     resl(2) = Eg(2,2)
-                     resl(3) = Eg(3,3)
-                     resl(4) = Eg(1,2)
-                     resl(5) = Eg(2,3)
-                     resl(6) = Eg(3,1)
+            CASE (outGrp_strain, outGrp_C, outGrp_I1)
+               IF (outGrp .EQ. outGrp_strain) THEN
+!              Green-Lagrange strain tensor
+                  IF (cPhys .EQ. phys_lElas) THEN
+                     resl(:) = ed(:)
                   ELSE
-                     resl(1) = Eg(1,1)
-                     resl(2) = Eg(2,2)
-                     resl(3) = Eg(1,2)
+                     C  = MATMUL(TRANSPOSE(F), F)
+                     Eg = 0.5_RKIND * (C - Im)
+                     ! resl is used to remap Eg
+                     IF (nsd .EQ. 3) THEN
+                        resl(1) = Eg(1,1)
+                        resl(2) = Eg(2,2)
+                        resl(3) = Eg(3,3)
+                        resl(4) = Eg(1,2)
+                        resl(5) = Eg(2,3)
+                        resl(6) = Eg(3,1)
+                     ELSE
+                        resl(1) = Eg(1,1)
+                        resl(2) = Eg(2,2)
+                        resl(3) = Eg(1,2)
+                     END IF
                   END IF
+               ELSE IF (outGrp .EQ. outGrp_C) THEN
+                  C  = MATMUL(TRANSPOSE(F), F)
+                  IF (nsd .EQ. 3) THEN
+                     resl(1) = C(1,1)
+                     resl(2) = C(2,2)
+                     resl(3) = C(3,3)
+                     resl(4) = C(1,2)
+                     resl(5) = C(2,3)
+                     resl(6) = C(3,1)
+                  ELSE
+                     resl(1) = C(1,1)
+                     resl(2) = C(2,2)
+                     resl(3) = C(1,2)
+                  END IF
+               ELSE IF (outGrp .EQ. outGrp_I1) THEN
+                  C  = MATMUL(TRANSPOSE(F), F)
+                  I1 = MAT_TRACE(C,nsd)
                END IF
 
             CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
@@ -797,7 +818,7 @@
                   DO l=1, nsd
                      sigma(l,l) = sigma(l,l) - trS
                   END DO
-                  vmises  = SQRT(MAT_DDOT(sigma, sigma, nsd))
+                  vmises  = r32 * SQRT(MAT_DDOT(sigma, sigma, nsd))
                   resl(1) = vmises
                   sE(e)   = sE(e) + w*vmises
                END IF
@@ -879,29 +900,23 @@
                DO i=1, fs%eNoN
                   resl(:) = resl(:) + N(i)*yl(:,i)
                END DO
-
                IF (eNds(Ac) .EQ. 0) eNds(Ac) = 1
                sF(:,Ac) = sF(:,Ac) + resl(:)*Je
                sA(Ac)   = sA(Ac)   + Je
             END DO
          END DO
-
          CALL COMMU(sF)
          CALL COMMU(sA)
-
          DO a=1, lM%nNo
             Ac = lM%gN(a)
             IF (eNds(Ac).EQ.1 .AND. .NOT.ISZERO(sA(Ac))) THEN
                res(:,a) = res(:,a) + sF(:,Ac)/sA(Ac)
             END IF
          END DO
-
          DEALLOCATE(eNds)
       END IF
-
       DEALLOCATE (sA, sF, sE, xl, dl, yl, tmXl, ya_l, fN, resl, N, Nx)
       CALL DESTROY(fs)
-
       RETURN
       END SUBROUTINE TPOST
 !####################################################################
@@ -919,11 +934,11 @@
       LOGICAL incompFlag
       INTEGER(KIND=IKIND) a, b, e, g, i, j, k, l, iFn, Ac, nFn, insd,
      2   eNoN, cPhys, nwg
-      REAL(KIND=RKIND) :: w, nu, Jac0, Jac, Je, lam3, detF, trS, vmises,
-     2   nV0(3), nV(3), aCov0(3,2), aCov(3,2), aCnv0(3,2), aCnv(3,2),
-     3   aa_0(2,2), aa_x(2,2), bb_0(2,2), bb_x(2,2), r0_xx(2,2,3),
-     4   r_xx(2,2,3), Sm(3,2), Dm(3,3,3), Im(3,3), F(3,3), C(3,3),
-     5   Eg(3,3), S(3,3), PK1(3,3), sigma(3,3)
+      REAL(KIND=RKIND) :: w, nu, ht, Jac0, Jac, Je, lam3, detF, nV0(3),
+     2   nV(3), aCov0(3,2), aCov(3,2), aCnv0(3,2), aCnv(3,2), aa_0(2,2),
+     3   aa_x(2,2), bb_0(2,2), bb_x(2,2), r0_xx(2,2,3), r_xx(2,2,3),
+     4   Sm(3,2), Dm(3,3,3), Im(3,3), F(3,3), F3d(3,3), C(3,3), Eg(3,3),
+     5   S(3,3)
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), sE(:), resl(:),
@@ -968,6 +983,7 @@
 
 !        Get shell properties
          nu = eq(iEq)%dmn(cDmn)%prop(poisson_ratio)
+         ht = eq(iEq)%dmn(cDmn)%prop(shell_thickness)
 
 !        Check for incompressibility
          incompFlag = .FALSE.
@@ -1143,12 +1159,14 @@
             CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x,
      2         bb_0, bb_x, lam3, Sm, Dm)
 
-!           Compute 3D deformation gradient tensor in shell continuum
+!           Shell in-plane deformation gradient tensor
             F = MAT_DYADPROD(aCov(:,1), aCnv0(:,1), 3)
      2        + MAT_DYADPROD(aCov(:,2), aCnv0(:,2), 3)
-     3        + lam3*MAT_DYADPROD(nV, nV0, 3)
 
-            detF = MAT_DET(F, nsd)
+!           3D deformation gradient tensor in shell continuum
+            F3d = F + lam3*MAT_DYADPROD(nV, nV0, 3)
+
+            detF = MAT_DET(F3d, nsd)
 
             Je = Je + w
             Im = MAT_ID(nsd)
@@ -1160,88 +1178,67 @@
                sE(e)   = sE(e) + w*detF
 
             CASE (outGrp_F)
-!              Deformation gradient tensor (F)
-               IF (nsd .EQ. 3) THEN
-                  resl(1) = F(1,1)
-                  resl(2) = F(1,2)
-                  resl(3) = F(1,3)
-                  resl(4) = F(2,1)
-                  resl(5) = F(2,2)
-                  resl(6) = F(2,3)
-                  resl(7) = F(3,1)
-                  resl(8) = F(3,2)
-                  resl(9) = F(3,3)
-               ELSE
-                  resl(1) = F(1,1)
-                  resl(2) = F(1,2)
-                  resl(3) = F(2,1)
-                  resl(4) = F(2,2)
-               END IF
+!              3D deformation gradient tensor (F)
+               resl(1) = F3d(1,1)
+               resl(2) = F3d(1,2)
+               resl(3) = F3d(1,3)
+               resl(4) = F3d(2,1)
+               resl(5) = F3d(2,2)
+               resl(6) = F3d(2,3)
+               resl(7) = F3d(3,1)
+               resl(8) = F3d(3,2)
+               resl(9) = F3d(3,3)
 
-            CASE (outGrp_strain)
-!              Cauchy-Green deformation (3D shell continuum)
-               C  = MATMUL(TRANSPOSE(F), F)
+            CASE (outGrp_strain, outGrp_C, outGrp_I1)
+!              In-plane Cauchy-Green deformation tensor
+               C = MATMUL(TRANSPOSE(F), F)
 
-!              Green-Lagrange strain tensor (3D shell continuum)
+!              In-plane Green-Lagrange strain tensor
                Eg = 0.5_RKIND * (C - Im)
 
-               ! resl is used to remap Eg
-               IF (nsd .EQ. 3) THEN
+               IF (outGrp .EQ. outGrp_strain) THEN
+                  ! resl is used to remap Eg
                   resl(1) = Eg(1,1)
                   resl(2) = Eg(2,2)
                   resl(3) = Eg(3,3)
                   resl(4) = Eg(1,2)
                   resl(5) = Eg(2,3)
                   resl(6) = Eg(3,1)
-               ELSE
-                  resl(1) = Eg(1,1)
-                  resl(2) = Eg(2,2)
-                  resl(3) = Eg(1,2)
+
+               ELSE IF (outGrp .EQ. outGrp_C) THEN
+                  ! resl is used to remap C
+                  resl(1) = C(1,1)
+                  resl(2) = C(2,2)
+                  resl(3) = C(3,3)
+                  resl(4) = C(1,2)
+                  resl(5) = C(2,3)
+                  resl(6) = C(3,1)
+
+               ELSE IF (outGrp .EQ. outGrp_I1) THEN
+                  resl(1) = MAT_TRACE(C, 3)
+                  sE(e)   = sE(e) + w*resl(1)
+
                END IF
 
-            CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
-               sigma  = 0._RKIND
+            CASE (outGrp_stress)
                S(:,:) = 0._RKIND
 
-!              2nd Piola-Kirchhoff stress (membrane + bending)
-               S(1,1) = Sm(1,1) + Sm(1,2)
-               S(2,2) = Sm(2,1) + Sm(2,2)
-               S(1,2) = Sm(3,1) + Sm(3,2)
+!              2nd Piola-Kirchhoff stress
+               S(1,1) = Sm(1,1)
+               S(2,2) = Sm(2,1)
+               S(1,2) = Sm(3,1)
                S(2,1) = S(1,2)
 
-!              Cauchy stress
-               PK1 = MATMUL(F, S)
-               sigma = MATMUL(PK1, TRANSPOSE(F))
-               IF (.NOT.ISZERO(detF)) sigma(:,:) = sigma(:,:) / detF
+!              Normalizing stress by thickness
+               S = S / ht
 
 !        2nd Piola-Kirchhoff stress tensor
-               IF (outGrp .EQ. outGrp_stress) THEN
-                  resl(1) = S(1,1)
-                  resl(2) = S(2,2)
-                  resl(3) = S(3,3)
-                  resl(4) = S(1,2)
-                  resl(5) = S(2,3)
-                  resl(6) = S(3,1)
-
-!        Cauchy stress tensor
-               ELSE IF (outGrp .EQ. outGrp_cauchy) THEN
-                  resl(1) = sigma(1,1)
-                  resl(2) = sigma(2,2)
-                  resl(3) = sigma(3,3)
-                  resl(4) = sigma(1,2)
-                  resl(5) = sigma(2,3)
-                  resl(6) = sigma(3,1)
-
-!        Von Mises stress
-               ELSE IF (outGrp .EQ. outGrp_mises) THEN
-                  trS = MAT_TRACE(sigma, nsd) / REAL(nsd,KIND=RKIND)
-                  DO l=1, nsd
-                     sigma(l,l) = sigma(l,l) - trS
-                  END DO
-                  vmises  = SQRT(MAT_DDOT(sigma, sigma, nsd))
-                  resl(1) = vmises
-                  sE(e)   = sE(e) + w*vmises
-               END IF
+               resl(1) = S(1,1)
+               resl(2) = S(2,2)
+               resl(3) = S(3,3)
+               resl(4) = S(1,2)
+               resl(5) = S(2,3)
+               resl(6) = S(3,1)
             END SELECT
 
             DO a=1, lM%eNoN
@@ -1265,7 +1262,7 @@
          ENDIF
       END DO
 
-      DEALLOCATE(sA, sF, sE, resl, dl, x0, xc, fN, fNa0, ptr, N, Nx)
+      DEALLOCATE(sA, sF, sE, resl, dl, x0, xc, fN, fNa0, ptr, N, Nx, Bb)
 
       RETURN
       END SUBROUTINE SHLPOST

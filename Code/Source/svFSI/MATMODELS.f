@@ -1307,7 +1307,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     for compressible shell elements
       SUBROUTINE GETPK2CC_SHLc(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml,
-     3   Dml)
+     2  Dml)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
@@ -1319,9 +1319,13 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       INTEGER(KIND=IKIND), PARAMETER :: MAXITR = 20
       REAL(KIND=RKIND), PARAMETER :: ATOL = 1E-10
 
-      INTEGER(KIND=IKIND) :: itr, i, j, k, l
+      INTEGER(KIND=IKIND) :: itr, i, j, k, l, iFn
       REAL(KIND=RKIND) :: Jg2, J2, J23, f13, f23, trC3, C33, kap, mu,
-     2   pJ, plJ, gi_x(2,2), gi_0(3,3), Ci(3,3), S(3,3), CC(3,3,3,3)
+     2   pJ, plJ, gi_x(2,2), gi_0(3,3), Ci(3,3), S(3,3), CC(3,3,3,3),
+     3   fl(2,2,nfd), C1, C2, J43, Gi4AS(3,3,3,3), I2, I2ij(3,3),
+     4   I2ijkl(3,3,3,3), Cikl(3,3,3,3), Inv4, Inv6, Inv8, Eff, Ess,
+     5   Efs, c4f, c4s, dc4f, dc4s, d1, g1, g2, Hfs(3,3), SN(3,3),
+     6   CCN(3,3,3,3), flM(3,3)
       TYPE(stModelType) :: stM
 
       Sml  = 0._RKIND
@@ -1384,13 +1388,150 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
          CASE (stIso_MR)
 !           2nd Piola Kirchhoff stress
-            S  = mu*J23*(gi_0 - trC3*Ci) + pJ*Ci
+            C1  = stM%C10
+            C2  = stM%C01
+            J43 = J2**(-f23)
+
+            I2ijkl = TEN_DYADPROD(gi_0, gi_0, 3)
+     2             - TEN_SYMMPROD(gi_0, gi_0, 3)
+            I2ij   = TEN_MDDOT(I2ijkl, Ci, 3)
+
+            Gi4AS  = TEN_ASYMPROD12(gi_0, gi_0, 3)
+            I2     = MAT_DDOT(Ci, TEN_MDDOT(Gi4AS, Ci, 3), 3)
+            ! I2  = MAT_DDOT(Ci, I2ij, 3)
+            Cikl   = - TEN_SYMMPROD(Ci, Ci, 3)
+
+            S  = C1*J23*(gi_0 - trC3*Ci) + pJ*Ci
+     2         + C2*J43*(I2ij - f23*I2*Ci)
 
 !           Elasticity tensor
-            CC = (mu*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
-     2         + (mu*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
-     3         - f23*mu*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+            CC = (C1*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (C1*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*C1*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
      4                       TEN_DYADPROD(Ci, gi_0, 3))
+
+            CC = CC + 2._RKIND*f23*C2*J43*(
+     2               TEN_DYADPROD((f23*I2*Ci-I2ij), Ci, 3) - I2*Cikl
+     3                - TEN_DYADPROD(Ci, I2ij, 3) + I2ijkl)
+
+         CASE (stIso_HO_ma)
+            IF (nfd .NE. 2) err = "Min fiber directions not defined"//
+     2          "for Holzapfel material model (2)"
+
+            DO iFn=1, nfd
+                fl(1,1,iFn) = fNa0(1,iFn)*fNa0(1,iFn)
+                fl(1,2,iFn) = fNa0(1,iFn)*fNa0(2,iFn)
+                fl(2,1,iFn) = fNa0(2,iFn)*fNa0(1,iFn)
+                fl(2,2,iFn) = fNa0(2,iFn)*fNa0(2,iFn)
+            END DO
+
+    !        Compute fiber-based invariants
+            Inv4 = gg_x(1,1)*fl(1,1,1) + gg_x(1,2)*fl(1,2,1)
+     2              + gg_x(2,1)*fl(2,1,1) + gg_x(2,2)*fl(2,2,1)
+            Inv6 = gg_x(1,1)*fl(1,1,2) + gg_x(1,2)*fl(1,2,2)
+     2            + gg_x(2,1)*fl(2,1,2) + gg_x(2,2)*fl(2,2,2)
+            Inv8 = gg_x(1,1)*fNa0(1,1)*fNa0(1,2)
+     2              + gg_x(1,2)*fNa0(1,1)*fNa0(2,2)
+     3              + gg_x(2,1)*fNa0(2,1)*fNa0(1,2)
+     4              + gg_x(2,2)*fNa0(2,1)*fNa0(2,2)
+
+            Eff  = Inv4 - 1._RKIND
+            Ess  = Inv6 - 1._RKIND
+            Efs  = Inv8
+
+    !        Smoothed heaviside function
+            c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
+            c4s  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Ess))
+
+    !        Approx. derivative of smoothed heaviside function
+            dc4f = 0.25_RKIND*stM%khs*EXP(-stM%khs*ABS(Eff))
+            dc4s = 0.25_RKIND*stM%khs*EXP(-stM%khs*ABS(Ess))
+
+    !        Add isochoric stress and stiffness contribution
+            ! EI1  = I1 + Jg2i - 3._RKIND
+            d1 = stM%a*J23*EXP(3._RKIND*stM%b*(trC3*J23 - 1._RKIND))
+            SN = (gi_0 - trC3*Ci)
+            S  = d1*SN + pJ*Ci
+            CC = f23*trC3*TEN_DYADPROD(Ci, Ci, 3)
+     2         + trC3*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*(TEN_DYADPROD(gi_0, Ci, 3)
+     4         + TEN_DYADPROD(Ci, gi_0, 3))
+     5         + 2._RKIND*stM%b*J23*TEN_DYADPROD(SN, SN, 3)
+            CC = d1*CC + plJ*TEN_DYADPROD(Ci, Ci, 3)
+     2         - pJ*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+
+!           Anisotropic part
+!           Fiber sheet
+            Hfs  = 0._RKIND
+            Hfs(1:2,1:2)  = MAT_SYMMPROD(fNa0(:,1), fNa0(:,2), 2)
+            g1   = 2._RKIND*stM%afs*EXP(stM%bfs*Efs*Efs)
+            S    = S + g1*Efs*Hfs
+
+            g2   = g1*2._RKIND*(1._RKIND + 2._RKIND*Efs*Efs)
+            CC   = CC + g2*TEN_DYADPROD(Hfs, Hfs, 3)
+
+!           Fiber
+            flM = 0._RKIND
+            IF (Eff > 0._RKIND) THEN
+                flM(1:2,1:2) = fl(:,:,1)
+                ! S  = S + 2._RKIND*stM%aff*Eff*flM
+                ! CC = CC + 4._RKIND*stM%aff*TEN_DYADPROD(flM, flM, 2)
+                g1 = 2._RKIND*stM%aff*EXP(stM%bff*Eff*Eff)
+                S  = S  + g1*Eff*flM
+                g2 = g1*2._RKIND*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)
+                CC = CC + g2*TEN_DYADPROD(flM, flM, 3)
+            END IF
+
+!           Sheet
+            IF (Ess > 0._RKIND) THEN
+                flM(1:2,1:2) = fl(:,:,2)
+                g1  = 2._RKIND*stM%ass*EXP(stM%bss*Ess*Ess)
+                S   = S + g1*Ess*flM
+                g2  = g1*2._RKIND*(1._RKIND + 2._RKIND*stM%bss*Ess*Ess)
+                CC  = CC + g2*TEN_DYADPROD(flM, flM, 3)
+            END IF
+
+         CASE (stIso_LS)
+            DO iFn=1, nfd
+                fl(1,1,iFn) = fNa0(1,iFn)*fNa0(1,iFn)
+                fl(1,2,iFn) = fNa0(1,iFn)*fNa0(2,iFn)
+                fl(2,1,iFn) = fNa0(2,iFn)*fNa0(1,iFn)
+                fl(2,2,iFn) = fNa0(2,iFn)*fNa0(2,iFn)
+            END DO
+
+!           Compute fiber-based invariants
+            Inv4 = gg_x(1,1)*fl(1,1,1) + gg_x(1,2)*fl(1,2,1)
+     2          + gg_x(2,1)*fl(2,1,1) + gg_x(2,2)*fl(2,2,1)
+            Eff  = Inv4 - 1._RKIND
+
+!           Isotropic contribution
+            d1 = 2._RKIND*stM%a0*stM%mu0*stM%b1*J23
+     2          * EXP(3._RKIND*stM%b1*(trC3*J23 - 1._RKIND))
+            SN = (gi_0 - trC3*Ci)
+            CCN = f23*trC3*TEN_DYADPROD(Ci, Ci, 3)
+     2         + trC3*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*(TEN_DYADPROD(gi_0, Ci, 3)
+     4         + TEN_DYADPROD(Ci, gi_0, 3))
+            S  = (stM%a + d1*(3._RKIND*(trC3*J23 - 1._RKIND)))*SN
+     2         + pJ*Ci
+            CC = (1._RKIND + 18._RKIND*stM%b1*(trC3*J23 - 1._RKIND)
+     2         * (trC3*J23 - 1._RKIND))*J23*TEN_DYADPROD(SN, SN, 3)
+     3         + 3._RKIND*(trC3*J23 - 1._RKIND)*CCN
+            CC = stM%a*CCN + 2._RKIND*d1*CC
+     2         + plJ*TEN_DYADPROD(Ci, Ci, 3)
+     3         - pJ*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+
+!           Anisotropic contribution
+            flM = 0._RKIND
+            IF (Eff > 0._RKIND) THEN
+                flM(1:2,1:2) = fl(:,:,1)
+                S   = S + 2._RKIND*stM%a0*(1._RKIND - stM%mu0)
+     2              *stM%b2*Eff * EXP(stM%b2*Eff*Eff)*flM
+                CC  = CC + 4._RKIND*stM%a0*(1._RKIND - stM%mu0)
+     2              * stM%b2 * (1._RKIND + 2._RKIND*stM%b2*Eff*Eff)
+     3              * EXP(stM%b2*Eff*Eff) * TEN_DYADPROD(flM, flM, 3)
+            END IF
+
 
          CASE DEFAULT
             err = "Undefined material constitutive model"
@@ -1419,6 +1560,8 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
             END DO
          END DO
       END DO
+
+      g33 = C33
 
 !     Convert the in-plane components to Voigt notation
       Sml(1) = S(1,1)
