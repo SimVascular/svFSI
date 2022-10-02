@@ -1194,11 +1194,11 @@
                resl(9) = F(3,3)
 
             CASE (outGrp_strain, outGrp_C, outGrp_I1)
-!              Cauchy-Green deformation (3D shell continuum)
-               C  = MATMUL(TRANSPOSE(F), F)
+!              Cauchy-Green deformation (in-plane shell continuum)
+               Cip  = MATMUL(TRANSPOSE(Fip), Fip)
 
-!              Green-Lagrange strain tensor (3D shell continuum)
-               Eg = 0.5_RKIND * (C - Im)
+!              Green-Lagrange strain tensor (in-plane shell continuum)
+               Eg = 0.5_RKIND * (Cip - Im)
 
                IF (outGrp .EQ. outGrp_strain) THEN
                   ! resl is used to remap Eg
@@ -1209,7 +1209,6 @@
                   resl(5) = Eg(2,3)
                   resl(6) = Eg(3,1)
                ELSE IF (outGrp .EQ. outGrp_C) THEN
-                  Cip  = MATMUL(TRANSPOSE(Fip), Fip)
                   ! resl is used to remap C
                   resl(1) = Cip(1,1)
                   resl(2) = Cip(2,2)
@@ -1218,7 +1217,6 @@
                   resl(5) = Cip(2,3)
                   resl(6) = Cip(3,1)
                ELSE IF (outGrp .EQ. outGrp_I1) THEN
-                  Cip  = MATMUL(TRANSPOSE(Fip), Fip)
                   resl(1) = MAT_TRACE(Cip,3)
                   sE(e)   = sE(e) + w*MAT_TRACE(Cip,3)
                END IF
@@ -1231,7 +1229,7 @@
                S(1,1) = Sm(1,1)
                S(2,2) = Sm(2,1)
                S(1,2) = Sm(3,1)
-               S(2,1) = S(1,2) ! TODO: Normalize by thickness
+               S(2,1) = S(1,2) 
                S = S / ht 
 
 !        2nd Piola-Kirchhoff stress tensor
