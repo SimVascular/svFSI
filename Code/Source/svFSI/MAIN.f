@@ -154,7 +154,6 @@
 
 !        Apply contact model and add its contribution to residue
             IF (iCntct) CALL CONSTRUCT_CONTACTPNLTY(Dg)
-            !	IF (iCntct) CALL CONSTRUCT_CONTACTPTNL(Dg)
 
 !        Synchronize R across processes. Note: that it is important
 !        to synchronize residue, R before treating immersed bodies as
@@ -199,9 +198,6 @@
 
 !        Solution is obtained, now updating (Corrector)
             CALL PICC
-
-            ! For printing newton iterations
-            ! CALL WRITEVTUS(An, Yn, Dn, .FALSE.)
 
 !        Checking for exceptions
             CALL EXCEPTIONS

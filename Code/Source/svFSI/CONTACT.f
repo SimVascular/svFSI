@@ -79,7 +79,7 @@
                xl(3,a) = x(3,Ac) + Dg(k,Ac)
             END DO
             CALL GNNS(eNoN, Nx, xl, nV1, gCov, gCnv)
-            Jac = SQRT(NORM(nV1(:))) 
+            Jac = SQRT(NORM(nV1(:)))
             nV1(:) = nV1(:)/Jac
 
             DO g=1, msh(iM)%nG
