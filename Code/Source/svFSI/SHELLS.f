@@ -115,7 +115,7 @@
 !           Gauss integration
             DO g=1, lM%nG
                CALL SHELL3D(lM, g, eNoN, nFn, fN, al, yl, dl, xl,
-     2            bfl, lR, lK, e)
+     2            bfl, lR, lK)
             END DO
 
 !           Assembly
@@ -153,7 +153,7 @@
      2   fb(3), ud(3), nV0(3), nV(3), x0(3,eNoN), xc(3,eNoN), aCov(3,2),
      3   aCov0(3,2), aCnv(3,2), aCnv0(3,2), aa_0(2,2), aa_x(2,2),
      4   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Bm(3,3,lM%eNoN),
-     5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN), F(3,3),
+     5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN),
      6   D1Bb(3,3,eNoN), D2Bb(3,3,eNoN), BtS, NxSNx, BtDB, fNa0(2,nFn)
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:),
@@ -277,14 +277,7 @@
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, lam3, Sm, Dm, e)
-
-      F = MAT_DYADPROD(aCov(:,1), aCnv0(:,1), 3)
-     2        + MAT_DYADPROD(aCov(:,2), aCnv0(:,2), 3)
-     3        + lam3*MAT_DYADPROD(nV, nV0, 3)
-
-!       IF (e.EQ.463) PRINT *, e, aCov0
-!       IF (e.EQ.465) PRINT *, e, aCov0
+     2   bb_x, lam3, Sm, Dm)
 
 !---------------------------------------------------------------------
 !     Contribution to tangent matrices: Dm * Bm, Dm*Bb
@@ -625,7 +618,7 @@
      2         nInI(2,3)*a0(3,p)) + x0(2,i)
             x0(3,j) = 2._RKIND*(nInI(3,1)*a0(1,p) + nInI(3,2)*a0(2,p) +
      2         nInI(3,3)*a0(3,p)) + x0(3,i)
-      
+
 !           Current config
 !           eI = aI/|aI| (current config)
             aIi   = 1._RKIND/SQRT(NORM(a(:,i)))
@@ -713,7 +706,7 @@
       v0(1) = Tm0(1,1)*xi0(3,1) + Tm0(1,2)*xi0(3,2) + Tm0(1,3)*xi0(3,3)
       v0(2) = Tm0(2,1)*xi0(3,1) + Tm0(2,2)*xi0(3,2) + Tm0(2,3)*xi0(3,3)
       v0(3) = Tm0(3,1)*xi0(3,1) + Tm0(3,2)*xi0(3,2) + Tm0(3,3)*xi0(3,3)
- 
+
 !     Curvature coefficients (ref. config)
       bb_0(1,1) = 2._RKIND*v0(1)
       bb_0(2,2) = 2._RKIND*v0(2)
@@ -973,12 +966,12 @@
 !####################################################################
 !     Construct shell mechanics for higher order elements/NURBS
       SUBROUTINE SHELL3D (lM, g, eNoN, nFn, fN, al, yl, dl, xl, bfl,
-     2   lR, lK, e)
+     2   lR, lK)
       USE COMMOD
       USE MATFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN, nFn, e
+      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN, nFn
       REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN), fN(3,nFn)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
@@ -1115,7 +1108,7 @@ c=====================================================================
 !     stress and elasticity tensors through the shell thickness. These
 !     resultants are computed in Voigt notation.
       CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
-     2   bb_x, lam3, Sm, Dm, e)
+     2   bb_x, lam3, Sm, Dm)
 
 !---------------------------------------------------------------------
 !     Variation in the membrane strain
@@ -1329,11 +1322,11 @@ c=====================================================================
 !####################################################################
 !     Compute stress resultants for shell elements
       SUBROUTINE SHL_STRS_RES(lDmn, nFn, fNa0, aa_0, aa_x, bb_0, bb_x,
-     2   lam3, Sm, Dm, e)
+     2   lam3, Sm, Dm)
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
-      INTEGER(KIND=IKIND), INTENT(IN) :: nFn, e
+      INTEGER(KIND=IKIND), INTENT(IN) :: nFn
       REAL(KIND=RKIND), INTENT(IN) :: aa_0(2,2), aa_x(2,2), bb_0(2,2),
      2   bb_x(2,2), fNa0(2,nFn)
       REAL(KIND=RKIND), INTENT(OUT) :: lam3, Sm(3,2), Dm(3,3,3)

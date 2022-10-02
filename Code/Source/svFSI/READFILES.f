@@ -368,7 +368,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       CHARACTER(LEN=stdL), INTENT(IN) :: eqName
 
-      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 22
+      INTEGER(KIND=IKIND), PARAMETER :: maxOutput = 24
 
       LOGICAL THflag
       INTEGER(KIND=IKIND) fid, iBc, iBf, iM, iFa, phys(4),
@@ -803,7 +803,7 @@
 
          CALL READDOMAIN(lEq, propL, list, phys)
 
-         nDOP = (/22,4,2,0/)
+         nDOP = (/24,4,2,0/)
          outPuts(1)  = out_velocity
          outPuts(2)  = out_pressure
          outPuts(3)  = out_displacement
@@ -826,9 +826,11 @@
          outPuts(18) = out_integ
          outPuts(19) = out_fibDir
          outPuts(20) = out_fibAlign
+         outPuts(21) = out_CGstrain
+         outPuts(22) = out_CGInv1
 
-         outPuts(21) = out_divergence
-         outPuts(22) = out_acceleration
+         outPuts(23) = out_divergence
+         outPuts(24) = out_acceleration
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
@@ -1465,7 +1467,7 @@
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = nsymd
             lEq%output(iOut)%name = "CG_Strain"
-         CASE (out_CGInv1) 
+         CASE (out_CGInv1)
             lEq%output(iOut)%grp  = outGrp_I1
             lEq%output(iOut)%o    = 0
             lEq%output(iOut)%l    = 1

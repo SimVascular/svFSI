@@ -509,6 +509,8 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: res(m,lM%nNo), resE(lM%nEl)
       REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo), lY(tDof,tnNo)
 
+      REAL(KIND=RKIND), PARAMETER :: r32 = 1.224744871391590_RKIND
+
       LOGICAL flag
       INTEGER(KIND=IKIND) a, b, e, g, Ac, i, j, k, l, cPhys, insd, nFn
       REAL(KIND=RKIND) w, Jac, detF, Je, tmX, ya, Ja, elM, nu, lambda,
@@ -728,7 +730,7 @@
                ELSE IF (outGrp .EQ. outGrp_I1) THEN
                   C  = MATMUL(TRANSPOSE(F), F)
                   I1 = MAT_TRACE(C,nsd)
-               END IF               
+               END IF
 
             CASE (outGrp_stress, outGrp_cauchy, outGrp_mises)
                sigma = 0._RKIND
@@ -816,8 +818,7 @@
                   DO l=1, nsd
                      sigma(l,l) = sigma(l,l) - trS
                   END DO
-                  vmises  = SQRT(MAT_DDOT(sigma, sigma, nsd))
-                  vmises  = vmises * SQRT(3._RKIND/2._RKIND)
+                  vmises  = r32 * SQRT(MAT_DDOT(sigma, sigma, nsd))
                   resl(1) = vmises
                   sE(e)   = sE(e) + w*vmises
                END IF
@@ -933,11 +934,11 @@
       LOGICAL incompFlag
       INTEGER(KIND=IKIND) a, b, e, g, i, j, k, l, iFn, Ac, nFn, insd,
      2   eNoN, cPhys, nwg
-      REAL(KIND=RKIND) :: w, nu, Jac0, Jac, Je, lam3, detF, trS, vmises,
-     2   nV0(3), nV(3), aCov0(3,2), aCov(3,2), aCnv0(3,2), aCnv(3,2),
-     3   aa_0(2,2), aa_x(2,2), bb_0(2,2), bb_x(2,2), r0_xx(2,2,3),
-     4   r_xx(2,2,3), Sm(3,2), Dm(3,3,3), Im(3,3), F(3,3), C(3,3),
-     5   Eg(3,3), S(3,3), PK1(3,3), sigma(3,3), Fip(3,3), ht, Cip(3,3)
+      REAL(KIND=RKIND) :: w, nu, ht, Jac0, Jac, Je, lam3, detF, nV0(3),
+     2   nV(3), aCov0(3,2), aCov(3,2), aCnv0(3,2), aCnv(3,2), aa_0(2,2),
+     3   aa_x(2,2), bb_0(2,2), bb_x(2,2), r0_xx(2,2,3), r_xx(2,2,3),
+     4   Sm(3,2), Dm(3,3,3), Im(3,3), F(3,3), F3d(3,3), C(3,3), Eg(3,3),
+     5   S(3,3)
 
       INTEGER, ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: sA(:), sF(:,:), sE(:), resl(:),
@@ -1154,23 +1155,18 @@
             END DO
 
 !           Compute stress resultants and lambda3 (integrated through
-!           the shell thickness) 463 465
-            ! IF (e.EQ.463) PRINT *, "++++++++   POST 463 +++++++++"
-            ! IF (e.EQ.465) PRINT *, "++++++++   POST 465 +++++++++"
+!           the shell thickness)
             CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x,
-     2         bb_0, bb_x, lam3, Sm, Dm, e)
+     2         bb_0, bb_x, lam3, Sm, Dm)
 
-!           Compute 3D deformation gradient tensor in shell continuum
-            Fip = MAT_DYADPROD(aCov(:,1), aCnv0(:,1), 3)
+!           Shell in-plane deformation gradient tensor
+            F = MAT_DYADPROD(aCov(:,1), aCnv0(:,1), 3)
      2        + MAT_DYADPROD(aCov(:,2), aCnv0(:,2), 3)
-            F   = Fip + lam3*MAT_DYADPROD(nV, nV0, 3)
 
-            detF = MAT_DET(F, nsd)
+!           3D deformation gradient tensor in shell continuum
+            F3d = F + lam3*MAT_DYADPROD(nV, nV0, 3)
 
-            ! IF (e.EQ.463) PRINT *, e, Fip, F
-            ! IF (e.EQ.465) PRINT *, e, Fip, F
-            ! IF (e.EQ.463) PRINT *, "========   POST 463 ========"
-            ! IF (e.EQ.465) PRINT *, "========   POST 465 ========"
+            detF = MAT_DET(F3d, nsd)
 
             Je = Je + w
             Im = MAT_ID(nsd)
@@ -1182,23 +1178,23 @@
                sE(e)   = sE(e) + w*detF
 
             CASE (outGrp_F)
-!              Deformation gradient tensor (F)
-               resl(1) = F(1,1)
-               resl(2) = F(1,2)
-               resl(3) = F(1,3)
-               resl(4) = F(2,1)
-               resl(5) = F(2,2)
-               resl(6) = F(2,3)
-               resl(7) = F(3,1)
-               resl(8) = F(3,2)
-               resl(9) = F(3,3)
+!              3D deformation gradient tensor (F)
+               resl(1) = F3d(1,1)
+               resl(2) = F3d(1,2)
+               resl(3) = F3d(1,3)
+               resl(4) = F3d(2,1)
+               resl(5) = F3d(2,2)
+               resl(6) = F3d(2,3)
+               resl(7) = F3d(3,1)
+               resl(8) = F3d(3,2)
+               resl(9) = F3d(3,3)
 
             CASE (outGrp_strain, outGrp_C, outGrp_I1)
-!              Cauchy-Green deformation (in-plane shell continuum)
-               Cip  = MATMUL(TRANSPOSE(Fip), Fip)
+!              In-plane Cauchy-Green deformation tensor
+               C = MATMUL(TRANSPOSE(F), F)
 
-!              Green-Lagrange strain tensor (in-plane shell continuum)
-               Eg = 0.5_RKIND * (Cip - Im)
+!              In-plane Green-Lagrange strain tensor
+               Eg = 0.5_RKIND * (C - Im)
 
                IF (outGrp .EQ. outGrp_strain) THEN
                   ! resl is used to remap Eg
@@ -1208,29 +1204,32 @@
                   resl(4) = Eg(1,2)
                   resl(5) = Eg(2,3)
                   resl(6) = Eg(3,1)
+
                ELSE IF (outGrp .EQ. outGrp_C) THEN
                   ! resl is used to remap C
-                  resl(1) = Cip(1,1)
-                  resl(2) = Cip(2,2)
-                  resl(3) = Cip(3,3)
-                  resl(4) = Cip(1,2)
-                  resl(5) = Cip(2,3)
-                  resl(6) = Cip(3,1)
+                  resl(1) = C(1,1)
+                  resl(2) = C(2,2)
+                  resl(3) = C(3,3)
+                  resl(4) = C(1,2)
+                  resl(5) = C(2,3)
+                  resl(6) = C(3,1)
+
                ELSE IF (outGrp .EQ. outGrp_I1) THEN
-                  resl(1) = MAT_TRACE(Cip,3)
-                  sE(e)   = sE(e) + w*MAT_TRACE(Cip,3)
+                  resl(1) = MAT_TRACE(C, 3)
+                  sE(e)   = sE(e) + w*resl(1)
                END IF
 
             CASE (outGrp_stress)
-               sigma  = 0._RKIND
                S(:,:) = 0._RKIND
 
-!              2nd Piola-Kirchhoff stress 
+!              2nd Piola-Kirchhoff stress
                S(1,1) = Sm(1,1)
                S(2,2) = Sm(2,1)
                S(1,2) = Sm(3,1)
-               S(2,1) = S(1,2) 
-               S = S / ht 
+               S(2,1) = S(1,2)
+
+!              Normalizing stress by thickness
+               S = S / ht
 
 !        2nd Piola-Kirchhoff stress tensor
                resl(1) = S(1,1)
@@ -1262,8 +1261,7 @@
          ENDIF
       END DO
 
-      DEALLOCATE(sA, sF, sE, resl, dl, x0, xc, fN, fNa0, ptr, N, Nx, 
-     2      Bb )
+      DEALLOCATE(sA, sF, sE, resl, dl, x0, xc, fN, fNa0, ptr, N, Nx, Bb)
 
       RETURN
       END SUBROUTINE SHLPOST
