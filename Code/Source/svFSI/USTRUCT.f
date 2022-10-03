@@ -174,12 +174,12 @@
             IF (nsd .EQ. 3) THEN
                CALL USTRUCT3D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w, Jac,
      2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, dl, bfl,
-     3            lR, lK, lKd)
+     3            ksix, lR, lK, lKd)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL USTRUCT2D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w, Jac,
      2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, dl, bfl,
-     3            lR, lK, lKd)
+     3            ksix, lR, lK, lKd)
 
             END IF
          END DO ! g: loop
@@ -831,7 +831,7 @@
       END SUBROUTINE USTRUCT2D_M
 !####################################################################
       SUBROUTINE USTRUCT3D_C(vmsFlag, eNoNw, eNoNq, w, Je, Nw, Nq, Nwx,
-     2   Nqx, al, yl, dl, bfl, lR, lK, lKd)
+     2   Nqx, al, yl, dl, bfl, Kxi, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -839,18 +839,20 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(3,eNoNw), Nqx(3,eNoNq), al(tDof,eNoNw), yl(tDof,eNoNw),
-     3   dl(tDof,eNoNw), bfl(3,eNoNw)
+     3   dl(tDof,eNoNw), bfl(3,eNoNw), Kxi(3,3)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lKd(dof*3,eNoNw,eNoNw), lK(dof*dof,eNoNw,eNoNw)
 
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b
-      REAL(KIND=RKIND) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p,
-     2   pd, px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, tauM,
-     3   tauC, rC, rM(3), NwxFi(3,eNoNw), NqxFi(3,eNoNq),VxFi(3,3),
-     4   PxFi(3), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(3,eNoNw), NxNx, T1,
-     5   T2, T3, Ku
+      REAL(KIND=RKIND) :: ctV, fb(3), am, af, afm, v(3), vd(3), vx(3,3),
+     2   p, pd, px(3), F(3,3), Jac, Fi(3,3), mu, rho, beta, drho, dbeta,
+     3   tauM, tauC, tauV, rC, rM(3), NwxFi(3,eNoNw), NqxFi(3,eNoNq),
+     4   Kx(3,3), VxFi(3,3), PxFi(3), rMNqx(eNoNq), rMNwx(eNoNw),
+     5   VxNwx(3,eNoNw), NxNx, T1, T2, T3, Ku
 
 !     Define parameters
+      ctV     = 36._RKIND
+      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -924,6 +926,17 @@
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
+
+!        Stabilization parameter for solid viscosity
+         Kx = MATMUL(Kxi, Fi)
+         Kx = MATMUL(TRANSPOSE(Fi), Kx)
+
+         tauV = Kx(1,1)*Kx(1,1) + Kx(2,1)*Kx(2,1) + Kx(3,1)*Kx(3,1)
+     2        + Kx(1,2)*Kx(1,2) + Kx(2,2)*Kx(2,2) + Kx(3,2)*Kx(3,2)
+     3        + Kx(1,3)*Kx(1,3) + Kx(2,3)*Kx(2,3) + Kx(3,3)*Kx(3,3)
+         tauV = ctV*mu*mu*tauV
+
+         tauM = 1._RKIND / SQRT( tauV + (1._RKIND/tauM)**2._RKIND )
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND
@@ -1042,7 +1055,7 @@
       END SUBROUTINE USTRUCT3D_C
 !--------------------------------------------------------------------
       SUBROUTINE USTRUCT2D_C(vmsFlag, eNoNw, eNoNq, w, Je, Nw, Nq, Nwx,
-     2   Nqx, al, yl, dl, bfl, lR, lK, lKd)
+     2   Nqx, al, yl, dl, bfl, Kxi, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -1050,18 +1063,20 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(2,eNoNw), Nqx(2,eNoNq), al(tDof,eNoNw), yl(tDof,eNoNw),
-     3   dl(tDof,eNoNw), bfl(2,eNoNw)
+     3   dl(tDof,eNoNw), bfl(2,eNoNw), Kxi(2,2)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lKd(dof*2,eNoNw,eNoNw), lK(dof*dof,eNoNw,eNoNw)
 
       INTEGER(KIND=IKIND) :: i, j, k, a, b
-      REAL(KIND=RKIND) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p,
-     2   pd, px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, tauM,
-     3   tauC, rC, rM(2), NwxFi(2,eNoNw), NqxFi(2,eNoNq),VxFi(2,2),
-     4   PxFi(2), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(2,eNoNw), NxNx, T1,
-     5   T2, T3, Ku
+      REAL(KIND=RKIND) :: ctV, fb(2), am, af, afm, v(2), vd(2), vx(2,2),
+     2   p, pd, px(2), F(2,2), Jac, Fi(2,2), mu, rho, beta, drho, dbeta,
+     3   tauM, tauC, tauV, rC, rM(2), NwxFi(2,eNoNw), NqxFi(2,eNoNq),
+     4   Kx(2,2), VxFi(2,2), PxFi(2), rMNqx(eNoNq), rMNwx(eNoNw),
+     5   VxNwx(2,eNoNw), NxNx, T1, T2, T3, Ku
 
 !     Define parameters
+      ctV     = 36._RKIND
+      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
@@ -1119,6 +1134,16 @@
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
+
+!        Stabilization parameter for solid viscosity
+         Kx = MATMUL(Kxi, Fi)
+         Kx = MATMUL(TRANSPOSE(Fi), Kx)
+
+         tauV = Kx(1,1)*Kx(1,1) + Kx(2,1)*Kx(2,1)
+     2        + Kx(1,2)*Kx(1,2) + Kx(2,2)*Kx(2,2)
+         tauV = ctV*mu*mu*tauV
+
+         tauM = 1._RKIND / SQRT( tauV + (1._RKIND/tauM)**2._RKIND )
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND
