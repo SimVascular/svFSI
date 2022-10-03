@@ -118,14 +118,16 @@
       ! proc doesn't own the node to query, so we need to communicate
       INTEGER(KIND=IKIND), INTENT(IN) :: Ac
       ! Vector containing s at a node
-      REAL(KIND=RKIND), INTENT(OUT) :: snode(nsd)
+      REAL(KIND=RKIND), INTENT(OUT) :: snode(:)
    
       ! Allocate useful variables
-      INTEGER(KIND=IKIND) p, ierr
+      INTEGER(KIND=IKIND) p, ierr, sz
       
       ! Temporary array containing snode from all procs
       REAL(KIND=RKIND), ALLOCATABLE :: sgather(:,:) 
-      ALLOCATE(sgather(nsd, cm%np()))
+      ! Get size of snode
+      sz = SIZE(snode) ! usually nsd or nsd+1
+      ALLOCATE(sgather(sz, cm%np()))
 
       IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
          snode = 0._RKIND
@@ -137,7 +139,7 @@
       ! First, allocate space for snode values. The size of sgather
       ! vector is the number of procs being used.
       sgather = 0._RKIND
-      CALL MPI_GATHER(snode, nsd, mpreal, sgather, nsd,
+      CALL MPI_GATHER(snode, sz, mpreal, sgather, sz,
      2            mpreal, master, cm%com(), ierr)
 !     If master, go through sgather and search for first non-zero
 !     value.
@@ -399,6 +401,8 @@
 !              AB 5/11/22:
 !              If struct, compute weighted normal in current config, so that we
 !              integrate over the current config surface
+!              When this function is called during INITIALIZE()->BAFINI()->CALCDERCPLBC(), 
+!              cEq = 0. Should probably change this to use some other condition
                IF ((eq(cEq)%phys .EQ. phys_struct) .OR.
      2             (eq(cEq)%phys .EQ. phys_ustruct) ) THEN
 !                 Returns a vector (n) at element e and Gauss point g on face lFa

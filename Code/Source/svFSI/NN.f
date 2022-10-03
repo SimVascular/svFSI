@@ -2095,7 +2095,7 @@ c        N(8) = lx*my*0.5_RKIND
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
 !        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector? I believe these components are the fluid mesh displacements
 !        Deform the geometry by the new displacements Dn?
-         lX(:,a) = lX(:,a) + Dn(:,Ac) 
+         lX(:,a) = lX(:,a) + Dn(1:nsd,Ac) 
       END DO
 
 !     Calculating surface deflation
@@ -2330,7 +2330,7 @@ c        N(8) = lx*my*0.5_RKIND
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
       ! Arrays to hold nodal positions and displacements for MPI gather operation
       ALLOCATE(tmpX(nsd))
-      ALLOCATE(tmpDn(nsd))
+      ALLOCATE(tmpDn(SIZE(Dn(:,1)))) ! In case Dn has more than nsd dof per node
 
 !     Collecting node information on master, so master can compute the normal
 !     Also, updating nodal position with nodal displacement, so that we
@@ -2343,7 +2343,7 @@ c        N(8) = lx*my*0.5_RKIND
          CALL GatherMasterV(Dn, Ac, tmpDn)
 
 !        Update local position with displacement for normal computation
-         lX(:,a) = tmpX(:) + tmpDn(:) 
+         lX(:,a) = tmpX(:) + tmpDn(1:nsd) 
       END DO
 
 !     If slave, don't perform calculation of n. Wait for master to complete
@@ -2410,8 +2410,9 @@ c        N(8) = lx*my*0.5_RKIND
          n = CROSS(xXi)
          DEALLOCATE(xXi)
       END IF
-      DEALLOCATE(setIt, ptr, lX, tmpX, tmpDn)
-
+      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(tmpDn)
+      DEALLOCATE(tmpX)
 
       ! If master, broadcast value of n to slaves
       IF (cm%mas()) THEN 
