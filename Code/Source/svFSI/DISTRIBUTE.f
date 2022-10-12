@@ -210,7 +210,6 @@
             CALL cm%bcast(cntctM%p)
             CALL cm%bcast(cntctM%Rin)
             CALL cm%bcast(cntctM%Rout)
-            CALL cm%bcast(cntctM%gap)
          END IF
          CALL cm%bcast(ibFlag)
          IF (ibFlag) CALL DISTIB()
