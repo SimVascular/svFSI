@@ -60,7 +60,7 @@
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
             CALL BCINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa))
-            IF (msh(iM)%lShl) THEN
+            IF (msh(iM)%lShl.AND.(msh(iM)%eType.EQ.eType_TRI3)) THEN
                CALL SHLBCINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), msh(iM))
             END IF
          END DO
@@ -710,7 +710,6 @@
       INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, Ec
       LOGICAL :: bFlag
 
-      IF (lFa%eType .NE. eType_TRI3) RETURN
       DO e=1, lFa%nEl
          Ec = lFa%gE(e)
          DO a=1, lM%eNoN
@@ -723,10 +722,13 @@
                   EXIT
                END IF
             END DO
+            ! Use the corr. point to represent line
             IF (.NOT.bFlag) THEN
-               IF (.NOT.BTEST(lM%sbc(a,Ec),bType_free)) err =
-     2            "BC detected on a non-boundary shell element. "//
-     3            "Correction needed"
+   !             IF (.NOT.BTEST(lM%sbc(a,Ec),bType_free)) err =
+   !   2            "BC detected on a non-boundary shell element. "//
+   !   3            "Correction needed"
+               ! This will lead to bug if two types are asigned to 
+               ! same boundary
                lM%sbc(a,Ec) = IBCLR(lM%sbc(a,Ec), bType_free)
                IF (BTEST(lBc%bType,bType_free)) THEN
                   lM%sbc(a,Ec) = IBSET(lM%sbc(a,Ec),bType_free)

@@ -88,6 +88,7 @@
             CALL SETBCDIRL(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), tmpA, tmpY,
      2         lDof)
 
+            ! Apply imposing on specific direction 
             IF (ANY(eDir)) THEN
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_impD)) THEN
                   DO a=1, msh(iM)%fa(iFa)%nNo
@@ -640,17 +641,19 @@
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
          IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_undefNeu)) THEN
-            CALL SETBCUNDEFNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
+            CALL SETBCUNDEFNEUL(msh(iM), eq(cEq)%bc(iBc),
+     2                                            msh(iM)%fa(iFa))
          END IF
       END DO
 
       RETURN
       END SUBROUTINE SETBCUNDEFNEU
 !--------------------------------------------------------------------
-      SUBROUTINE SETBCUNDEFNEUL(lBc, lFa)
+      SUBROUTINE SETBCUNDEFNEUL(lM, lBc, lFa)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
       TYPE(bcType), INTENT(IN) :: lBc
       TYPE(faceType), INTENT(IN) :: lFa
 
@@ -679,25 +682,47 @@
          END DO
 
       ELSE IF (nsd .EQ. 3) THEN
-         DO a=1, lFa%nNo
-            rowN = lFa%gN(a)
-            IF (rowN .EQ. masN) CYCLE
-            R (1:3,rowN) = 0._RKIND
+         IF (lM%lShl) THEN
+            DO a=1, lFa%nNo
+               rowN = lFa%gN(a)
+               IF (rowN .EQ. masN) CYCLE
+               R (1:3,rowN) = 0._RKIND
 
-!           Diagonalize the stiffness matrix (A)
-            DO i=rowPtr(rowN), rowPtr(rowN+1)-1
-               colN = colPtr(i)
-               IF (colN .EQ. rowN) THEN
-                  Val(1, i) = 1._RKIND
-                  Val(6, i) = 1._RKIND
-                  Val(11,i) = 1._RKIND
-               ELSE IF (colN .EQ. masN) THEN
-                  Val(1, i) = -1._RKIND
-                  Val(6, i) = -1._RKIND
-                  Val(11,i) = -1._RKIND
-               END IF
+   !           Diagonalize the stiffness matrix (A)
+               DO i=rowPtr(rowN), rowPtr(rowN+1)-1
+                  colN = colPtr(i)
+                  IF (colN .EQ. rowN) THEN
+                     Val(1, i) = 1._RKIND
+                     Val(5, i) = 1._RKIND
+                     Val(9, i) = 1._RKIND
+                  ELSE IF (colN .EQ. masN) THEN
+                     Val(1, i) = -1._RKIND
+                     Val(5, i) = -1._RKIND
+                     Val(9, i) = -1._RKIND
+                  END IF
+               END DO
             END DO
-         END DO
+         ELSE
+            DO a=1, lFa%nNo
+               rowN = lFa%gN(a)
+               IF (rowN .EQ. masN) CYCLE
+               R (1:3,rowN) = 0._RKIND
+
+   !           Diagonalize the stiffness matrix (A)
+               DO i=rowPtr(rowN), rowPtr(rowN+1)-1
+                  colN = colPtr(i)
+                  IF (colN .EQ. rowN) THEN
+                     Val(1, i) = 1._RKIND
+                     Val(6, i) = 1._RKIND
+                     Val(11,i) = 1._RKIND
+                  ELSE IF (colN .EQ. masN) THEN
+                     Val(1, i) = -1._RKIND
+                     Val(6, i) = -1._RKIND
+                     Val(11,i) = -1._RKIND
+                  END IF
+               END DO
+            END DO
+         END IF
       END IF
 
       RETURN

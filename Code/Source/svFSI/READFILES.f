@@ -1942,12 +1942,13 @@ c     2         "can be applied for Neumann boundaries only"
          lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
          lPtr => list%get(ltmp, "Undeforming Neu face")
          IF (ltmp) THEN
-            IF (phys .NE. phys_ustruct) err = "Undeforming Neu "//
-     2         "face is currently formulated for USTRUCT only"
+            IF ((phys .NE. phys_ustruct) .AND.
+     2         (phys .NE. phys_shell)) err = "Undeforming Neu "//
+     3         "face is currently formulated for USTRUCT and SHELL only"
 
             IF (BTEST(lBc%bType,bType_cpl) .OR.
      2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//
-     2         "BC cannot be used with resistance or couple BC yet"
+     3         "BC cannot be used with resistance or couple BC yet"
 
 !           Clear any BC profile
             lBc%bType = IBCLR(lBc%bType,bType_flat)

@@ -471,7 +471,7 @@
             ! Note that here we only consider the same kinds of elems
             ! are used for both surfaces. If different kinds of elems
             ! are used, this needs to be modified.
-            ! lK2 = 0._RKIND
+            lK2 = 0._RKIND
 #ifdef WITH_TRILINOS
             IF (eq(cEq)%assmTLS) THEN
                CALL TRILINOS_DOASSEM(eNoN2, ptr2, lK2, lR2)
@@ -484,7 +484,7 @@
             DEALLOCATE(x2, ptr2, lR2, lK2) 
          END DO 
          ! Assembly lR lK1
-         ! lK1 = 0._RKIND
+         lK1 = 0._RKIND
 #ifdef WITH_TRILINOS
          IF (eq(cEq)%assmTLS) THEN
             CALL TRILINOS_DOASSEM(eNoN1, ptr1, lK1, lR)

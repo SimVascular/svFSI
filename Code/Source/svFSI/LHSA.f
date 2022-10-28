@@ -105,17 +105,32 @@
          DO j=1, eq(i)%nBc
             iM  = eq(i)%bc(j)%iM
             iFa = eq(i)%bc(j)%iFa
-            IF (BTEST(eq(i)%bc(j)%bType, bType_undefNeu)) THEN
-               masN = eq(i)%bc(j)%masN
-               IF (masN .EQ. 0) CYCLE
-               DO a=1, msh(iM)%fa(iFa)%nNo
-                  rowN = msh(iM)%fa(iFa)%gN(a)
-                  IF (rowN .EQ. masN) CYCLE
-                  idMap(rowN) = masN
-!                 Insert master to the row if not already present
-                  CALL ADDCOL(rowN, masN)
-               END DO
-               flag = .TRUE.
+            IF (msh(iM)%lShl) THEN
+               IF (BTEST(eq(i)%bc(j)%bType, bType_undefNeu)) THEN
+                  masN = eq(i)%bc(j)%masN
+                  IF (masN .EQ. 0) CYCLE
+                  DO a=1, msh(iM)%fa(iFa)%nNo
+                     rowN = msh(iM)%fa(iFa)%gN(a)
+                     IF (rowN .EQ. masN) CYCLE
+                     idMap(rowN) = masN
+   !                 Insert master to the row if not already present
+                     CALL ADDCOL(rowN, masN)
+                  END DO
+                  flag = .TRUE.
+               END IF
+            ELSE
+               IF (BTEST(eq(i)%bc(j)%bType, bType_undefNeu)) THEN
+                  masN = eq(i)%bc(j)%masN
+                  IF (masN .EQ. 0) CYCLE
+                  DO a=1, msh(iM)%fa(iFa)%nNo
+                     rowN = msh(iM)%fa(iFa)%gN(a)
+                     IF (rowN .EQ. masN) CYCLE
+                     idMap(rowN) = masN
+   !                 Insert master to the row if not already present
+                     CALL ADDCOL(rowN, masN)
+                  END DO
+                  flag = .TRUE.
+               END IF
             END IF
          END DO
       END DO
@@ -225,7 +240,7 @@
 !           If column entry already exists, exit
             IF (col .EQ. uInd(i,row)) EXIT
 
-!           If we are this point, then then the current entry is bigger.
+!           If we are this point, then the current entry is bigger.
 !           Shift all the entries from here to the end of the list. If
 !           list is full, we request a larger list, otherwise we shift
 !           and add the item at the current entry position.

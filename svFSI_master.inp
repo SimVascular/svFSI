@@ -945,7 +945,10 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        Setting the flag on either one despite having distinct
    #        BC types can lead to zeroing out the perimeter. Note that
    #        for CMM type BC, zero out is required to be true and is
-   #        enforced.
+   #        enforced. When doing displacement-controlled solid mechanics
+   #	    simulations (struct, ustruct, shell), this parameter is 
+   #	    suggested to set to false to avoid the unphysical
+   #	    deformation.
    #
    #  5. Weakly applied: This applies to to Dirichlet BC only and
    #        defaults to false. If "Weakly applied" is set to true, the
@@ -968,10 +971,10 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #        current configuration that changes with deformation.
    #
    #  7. Undeforming Neu face: This applies to for Neu BC and
-   #        ustruct equation only. If set to true, this setting will
-   #        mimic clamped condition on a specimen routinely done in
-   #        experiments. Clamping will not allow the surface, on which
-   #        the load is applied, to deform.
+   #        ustruct and shell equation only. If set to true, this
+   # 	    setting will mimic clamped condition on a specimen 
+   #        routinely done in experiments. Clamping will not allow the  
+   #        surface, on which the load is applied, to deform.   
    #
    #  #------------  Additional Traction BC controls
    #  8. Traction values file path: Applicable for Traction BC only.
