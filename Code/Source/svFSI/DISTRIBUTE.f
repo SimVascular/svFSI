@@ -774,9 +774,8 @@
          DEALLOCATE(tmp)
       END IF
 
-!     Communicating and reordering master node data for undeforming
-!     Neumann BC faces
-      IF (BTEST(lBc%bType,bType_undefNeu)) THEN
+!     Communicating and reordering master node data for clamped Neu BC
+      IF (BTEST(lBc%bType,bType_clmpd)) THEN
          CALL cm%bcast(lBc%masN)
          iM   = lBc%iM
          iFa  = lBc%iFa

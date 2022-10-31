@@ -60,7 +60,7 @@
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
             CALL BCINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa))
-            IF (msh(iM)%lShl) THEN
+            IF (msh(iM)%lShl .AND. (msh(iM)%eType.EQ.eType_TRI3)) THEN
                CALL SHLBCINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), msh(iM))
             END IF
          END DO
@@ -698,7 +698,8 @@
       RETURN
       END SUBROUTINE SHLINI
 !--------------------------------------------------------------------
-!     Initializing boundary condition variables for CST shells
+!     Initializing boundary condition variables for CST shells - this
+!     BC is set on the interior node adjacent to the boundary
       SUBROUTINE SHLBCINI(lBc, lFa, lM)
       USE COMMOD
       USE ALLFUN
@@ -710,11 +711,13 @@
       INTEGER(KIND=IKIND) :: a, b, e, Ac, Bc, Ec
       LOGICAL :: bFlag
 
-      IF (lFa%eType .NE. eType_TRI3) RETURN
       DO e=1, lFa%nEl
          Ec = lFa%gE(e)
          DO a=1, lM%eNoN
             Ac = lM%IEN(a,Ec)
+
+!           Find the interior node of the mesh element that is part of
+!           the boundary. [bFlag=='T' => node is on the boundary]
             bflag = .FALSE.
             DO b=1, lFa%eNoN
                Bc = lFa%IEN(b,e)
@@ -723,10 +726,13 @@
                   EXIT
                END IF
             END DO
+
+!           Set the BC on the interior node [bFlag == 'F']
             IF (.NOT.bFlag) THEN
-               IF (.NOT.BTEST(lM%sbc(a,Ec),bType_free)) err =
-     2            "BC detected on a non-boundary shell element. "//
-     3            "Correction needed"
+               IF (.NOT.BTEST(lM%sbc(a,Ec),bType_free)) THEN
+                  err = "BC detected on a non-boundary shell element."//
+     2               " Correction needed"
+               END IF
                lM%sbc(a,Ec) = IBCLR(lM%sbc(a,Ec), bType_free)
                IF (BTEST(lBc%bType,bType_free)) THEN
                   lM%sbc(a,Ec) = IBSET(lM%sbc(a,Ec),bType_free)

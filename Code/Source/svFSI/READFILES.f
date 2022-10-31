@@ -1935,19 +1935,26 @@ c     2         "can be applied for Neumann boundaries only"
          END IF
       END  IF
 
-!     If a Neumann BC face is undeforming
+!     If a clamped BC is applied
       lBc%masN = 0
       IF (BTEST(lBc%bType,bType_Neu)) THEN
          ltmp = .FALSE.
-         lBc%bType = IBCLR(lBc%bType,bType_undefNeu)
-         lPtr => list%get(ltmp, "Undeforming Neu face")
+         lBc%bType = IBCLR(lBc%bType,bType_clmpd)
+         lPtr => list%get(ltmp, "Clamped Neu face")
          IF (ltmp) THEN
-            IF (phys .NE. phys_ustruct) err = "Undeforming Neu "//
-     2         "face is currently formulated for USTRUCT only"
+            IF ((phys .NE. phys_lElas)   .AND.
+     2          (phys .NE. phys_shell)   .AND.
+     3          (phys .NE. phys_struct)  .AND.
+     4          (phys .NE. phys_ustruct)) THEN
+               err = "Clamped Neu BC is currently formulated"//
+     2            "for LELAS, SHELL, STRUCT, and USTRUCT only"
+            END IF
 
             IF (BTEST(lBc%bType,bType_cpl) .OR.
-     2          BTEST(lBc%bType,bType_res)) err = "Undeforming Neu "//
-     2         "BC cannot be used with resistance or couple BC yet"
+     2          BTEST(lBc%bType,bType_res)) THEN
+                err = "Clamped Neu BC cannot be used with"//
+     2             "resistance or couple BC yet"
+            END IF
 
 !           Clear any BC profile
             lBc%bType = IBCLR(lBc%bType,bType_flat)
@@ -1955,15 +1962,15 @@ c     2         "can be applied for Neumann boundaries only"
             IF (BTEST(lBc%bType,bType_ud) .OR.
      2          BTEST(lBc%bType,bType_gen)) THEN
                err = "General BC or user defined spatial profile "//
-     2            "cannot be imposed on an undeforming Neu face"
+     2            "cannot be imposed on a clamped Neu face"
             END IF
 
 !           Clear zero perimeter flag
             lBc%bType = IBCLR(lBc%bType,bType_zp)
 
-!           Reset profile to flat and set undeforming Neumann BC flag
+!           Reset profile to flat and set clamped Neumann BC flag
             lBc%bType = IBSET(lBc%bType,bType_flat)
-            lBc%bType = IBSET(lBc%bType,bType_undefNeu)
+            lBc%bType = IBSET(lBc%bType,bType_clmpd)
 
 !           Set master-slave node parameters. Set a master node that
 !           is not part of any other face (not on perimeter)

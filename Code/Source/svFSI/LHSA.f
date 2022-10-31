@@ -96,7 +96,7 @@
          END DO
       END DO
 
-!     Now reset idMap for undeforming Neumann BC faces. Then insert
+!     Now reset idMap for clamped Neumann BC faces. Then insert
 !     master node as a column entry in each row for all the slave nodes.
 !     This step is performed even for ghost master nodes where the idMap
 !     points to the ghost master node.
@@ -105,7 +105,7 @@
          DO j=1, eq(i)%nBc
             iM  = eq(i)%bc(j)%iM
             iFa = eq(i)%bc(j)%iFa
-            IF (BTEST(eq(i)%bc(j)%bType, bType_undefNeu)) THEN
+            IF (BTEST(eq(i)%bc(j)%bType, bType_clmpd)) THEN
                masN = eq(i)%bc(j)%masN
                IF (masN .EQ. 0) CYCLE
                DO a=1, msh(iM)%fa(iFa)%nNo
@@ -225,7 +225,7 @@
 !           If column entry already exists, exit
             IF (col .EQ. uInd(i,row)) EXIT
 
-!           If we are this point, then then the current entry is bigger.
+!           If we are this point, then the current entry is bigger.
 !           Shift all the entries from here to the end of the list. If
 !           list is full, we request a larger list, otherwise we shift
 !           and add the item at the current entry position.

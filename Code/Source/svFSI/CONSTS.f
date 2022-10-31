@@ -128,14 +128,14 @@
 !     flux, zero out perimeter, impose BC on the integral of state
 !     variable or D (instead of Y), flat profile, parabolic profile,
 !     user defined profile, backflow stabilization, BCs for shells
-!     (fixed, hinged, free, symmetric), undeforming Neu, RCR-Neu
+!     (fixed, hinged, free, symmetric), clamped Neu BC, RCR-Neu
       INTEGER(KIND=IKIND), PARAMETER :: bType_Dir = 0, bType_Neu = 1,
      2   bType_trac = 2, bType_CMM = 3, bType_Robin = 4, bType_std = 5,
      3   bType_ustd = 6, bType_cpl = 7, bType_gen = 8, bType_res = 9,
      4   bType_flx = 10, bType_zp = 11, bType_impD = 12, bType_flat =13,
      5   bType_para = 14, bType_ud = 15, bType_bfs = 16, bType_fix = 17,
      6   bType_hing = 18, bType_free = 19, bType_symm = 20,
-     7   bType_undefNeu = 21, bType_RCR = 22
+     7   bType_clmpd = 21, bType_RCR = 22
 !--------------------------------------------------------------------
 !     Body force types: volumetric (default), traction, Neumann
 !     (pressure based), time dependence (steady, unsteady, spatially

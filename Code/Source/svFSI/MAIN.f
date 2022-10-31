@@ -172,7 +172,8 @@
                CALL THOOD_ValRC()
             END IF
 
-            CALL SETBCUNDEFNEU()
+!        Update LHS for clamped BC
+            CALL SETBC_CLMPD()
 
 !        IB treatment: for explicit coupling, simply construct residue.
             IF (ibFlag) THEN

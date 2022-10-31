@@ -160,7 +160,7 @@
          INTEGER(KIND=IKIND) iM
 !        Pointer to FSILS%bc
          INTEGER(KIND=IKIND) lsPtr
-!        Undeforming Neu BC master-slave node parameters.
+!        Clamped Neu BC master node parameter
          INTEGER(KIND=IKIND) masN
 !        Defined steady value
          REAL(KIND=RKIND) :: g = 0._RKIND
