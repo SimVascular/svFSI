@@ -202,6 +202,8 @@
             CALL LSSOLVE(eq(cEq), incL, res)
 
 !        Solution is obtained, now updating (Corrector)
+!        Note the corrector step inside the NR loop, which is
+!        slightly different from https://www.scorec.rpi.edu/~kjansen/genalf.pdf
             CALL PICC
 
 !        Checking for exceptions

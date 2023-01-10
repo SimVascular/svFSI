@@ -537,18 +537,21 @@
                CASE (outGrp_A)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
+                     ! Why don't we divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lA(s:e,Ac)
                   END DO
 
                CASE (outGrp_Y)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
+                     ! Why don't we divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lY(s:e,Ac)
                   END DO
 
                CASE (outGrp_D)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
+                     ! Divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lD(s:e,Ac)/msh(iM)%scF
                   END DO
 

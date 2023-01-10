@@ -2191,6 +2191,7 @@ c        N(8) = lx*my*0.5_RKIND
       REAL(KIND=RKIND) v(nsd)
 
       LOGICAL, ALLOCATABLE :: setIt(:)
+      ! ptr not needed in this function
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
@@ -2317,6 +2318,7 @@ c        N(8) = lx*my*0.5_RKIND
       REAL(KIND=RKIND) v(nsd)
 
       LOGICAL, ALLOCATABLE :: setIt(:)
+      ! ptr not needed in this function
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)

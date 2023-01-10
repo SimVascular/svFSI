@@ -1262,7 +1262,7 @@
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT
-!     The output of this process is "part" array which part(i) says
+!     The output of this process is "part" array. part(i) says
 !     which processor element "i" belongs to
 !     Doing partitioning, using ParMetis
          edgecut = SPLIT(nEl, eNoN, eNoNb, lM%IEN, cm%np(), lM%eDist,
@@ -1606,7 +1606,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       lFa%capFaceID = gFa%capFaceID
 
 !     AB 7/7/22: If face is virtual, cannot partition it according to the already 
-!     partitioned mesh. Instead, separately partition this face.
+!     partitioned mesh. Instead, treat this separately.
       IF (lFa%virtual) THEN
          CALL PARTFACEV(lM, lFa, gFa, gmtl)
          RETURN
