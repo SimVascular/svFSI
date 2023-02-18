@@ -944,16 +944,22 @@
             IF (ptr .NE. 0) THEN
 !              Compute flow rates from 3D on Neumann boundaries
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-                  cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
-                  cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
+!                 AB 2/15/23: For Qo, should integrate over config at timestep n
+!                             For Qn, should integrate over config at timestep n+1 (unknown, but we have a guess with Dn)
+!                             What is the best way to do this? Set a flag in Integ function to say which configuration we want
+!                             to integrate in? 'r' for reference config, 'o' for timestep n config, 'n' for timestep n+1 config
+                  cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,
+     2                                    nsd, .FALSE.,'o') 
+                  cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,
+     2                                    nsd, .FALSE.,'n')
 
 !                 Add velocity flux from cap if face is capped
                   iFaCap = msh(iM)%fa(iFa)%capFaceID
                   IF (iFaCap .NE. 0) THEN ! If face is capped
                      cplBC%fa(ptr)%Qo = cplBC%fa(ptr)%Qo + 
-     2                           Integ(msh(iM)%fa(iFaCap),Yo,1,nsd)
+     2                    Integ(msh(iM)%fa(iFaCap),Yo,1,nsd,.FALSE.,'o')
                      cplBC%fa(ptr)%Qn = cplBC%fa(ptr)%Qn + 
-     2                           Integ(msh(iM)%fa(iFaCap),Yn,1,nsd)
+     2                    Integ(msh(iM)%fa(iFaCap),Yn,1,nsd,.FALSE.,'n')
                   END IF
 
                   cplBC%fa(ptr)%Po = 0._RKIND
@@ -994,8 +1000,8 @@
       USE ALLFUN
       IMPLICIT NONE
       INTEGER(KIND=IKIND), PARAMETER :: iEq = 1
-      REAL(KIND=RKIND), PARAMETER :: absTol = 1.E-8_RKIND,
-     2   relTol = 1.E-5_RKIND
+      REAL(KIND=RKIND), PARAMETER :: absTol = 1.E-10_RKIND,
+     2   relTol = 1.E-3_RKIND
 
       LOGICAL RCRflag
       INTEGER(KIND=IKIND) iFa, iFaCap, i, j, ptr, iBc, iCapBC, iM
@@ -1020,16 +1026,22 @@
                ! AB 5/11/22: Need to change how these flow rates are calculated
                ! to account for deformed mesh
                ! Calls IntegG()->IntegV to integrate velocities (Yo) over face
-               cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd) 
-               cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,nsd)
+!                 AB 2/15/23: For Qo, should integrate over config at timestep n
+!                             For Qn, should integrate over config at timestep n+1 (unknown, but we have a guess with Dn)
+!                             What is the best way to do this? Set a flag in Integ function to say which configuration we want
+!                             to integrate in? 'r' for reference config, 'o' for timestep n config, 'n' for timestep n+1 config
+               cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,
+     2                                 nsd, .FALSE.,'o') 
+               cplBC%fa(ptr)%Qn = Integ(msh(iM)%fa(iFa),Yn,1,
+     2                                 nsd, .FALSE.,'n')
 
 !              Add velocity flux from cap if face is capped
                iFaCap = msh(iM)%fa(iFa)%capFaceID
                IF (iFaCap .NE. 0) THEN ! If face is capped
                   cplBC%fa(ptr)%Qo = cplBC%fa(ptr)%Qo + 
-     2                        Integ(msh(iM)%fa(iFaCap),Yo,1,nsd)
+     2                  Integ(msh(iM)%fa(iFaCap),Yo,1,nsd,.FALSE.,'o')
                   cplBC%fa(ptr)%Qn = cplBC%fa(ptr)%Qn + 
-     2                        Integ(msh(iM)%fa(iFaCap),Yn,1,nsd)
+     2                  Integ(msh(iM)%fa(iFaCap),Yn,1,nsd,.FALSE.,'n')
                END IF
 
                cplBC%fa(ptr)%Po = 0._RKIND
@@ -1058,8 +1070,13 @@
       DO iBc=1, eq(iEq)%nBc
          i = eq(iEq)%bc(iBc)%cplBCptr
          IF (i.NE.0 .AND. BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-            diff = diff + (cplBC%fa(i)%Qo*cplBC%fa(i)%Qo)
+!            PRINT*, 'i: ', i
+!            PRINT*, 'Qn: ', cplBC%fa(i)%Qn
+!            PRINT*, 'Qn*Qn: ', (cplBC%fa(i)%Qn*cplBC%fa(i)%Qn)
+!            PRINT*, 'diff: ', diff
+            diff = diff + cplBC%fa(i)%Qn*cplBC%fa(i)%Qn
             j = j + 1
+!            PRINT*, 'diff + Qn*Qn: ', diff
          END IF
       END DO
       diff = SQRT(diff/REAL(j, KIND=RKIND))

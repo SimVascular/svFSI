@@ -1854,7 +1854,12 @@ c        N(8) = lx*my*0.5_RKIND
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
 !     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
 !     ref configuration surface element.
-      SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n)
+!     
+!     cfg determines in which configuration to return the normal vector
+!     if cfg = 'r', reference configuration
+!     if cfg = 'o', old configuration (at timestep n)
+!     if cfg = 'n', new configuration (at timestep n+1)
+      SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n, cfgin)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -1862,9 +1867,11 @@ c        N(8) = lx*my*0.5_RKIND
       REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
       REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
       TYPE(faceType), INTENT(IN) :: lFa
+      CHARACTER, OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
 
       INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
       REAL(KIND=RKIND) v(nsd)
+      CHARACTER cfg
 
       LOGICAL, ALLOCATABLE :: setIt(:)
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
@@ -1873,6 +1880,12 @@ c        N(8) = lx*my*0.5_RKIND
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
+
+! Deal with optional config flag. If cfg is not provided, use reference config
+      cfg = 'r'
+      IF(PRESENT(cfgin)) THEN
+         cfg = cfgin
+      END IF
 
 !     If this is a virtual face, then this face element does not lie on a volume 
 !     element, and we compute the normal vector slightly differently.
@@ -1932,8 +1945,18 @@ c        N(8) = lx*my*0.5_RKIND
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
-!        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
-         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+
+         IF (mvMsh) THEN 
+            ! Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
+            lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+         ELSE
+            IF (cfg .EQ. 'o') THEN ! Use Do to deform geometry
+               lX(:,a) = lX(:,a) + Do(1:nsd,Ac) 
+            ELSE IF (cfg .EQ. 'n') THEN ! Use Dn to deform geometry
+               lX(:,a) = lX(:,a) + Dn(1:nsd,Ac)
+            ! If cfg == 'r', do nothing
+            END IF
+         END IF
       END DO
 
 !     Calculating surface deflation
@@ -2014,6 +2037,9 @@ c        N(8) = lx*my*0.5_RKIND
 !     Jac = SQRT(NORM(n)). The normal is the surface normal in the current 
 !     configuration, and the Jacobian is the Jacobian of the mapping from parent
 !     surface element to current configuration surface element
+!
+!     AB 2/16/23: Redundant after modifying GNNB to take a flag telling what 
+!     configuration to use
       SUBROUTINE GNNBT(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN

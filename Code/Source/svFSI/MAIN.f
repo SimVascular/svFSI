@@ -107,6 +107,8 @@
          END IF
 
 !     Predictor step
+!     Predicts new quantities (An, Yn, Dn) from old quantities (Ao, Yo, Do) using
+!     gen-alpha relations
          CALL PICP
 
 !     Apply Dirichlet BCs strongly
