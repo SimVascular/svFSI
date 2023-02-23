@@ -82,7 +82,7 @@
          PROCEDURE, PUBLIC :: seq
 !        Forces the MPI communicator to abort
          PROCEDURE, PUBLIC :: fStop
-!        Broadcasting scalar/vector of logic/integer/real/character
+!        Broadcasting scaler/vector of logic/integer/real/character
          PROCEDURE :: BCASTLS
          PROCEDURE :: BCASTLV
          PROCEDURE :: BCASTIS
