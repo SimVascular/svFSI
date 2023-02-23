@@ -196,6 +196,9 @@
       IF (resetSim) THEN
          IF (communicator%foC) CALL FSILS_COMMU_FREE(communicator)
          IF (lhs%foC) CALL FSILS_LHS_FREE(lhs)
+#ifdef WITH_PETSC
+         CALL PETSC_DESTROY_ALL()
+#endif
       END IF ! resetSim
 
       dbg = "Calling FSILS_COMMU_CREATE"
@@ -214,6 +217,19 @@
            tls%ltg(lhs%map(a)) = ltg(a)
          END DO
       END IF
+
+!     Initialize PETSc
+#ifdef WITH_PETSC
+      dbg = "Calling PETSC_INITIALIZE"
+      CALL PETSC_INITIALIZE(lhs%nNo, lhs%mynNo, lhs%nnz, nEq, ltg,
+     2                      lhs%map, lhs%rowPtr, lhs%colPtr)
+      DO iEq = 1, nEq
+         CALL PETSC_CREATE_LINEARSOLVER(eq(iEq)%ls%LS_type, 
+     2   eq(iEq)%ls%PREC_Type, eq(iEq)%ls%sD, eq(iEq)%ls%mItr,
+     3   eq(iEq)%ls%relTol, eq(iEq)%ls%absTol, eq(iEq)%phys,
+     4   eq(iEq)%dof, iEq, nEq)
+      END DO
+#endif
 
 !     Variable allocation and initialization
       ALLOCATE(Ao(tDof,tnNo), An(tDof,tnNo), Yo(tDof,tnNo),
@@ -636,6 +652,9 @@
       ELSE
          IF (ALLOCATED(Val))   DEALLOCATE(Val)
       END IF
+#ifdef WITH_PETSC
+      CALL PETSC_DESTROY_ALL(nEq)
+#endif
 
       IF (ALLOCATED(colPtr))   DEALLOCATE(colPtr)
       IF (ALLOCATED(dmnId))    DEALLOCATE(dmnId)

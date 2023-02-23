@@ -73,6 +73,21 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: incL(nFacesLS)
       REAL(KIND=RKIND), INTENT(IN) :: res(nFacesLS)
 
+#ifdef WITH_PETSC
+      REAL(KIND=RKIND), ALLOCATABLE :: W(:,:), V(:,:)
+
+      ALLOCATE(W(dof,tnNo), V(dof,tnNo))
+      CALL INIT_DIR_AND_COUPNEU_BC_PETSC(incL, res, W, V)
+      CALL PETSC_CREATE_LINEARSYSTEM(dof, cEq, nEq, W, V) ! Only excute once for each equation
+      CALL PETSC_SET_VALUES(dof, cEq, R, Val, W, V)
+      CALL PETSC_SOLVE(lEq%FSILS%RI%fNorm, lEq%FSILS%RI%iNorm,
+     2      lEq%FSILS%RI%dB, lEq%FSILS%RI%callD, lEq%FSILS%RI%suc,
+     3      lEq%FSILS%RI%itr, R, lEq%FSILS%RI%mItr, dof, cEq)
+      DEALLOCATE(W, V)
+
+      RETURN
+#endif
+
 #ifdef WITH_TRILINOS
       INTEGER(KIND=IKIND) a
 
@@ -175,4 +190,64 @@
       DEALLOCATE(v)
 
       END SUBROUTINE INIT_DIR_AND_COUPNEU_BC
+!--------------------------------------------------------------------
+      SUBROUTINE INIT_DIR_AND_COUPNEU_BC_PETSC(incL, res, W, V)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: incL(lhs%nFaces)
+      REAL(KIND=RKIND), INTENT(IN) :: res(lhs%nFaces)
+      REAL(KIND=RKIND), INTENT(OUT) :: W(dof,tnNo), V(dof,tnNo)
+
+      INTEGER(KIND=IKIND) a, i, Ac, faIn, faDof
+      LOGICAL flag, isCoupledBC
+
+      IF (lhs%nFaces .NE. 0) THEN
+         lhs%face%incFlag = .TRUE.
+         DO faIn=1, lhs%nFaces
+            IF (incL(faIn) .EQ. 0)  lhs%face(faIn)%incFlag = .FALSE.
+         END DO
+         DO faIn=1, lhs%nFaces
+            lhs%face(faIn)%coupledFlag = .FALSE.
+            IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
+            flag = lhs%face(faIn)%bGrp .EQ. BC_TYPE_Neu
+            IF (flag .AND. res(faIn).NE.0._RKIND) THEN
+               lhs%face(faIn)%res = res(faIn)
+               lhs%face(faIn)%coupledFlag = .TRUE.
+            END IF
+         END DO
+      END IF
+
+      W = 1._RKIND
+      DO faIn=1, lhs%nFaces
+         IF (.NOT.lhs%face(faIn)%incFlag) CYCLE
+         faDof = MIN(lhs%face(faIn)%dof,dof)
+         IF (lhs%face(faIn)%bGrp .EQ. BC_TYPE_Dir) THEN
+            DO a=1, lhs%face(faIn)%nNo
+               Ac = lhs%face(faIn)%glob(a)
+               DO i=1, faDof
+                  W(i,Ac) = W(i,Ac) * lhs%face(faIn)%val(i,a)
+               END DO
+            END DO
+         END IF
+      END DO
+
+      V = 0._RKIND
+      isCoupledBC = .FALSE.
+      DO faIn=1, lhs%nFaces
+         IF (lhs%face(faIn)%coupledFlag) THEN
+            isCoupledBC = .TRUE.
+            faDof = MIN(lhs%face(faIn)%dof,dof)
+            DO a=1, lhs%face(faIn)%nNo
+               Ac = lhs%face(faIn)%glob(a)
+               DO i=1, faDof
+                  V(i,Ac) = V(i,Ac) +
+     2               SQRT(ABS(res(faIn)))*lhs%face(faIn)%val(i,a)
+               END DO
+            END DO
+         END IF
+      END DO
+
+      RETURN
+      END SUBROUTINE INIT_DIR_AND_COUPNEU_BC_PETSC
 !####################################################################
