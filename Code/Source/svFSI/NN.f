@@ -1941,7 +1941,8 @@ c        N(8) = lx*my*0.5_RKIND
          END IF
       END DO
 
-!     Correcting the position vector if mesh is moving
+!     Correcting the position vector if mesh is moving or we want to integrate
+!     over a different configuration
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
          lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)

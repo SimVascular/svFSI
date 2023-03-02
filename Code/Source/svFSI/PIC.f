@@ -33,6 +33,10 @@
 !
 !     This routine contains predictor/initiator/corrector routines, as
 !     part of time integration scheme.
+!     
+!     See the following publication section 4.4 for theory and derivation:
+!     Bazilevs, Yuri, et al. "Isogeometric fluid-structure interaction: theory, 
+!     algorithms, and computations." Computational mechanics 43 (2008): 3-37.
 !
 !--------------------------------------------------------------------
 
