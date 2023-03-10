@@ -124,6 +124,7 @@
             saveName = ""
             appPath = STR(cm%np())//"-procs"//delimiter
          END IF
+         IF (appPath .NE. "") CALL SYSTEM("mkdir -p "//TRIM(appPath))
 
          lPtr => list%get(std%oTS,"Verbose")
          lPtr => list%get(wrn%oTS,"Warning")
