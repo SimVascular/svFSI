@@ -1080,7 +1080,7 @@
          END IF
       END DO
       diff = SQRT(diff/REAL(j, KIND=RKIND))
-      IF (diff*relTol .LT. absTol) THEN
+      IF (diff*relTol .GT. absTol .OR. diff .EQ. 0.0) THEN
          diff = absTol
       ELSE
          diff = diff*relTol

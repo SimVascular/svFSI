@@ -1892,7 +1892,7 @@ c        N(8) = lx*my*0.5_RKIND
       IF (lFa%virtual) THEN
 !         WRITE(*,'(A)') "Face element not on volume element."
 !         WRITE(*,'(A)') "Calculate normal vector anyway."
-         CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
+         CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n, cfg)
          RETURN
       END IF
 
@@ -2205,7 +2205,12 @@ c        N(8) = lx*my*0.5_RKIND
 !     not lie on a volume element).
 !     For these elements, the direction of the normal vector is assumed from the
 !     nodal ordering.
-      SUBROUTINE GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n)
+!
+!     cfg determines in which configuration to return the normal vector
+!     if cfg = 'r', reference configuration
+!     if cfg = 'o', old configuration (at timestep n)
+!     if cfg = 'n', new configuration (at timestep n+1)
+      SUBROUTINE GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n, cfg)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -2213,37 +2218,62 @@ c        N(8) = lx*my*0.5_RKIND
       REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
       REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
       TYPE(faceType), INTENT(IN) :: lFa
+      !CHARACTER, OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
+      CHARACTER, INTENT(IN) :: cfg
 
       INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
       REAL(KIND=RKIND) v(nsd)
+      !CHARACTER cfg
 
       LOGICAL, ALLOCATABLE :: setIt(:)
       ! ptr not needed in this function
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDo(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDn(:)
       INTEGER(KIND=IKIND) ierr, p
 
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
 
+      ! Deal with optional config flag. If cfg is not provided, use reference config
+      !cfg = 'r'
+      !IF(PRESENT(cfgin)) THEN
+      !   cfg = cfgin
+      !END IF
+
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
       ! Arrays to hold nodal positions for MPI gather operation
       ALLOCATE(tmpX(nsd))
+      ALLOCATE(tmpDo(SIZE(Do(:,1)))) ! In case Dn has more than nsd dof per node
+      ALLOCATE(tmpDn(SIZE(Dn(:,1)))) ! In case Dn has more than nsd dof per node
 
 !     Communicating nodal positions and correcting the position vector if mesh is moving
       DO a=1, eNoNb ! Loop over nodes of boundary surface element
          Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
          ! Collect node position onto Master. On slaves
-         ! set both (tmpX and tmpDn) to zero.
+         ! set tmpX to zero.
          CALL GatherMasterV(x, Ac, tmpX)
 
          ! Transfer nodal position to lX array
          lX(:,a) = tmpX(:)
 
-!        I believe Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
-         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+         IF (mvMsh) THEN 
+            ! Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
+            CALL GatherMasterV(Do, Ac, tmpDo)
+            lX(:,a) = lX(:,a) + tmpDo(nsd+2:2*nsd+1)
+         ELSE
+            IF (cfg .EQ. 'o') THEN ! Use Do to deform geometry
+               CALL GatherMasterV(Do, Ac, tmpDo)
+               lX(:,a) = lX(:,a) + tmpDo(1:nsd) 
+            ELSE IF (cfg .EQ. 'n') THEN ! Use Dn to deform geometry
+               CALL GatherMasterV(Dn, Ac, tmpDn)
+               lX(:,a) = lX(:,a) + tmpDn(1:nsd) 
+            ! If cfg == 'r', do nothing
+            END IF
+         END IF
       END DO
 
 !     If slave, don't perform calculation of n. Wait for master to complete
@@ -2310,7 +2340,8 @@ c        N(8) = lx*my*0.5_RKIND
          n = CROSS(xXi)
          DEALLOCATE(xXi)
       END IF
-      DEALLOCATE(setIt, ptr, lX, tmpX)
+      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(tmpX, tmpDo, tmpDn)
 
 
       ! If master, broadcast value of n to slaves
@@ -2332,6 +2363,9 @@ c        N(8) = lx*my*0.5_RKIND
 !     For these elements, the direction of the normal vector is assumed from the
 !     nodal ordering.
 !     Same as GNNBSURF(), except uses current configuration nodal positions.
+!
+!     AB 3/09/23: Redundant after modifying GNNBSURF to take a flag telling what 
+!     configuration to use
       SUBROUTINE GNNBSURFT(lFa, e, g, insd, eNoNb, Nx, n)
       USE COMMOD
       USE ALLFUN
