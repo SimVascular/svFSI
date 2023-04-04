@@ -520,7 +520,7 @@
          ALLOCATE (sclr(nNo))
          DO a=1, nNo
             sclr(a) = s(l,a)
-            PRINT*, 'proc: ', cm%id(), 'sclr(:,a): ', sclr(a)
+            !PRINT*, 'proc: ', cm%id(), 'sclr(:,a): ', sclr(a)
          END DO
          IntegG = IntegS(lFa,sclr,flag,cfg)
       ELSE
