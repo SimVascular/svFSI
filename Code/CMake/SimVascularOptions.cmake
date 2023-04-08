@@ -76,7 +76,7 @@ option(SV_EXTERNALS_USE_TOPLEVEL_DIR "If ON, SV_EXTERNALS_TOPLEVEL_DIR will be u
 
 
 #-----------------------------------------------------------------------------
-# SVFSILS linear solver is always on 
+# SVFSILS linear solver is always on
 #-----------------------------------------------------------------------------
 set(USE_SVFSILS 1)
 set(SVFSILS_BUILD_TYPE "Source")

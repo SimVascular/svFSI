@@ -116,6 +116,7 @@
          DO
             iEqOld = cEq
 
+!           cplBC is invoked only for the first equation
             IF (cplBC%coupled .AND. cEq.EQ.1) THEN
                CALL SETBCCPL
                CALL SETBCDIR(An, Yn, Dn)
@@ -152,7 +153,7 @@
             CALL SETBCDIRW(Yg, Dg)
 
 !        Apply contact model and add its contribution to residue
-            IF (iCntct) CALL CONTACTFORCES(Dg)
+            IF (iCntct) CALL CONSTRUCT_CONTACTPNLTY(Dg)
 
 !        Synchronize R across processes. Note: that it is important
 !        to synchronize residue, R before treating immersed bodies as
@@ -171,7 +172,8 @@
                CALL THOOD_ValRC()
             END IF
 
-            CALL SETBCUNDEFNEU()
+!        Update LHS for clamped BC
+            CALL SETBC_CLMPD()
 
 !        IB treatment: for explicit coupling, simply construct residue.
             IF (ibFlag) THEN

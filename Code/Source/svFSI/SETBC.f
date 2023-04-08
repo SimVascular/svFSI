@@ -623,14 +623,14 @@
       RETURN
       END SUBROUTINE SETBCRBNL
 !####################################################################
-!     Treat Neumann boundaries that are not deforming.
+!     Treat Neumann boundaries that are clamped and do not deform.
 !     Leave the row corresponding to the master node of the owner
 !     process in the LHS matrix and the residue vector untouched. For
 !     all the other nodes of the face, set the residue to be 0 for
 !     velocity dofs. Zero out all the elements of corresponding rows of
 !     the LHS matrix. Make the diagonal elements of the LHS matrix equal
 !     to 1 and the column entry corresponding to the master node, -1
-      SUBROUTINE SETBCUNDEFNEU
+      SUBROUTINE SETBC_CLMPD
       USE COMMOD
       IMPLICIT NONE
 
@@ -639,15 +639,20 @@
       DO iBc=1, eq(cEq)%nBc
          iFa = eq(cEq)%bc(iBc)%iFa
          iM  = eq(cEq)%bc(iBc)%iM
-         IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_undefNeu)) THEN
-            CALL SETBCUNDEFNEUL(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
+         IF (BTEST(eq(cEq)%bc(iBc)%bType,bType_clmpd)) THEN
+            IF (nsd .EQ. 2) THEN
+               CALL SETBC_CLMPD2D(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
+            ELSE
+               CALL SETBC_CLMPD3D(eq(cEq)%bc(iBc), msh(iM)%fa(iFa))
+            END IF
          END IF
       END DO
 
       RETURN
-      END SUBROUTINE SETBCUNDEFNEU
+      END SUBROUTINE SETBC_CLMPD
 !--------------------------------------------------------------------
-      SUBROUTINE SETBCUNDEFNEUL(lBc, lFa)
+!     Set clamped BC for 2D problems
+      SUBROUTINE SETBC_CLMPD2D(lBc, lFa)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -659,7 +664,28 @@
       masN = lBc%masN
       IF (lFa%nNo.EQ.0 .OR. masN.EQ.0) RETURN
 
-      IF (nsd .EQ. 2) THEN
+!     For lElas, struct: dof = 2; for ustruct: dof = 3
+      IF ((eq(cEq)%phys .EQ. phys_lElas) .OR.
+     2    (eq(cEq)%phys .EQ. phys_struct)) THEN
+         DO a=1, lFa%nNo
+            rowN = lFa%gN(a)
+            IF (rowN .EQ. masN) CYCLE
+            R (1:2,rowN) = 0._RKIND
+
+!           Diagonalize the stiffness matrix (A)
+            DO i=rowPtr(rowN), rowPtr(rowN+1)-1
+               colN = colPtr(i)
+               IF (colN .EQ. rowN) THEN
+                  Val(1,i) = 1._RKIND
+                  Val(4,i) = 1._RKIND
+               ELSE IF (colN .EQ. masN) THEN
+                  Val(1,i) = -1._RKIND
+                  Val(4,i) = -1._RKIND
+               END IF
+            END DO
+         END DO
+
+      ELSE IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
          DO a=1, lFa%nNo
             rowN = lFa%gN(a)
             IF (rowN .EQ. masN) CYCLE
@@ -677,8 +703,49 @@
                END IF
             END DO
          END DO
+      END IF
 
-      ELSE IF (nsd .EQ. 3) THEN
+      RETURN
+      END SUBROUTINE SETBC_CLMPD2D
+!--------------------------------------------------------------------
+!     Set clamped BC for 3D problems
+      SUBROUTINE SETBC_CLMPD3D(lBc, lFa)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(bcType), INTENT(IN) :: lBc
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, i, masN, rowN, colN
+
+      masN = lBc%masN
+      IF (lFa%nNo.EQ.0 .OR. masN.EQ.0) RETURN
+
+!     For lElas, struct: dof = 3; for ustruct: dof = 4
+      IF ((eq(cEq)%phys .EQ. phys_lElas) .OR.
+     2    (eq(cEq)%phys .EQ. phys_shell) .OR.
+     3    (eq(cEq)%phys .EQ. phys_struct)) THEN
+         DO a=1, lFa%nNo
+            rowN = lFa%gN(a)
+            IF (rowN .EQ. masN) CYCLE
+            R (1:3,rowN) = 0._RKIND
+
+!           Diagonalize the stiffness matrix (A)
+            DO i=rowPtr(rowN), rowPtr(rowN+1)-1
+               colN = colPtr(i)
+               IF (colN .EQ. rowN) THEN
+                  Val(1,i) = 1._RKIND
+                  Val(5,i) = 1._RKIND
+                  Val(9,i) = 1._RKIND
+               ELSE IF (colN .EQ. masN) THEN
+                  Val(1,i) = -1._RKIND
+                  Val(5,i) = -1._RKIND
+                  Val(9,i) = -1._RKIND
+               END IF
+            END DO
+         END DO
+
+      ELSE IF (eq(cEq)%phys .EQ. phys_ustruct) THEN
          DO a=1, lFa%nNo
             rowN = lFa%gN(a)
             IF (rowN .EQ. masN) CYCLE
@@ -701,7 +768,7 @@
       END IF
 
       RETURN
-      END SUBROUTINE SETBCUNDEFNEUL
+      END SUBROUTINE SETBC_CLMPD3D
 !####################################################################
 !     Weak treatment of Dirichlet boundary conditions
       SUBROUTINE SETBCDIRW(Yg, Dg)
@@ -922,16 +989,13 @@
       REAL(KIND=RKIND) tmp
 
       IF (cplBC%schm .EQ. cplBC_I) THEN
-         CALL CALCDERCPLBC
+         CALL CALCDERCPLBC()
+
       ELSE
-         RCRflag = .FALSE.
          DO iBc=1, eq(iEq)%nBc
             iFa = eq(iEq)%bc(iBc)%iFa
             iM  = eq(iEq)%bc(iBc)%iM
             ptr = eq(iEq)%bc(iBc)%cplBCptr
-            IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
-               IF (.NOT.RCRflag) RCRflag = .TRUE.
-            END IF
             IF (ptr .NE. 0) THEN
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                   cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
@@ -947,9 +1011,15 @@
                END IF
             END IF
          END DO
+
          IF (cplBC%useGenBC) THEN
             CALL genBC_Integ_X('T')
          ELSE
+            RCRflag = .FALSE.
+            IF (ANY(BTEST(eq(iEq)%bc(:)%bType,bType_RCR))) THEN
+               IF (.NOT.RCRflag) RCRflag = .TRUE.
+            END IF
+
             CALL cplBC_Integ_X(RCRflag)
          END IF
       END IF
@@ -978,16 +1048,12 @@
 
       REAL(KIND=RKIND), ALLOCATABLE :: orgY(:), orgQ(:)
 
-      IF (ALL(cplBC%fa%bGrp.EQ.cplBC_Dir)) RETURN
+      IF (ALL(cplBC%fa%bGrp .EQ. cplBC_Dir)) RETURN
 
-      RCRflag = .FALSE.
       DO iBc=1, eq(iEq)%nBc
          iFa = eq(iEq)%bc(iBc)%iFa
          iM  = eq(iEq)%bc(iBc)%iM
          ptr = eq(iEq)%bc(iBc)%cplBCptr
-         IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_RCR)) THEN
-            IF (.NOT.RCRflag) RCRflag = .TRUE.
-         END IF
          IF (ptr .NE. 0) THEN
             IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
                cplBC%fa(ptr)%Qo = Integ(msh(iM)%fa(iFa),Yo,1,nsd)
@@ -1007,6 +1073,11 @@
       IF (cplBC%useGenBC) THEN
          CALL genBC_Integ_X('D')
       ELSE
+         RCRflag = .FALSE.
+         IF (ANY(BTEST(eq(iEq)%bc(:)%bType, bType_RCR))) THEN
+            RCRflag = .TRUE.
+         END IF
+
          CALL cplBC_Integ_X(RCRflag)
       END IF
 
@@ -1073,7 +1144,7 @@
             END IF
          END DO
          fid = 1
-         OPEN(fid, FILE=cplBC%commuName, FORM='UNFORMATTED')
+         OPEN(fid, FILE=TRIM(cplBC%commuName), FORM='UNFORMATTED')
          WRITE(fid) genFlag
          WRITE(fid) dt
          WRITE(fid) nDir

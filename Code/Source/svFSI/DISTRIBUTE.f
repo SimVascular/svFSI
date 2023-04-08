@@ -188,6 +188,7 @@
          CALL cm%bcast(pstEq)
          CALL cm%bcast(sstEq)
          CALL cm%bcast(cepEq)
+         CALL cm%bcast(ecCpld)
          IF (rmsh%isReqd) THEN
             CALL cm%bcast(rmsh%method)
             CALL cm%bcast(rmsh%freq)
@@ -206,6 +207,10 @@
             CALL cm%bcast(cntctM%c)
             CALL cm%bcast(cntctM%h)
             CALL cm%bcast(cntctM%al)
+            CALL cm%bcast(cntctM%p)
+            CALL cm%bcast(cntctM%Rin)
+            CALL cm%bcast(cntctM%Rout)
+            CALL cm%bcast(cntctM%gap)
          END IF
          CALL cm%bcast(ibFlag)
          IF (ibFlag) CALL DISTIB()
@@ -516,6 +521,7 @@
       CALL cm%bcast(lEq%nBc)
       CALL cm%bcast(lEq%nBf)
       CALL cm%bcast(lEq%tol)
+      CALL cm%bcast(lEq%absTol)
       CALL cm%bcast(lEq%useTLS)
       CALL cm%bcast(lEq%assmTLS)
       IF (ibFlag) THEN
@@ -554,6 +560,7 @@
          CALL cm%bcast(lEq%dmn(iDmn)%prop)
          IF (lEq%dmn(iDmn)%phys .EQ. phys_CEP) THEN
             CALL cm%bcast(lEq%dmn(iDmn)%cep%cepType)
+            CALL cm%bcast(lEq%dmn(iDmn)%cep%fpar_in)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nX)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nG)
             CALL cm%bcast(lEq%dmn(iDmn)%cep%nFn)
@@ -578,8 +585,13 @@
          END IF
 
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
-     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct)) THEN
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct) .OR.
+     3       (lEq%dmn(iDmn)%phys .EQ. phys_shell)) THEN
             CALL DIST_MATCONSTS(lEq%dmn(iDmn)%stM)
+         END IF
+
+         IF (ecCpld) THEN
+            CALL DIST_ECMODEL(lEq%dmn(iDmn)%ec)
          END IF
 
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
@@ -588,13 +600,6 @@
             CALL DIST_VISCMODEL(lEq%dmn(iDmn)%visc)
          END IF
       END DO
-
-!     Distribute cardiac electromechanics parameters
-      CALL cm%bcast(cem%cpld)
-      IF (cem%cpld) THEN
-         CALL cm%bcast(cem%aStress)
-         CALL cm%bcast(cem%aStrain)
-      END IF
 
       IF (ibFlag) THEN
          IF (cm%slv()) ALLOCATE(lEq%dmnIB(lEq%nDmnIB))
@@ -769,9 +774,8 @@
          DEALLOCATE(tmp)
       END IF
 
-!     Communicating and reordering master node data for undeforming
-!     Neumann BC faces
-      IF (BTEST(lBc%bType,bType_undefNeu)) THEN
+!     Communicating and reordering master node data for clamped Neu BC
+      IF (BTEST(lBc%bType,bType_clmpd)) THEN
          CALL cm%bcast(lBc%masN)
          iM   = lBc%iM
          iFa  = lBc%iFa
@@ -1028,7 +1032,7 @@
       END SUBROUTINE DISTBF
 !--------------------------------------------------------------------
 !     This subroutine distributes constants and parameters of the
-!     constitutive model to all processes
+!     structural constitutive model to all processes
       SUBROUTINE DIST_MATCONSTS(lStM)
       USE COMMOD
       USE ALLFUN
@@ -1052,6 +1056,10 @@
       CALL cm%bcast(lStM%bfs)
       CALL cm%bcast(lStM%kap)
       CALL cm%bcast(lStM%khs)
+      CALL cm%bcast(lStM%a0)
+      CALL cm%bcast(lStM%b1)
+      CALL cm%bcast(lStM%b2)
+      CALL cm%bcast(lStM%mu0)
 
 !     Distribute fiber stress
       CALL cm%bcast(lStM%Tf%fType)
@@ -1076,12 +1084,56 @@
          CALL cm%bcast(lStM%Tf%gt%r)
          CALL cm%bcast(lStM%Tf%gt%i)
       END IF
+      CALL cm%bcast(lStM%Tf%eta_s)
 
       RETURN
       END SUBROUTINE DIST_MATCONSTS
 !--------------------------------------------------------------------
 !     This subroutine distributes constants and parameters of the
-!     constitutive model to all processes
+!     excitation-contraction coupling model
+      SUBROUTINE DIST_ECMODEL(lEc)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      TYPE(eccModelType), INTENT(INOUT) :: lEc
+
+      CALL cm%bcast(lEc%astress)
+      CALL cm%bcast(lEc%astrain)
+      CALL cm%bcast(lEc%asnType)
+      CALL cm%bcast(lEc%k)
+      CALL cm%bcast(lEc%caCpld)
+      CALL cm%bcast(lEc%fpar_in)
+      IF (.NOT.lEc%caCpld) THEN
+         CALL cm%bcast(lEc%odes%tIntType)
+         CALL cm%bcast(lEc%dt)
+         CALL cm%bcast(lEc%dType)
+         IF (BTEST(lEc%dType, bType_std)) THEN
+            CALL cm%bcast(lEc%Ya)
+         ELSE IF (BTEST(lEc%dType, bType_ustd)) THEN
+            CALL cm%bcast(lEc%Yat%lrmp)
+            CALL cm%bcast(lEc%Yat%d)
+            CALL cm%bcast(lEc%Yat%n)
+            IF (cm%slv()) THEN
+               ALLOCATE(lEc%Yat%qi(lEc%Yat%d))
+               ALLOCATE(lEc%Yat%qs(lEc%Yat%d))
+               ALLOCATE(lEc%Yat%r(lEc%Yat%d,lEc%Yat%n))
+               ALLOCATE(lEc%Yat%i(lEc%Yat%d,lEc%Yat%n))
+            END IF
+            CALL cm%bcast(lEc%Yat%ti)
+            CALL cm%bcast(lEc%Yat%T)
+            CALL cm%bcast(lEc%Yat%qi)
+            CALL cm%bcast(lEc%Yat%qs)
+            CALL cm%bcast(lEc%Yat%r)
+            CALL cm%bcast(lEc%Yat%i)
+         END IF
+      END IF
+      CALL cm%bcast(lEc%eta_s)
+
+      RETURN
+      END SUBROUTINE DIST_ECMODEL
+!--------------------------------------------------------------------
+!     This subroutine distributes constants and parameters of the
+!     fluid viscosity constitutive model to all processes
       SUBROUTINE DIST_VISCMODEL(lVis)
       USE COMMOD
       USE ALLFUN
@@ -1415,6 +1467,30 @@ c            wrn = " ParMETIS failed to partition the mesh"
       lM%nNo = nNo
       IF (cm%slv()) ALLOCATE(lM%gN(lM%gnNo))
       CALL cm%bcast(lM%gN)
+
+!     Use gtlptr to distribute lM%tmX, if allocated
+      flag = ALLOCATED(lM%tmX)
+      CALL cm%bcast(flag)
+      IF (flag) THEN
+         ALLOCATE(tmpR(lM%gnNo))
+         IF (cm%mas()) THEN
+            tmpR = lM%tmX
+            DEALLOCATE(lM%tmX)
+         END IF
+
+         CALL cm%bcast(tmpR)
+
+         ALLOCATE(lM%tmX(lM%nNo))
+         lM%tmX = 0._RKIND
+         DO Ac=1, lM%gnNo
+            a = gtlptr(Ac)
+            IF (a .NE. 0) THEN
+               lM%tmX(a) = tmpR(Ac)
+            END IF
+         END DO
+         DEALLOCATE(tmpR)
+      END IF
+
 !     lM%gN: gnNo --> gtnNo
 !     part:  nNo  --> gtnNo
       ALLOCATE(part(nNo))
@@ -1467,6 +1543,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
                lM%nW(a) = tmpR(Ac)
             END IF
          END DO
+         DEALLOCATE(tmpR)
+
 !     Distributing INN, using tempIEN as tmp array
          IF (cm%mas()) THEN
             ALLOCATE(tempIEN(insd,lM%gnEl))

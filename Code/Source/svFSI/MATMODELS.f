@@ -38,25 +38,25 @@
 
 !     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
 !     including both dilational and isochoric components
-      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, ya, S, Dm)
+      SUBROUTINE GETPK2CC(lDmn, F, nfd, fl, tmX, ya, S, Dm)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), tmX, ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd)
 
       TYPE(stModelType) :: stM
-      REAL(KIND=RKIND) :: nd, Kp, J, J2d, J4d, trE, p, pl, Inv1, Inv2,
-     2   Inv4, Inv6, Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd),
-     3   Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
+      REAL(KIND=RKIND) :: nd, Kp, J, Ja, J2d, J4d, trE, p, pl, Inv1,
+     2   Inv2, Inv4, Inv6, Inv8, Tfa, Tsa, IDm(nsd,nsd), C(nsd,nsd),
+     3   E(nsd,nsd), Ci(nsd,nsd), Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd),
      4   PP(nsd,nsd,nsd,nsd), CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3, rexp
 !     Guccione
       REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
 !     HGO/HO model
-      REAL(KIND=RKIND) :: Eff, Ess, Efs, fsn, kap, c4f, c4s, dc4f, dc4s,
+      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, c4f, c4s, dc4f, dc4s,
      2   Hff(nsd,nsd), Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
@@ -70,21 +70,26 @@
       Kp   = stM%Kpen
 
 !     Fiber-reinforced stress
-      CALL GETFIBSTRESS(stM%Tf, Tfa)
+      CALL GET_FIB_STRESS(stM%Tf, Tfa)
+      Tsa = Tfa*stM%Tf%eta_s
 
 !     Electromechanics coupling - active stress
-      IF (cem%aStress) Tfa = Tfa + ya
+      IF (lDmn%ec%astress) THEN
+         Tfa = Tfa + ya
+         Tsa = Tsa + ya*lDmn%ec%eta_s
+      END IF
 
 !     Electromechanics coupling - active strain
       Fe   = F
       Fa   = MAT_ID(nsd)
       Fai  = Fa
-      IF (cem%aStrain) THEN
-         CALL ACTVSTRAIN(ya, nfd, fl, Fa)
+      IF (lDmn%ec%astrain) THEN
+         CALL GET_ACTV_DEFGRAD(lDmn%ec, nfd, fl, tmX, ya, Fa)
          Fai  = MAT_INV(Fa, nsd)
          Fe   = MATMUL(F, Fai)
       END IF
 
+      Ja   = MAT_DET(Fa, nsd)
       J    = MAT_DET(Fe, nsd)
       J2d  = J**(-2._RKIND/nd)
       J4d  = J2d*J2d
@@ -173,7 +178,7 @@
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with isochoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HGO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
@@ -192,8 +197,9 @@
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + additional cross-fiber stresses
          Sb   = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2             + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
      2      EXP(stM%bff*Eff*Eff)
@@ -222,7 +228,7 @@
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with full
 !     invariants for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HGO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv1 = MAT_TRACE(C,nsd)
@@ -257,12 +263,12 @@
          g1   = 4._RKIND*stM%aff*g1*rexp
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-Sheet interaction
+!        Sheet-Sheet interaction + additional cross-fiber stress
          rexp = EXP(stM%bss*Ess*Ess)
          g2   = 2._RKIND*stM%ass*Ess*rexp
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Hss  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hss
-         S    = S + (g2*Hss)
+         S    = S + (g2*Hss) + (Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd))
 
          g2   = (1._RKIND + (2._RKIND*stM%bss*Ess*Ess))
          g2   = 4._RKIND*stM%ass*g2*rexp
@@ -270,7 +276,7 @@
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Guccione material model (2)"
 !        Compute isochoric component of E
          E = 0.5_RKIND * (J2d*C - Idm)
@@ -312,8 +318,9 @@
          CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
          Sb  = Sb * r2
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + additional cross-fiber stresses
          Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2            + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -341,7 +348,7 @@
 !     HO (Holzapfel-Ogden) model for myocardium with isoschoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based invariants
@@ -352,9 +359,6 @@
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
          Efs  = Inv8
-
-!        dot product: f.s
-         fsn  = NORM(fl(:,1), fl(:,2))
 
 !        Smoothed heaviside function
          c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
@@ -370,14 +374,13 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
 !        Isotropic + fiber-sheet interaction stress
          g1   = stM%a * EXP(stM%b*(Inv1-3._RKIND))
-         g2   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs) * fsn
+         g2   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Efs*Hfs
 
 !        Isotropic + fiber-sheet interaction stiffness
          g1   = g1 * 2._RKIND*J4d*stM%b
-         g2   = g2 * 2._RKIND*J4d*fsn*
-     2          (1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g2   = g2 * 2._RKIND*J4d*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -395,11 +398,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*J4d*stM%aff*g1
          CCb  = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Sb   = Sb + g2*Hss
 
@@ -425,20 +428,10 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          CC  = CC + 2._RKIND*(r1 - p*J) * TEN_SYMMPROD(Ci, Ci, nsd) +
      2          (pl*J - 2._RKIND*r1/nd) * TEN_DYADPROD(Ci, Ci, nsd)
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
 !     HO (Holzapfel-Ogden) model for myocardium with full invariants
 !     for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based full invariants (not isochoric)
@@ -449,9 +442,6 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
          Efs  = Inv8
-
-!        dot product: f.s
-         fsn  = NORM(fl(:,1), fl(:,2))
 
 !        Smoothed heaviside function
          c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
@@ -492,11 +482,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !        anisotropic components need to be added
 
 !        Fiber-sheet interaction terms
-         g1   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs) * fsn
+         g1   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          S    = S + (g1*Efs*Hfs)
 
-         g1   = g1 * 2._RKIND*fsn*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g1   = g1 * 2._RKIND*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
          CC   = CC + (g1*TEN_DYADPROD(Hfs, Hfs, nsd))
 
 !        Fiber-fiber interaction stress + additional reinforcement (Tfa)
@@ -513,11 +503,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*stM%aff*g1
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          S    = S + (g2*Hss)
 
@@ -527,19 +517,18 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g2   = 4._RKIND*stM%ass*g2
          CC   = CC + (g2*TEN_DYADPROD(Hss, Hss, nsd))
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
       CASE DEFAULT
          err = "Undefined material constitutive model"
       END SELECT
+
+!     Contribution from active strain
+      IF (lDmn%ec%astrain) THEN
+         S   = Ja * MATMUL(Fai, S)
+         S   = MATMUL(S, TRANSPOSE(Fai))
+         CCb = TEN_DYADPROD(Fai, Fai, nsd)
+         CC  = TEN_DDOT_3424(CC, CCb, nsd)
+         CC  = Ja * TEN_DDOT_2412(CCb, CC, nsd)
+      END IF
 
 !     Convert to Voigt Notation
       CALL CCTOVOIGT(CC, Dm)
@@ -576,25 +565,25 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !####################################################################
 !     Compute isochoric (deviatoric) component of 2nd Piola-Kirchhoff
 !     stress and material stiffness tensors
-      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, ya, S, Dm, Ja)
+      SUBROUTINE GETPK2CCdev(lDmn, F, nfd, fl, tmX, ya, S, Dm, Ja)
       USE MATFUN
       USE COMMOD
       IMPLICIT NONE
       TYPE(dmnType), INTENT(IN) :: lDmn
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), ya
+      REAL(KIND=RKIND), INTENT(IN) :: F(nsd,nsd), fl(nsd,nfd), tmX, ya
       REAL(KIND=RKIND), INTENT(OUT) :: S(nsd,nsd), Dm(nsymd,nsymd), Ja
 
       TYPE(stModelType) :: stM
       REAL(KIND=RKIND) :: nd, J, J2d, J4d, trE, Inv1, Inv2, Inv4, Inv6,
      2   Inv8, Tfa, IDm(nsd,nsd), C(nsd,nsd), E(nsd,nsd), Ci(nsd,nsd),
-     3   Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
+     3   Tsa, Sb(nsd,nsd), CCb(nsd,nsd,nsd,nsd), PP(nsd,nsd,nsd,nsd),
      4   CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND) :: r1, r2, g1, g2, g3, rexp
       ! Guccione !
       REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
       ! HGO, HO !
-      REAL(KIND=RKIND) :: Eff, Ess, Efs, fsn, kap, c4f, c4s, dc4f, dc4s,
+      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, c4f, c4s, dc4f, dc4s,
      2   Hff(nsd,nsd), Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
@@ -607,17 +596,21 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       nd   = REAL(nsd, KIND=RKIND)
 
 !     Fiber-reinforced stress
-      CALL GETFIBSTRESS(stM%Tf, Tfa)
+      CALL GET_FIB_STRESS(stM%Tf, Tfa)
+      Tsa = Tfa*stM%Tf%eta_s
 
 !     Electromechanics coupling - active stress
-      IF (cem%aStress) Tfa = Tfa + ya
+      IF (lDmn%ec%astress) THEN
+         Tfa = Tfa + ya
+         Tsa = Tsa + ya*lDmn%ec%eta_s
+      END IF
 
 !     Electromechanics coupling - active strain
       Fe   = F
       Fa   = MAT_ID(nsd)
       Fai  = Fa
-      IF (cem%aStrain) THEN
-         CALL ACTVSTRAIN(ya, nfd, fl, Fa)
+      IF (lDmn%ec%astrain) THEN
+         CALL GET_ACTV_DEFGRAD(lDmn%ec, nfd, fl, tmX, ya, Fa)
          Fai  = MAT_INV(Fa, nsd)
          Fe   = MATMUL(F, Fai)
       END IF
@@ -680,7 +673,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with isochoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HGO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
@@ -699,8 +692,9 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g3   = stM%ass * Ess * EXP(stM%bss*Ess*Ess)
          Sb   = 2._RKIND*(g1*IDm + g2*Hff + g3*Hss)
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + additional cross-fiber stresses
          Sb   = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2             + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          g1   = stM%aff*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)*
      2      EXP(stM%bff*Eff*Eff)
@@ -727,7 +721,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HGO (Holzapfel-Gasser-Ogden) model for arteries with full
 !     invariants for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HGO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "HGO material model (2)"
          kap  = stM%kap
          Inv1 = MAT_TRACE(C,nsd)
@@ -759,12 +753,12 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*stM%aff*g1*rexp
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-Sheet interaction
+!        Sheet-Sheet interaction + additional cross-fiber stress
          rexp = EXP(stM%bss*Ess*Ess)
          g2   = 2._RKIND*stM%ass*Ess*rexp
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Hss  = kap*IDm + (1._RKIND-3._RKIND*kap)*Hss
-         S    = S + (g2*Hss)
+         S    = S + (g2*Hss) + (Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd))
 
          g2   = (1._RKIND + (2._RKIND*stM%bss*Ess*Ess))
          g2   = 4._RKIND*stM%ass*g2*rexp
@@ -772,7 +766,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
 !     Guccione (1995) transversely isotropic model
       CASE (stIso_Gucci)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Guccione material model (2)"
 !        Compute isochoric component of E
          E = 0.5_RKIND * (J2d*C - Idm)
@@ -814,8 +808,9 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          CCb = 2._RKIND*TEN_DYADPROD(Sb, Sb, nsd)
          Sb  = Sb * r2
 
-!        Fiber reinforcement/active stress
+!        Fiber reinforcement/active + addtional cross-fiber stresses
          Sb  = Sb + Tfa*MAT_DYADPROD(fl(:,1), fl(:,1), nsd)
+     2            + Tsa*MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
 
          r1  = J2d*MAT_DDOT(C, Sb, nsd) / nd
          S   = J2d*Sb - r1*Ci
@@ -840,7 +835,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !     HO (Holzapfel-Ogden) model for myocardium with isoschoric
 !     invariants for the anisotropy terms (decoupled)
       CASE (stIso_HO_d)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based invariants
@@ -851,9 +846,6 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
          Efs  = Inv8
-
-!        dot product: f.s
-         fsn  = NORM(fl(:,1), fl(:,2))
 
 !        Smoothed heaviside function
          c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
@@ -869,14 +861,13 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
 !        Isotropic + fiber-sheet interaction stress
          g1   = stM%a * EXP(stM%b*(Inv1-3._RKIND))
-         g2   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs) * fsn
+         g2   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          Sb   = g1*IDm + g2*Efs*Hfs
 
 !        Isotropic + fiber-sheet interaction stiffness
          g1   = g1 * 2._RKIND*J4d*stM%b
-         g2   = g2 * 2._RKIND*J4d*fsn*
-     2          (1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g2   = g2 * 2._RKIND*J4d*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -894,11 +885,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*J4d*stM%aff*g1
          CCb  = CCb + g1*TEN_DYADPROD(Hff, Hff, nsd)
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          Sb   = Sb + g2*Hss
 
@@ -921,20 +912,10 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
      3            - 2._RKIND/nd * ( TEN_DYADPROD(Ci, S, nsd) +
      4                         TEN_DYADPROD(S, Ci, nsd) )
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
 !     HO (Holzapfel-Ogden) model for myocardium with full invariants
 !     for the anisotropy terms (modified-anisotropy)
       CASE (stIso_HO_ma)
-         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+         IF (nfd .LT. 2) err = "Min fiber directions not defined for "//
      2      "Holzapfel material model (2)"
 
 !        Compute fiber-based invariants
@@ -945,9 +926,6 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
          Efs  = Inv8
-
-!        dot product: f.s
-         fsn  = NORM(fl(:,1), fl(:,2))
 
 !        Smoothed heaviside function
          c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
@@ -983,11 +961,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 
 !        Now add anisotropic components
 !        Fiber-sheet interaction terms
-         g1   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs) * fsn
+         g1   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
          S    = S + (g1*Efs*Hfs)
 
-         g1   = g1 * 2._RKIND*fsn*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g1   = g1 * 2._RKIND*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
          CC   = CC + (g1*TEN_DYADPROD(Hfs, Hfs, nsd))
 
 !        Fiber-fiber interaction stress + additional reinforcement (Tfa)
@@ -1004,11 +982,11 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = 4._RKIND*stM%aff*g1
          CC   = CC + (g1*TEN_DYADPROD(Hff, Hff, nsd))
 
-!        Sheet-sheet interaction stress
+!        Sheet-sheet interaction stress + additional cross-fiber stress
          rexp = EXP(stM%bss * Ess * Ess)
          g2   = c4s*Ess*rexp
          g2   = g2 + (0.5_RKIND*dc4s/stM%bss)*(rexp - 1._RKIND)
-         g2   = 2._RKIND*stM%ass*g2
+         g2   = 2._RKIND*stM%ass*g2 + Tsa
          Hss  = MAT_DYADPROD(fl(:,2), fl(:,2), nsd)
          S    = S + (g2*Hss)
 
@@ -1018,19 +996,18 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g2   = 4._RKIND*stM%ass*g2
          CC   = CC + (g2*TEN_DYADPROD(Hss, Hss, nsd))
 
-!        Contribution from active strain
-         IF (cem%aStrain) THEN
-            S = MATMUL(Fai, S)
-            S = MATMUL(S, TRANSPOSE(Fai))
-            CCb = 0._RKIND
-            CCb = TEN_DYADPROD(Fai, Fai, nsd)
-            CC  = TEN_DDOT_3424(CC, CCb, nsd)
-            CC  = TEN_DDOT_2412(CCb, CC, nsd)
-         END IF
-
       CASE DEFAULT
          err = "Undefined isochoric material constitutive model"
       END SELECT
+
+!     Contribution from active strain
+      IF (lDmn%ec%astrain) THEN
+         S   = Ja * MATMUL(Fai, S)
+         S   = MATMUL(S, TRANSPOSE(Fai))
+         CCb = TEN_DYADPROD(Fai, Fai, nsd)
+         CC  = TEN_DDOT_3424(CC, CCb, nsd)
+         CC  = Ja * TEN_DDOT_2412(CCb, CC, nsd)
+      END IF
 
 !     Convert to Voigt Notation
       CALL CCTOVOIGT(CC, Dm)
@@ -1124,14 +1101,497 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       RETURN
       END SUBROUTINE GETTAU
 !####################################################################
+!     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
+!     for incompressible shell elements
+      SUBROUTINE GETPK2CC_SHLi(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml,
+     2  Dml)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
+      REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
+
+      INTEGER a, b, iFn
+      REAL(KIND=RKIND) :: Jg2i, I1, mu, gi_0(2,2), gi_x(2,2), S(2,2),
+     2   CC(2,2,2,2), SN(2,2), CCN(2,2,2,2), Inv4, Inv6, Inv8, Eff, Ess,
+     3   Efs, flM(2,2), c4f, c4s, dc4f, dc4s, d1, fl(2,2,nfd), Hfs(2,2),
+     4   EI1, g1, g2
+      TYPE(stModelType) :: stM
+
+      Sml  = 0._RKIND
+      Dml  = 0._RKIND
+
+!     Some preliminaries
+      stM  = lDmn%stM
+
+!     Inverse of metric coefficients in shell continuum
+      gi_0 = MAT_INV(gg_0, 2)
+      gi_x = MAT_INV(gg_x, 2)
+
+!     Ratio of inplane Jacobian determinants
+      Jg2i = MAT_DET(gg_x, 2)
+      IF (ISZERO(Jg2i)) err = " Divide by zero in-plane Jacobian"//
+     2   " determinant"
+      Jg2i = MAT_DET(gg_0, 2) / Jg2i
+
+      I1 = 0._RKIND
+      DO a=1, 2
+        DO b=1, 2
+            I1 = I1 + gi_0(a,b)*gg_x(a,b)
+        END DO
+      END DO
+
+      SELECT CASE(stM%isoType)
+      CASE (stIso_nHook)
+         mu  = 2._RKIND * stM%C10
+         S   = mu*(gi_0 - Jg2i*gi_x)
+
+         CC  = 2._RKIND*mu*Jg2i*(TEN_DYADPROD(gi_x, gi_x, 2) +
+     2                     TEN_SYMMPROD(gi_x, gi_x, 2))
+
+      CASE (stIso_MR)
+         SN  = (gi_0 - Jg2i*gi_x)
+         CCN = 2._RKIND*Jg2i*(TEN_DYADPROD(gi_x, gi_x, 2) +
+     2                     TEN_SYMMPROD(gi_x, gi_x, 2))
+
+         S   = stM%C10*SN + stM%C01*Jg2i* (gi_0 - I1*gi_x)
+     2       + stM%C01/Jg2i*gi_x
+         CC  = (stM%C10 + stM%C01*I1) * CCN - 2._RKIND*stM%C01 *
+     2         Jg2i * (TEN_DYADPROD(gi_0, gi_x, 2) +
+     3         TEN_DYADPROD(gi_x, gi_0, 2)) + 2._RKIND*stM%C01 /
+     4         Jg2i *(TEN_DYADPROD(gi_x, gi_0, 2) -
+     5         TEN_SYMMPROD(gi_x, gi_x, 2))
+
+!     HO (Holzapfel-Ogden) model for myocardium with full invariants
+!     for the anisotropy terms (modified-anisotropy)
+      CASE (stIso_HO_ma)
+         IF (nfd .NE. 2) err = "Min fiber directions not defined for "//
+     2      "Holzapfel material model (2)"
+
+         DO iFn=1, nfd
+            fl(1,1,iFn) = fNa0(1,iFn)*fNa0(1,iFn)
+            fl(1,2,iFn) = fNa0(1,iFn)*fNa0(2,iFn)
+            fl(2,1,iFn) = fNa0(2,iFn)*fNa0(1,iFn)
+            fl(2,2,iFn) = fNa0(2,iFn)*fNa0(2,iFn)
+         END DO
+
+!        Compute fiber-based invariants
+         Inv4 = gg_x(1,1)*fl(1,1,1) + gg_x(1,2)*fl(1,2,1)
+     2          + gg_x(2,1)*fl(2,1,1) + gg_x(2,2)*fl(2,2,1)
+         Inv6 = gg_x(1,1)*fl(1,1,2) + gg_x(1,2)*fl(1,2,2)
+     2          + gg_x(2,1)*fl(2,1,2) + gg_x(2,2)*fl(2,2,2)
+         Inv8 = gg_x(1,1)*fNa0(1,1)*fNa0(1,2)
+     2            + gg_x(1,2)*fNa0(1,1)*fNa0(2,2)
+     3            + gg_x(2,1)*fNa0(2,1)*fNa0(1,2)
+     4            + gg_x(2,2)*fNa0(2,1)*fNa0(2,2)
+
+         Eff  = Inv4 - 1._RKIND
+         Ess  = Inv6 - 1._RKIND
+         Efs  = Inv8
+
+!        Smoothed heaviside function
+         c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
+         c4s  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Ess))
+
+!        Approx. derivative of smoothed heaviside function
+         dc4f = 0.25_RKIND*stM%khs*EXP(-stM%khs*ABS(Eff))
+         dc4s = 0.25_RKIND*stM%khs*EXP(-stM%khs*ABS(Ess))
+
+!        Add isochoric stress and stiffness contribution
+         EI1  = I1 + Jg2i - 3._RKIND
+         SN   = (gi_0 - Jg2i*gi_x)
+         CCN  = 2._RKIND*Jg2i*(TEN_DYADPROD(gi_x, gi_x, 2) +
+     2                         TEN_SYMMPROD(gi_x, gi_x, 2))
+
+         d1   = stM%a*EXP(stM%b*EI1)
+         S    = d1*SN
+         CC   = d1*(CCN + 2._RKIND*stM%b*TEN_DYADPROD(SN, SN, 2))
+
+!        Anisotropic part
+!        Fiber sheet
+         Hfs  = MAT_SYMMPROD(fNa0(:,1), fNa0(:,2), 2)
+         g1   = 2._RKIND*stM%afs*EXP(stM%bfs*Efs*Efs)
+         S    = S + g1*Efs*Hfs
+
+         g2   = g1*2._RKIND*(1._RKIND + 2._RKIND*Efs*Efs)
+         CC   = CC + g2*TEN_DYADPROD(Hfs, Hfs, 2)
+
+!        Fiber
+         IF (Eff > 0._RKIND) THEN
+            flM = fl(:,:,1)
+            ! S  = S + 2._RKIND*stM%aff*Eff*flM
+            ! CC = CC + 4._RKIND*stM%aff*TEN_DYADPROD(flM, flM, 2)
+            g1 = 2._RKIND*stM%aff*EXP(stM%bff*Eff*Eff)
+            S  = S  + g1*Eff*flM
+            g2 = g1*2._RKIND*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)
+            CC = CC + g2*TEN_DYADPROD(flM, flM, 2)
+         END IF
+
+!        Sheet
+         IF (Ess > 0._RKIND) THEN
+            flM = fl(:,:,2)
+            g1  = 2._RKIND*stM%ass*EXP(stM%bss*Ess*Ess)
+            S   = S + g1*Ess*flM
+            g2  = g1*2._RKIND*(1._RKIND + 2._RKIND*stM%bss*Ess*Ess)
+            CC  = CC + g2*TEN_DYADPROD(flM, flM, 2)
+         END IF
+
+!     Lee Sacks model for aorta with full invariants
+!     for the anisotropy terms (modified-anisotropy)
+      CASE (stIso_LS)
+         SN = (gi_0 - Jg2i*gi_x)
+         CCN= 2._RKIND*Jg2i*(TEN_DYADPROD(gi_x, gi_x, 2) +
+     2                       TEN_SYMMPROD(gi_x, gi_x, 2))
+
+         DO iFn=1, nfd
+            fl(1,1,iFn) = fNa0(1,iFn)*fNa0(1,iFn)
+            fl(1,2,iFn) = fNa0(1,iFn)*fNa0(2,iFn)
+            fl(2,1,iFn) = fNa0(2,iFn)*fNa0(1,iFn)
+            fl(2,2,iFn) = fNa0(2,iFn)*fNa0(2,iFn)
+         END DO
+
+!        Compute fiber-based invariants
+         Inv4 = gg_x(1,1)*fl(1,1,1) + gg_x(1,2)*fl(1,2,1)
+     2        + gg_x(2,1)*fl(2,1,1) + gg_x(2,2)*fl(2,2,1)
+         Eff  = Inv4 - 1._RKIND
+
+!        Isotropic contribution
+         EI1 = (I1 + Jg2i - 3._RKIND)
+         S   = stM%a*SN + 2._RKIND*stM%a0*stM%mu0*stM%b1*EI1
+     2       * EXP(stM%b1*EI1*EI1) * SN
+         CC  = stM%a*CCN + 4._RKIND*stM%a0*stM%mu0*stM%b1
+     2       * EXP(stM%b1*EI1*EI1)
+     3       * ((1._RKIND + 2._RKIND*stM%b1*EI1*EI1)
+     4       * TEN_DYADPROD(SN, SN, 2) + 0.5_RKIND*EI1*CCN)
+
+!        Anisotropic contribution
+         IF (Eff > 0._RKIND) THEN
+            flM = fl(:,:,1)
+            S   = S + 2._RKIND*stM%a0*(1._RKIND - stM%mu0)*stM%b2*Eff
+     2          * EXP(stM%b2*Eff*Eff)*flM
+            CC  = CC + 4._RKIND*stM%a0*(1._RKIND - stM%mu0)*stM%b2
+     2          * (1._RKIND + 2._RKIND*stM%b2*Eff*Eff)
+     3          * EXP(stM%b2*Eff*Eff) * TEN_DYADPROD(flM, flM, 2)
+
+         END IF
+
+      CASE DEFAULT
+         err = "Undefined material constitutive model"
+      END SELECT
+
+      g33 = Jg2i
+
+!     Convert to Voigt notation
+      Sml(1) = S(1,1)
+      Sml(2) = S(2,2)
+      Sml(3) = S(1,2)
+
+      Dml(1,1) = CC(1,1,1,1)
+      Dml(1,2) = CC(1,1,2,2)
+      Dml(1,3) = CC(1,1,1,2)
+
+      Dml(2,2) = CC(2,2,2,2)
+      Dml(2,3) = CC(2,2,1,2)
+
+      Dml(3,3) = CC(1,2,1,2)
+
+      Dml(2,1) = Dml(1,2)
+      Dml(3,1) = Dml(1,3)
+      Dml(3,2) = Dml(2,3)
+
+      RETURN
+      END SUBROUTINE GETPK2CC_SHLi
+!--------------------------------------------------------------------
+!     Compute 2nd Piola-Kirchhoff stress and material stiffness tensors
+!     for compressible shell elements
+      SUBROUTINE GETPK2CC_SHLc(lDmn, nfd, fNa0, gg_0, gg_x, g33, Sml,
+     2  Dml)
+      USE MATFUN
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      INTEGER(KIND=IKIND), INTENT(IN) :: nfd
+      REAL(KIND=RKIND), INTENT(IN) :: gg_0(2,2), gg_x(2,2), fNa0(2,nfd)
+      REAL(KIND=RKIND), INTENT(OUT) :: g33, Sml(3), Dml(3,3)
+
+      INTEGER(KIND=IKIND), PARAMETER :: MAXITR = 20
+      REAL(KIND=RKIND), PARAMETER :: ATOL = 1E-10
+
+      INTEGER(KIND=IKIND) :: itr, i, j, k, l, iFn
+      REAL(KIND=RKIND) :: Jg2, J2, J23, f13, f23, trC3, C33, kap, mu,
+     2   pJ, plJ, gi_x(2,2), gi_0(3,3), Ci(3,3), S(3,3), CC(3,3,3,3),
+     3   fl(2,2,nfd), C1, C2, J43, Gi4AS(3,3,3,3), I2, I2ij(3,3),
+     4   I2ijkl(3,3,3,3), Cikl(3,3,3,3), Inv4, Inv6, Inv8, Eff, Ess,
+     5   Efs, c4f, c4s, dc4f, dc4s, d1, g1, g2, Hfs(3,3), SN(3,3),
+     6   CCN(3,3,3,3), flM(3,3)
+      TYPE(stModelType) :: stM
+
+      Sml  = 0._RKIND
+      Dml  = 0._RKIND
+
+!     Initialize tensor operations
+      CALL TEN_INIT(3)
+
+!     Some preliminaries
+      stM  = lDmn%stM
+      kap  = stM%Kpen
+      mu   = 2._RKIND * stM%C10
+      f13  = 1._RKIND / 3._RKIND
+      f23  = 2._RKIND / 3._RKIND
+
+!     Inverse of metric coefficients in shell continuum
+      gi_x = MAT_INV(gg_x, 2)
+
+      gi_0 = 0._RKIND
+      gi_0(1:2,1:2) = MAT_INV(gg_0, 2)
+      gi_0(3,3) = 1._RKIND
+
+!     Ratio of inplane Jacobian determinant squared
+      Jg2 = MAT_DET(gg_x, 2) / MAT_DET(gg_0, 2)
+
+!     Begin Newton iterations to satisfy plane-stress condition.
+!     The objective is to find C33 that satisfies S33 = 0.
+      itr = 0
+      C33 = 1._RKIND
+      DO
+         itr  = itr + 1
+
+!        Trace (C)
+         trC3 = (gg_x(1,1)*gi_0(1,1) + gg_x(1,2)*gi_0(1,2)
+     2        +  gg_x(2,1)*gi_0(2,1) + gg_x(2,2)*gi_0(2,2) + C33)*f13
+
+!        Jacobian-related quantities
+         J2  = Jg2*C33
+         J23 = J2**(-f13)
+
+!        Inverse of curvilinear Cauchy-Green deformation tensor
+         Ci(:,:) = 0._RKIND
+         Ci(3,3) = 1._RKIND/C33
+         Ci(1:2,1:2) = gi_x(:,:)
+
+!        Contribution from dilational penalty terms to S and CC
+         pJ  = 0.5_RKIND*kap*(J2 - 1._RKIND)
+         plJ = kap*J2
+
+         SELECT CASE (stM%isoType)
+         CASE (stIso_nHook)
+!           2nd Piola Kirchhoff stress
+            S  = mu*J23*(gi_0 - trC3*Ci) + pJ*Ci
+
+!           Elasticity tensor
+            CC = (mu*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (mu*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*mu*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+     4                       TEN_DYADPROD(Ci, gi_0, 3))
+
+         CASE (stIso_MR)
+!           2nd Piola Kirchhoff stress
+            C1  = stM%C10
+            C2  = stM%C01
+            J43 = J2**(-f23)
+
+            I2ijkl = TEN_DYADPROD(gi_0, gi_0, 3)
+     2             - TEN_SYMMPROD(gi_0, gi_0, 3)
+            I2ij   = TEN_MDDOT(I2ijkl, Ci, 3)
+
+            Gi4AS  = TEN_ASYMPROD12(gi_0, gi_0, 3)
+            I2     = MAT_DDOT(Ci, TEN_MDDOT(Gi4AS, Ci, 3), 3)
+            ! I2  = MAT_DDOT(Ci, I2ij, 3)
+            Cikl   = - TEN_SYMMPROD(Ci, Ci, 3)
+
+            S  = C1*J23*(gi_0 - trC3*Ci) + pJ*Ci
+     2         + C2*J43*(I2ij - f23*I2*Ci)
+
+!           Elasticity tensor
+            CC = (C1*J23*f23*trC3 + plJ)*TEN_DYADPROD(Ci, Ci, 3)
+     2         + (C1*J23*trC3 - pJ)*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*C1*J23*(TEN_DYADPROD(gi_0, Ci, 3) +
+     4                       TEN_DYADPROD(Ci, gi_0, 3))
+
+            CC = CC + 2._RKIND*f23*C2*J43*(
+     2               TEN_DYADPROD((f23*I2*Ci-I2ij), Ci, 3) - I2*Cikl
+     3                - TEN_DYADPROD(Ci, I2ij, 3) + I2ijkl)
+
+         CASE (stIso_HO_ma)
+            IF (nfd .NE. 2) err = "Min fiber directions not defined"//
+     2          "for Holzapfel material model (2)"
+
+            DO iFn=1, nfd
+                fl(1,1,iFn) = fNa0(1,iFn)*fNa0(1,iFn)
+                fl(1,2,iFn) = fNa0(1,iFn)*fNa0(2,iFn)
+                fl(2,1,iFn) = fNa0(2,iFn)*fNa0(1,iFn)
+                fl(2,2,iFn) = fNa0(2,iFn)*fNa0(2,iFn)
+            END DO
+
+    !        Compute fiber-based invariants
+            Inv4 = gg_x(1,1)*fl(1,1,1) + gg_x(1,2)*fl(1,2,1)
+     2              + gg_x(2,1)*fl(2,1,1) + gg_x(2,2)*fl(2,2,1)
+            Inv6 = gg_x(1,1)*fl(1,1,2) + gg_x(1,2)*fl(1,2,2)
+     2            + gg_x(2,1)*fl(2,1,2) + gg_x(2,2)*fl(2,2,2)
+            Inv8 = gg_x(1,1)*fNa0(1,1)*fNa0(1,2)
+     2              + gg_x(1,2)*fNa0(1,1)*fNa0(2,2)
+     3              + gg_x(2,1)*fNa0(2,1)*fNa0(1,2)
+     4              + gg_x(2,2)*fNa0(2,1)*fNa0(2,2)
+
+            Eff  = Inv4 - 1._RKIND
+            Ess  = Inv6 - 1._RKIND
+            Efs  = Inv8
+
+    !        Smoothed heaviside function
+            c4f  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Eff))
+            c4s  = 1._RKIND / (1._RKIND + EXP(-stM%khs*Ess))
+
+    !        Approx. derivative of smoothed heaviside function
+            dc4f = 0.25_RKIND*stM%khs*EXP(-stM%khs*ABS(Eff))
+            dc4s = 0.25_RKIND*stM%khs*EXP(-stM%khs*ABS(Ess))
+
+    !        Add isochoric stress and stiffness contribution
+            ! EI1  = I1 + Jg2i - 3._RKIND
+            d1 = stM%a*J23*EXP(3._RKIND*stM%b*(trC3*J23 - 1._RKIND))
+            SN = (gi_0 - trC3*Ci)
+            S  = d1*SN + pJ*Ci
+            CC = f23*trC3*TEN_DYADPROD(Ci, Ci, 3)
+     2         + trC3*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*(TEN_DYADPROD(gi_0, Ci, 3)
+     4         + TEN_DYADPROD(Ci, gi_0, 3))
+     5         + 2._RKIND*stM%b*J23*TEN_DYADPROD(SN, SN, 3)
+            CC = d1*CC + plJ*TEN_DYADPROD(Ci, Ci, 3)
+     2         - pJ*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+
+!           Anisotropic part
+!           Fiber sheet
+            Hfs  = 0._RKIND
+            Hfs(1:2,1:2)  = MAT_SYMMPROD(fNa0(:,1), fNa0(:,2), 2)
+            g1   = 2._RKIND*stM%afs*EXP(stM%bfs*Efs*Efs)
+            S    = S + g1*Efs*Hfs
+
+            g2   = g1*2._RKIND*(1._RKIND + 2._RKIND*Efs*Efs)
+            CC   = CC + g2*TEN_DYADPROD(Hfs, Hfs, 3)
+
+!           Fiber
+            flM = 0._RKIND
+            IF (Eff > 0._RKIND) THEN
+                flM(1:2,1:2) = fl(:,:,1)
+                ! S  = S + 2._RKIND*stM%aff*Eff*flM
+                ! CC = CC + 4._RKIND*stM%aff*TEN_DYADPROD(flM, flM, 2)
+                g1 = 2._RKIND*stM%aff*EXP(stM%bff*Eff*Eff)
+                S  = S  + g1*Eff*flM
+                g2 = g1*2._RKIND*(1._RKIND + 2._RKIND*stM%bff*Eff*Eff)
+                CC = CC + g2*TEN_DYADPROD(flM, flM, 3)
+            END IF
+
+!           Sheet
+            IF (Ess > 0._RKIND) THEN
+                flM(1:2,1:2) = fl(:,:,2)
+                g1  = 2._RKIND*stM%ass*EXP(stM%bss*Ess*Ess)
+                S   = S + g1*Ess*flM
+                g2  = g1*2._RKIND*(1._RKIND + 2._RKIND*stM%bss*Ess*Ess)
+                CC  = CC + g2*TEN_DYADPROD(flM, flM, 3)
+            END IF
+
+         CASE (stIso_LS)
+            DO iFn=1, nfd
+                fl(1,1,iFn) = fNa0(1,iFn)*fNa0(1,iFn)
+                fl(1,2,iFn) = fNa0(1,iFn)*fNa0(2,iFn)
+                fl(2,1,iFn) = fNa0(2,iFn)*fNa0(1,iFn)
+                fl(2,2,iFn) = fNa0(2,iFn)*fNa0(2,iFn)
+            END DO
+
+!           Compute fiber-based invariants
+            Inv4 = gg_x(1,1)*fl(1,1,1) + gg_x(1,2)*fl(1,2,1)
+     2          + gg_x(2,1)*fl(2,1,1) + gg_x(2,2)*fl(2,2,1)
+            Eff  = Inv4 - 1._RKIND
+
+!           Isotropic contribution
+            d1 = 2._RKIND*stM%a0*stM%mu0*stM%b1*J23
+     2          * EXP(3._RKIND*stM%b1*(trC3*J23 - 1._RKIND))
+            SN = (gi_0 - trC3*Ci)
+            CCN = f23*trC3*TEN_DYADPROD(Ci, Ci, 3)
+     2         + trC3*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+     3         - f23*(TEN_DYADPROD(gi_0, Ci, 3)
+     4         + TEN_DYADPROD(Ci, gi_0, 3))
+            S  = (stM%a + d1*(3._RKIND*(trC3*J23 - 1._RKIND)))*SN
+     2         + pJ*Ci
+            CC = (1._RKIND + 18._RKIND*stM%b1*(trC3*J23 - 1._RKIND)
+     2         * (trC3*J23 - 1._RKIND))*J23*TEN_DYADPROD(SN, SN, 3)
+     3         + 3._RKIND*(trC3*J23 - 1._RKIND)*CCN
+            CC = stM%a*CCN + 2._RKIND*d1*CC
+     2         + plJ*TEN_DYADPROD(Ci, Ci, 3)
+     3         - pJ*2._RKIND*TEN_SYMMPROD(Ci, Ci, 3)
+
+!           Anisotropic contribution
+            flM = 0._RKIND
+            IF (Eff > 0._RKIND) THEN
+                flM(1:2,1:2) = fl(:,:,1)
+                S   = S + 2._RKIND*stM%a0*(1._RKIND - stM%mu0)
+     2              *stM%b2*Eff * EXP(stM%b2*Eff*Eff)*flM
+                CC  = CC + 4._RKIND*stM%a0*(1._RKIND - stM%mu0)
+     2              * stM%b2 * (1._RKIND + 2._RKIND*stM%b2*Eff*Eff)
+     3              * EXP(stM%b2*Eff*Eff) * TEN_DYADPROD(flM, flM, 3)
+            END IF
+
+
+         CASE DEFAULT
+            err = "Undefined material constitutive model"
+
+         END SELECT
+
+         IF (ABS(S(3,3)) .LE. ATOL) EXIT
+         IF (itr .GT. MAXITR) THEN
+            wrn = " Failed to converge plane-stress condition"
+            EXIT
+         END IF
+
+         C33 = C33 - (2._RKIND*S(3,3)/CC(3,3,3,3))
+      END DO
+
+      g33 = C33
+
+!     Statically condense CC
+      DO i=1, 2
+         DO j=1, 2
+            DO k=1, 2
+               DO l=1, 2
+                  C33 = CC(i,j,3,3)*CC(3,3,k,l)/CC(3,3,3,3)
+                  CC(i,j,k,l) = CC(i,j,k,l) - C33
+               END DO
+            END DO
+         END DO
+      END DO
+
+      g33 = C33
+
+!     Convert the in-plane components to Voigt notation
+      Sml(1) = S(1,1)
+      Sml(2) = S(2,2)
+      Sml(3) = S(1,2)
+
+      Dml(1,1) = CC(1,1,1,1)
+      Dml(1,2) = CC(1,1,2,2)
+      Dml(1,3) = CC(1,1,1,2)
+
+      Dml(2,2) = CC(2,2,2,2)
+      Dml(2,3) = CC(2,2,1,2)
+
+      Dml(3,3) = CC(1,2,1,2)
+
+      Dml(2,1) = Dml(1,2)
+      Dml(3,1) = Dml(1,3)
+      Dml(3,2) = Dml(2,3)
+
+      RETURN
+      END SUBROUTINE GETPK2CC_SHLc
+!####################################################################
 !     Convert elasticity tensor to Voigt notation
       SUBROUTINE CCTOVOIGT(CC, Dm)
-      USE COMMOD, ONLY : RKIND, nsd, nsymd
+      USE COMMOD, ONLY : IKIND, RKIND, nsd, nsymd
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: CC(nsd,nsd,nsd,nsd)
       REAL(KIND=RKIND), INTENT(INOUT) :: Dm(nsymd,nsymd)
 
-      INTEGER i, j
+      INTEGER(KIND=IKIND) :: i, j
 
       IF (nsd .EQ. 3) THEN
          Dm(1,1) = CC(1,1,1,1)
@@ -1187,7 +1647,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       END SUBROUTINE CCTOVOIGT
 !####################################################################
 !     Compute additional fiber-reinforcement stress
-      SUBROUTINE GETFIBSTRESS(Tfl, g)
+      SUBROUTINE GET_FIB_STRESS(Tfl, g)
       USE COMMOD
       IMPLICIT NONE
       TYPE(fibStrsType), INTENT(IN) :: Tfl
@@ -1203,36 +1663,53 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       END IF
 
       RETURN
-      END SUBROUTINE GETFIBSTRESS
+      END SUBROUTINE GET_FIB_STRESS
 !####################################################################
 !     Compute active component of deformation gradient tensor for
 !     electromechanics coupling based on active strain formulation
-      SUBROUTINE ACTVSTRAIN(gf, nfd, fl, Fa)
+      SUBROUTINE GET_ACTV_DEFGRAD(ec, nfd, fl, lam, yf, Fa)
       USE MATFUN
       USE UTILMOD
-      USE COMMOD, ONLY : nsd
+      USE COMMOD, ONLY : asnType_tiso, asnType_ortho, asnType_hetortho,
+     2   nsd, eccModelType
       IMPLICIT NONE
+      TYPE(eccModelType), INTENT(IN) :: ec
       INTEGER(KIND=IKIND), INTENT(IN) :: nfd
-      REAL(KIND=RKIND), INTENT(IN) :: gf, fl(nsd,nfd)
-      REAL(KIND=RKIND), INTENT(INOUT) :: Fa(nsd,nsd)
+      REAL(KIND=RKIND), INTENT(IN) :: fl(nsd,nfd), lam, yf
+      REAL(KIND=RKIND), INTENT(OUT) :: Fa(nsd,nsd)
 
-      REAL(KIND=RKIND) :: gs, gn, af(nsd), as(nsd), an(nsd),
-     2   IDm(nsd,nsd), Hf(nsd,nsd), Hs(nsd,nsd), Hn(nsd,nsd)
+      REAL(KIND=RKIND) :: ys, yn, f(nsd), s(nsd), n(nsd), Hf(nsd,nsd),
+     2   Hs(nsd,nsd), Hn(nsd,nsd)
 
-      af  = fl(:,1)
-      as  = fl(:,2)
-      an  = CROSS(fl)
+      f  = fl(:,1)
+      s  = fl(:,2)
+      n  = CROSS(fl)
 
-      gn  = 4._RKIND*gf
-      gs  = 1._RKIND/((1._RKIND+gf)*(1._RKIND+gn)) - 1._RKIND
+      Hf = MAT_DYADPROD(f, f, nsd)
 
-      IDm = MAT_ID(nsd)
-      Hf  = MAT_DYADPROD(af, af, nsd)
-      Hs  = MAT_DYADPROD(as, as, nsd)
-      Hn  = MAT_DYADPROD(an, an, nsd)
+!     Transversely isotropic activation
+      IF (ec%asnType .EQ. asnType_tiso) THEN
+         yn = (1._RKIND/SQRT(1._RKIND+yf)) - 1._RKIND
 
-      Fa = IDm + gf*Hf + gs*Hs + gn*Hn
+!     Orthotropic activation
+      ELSE IF (ec%asnType .EQ. asnType_ortho) THEN
+         yn = ec%k*yf
+
+!     Transmurally heteregenous orthotropic activation
+!     lam: transmural coordinate (=0, endo; =1, epi)
+      ELSE IF (ec%asnType .EQ. asnType_hetortho) THEN
+         yn = (1._RKIND - lam)*ec%k*yf
+     2      + lam*(1._RKIND/SQRT(1._RKIND + yf) - 1._RKIND)
+
+      END IF
+
+      ys = 1._RKIND/((1._RKIND+yf)*(1._RKIND+yn)) - 1._RKIND
+      Hs = MAT_DYADPROD(s, s, nsd)
+      Hn = MAT_DYADPROD(n, n, nsd)
+
+      Fa = (1._RKIND+yf)*Hf + (1._RKIND+ys)*Hs + (1._RKIND+yn)*Hn
+!      Fa = MAT_ID(nsd) + (yf*Hf) + (ys*Hs) + (yn*Hn)
 
       RETURN
-      END SUBROUTINE ACTVSTRAIN
+      END SUBROUTINE GET_ACTV_DEFGRAD
 !####################################################################

@@ -3804,6 +3804,9 @@ c      END DO
       tt(1) = CPUT()
       cDmn = DOMAIN(msh(1), ib%cEq, 1)
 
+!     Initialize tensor operations
+      CALL TEN_INIT(nsd)
+
 !     Initialize residues to 0
       ib%R = 0._RKIND
       IF (ib%cpld .EQ. ibCpld_I) THEN

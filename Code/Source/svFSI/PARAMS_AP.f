@@ -31,16 +31,29 @@
 !
 !--------------------------------------------------------------------
 !
-!     Parameters used for Aliev-Panfilov Ventricular Myocyte Model.
+!     Parameters for Aliev-Panfilov cellular activation model.
+!     Parameters are chosen based on below references.
+!
+!     Reference for Aliev-Panfilov electrophysiology model:
+!        Goktepe, S., & Kuhl, E. (2009). Computational modeling of
+!        cardiac electrophysiology: A novel finite element approach.
+!        Int. J. Numer. Meth. Engng, 79, 156–178.
+!        https://doi.org/10.1002/nme
+!
+!     Reference for active stress model:
+!        Goktepe, S., & Kuhl, E. (2010). Electromechanics of the heart:
+!        A unified approach to the strongly coupled excitation-
+!        contraction problem. Computational Mechanics, 45(2–3), 227–243.
+!        https://doi.org/10.1007/s00466-009-0434-z
 !
 !--------------------------------------------------------------------
 
 !     Scaling factors
-!     Voltage scaling
+!     Voltage scaling (mV)
       REAL(KIND=RKIND) :: Vscale  = 100._RKIND
-!     Time scaling
+!     Time scaling (ms)
       REAL(KIND=RKIND) :: Tscale  = 12.9_RKIND
-!     Voltage offset parameter
+!     Voltage offset parameter (mV)
       REAL(KIND=RKIND) :: Voffset = -80._RKIND
 !-----------------------------------------------------------------------
 !     Model parameters
@@ -56,8 +69,8 @@
       REAL(KIND=RKIND) :: Vrest = -80._RKIND
 !     Critical voltage (mV)
       REAL(KIND=RKIND) :: Vcrit = -30._RKIND
-!     Saturation potential
-      REAL(KIND=RKIND) :: eta_T = 5.E-3_RKIND
+!     Saturation potential (Pa/mV)
+      REAL(KIND=RKIND) :: K_T = 5.0E3_RKIND
 !     Minimum activation (ms^{-1})
       REAL(KIND=RKIND) :: eps_0 = 0.1_RKIND
 !     Maximum activation (ms^{-1})

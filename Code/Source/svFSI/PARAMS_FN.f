@@ -33,6 +33,12 @@
 !
 !     Parameters used for Fitzhugh-Nagumo Myocyte Activation Model.
 !
+!     Reference for Aliev-Panfilov electrophysiology model:
+!        Goktepe, S., & Kuhl, E. (2009). Computational modeling of
+!        cardiac electrophysiology: A novel finite element approach.
+!        Int. J. Numer. Meth. Engng, 79, 156–178.
+!        https://doi.org/10.1002/nme
+!
 !--------------------------------------------------------------------
 
 !     Scaling factors

@@ -1264,7 +1264,7 @@ c        N(8) = lx*my*0.5_RKIND
       END SUBROUTINE GETGNN
 !--------------------------------------------------------------------
 !     Returns second order derivatives at given natural coords
-      SUBROUTINE GETGNNxx(insd, ind2, eType, eNoN, xi, Nxx)
+      PURE SUBROUTINE GETGNNxx(insd, ind2, eType, eNoN, xi, Nxx)
       USE COMMOD
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: insd, ind2, eType, eNoN
@@ -1608,7 +1608,7 @@ c        N(8) = lx*my*0.5_RKIND
             B(3,a) = Nxi2(3,a) - Nx(1,a)*xXi2(1,3) - Nx(2,a)*xXi2(2,3)
          END DO
 
-         CALL DGESV(l,eNoN,K,l,IPIV,B,l,INFO)
+         CALL DGESV(l, eNoN, K, l, IPIV, B, l, INFO)
          IF (INFO .NE. 0) err = "Error in Lapack @ GNNxx."
          Nxx = B
 
@@ -1703,10 +1703,10 @@ c        N(8) = lx*my*0.5_RKIND
       END DO
       nV = CROSS(xXi)
 
-!     Covariant basis
+!     Covariant basis, g_a
       gCov = xXi
 
-!     Metric tensor g_i . g_j
+!     Metric tensor g_a . g_b
       Gmat = 0._RKIND
       DO i=1, insd
          DO j=1, insd
@@ -1933,12 +1933,12 @@ c        N(8) = lx*my*0.5_RKIND
 !        Update shape functions if NURBS
          IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
 
-!        Compute adjoining mesh element normal
-         ALLOCATE(xXi(nsd,insd))
+!        Compute normal of the adjoining mesh element
+         ALLOCATE(xXi(nsd,nsd-1))
          xXi = 0._RKIND
          DO a=1, eNoN
-            DO i=1, insd
-               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            DO i=1, nsd-1
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,1)
             END DO
          END DO
          v(:) = CROSS(xXi)
@@ -1959,7 +1959,7 @@ c        N(8) = lx*my*0.5_RKIND
          n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
 
 !        I choose Gauss point of the mesh element for calculating
-!        interior edge
+!        interior edge vector.
          v(:) = 0._RKIND
          DO a=1, eNoN
             v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)

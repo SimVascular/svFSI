@@ -32,7 +32,7 @@
 !-----------------------------------------------------------------------
 !
 !     This routines is for solving nonlinear shell mechanics problem
-!     using linear triangle finite elements and IGA.
+!     using finite elements and IGA.
 !
 !--------------------------------------------------------------------
 
@@ -44,18 +44,24 @@
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, b, e, g, Ac, eNoN, cPhys
+      INTEGER(KIND=IKIND) a, b, e, g, Ac, eNoN, cPhys, iFn, nFn
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
-     2   dl(:,:), bfl(:,:), lR(:,:), lK(:,:,:)
+     2   dl(:,:), bfl(:,:), fN(:,:), lR(:,:), lK(:,:,:)
 
       eNoN = lM%eNoN
       IF (lM%eType .EQ. eType_TRI3) eNoN = 2*eNoN
 
+      nFn  = lM%nFn
+      IF (nFn .EQ. 0) nFn = 1
+
+!     Initialize tensor operations
+      CALL TEN_INIT(2)
+
 !     SHELLS: dof = nsd
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), bfl(nsd,eNoN), lR(dof,eNoN),
+     2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(3,nFn), lR(dof,eNoN),
      3   lK(dof*dof,eNoN,eNoN))
 
 !     Loop over all elements of mesh
@@ -72,7 +78,6 @@
          dl  = 0._RKIND
          bfl = 0._RKIND
          DO a=1, eNoN
-            Ac = lM%IEN(a,e)
             IF (a .LE. lM%eNoN) THEN
                Ac = lM%IEN(a,e)
                ptr(a) = Ac
@@ -89,21 +94,28 @@
             bfl(:,a) = Bf(:,Ac)
          END DO
 
-         IF (lM%eType .EQ. eType_TRI3) THEN
-!        Triangles - constant strain, no numerical integration
-            CALL SHELLTRI(lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
+         IF (ALLOCATED(lM%fN)) THEN
+            DO iFn=1, nFn
+               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
+            END DO
+         END IF
 
-         ELSE IF (lM%eType .EQ. eType_NRB) THEN
-!        NURBS
+         IF (lM%eType .EQ. eType_TRI3) THEN
+!           Constant strain triangles, no numerical integration
+            CALL SHELLCST(lM, e, eNoN, nFn, fN, al, yl, dl, xl, bfl,
+     2         ptr)
+
+         ELSE
             lR = 0._RKIND
             lK = 0._RKIND
 
-!           Update shape functions
-            CALL NRBNNX(lM, e)
+!           Update shape functions for NURBS elements
+            IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !           Gauss integration
             DO g=1, lM%nG
-               CALL SHELLNRB(lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
+               CALL SHELL3D(lM, g, eNoN, nFn, fN, al, yl, dl, xl,
+     2            bfl, lR, lK)
             END DO
 
 !           Assembly
@@ -119,28 +131,30 @@
          END IF
       END DO ! e: loop
 
-      DEALLOCATE(ptr, xl, al, yl, dl, bfl, lR, lK)
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, lR, lK)
 
       RETURN
       END SUBROUTINE CONSTRUCT_SHELL
 !####################################################################
-      SUBROUTINE SHELLTRI (lM, e, eNoN, al, yl, dl, xl, bfl, ptr)
+!     Construct shell mechanics for constant strain triangle elements
+      SUBROUTINE SHELLCST (lM, e, eNoN, nFn, fN, al, yl, dl, xl, bfl,
+     2   ptr)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
       TYPE(mshType), INTENT(IN) :: lM
-      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, ptr(eNoN)
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, eNoN, ptr(eNoN), nFn
       REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
+     2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN), fN(3,nFn)
 
-      LOGICAL :: bFlag, setIt(3)
-      INTEGER(KIND=IKIND) :: i, j, k, a, b, g
-      REAL(KIND=RKIND) :: rho, dmp, elM, nu, ht, T1, amd, afl, w, Jac0,
-     2   Jac, ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2),
-     3   gCov(3,2), gCnv(3,2), x0(3,eNoN), xc(3,eNoN), eLoc(3,3),
-     4   Jm(2,2), Qm(3,3), Dm(3,3), Em(3), Eb(3), DEm(3), DEb(3),
-     5   Bm(3,3,eNoN), Bb(3,3,eNoN), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDE,
-     6   BtDB, NxSNx
+      LOGICAL :: setIt(3)
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b, g, iFn
+      REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, Jac0, Jac, lam3,
+     2   fb(3), ud(3), nV0(3), nV(3), x0(3,eNoN), xc(3,eNoN), aCov(3,2),
+     3   aCov0(3,2), aCnv(3,2), aCnv0(3,2), aa_0(2,2), aa_x(2,2),
+     4   bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Bm(3,3,lM%eNoN),
+     5   Bb(3,3,eNoN), D0Bm(3,3,lM%eNoN), D1Bm(3,3,lM%eNoN),
+     6   D1Bb(3,3,eNoN), D2Bb(3,3,eNoN), BtS, NxSNx, BtDB, fNa0(2,nFn)
 
       REAL(KIND=RKIND), ALLOCATABLE :: N(:), Nx(:,:), lR(:,:),
      2   lK(:,:,:), tmpX(:,:)
@@ -152,8 +166,6 @@
 !     Define parameters
       rho   = eq(cEq)%dmn(cDmn)%prop(solid_density)
       dmp   = eq(cEq)%dmn(cDmn)%prop(damping)
-      elM   = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
-      nu    = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
       ht    = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
       fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -161,19 +173,12 @@
 
       amd  = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
       afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
+
       i    = eq(cEq)%s
       j    = i + 1
       k    = j + 1
 
-!     Determine if current element is a boundary element
-      bFlag = .FALSE.
-      DO a=lM%eNoN+1, eNoN
-         IF (ptr(a) .EQ. 0) THEN
-            bFlag = .TRUE.
-            EXIT
-         END IF
-      END DO
-
+!---------------------------------------------------------------------
 !     Get the reference configuration
       x0(:,:) = xl(:,:)
 
@@ -185,165 +190,108 @@
       END DO
       Nx(:,:) = lM%Nx(:,:,1)
 
+!---------------------------------------------------------------------
 !     Covariant and contravariant bases in reference config
       ALLOCATE(tmpX(nsd,lM%eNoN))
       tmpX = x0(:,1:lM%eNoN)
-      CALL GNNS(lM%eNoN, Nx, tmpX, nV0, gCov0, gCnv0)
+      CALL GNNS(lM%eNoN, Nx, tmpX, nV0, aCov0, aCnv0)
       Jac0 = SQRT(NORM(nV0))
       nV0  = nV0/Jac0
 
 !     Covariant and contravariant bases in current config
       tmpX = xc(:,1:lM%eNoN)
-      CALL GNNS(lM%eNoN, Nx, tmpX, nV, gCov, gCnv)
+      CALL GNNS(lM%eNoN, Nx, tmpX, nV, aCov, aCnv)
       Jac = SQRT(NORM(nV))
       nV  = nV/Jac
       DEALLOCATE(tmpX)
 
-!     Define local coordinates, Jacobian (J) and its inverse tensor
-!     defined in Voigt notation such that Q*E = J^{-T} * E * J^{-1})
-      eLoc(:,1) = gCov0(:,1)/SQRT(NORM(gCov0(:,1)))
-      eLoc(:,3) = nV0(:)
-
-      eLoc(1,2) = eLoc(2,3)*eLoc(3,1) - eLoc(3,3)*eLoc(2,1)
-      eLoc(2,2) = eLoc(3,3)*eLoc(1,1) - eLoc(1,3)*eLoc(3,1)
-      eLoc(3,2) = eLoc(1,3)*eLoc(2,1) - eLoc(2,3)*eLoc(1,1)
-
-      Jm(1,1) = NORM(gCov0(:,1), eLoc(:,1))
-      Jm(1,2) = NORM(gCov0(:,2), eLoc(:,1))
-      Jm(2,1) = NORM(gCov0(:,1), eLoc(:,2))
-      Jm(2,2) = NORM(gCov0(:,2), eLoc(:,2))
-
-      Qm = 0._RKIND
-      Qm(1,1) = 1._RKIND/(Jm(1,1)*Jm(1,1))
-      Qm(2,1) = (-Jm(1,2)/(Jm(1,1)*Jm(2,2)))**2._RKIND
-      Qm(2,2) = 1._RKIND/(Jm(2,2)*Jm(2,2))
-      Qm(2,3) = -Jm(1,2)/(Jm(1,1)*Jm(2,2)**2._RKIND)
-      Qm(3,1) = -2._RKIND*Jm(1,2)/(Jm(2,2)*Jm(1,1)*Jm(1,1))
-      Qm(3,3) = 1._RKIND/(Jm(1,1)*Jm(2,2))
-
-!     Material tensor D, isotropic St Venant Kirchhoff model
-      Dm = 0._RKIND
-      Dm(1,1) = 1._RKIND
-      Dm(1,2) = nu
-      Dm(2,1) = nu
-      Dm(2,2) = 1._RKIND
-      Dm(3,3) = 0.5_RKIND*(1._RKIND-nu)
-      Dm = elM/(1._RKIND-(nu*nu)) * Dm
-
-!     Compute Qt * D * Q
-      Dm = MATMUL(Dm, Qm)
-      Dm = MATMUL(TRANSPOSE(Qm), Dm)
-
-!     Membrane strain and its variation
-!     Define membrane strain tensor (Em), Voigt notation
-      Em = 0._RKIND
+!---------------------------------------------------------------------
+!     Compute metric tensor in reference and current config
+      aa_0 = 0._RKIND
+      aa_x = 0._RKIND
       DO g=1, nsd
-         Em(1) = Em(1) + gCov(g,1)*gCov(g,1) - gCov0(g,1)*gCov0(g,1)
-         Em(2) = Em(2) + gCov(g,2)*gCov(g,2) - gCov0(g,2)*gCov0(g,2)
-         Em(3) = Em(3) + gCov(g,1)*gCov(g,2) - gCov0(g,1)*gCov0(g,2)
-      END DO
-      Em(1) = 0.5_RKIND * Em(1)
-      Em(2) = 0.5_RKIND * Em(2)
+         aa_0(1,1) = aa_0(1,1) + aCov0(g,1)*aCov0(g,1)
+         aa_0(1,2) = aa_0(1,2) + aCov0(g,1)*aCov0(g,2)
+         aa_0(2,1) = aa_0(2,1) + aCov0(g,2)*aCov0(g,1)
+         aa_0(2,2) = aa_0(2,2) + aCov0(g,2)*aCov0(g,2)
 
+         aa_x(1,1) = aa_x(1,1) + aCov(g,1)*aCov(g,1)
+         aa_x(1,2) = aa_x(1,2) + aCov(g,1)*aCov(g,2)
+         aa_x(2,1) = aa_x(2,1) + aCov(g,2)*aCov(g,1)
+         aa_x(2,2) = aa_x(2,2) + aCov(g,2)*aCov(g,2)
+      END DO
+
+!     Compute fiber orientation in curvature coordinates
+      fNa0 = 0._RKIND
+      DO iFn=1, nFn
+         DO l=1, 3
+            fNa0(1,iFn) = fNa0(1,iFn) + fN(l,iFn)*aCnv0(l,1)
+            fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
+         END DO
+      END DO
+
+!---------------------------------------------------------------------
 !     Define variation in membrane strain only for the main element
       Bm = 0._RKIND
       DO a=1, lM%eNoN
-         Bm(1,1,a) = Nx(1,a)*gCov(1,1)
-         Bm(1,2,a) = Nx(1,a)*gCov(2,1)
-         Bm(1,3,a) = Nx(1,a)*gCov(3,1)
+         Bm(1,1,a) = Nx(1,a)*aCov(1,1)
+         Bm(1,2,a) = Nx(1,a)*aCov(2,1)
+         Bm(1,3,a) = Nx(1,a)*aCov(3,1)
 
-         Bm(2,1,a) = Nx(2,a)*gCov(1,2)
-         Bm(2,2,a) = Nx(2,a)*gCov(2,2)
-         Bm(2,3,a) = Nx(2,a)*gCov(3,2)
+         Bm(2,1,a) = Nx(2,a)*aCov(1,2)
+         Bm(2,2,a) = Nx(2,a)*aCov(2,2)
+         Bm(2,3,a) = Nx(2,a)*aCov(3,2)
 
-         Bm(3,1,a) = Nx(2,a)*gCov(1,1) + Nx(1,a)*gCov(1,2)
-         Bm(3,2,a) = Nx(2,a)*gCov(2,1) + Nx(1,a)*gCov(2,2)
-         Bm(3,3,a) = Nx(2,a)*gCov(3,1) + Nx(1,a)*gCov(3,2)
+         Bm(3,1,a) = Nx(2,a)*aCov(1,1) + Nx(1,a)*aCov(1,2)
+         Bm(3,2,a) = Nx(2,a)*aCov(2,1) + Nx(1,a)*aCov(2,2)
+         Bm(3,3,a) = Nx(2,a)*aCov(3,1) + Nx(1,a)*aCov(3,2)
       END DO
 
-!     Zero-out Bm for fixed BC on boundary elements
-      IF (bFlag) THEN
-         setIt = .FALSE.
-         DO a=lM%eNoN+1, eNoN
-            IF (ptr(a) .EQ. 0) THEN
-               b = a - lM%eNoN
-               IF (BTEST(lM%sbc(b,e),bType_fix)) setIt(b) = .TRUE.
-            END IF
-         END DO
+!     For the boundary elements, zero-out Bm for fixed/clamped BC.
+      setIt = .FALSE.
+      a = lM%eNoN + 1
+      DO WHILE (a .LE. eNoN)
+         IF (ptr(a) .EQ. 0) THEN
+            b = a - lM%eNoN
+            IF (BTEST(lM%sbc(b,e),bType_fix)) setIt(b) = .TRUE.
+         END IF
+         a = a + 1
+      END DO
 
-         DO a=1, lM%eNoN
-            IF (setIt(a)) THEN
-               DO b=1, lM%eNoN
-                  IF (a .EQ. b) CYCLE
-                  Bm(:,:,b) = 0._RKIND
-               END DO
-            END IF
-         END DO
-      END IF
-
-!     Bending strain and its variation for triangular elements
-      CALL SHELLBENDTRI(lM, e, ptr, x0, xc, Eb, Bb)
-
-!     Contribution to residue and tangent matrices from membrane strain
-!     D * Em
-      DEm(1) = Dm(1,1)*Em(1) + Dm(1,2)*Em(2) + Dm(1,3)*Em(3)
-      DEm(2) = Dm(2,1)*Em(1) + Dm(2,2)*Em(2) + Dm(2,3)*Em(3)
-      DEm(3) = Dm(3,1)*Em(1) + Dm(3,2)*Em(2) + Dm(3,3)*Em(3)
-
-!     D * Bm
       DO a=1, lM%eNoN
-         DBm(1,1,a) = Dm(1,1)*Bm(1,1,a) + Dm(1,2)*Bm(2,1,a) +
-     2      Dm(1,3)*Bm(3,1,a)
-         DBm(1,2,a) = Dm(1,1)*Bm(1,2,a) + Dm(1,2)*Bm(2,2,a) +
-     2      Dm(1,3)*Bm(3,2,a)
-         DBm(1,3,a) = Dm(1,1)*Bm(1,3,a) + Dm(1,2)*Bm(2,3,a) +
-     2      Dm(1,3)*Bm(3,3,a)
-
-         DBm(2,1,a) = Dm(2,1)*Bm(1,1,a) + Dm(2,2)*Bm(2,1,a) +
-     2      Dm(2,3)*Bm(3,1,a)
-         DBm(2,2,a) = Dm(2,1)*Bm(1,2,a) + Dm(2,2)*Bm(2,2,a) +
-     2      Dm(2,3)*Bm(3,2,a)
-         DBm(2,3,a) = Dm(2,1)*Bm(1,3,a) + Dm(2,2)*Bm(2,3,a) +
-     2      Dm(2,3)*Bm(3,3,a)
-
-         DBm(3,1,a) = Dm(3,1)*Bm(1,1,a) + Dm(3,2)*Bm(2,1,a) +
-     2      Dm(3,3)*Bm(3,1,a)
-         DBm(3,2,a) = Dm(3,1)*Bm(1,2,a) + Dm(3,2)*Bm(2,2,a) +
-     2      Dm(3,3)*Bm(3,2,a)
-         DBm(3,3,a) = Dm(3,1)*Bm(1,3,a) + Dm(3,2)*Bm(2,3,a) +
-     2      Dm(3,3)*Bm(3,3,a)
+         IF (setIt(a)) THEN
+            DO b=1, lM%eNoN
+               IF (a .EQ. b) CYCLE
+               Bm(:,:,b) = 0._RKIND
+            END DO
+         END IF
       END DO
 
-!     Contribution to residue and tangent matrices from bending strain
-!     D * Eb
-      DEb(1) = Dm(1,1)*Eb(1) + Dm(1,2)*Eb(2) + Dm(1,3)*Eb(3)
-      DEb(2) = Dm(2,1)*Eb(1) + Dm(2,2)*Eb(2) + Dm(2,3)*Eb(3)
-      DEb(3) = Dm(3,1)*Eb(1) + Dm(3,2)*Eb(2) + Dm(3,3)*Eb(3)
+!---------------------------------------------------------------------
+!     Compute curvature coefficients for bending strain and its
+!     variation for CST elements
+      CALL SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb, .TRUE.)
 
-!     D * Bb
+!---------------------------------------------------------------------
+!     Compute stress resultants by integrating 2nd Piola Kirchhoff
+!     stress and elasticity tensors through the shell thickness. These
+!     resultants are computed in Voigt notation.
+      CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
+     2   bb_x, lam3, Sm, Dm)
+
+!---------------------------------------------------------------------
+!     Contribution to tangent matrices: Dm * Bm, Dm*Bb
+      DO a=1, lM%eNoN
+         D0Bm(:,:,a) = MATMUL(Dm(:,:,1), Bm(:,:,a))
+         D1Bm(:,:,a) = MATMUL(Dm(:,:,2), Bm(:,:,a))
+      END DO
+
       DO a=1, eNoN
-         DBb(1,1,a) = Dm(1,1)*Bb(1,1,a) + Dm(1,2)*Bb(2,1,a) +
-     2      Dm(1,3)*Bb(3,1,a)
-         DBb(1,2,a) = Dm(1,1)*Bb(1,2,a) + Dm(1,2)*Bb(2,2,a) +
-     2      Dm(1,3)*Bb(3,2,a)
-         DBb(1,3,a) = Dm(1,1)*Bb(1,3,a) + Dm(1,2)*Bb(2,3,a) +
-     2      Dm(1,3)*Bb(3,3,a)
-
-         DBb(2,1,a) = Dm(2,1)*Bb(1,1,a) + Dm(2,2)*Bb(2,1,a) +
-     2      Dm(2,3)*Bb(3,1,a)
-         DBb(2,2,a) = Dm(2,1)*Bb(1,2,a) + Dm(2,2)*Bb(2,2,a) +
-     2      Dm(2,3)*Bb(3,2,a)
-         DBb(2,3,a) = Dm(2,1)*Bb(1,3,a) + Dm(2,2)*Bb(2,3,a) +
-     2      Dm(2,3)*Bb(3,3,a)
-
-         DBb(3,1,a) = Dm(3,1)*Bb(1,1,a) + Dm(3,2)*Bb(2,1,a) +
-     2      Dm(3,3)*Bb(3,1,a)
-         DBb(3,2,a) = Dm(3,1)*Bb(1,2,a) + Dm(3,2)*Bb(2,2,a) +
-     2      Dm(3,3)*Bb(3,2,a)
-         DBb(3,3,a) = Dm(3,1)*Bb(1,3,a) + Dm(3,2)*Bb(2,3,a) +
-     2      Dm(3,3)*Bb(3,3,a)
+         D1Bb(:,:,a) = MATMUL(Dm(:,:,2), Bb(:,:,a))
+         D2Bb(:,:,a) = MATMUL(Dm(:,:,3), Bb(:,:,a))
       END DO
 
+!---------------------------------------------------------------------
 !     Contribution to residue and stiffness matrices due to inertia and
 !     body forces
       lR = 0._RKIND
@@ -351,6 +299,7 @@
       DO g=1, lM%nG
          N = lM%N(:,g)
          w = lM%w(g)*Jac0*ht
+
 !        Acceleration and mass damping at the integration point
          ud = -fb
          DO a=1, lM%eNoN
@@ -369,123 +318,210 @@
 !        Local stiffness contribution from mass matrix
          DO b=1, lM%eNoN
             DO a=1, lM%eNoN
-               T1 = w*amd*N(a)*N(b)
-               lK(1,a,b) = lK(1,a,b) + T1
-               lK(dof+2,a,b) = lK(dof+2,a,b) + T1
-               lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + T1
+               BtS = w*amd*N(a)*N(b)
+               lK(1,a,b) = lK(1,a,b) + BtS
+               lK(dof+2,a,b) = lK(dof+2,a,b) + BtS
+               lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + BtS
             END DO
          END DO
       END DO
 
-!     Contribution from membrane strain related terms only on the main
-!     triangular element
-      T1 = Jac0 * ht * 0.5_RKIND
+!---------------------------------------------------------------------
+!     Contribution to residue from membrane strain
+      w = Jac0 * 0.5_RKIND
       DO a=1, lM%eNoN
-         BtDE = Bm(1,1,a)*DEm(1) + Bm(2,1,a)*DEm(2) + Bm(3,1,a)*DEm(3)
-         lR(1,a) = lR(1,a) + T1*BtDE
+         BtS = Bm(1,1,a)*Sm(1,1) + Bm(2,1,a)*Sm(2,1) + Bm(3,1,a)*Sm(3,1)
+         lR(1,a) = lR(1,a) + w*BtS
 
-         BtDE = Bm(1,2,a)*DEm(1) + Bm(2,2,a)*DEm(2) + Bm(3,2,a)*DEm(3)
-         lR(2,a) = lR(2,a) + T1*BtDE
+         BtS = Bm(1,2,a)*Sm(1,1) + Bm(2,2,a)*Sm(2,1) + Bm(3,2,a)*Sm(3,1)
+         lR(2,a) = lR(2,a) + w*BtS
 
-         BtDE = Bm(1,3,a)*DEm(1) + Bm(2,3,a)*DEm(2) + Bm(3,3,a)*DEm(3)
-         lR(3,a) = lR(3,a) + T1*BtDE
-
-         DO b=1, lM%eNoN
-!           Geometric stiffness
-            NxSNx = ( Nx(1,a)*Nx(1,b)*DEm(1) + Nx(2,a)*Nx(2,b)*DEm(2) +
-     2                Nx(1,a)*Nx(2,b)*DEm(3) + Nx(2,a)*Nx(1,b)*DEm(3) )
-
-!           Material stiffness
-            BtDB = Bm(1,1,a)*DBm(1,1,b) + Bm(2,1,a)*DBm(2,1,b) +
-     2             Bm(3,1,a)*DBm(3,1,b)
-            lK(1,a,b) = lK(1,a,b) + afl*T1*(BtDB + NxSNx)
-
-            BtDB = Bm(1,1,a)*DBm(1,2,b) + Bm(2,1,a)*DBm(2,2,b) +
-     2             Bm(3,1,a)*DBm(3,2,b)
-            lK(2,a,b) = lK(2,a,b) + afl*T1*BtDB
-
-            BtDB = Bm(1,1,a)*DBm(1,3,b) + Bm(2,1,a)*DBm(2,3,b) +
-     2             Bm(3,1,a)*DBm(3,3,b)
-            lK(3,a,b) = lK(3,a,b) + afl*T1*BtDB
-
-            BtDB = Bm(1,2,a)*DBm(1,1,b) + Bm(2,2,a)*DBm(2,1,b) +
-     2             Bm(3,2,a)*DBm(3,1,b)
-            lK(dof+1,a,b) = lK(dof+1,a,b) + afl*T1*BtDB
-
-            BtDB = Bm(1,2,a)*DBm(1,2,b) + Bm(2,2,a)*DBm(2,2,b) +
-     2             Bm(3,2,a)*DBm(3,2,b)
-            lK(dof+2,a,b) = lK(dof+2,a,b) + afl*T1*(BtDB + NxSNx)
-
-            BtDB = Bm(1,2,a)*DBm(1,3,b) + Bm(2,2,a)*DBm(2,3,b) +
-     2             Bm(3,2,a)*DBm(3,3,b)
-            lK(dof+3,a,b) = lK(dof+3,a,b) + afl*T1*BtDB
-
-            BtDB = Bm(1,3,a)*DBm(1,1,b) + Bm(2,3,a)*DBm(2,1,b) +
-     2             Bm(3,3,a)*DBm(3,1,b)
-            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + afl*T1*BtDB
-
-            BtDB = Bm(1,3,a)*DBm(1,2,b) + Bm(2,3,a)*DBm(2,2,b) +
-     2             Bm(3,3,a)*DBm(3,2,b)
-            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + afl*T1*BtDB
-
-            BtDB = Bm(1,3,a)*DBm(1,3,b) + Bm(2,3,a)*DBm(2,3,b) +
-     2             Bm(3,3,a)*DBm(3,3,b)
-            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + afl*T1*(BtDB + NxSNx)
-         END DO
+         BtS = Bm(1,3,a)*Sm(1,1) + Bm(2,3,a)*Sm(2,1) + Bm(3,3,a)*Sm(3,1)
+         lR(3,a) = lR(3,a) + w*BtS
       END DO
 
-!     Contribution from bending strain related terms for the main
-!     triangle and its neighbors. Geometric stiffness is ignored
-      T1 = Jac0 * ht**3._RKIND /24._RKIND
+!     Contribution to residue from bending strain
       DO a=1, eNoN
-         BtDE = Bb(1,1,a)*DEb(1) + Bb(2,1,a)*DEb(2) + Bb(3,1,a)*DEb(3)
-         lR(1,a) = lR(1,a) + T1*BtDE
+         BtS = Bb(1,1,a)*Sm(1,2) + Bb(2,1,a)*Sm(2,2) + Bb(3,1,a)*Sm(3,2)
+         lR(1,a) = lR(1,a) + w*BtS
 
-         BtDE = Bb(1,2,a)*DEb(1) + Bb(2,2,a)*DEb(2) + Bb(3,2,a)*DEb(3)
-         lR(2,a) = lR(2,a) + T1*BtDE
+         BtS = Bb(1,2,a)*Sm(1,2) + Bb(2,2,a)*Sm(2,2) + Bb(3,2,a)*Sm(3,2)
+         lR(2,a) = lR(2,a) + w*BtS
 
-         BtDE = Bb(1,3,a)*DEb(1) + Bb(2,3,a)*DEb(2) + Bb(3,3,a)*DEb(3)
-         lR(3,a) = lR(3,a) + T1*BtDE
+         BtS = Bb(1,3,a)*Sm(1,2) + Bb(2,3,a)*Sm(2,2) + Bb(3,3,a)*Sm(3,2)
+         lR(3,a) = lR(3,a) + w*BtS
+      END DO
 
-         DO b=1, eNoN
-            BtDB = Bb(1,1,a)*DBb(1,1,b) + Bb(2,1,a)*DBb(2,1,b) +
-     2             Bb(3,1,a)*DBb(3,1,b)
-            lK(1,a,b) = lK(1,a,b) + afl*T1*BtDB
+!---------------------------------------------------------------------
+!     Contribution to stiffness from membrane-membrane interactions
+      w = afl*Jac0*0.5_RKIND
+      DO b=1, lM%eNoN
+         DO a=1, lM%eNoN
+            NxSNx = Nx(1,a)*Nx(1,b)*Sm(1,1) + Nx(2,a)*Nx(2,b)*Sm(2,1)
+     2            + Nx(1,a)*Nx(2,b)*Sm(3,1) + Nx(2,a)*Nx(1,b)*Sm(3,1)
 
-            BtDB = Bb(1,1,a)*DBb(1,2,b) + Bb(2,1,a)*DBb(2,2,b) +
-     2             Bb(3,1,a)*DBb(3,2,b)
-            lK(2,a,b) = lK(2,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,1,a)*D0Bm(1,1,b) + Bm(2,1,a)*D0Bm(2,1,b)
+     2           + Bm(3,1,a)*D0Bm(3,1,b)
+            lK(1,a,b) = lK(1,a,b) + w*(BtDB + NxSNx)
 
-            BtDB = Bb(1,1,a)*DBb(1,3,b) + Bb(2,1,a)*DBb(2,3,b) +
-     2             Bb(3,1,a)*DBb(3,3,b)
-            lK(3,a,b) = lK(3,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,1,a)*D0Bm(1,2,b) + Bm(2,1,a)*D0Bm(2,2,b)
+     2           + Bm(3,1,a)*D0Bm(3,2,b)
+            lK(2,a,b) = lK(2,a,b) + w*BtDB
 
-            BtDB = Bb(1,2,a)*DBb(1,1,b) + Bb(2,2,a)*DBb(2,1,b) +
-     2             Bb(3,2,a)*DBb(3,1,b)
-            lK(dof+1,a,b) = lK(dof+1,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,1,a)*D0Bm(1,3,b) + Bm(2,1,a)*D0Bm(2,3,b)
+     2           + Bm(3,1,a)*D0Bm(3,3,b)
+            lK(3,a,b) = lK(3,a,b) + w*BtDB
 
-            BtDB = Bb(1,2,a)*DBb(1,2,b) + Bb(2,2,a)*DBb(2,2,b) +
-     2             Bb(3,2,a)*DBb(3,2,b)
-            lK(dof+2,a,b) = lK(dof+2,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,2,a)*D0Bm(1,1,b) + Bm(2,2,a)*D0Bm(2,1,b)
+     2           + Bm(3,2,a)*D0Bm(3,1,b)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + w*BtDB
 
-            BtDB = Bb(1,2,a)*DBb(1,3,b) + Bb(2,2,a)*DBb(2,3,b) +
-     2             Bb(3,2,a)*DBb(3,3,b)
-            lK(dof+3,a,b) = lK(dof+3,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,2,a)*D0Bm(1,2,b) + Bm(2,2,a)*D0Bm(2,2,b)
+     2           + Bm(3,2,a)*D0Bm(3,2,b)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(BtDB + NxSNx)
 
-            BtDB = Bb(1,3,a)*DBb(1,1,b) + Bb(2,3,a)*DBb(2,1,b) +
-     2             Bb(3,3,a)*DBb(3,1,b)
-            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,2,a)*D0Bm(1,3,b) + Bm(2,2,a)*D0Bm(2,3,b)
+     2           + Bm(3,2,a)*D0Bm(3,3,b)
+            lK(dof+3,a,b) = lK(dof+3,a,b) + w*BtDB
 
-            BtDB = Bb(1,3,a)*DBb(1,2,b) + Bb(2,3,a)*DBb(2,2,b) +
-     2             Bb(3,3,a)*DBb(3,2,b)
-            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,3,a)*D0Bm(1,1,b) + Bm(2,3,a)*D0Bm(2,1,b)
+     2           + Bm(3,3,a)*D0Bm(3,1,b)
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*BtDB
 
-            BtDB = Bb(1,3,a)*DBb(1,3,b) + Bb(2,3,a)*DBb(2,3,b) +
-     2             Bb(3,3,a)*DBb(3,3,b)
-            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + afl*T1*BtDB
+            BtDB = Bm(1,3,a)*D0Bm(1,2,b) + Bm(2,3,a)*D0Bm(2,2,b)
+     2           + Bm(3,3,a)*D0Bm(3,2,b)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*BtDB
+
+            BtDB = Bm(1,3,a)*D0Bm(1,3,b) + Bm(2,3,a)*D0Bm(2,3,b)
+     2           + Bm(3,3,a)*D0Bm(3,3,b)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + w*(BtDB + NxSNx)
          END DO
       END DO
 
+!     Contribution to stiffness from membrane-bending interactions
+      DO b=1, eNoN
+         DO a=1, lM%eNoN
+            BtDB = Bm(1,1,a)*D1Bb(1,1,b) + Bm(2,1,a)*D1Bb(2,1,b)
+     2           + Bm(3,1,a)*D1Bb(3,1,b)
+            lK(1,a,b) = lK(1,a,b) + w*BtDB
+
+            BtDB = Bm(1,1,a)*D1Bb(1,2,b) + Bm(2,1,a)*D1Bb(2,2,b)
+     2           + Bm(3,1,a)*D1Bb(3,2,b)
+            lK(2,a,b) = lK(2,a,b) + w*BtDB
+
+            BtDB = Bm(1,1,a)*D1Bb(1,3,b) + Bm(2,1,a)*D1Bb(2,3,b)
+     2           + Bm(3,1,a)*D1Bb(3,3,b)
+            lK(3,a,b) = lK(3,a,b) + w*BtDB
+
+            BtDB = Bm(1,2,a)*D1Bb(1,1,b) + Bm(2,2,a)*D1Bb(2,1,b)
+     2           + Bm(3,2,a)*D1Bb(3,1,b)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + w*BtDB
+
+            BtDB = Bm(1,2,a)*D1Bb(1,2,b) + Bm(2,2,a)*D1Bb(2,2,b)
+     2           + Bm(3,2,a)*D1Bb(3,2,b)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + w*BtDB
+
+            BtDB = Bm(1,2,a)*D1Bb(1,3,b) + Bm(2,2,a)*D1Bb(2,3,b)
+     2           + Bm(3,2,a)*D1Bb(3,3,b)
+            lK(dof+3,a,b) = lK(dof+3,a,b) + w*BtDB
+
+            BtDB = Bm(1,3,a)*D1Bb(1,1,b) + Bm(2,3,a)*D1Bb(2,1,b)
+     2           + Bm(3,3,a)*D1Bb(3,1,b)
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*BtDB
+
+            BtDB = Bm(1,3,a)*D1Bb(1,2,b) + Bm(2,3,a)*D1Bb(2,2,b)
+     2           + Bm(3,3,a)*D1Bb(3,2,b)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*BtDB
+
+            BtDB = Bm(1,3,a)*D1Bb(1,3,b) + Bm(2,3,a)*D1Bb(2,3,b)
+     2           + Bm(3,3,a)*D1Bb(3,3,b)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + w*BtDB
+         END DO
+      END DO
+
+!     Contribution to stiffness from bending-membrane interactions
+      DO b=1, lM%eNoN
+         DO a=1, eNoN
+            BtDB = Bb(1,1,a)*D1Bm(1,1,b) + Bb(2,1,a)*D1Bm(2,1,b)
+     2           + Bb(3,1,a)*D1Bm(3,1,b)
+            lK(1,a,b) = lK(1,a,b) + w*BtDB
+
+            BtDB = Bb(1,1,a)*D1Bm(1,2,b) + Bb(2,1,a)*D1Bm(2,2,b)
+     2           + Bb(3,1,a)*D1Bm(3,2,b)
+            lK(2,a,b) = lK(2,a,b) + w*BtDB
+
+            BtDB = Bb(1,1,a)*D1Bm(1,3,b) + Bb(2,1,a)*D1Bm(2,3,b)
+     2           + Bb(3,1,a)*D1Bm(3,3,b)
+            lK(3,a,b) = lK(3,a,b) + w*BtDB
+
+            BtDB = Bb(1,2,a)*D1Bm(1,1,b) + Bb(2,2,a)*D1Bm(2,1,b)
+     2           + Bb(3,2,a)*D1Bm(3,1,b)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + w*BtDB
+
+            BtDB = Bb(1,2,a)*D1Bm(1,2,b) + Bb(2,2,a)*D1Bm(2,2,b)
+     2           + Bb(3,2,a)*D1Bm(3,2,b)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + w*BtDB
+
+            BtDB = Bb(1,2,a)*D1Bm(1,3,b) + Bb(2,2,a)*D1Bm(2,3,b)
+     2           + Bb(3,2,a)*D1Bm(3,3,b)
+            lK(dof+3,a,b) = lK(dof+3,a,b) + w*BtDB
+
+            BtDB = Bb(1,3,a)*D1Bm(1,1,b) + Bb(2,3,a)*D1Bm(2,1,b)
+     2           + Bb(3,3,a)*D1Bm(3,1,b)
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*BtDB
+
+            BtDB = Bb(1,3,a)*D1Bm(1,2,b) + Bb(2,3,a)*D1Bm(2,2,b)
+     2           + Bb(3,3,a)*D1Bm(3,2,b)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*BtDB
+
+            BtDB = Bb(1,3,a)*D1Bm(1,3,b) + Bb(2,3,a)*D1Bm(2,3,b)
+     2           + Bb(3,3,a)*D1Bm(3,3,b)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + w*BtDB
+         END DO
+      END DO
+
+!     Contribution to stiffness from bending-bending interactions
+      DO b=1, eNoN
+         DO a=1, eNoN
+            BtDB = Bb(1,1,a)*D2Bb(1,1,b) + Bb(2,1,a)*D2Bb(2,1,b)
+     2           + Bb(3,1,a)*D2Bb(3,1,b)
+            lK(1,a,b) = lK(1,a,b) + w*BtDB
+
+            BtDB = Bb(1,1,a)*D2Bb(1,2,b) + Bb(2,1,a)*D2Bb(2,2,b)
+     2           + Bb(3,1,a)*D2Bb(3,2,b)
+            lK(2,a,b) = lK(2,a,b) + w*BtDB
+
+            BtDB = Bb(1,1,a)*D2Bb(1,3,b) + Bb(2,1,a)*D2Bb(2,3,b)
+     2           + Bb(3,1,a)*D2Bb(3,3,b)
+            lK(3,a,b) = lK(3,a,b) + w*BtDB
+
+            BtDB = Bb(1,2,a)*D2Bb(1,1,b) + Bb(2,2,a)*D2Bb(2,1,b)
+     2           + Bb(3,2,a)*D2Bb(3,1,b)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + w*BtDB
+
+            BtDB = Bb(1,2,a)*D2Bb(1,2,b) + Bb(2,2,a)*D2Bb(2,2,b)
+     2           + Bb(3,2,a)*D2Bb(3,2,b)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + w*BtDB
+
+            BtDB = Bb(1,2,a)*D2Bb(1,3,b) + Bb(2,2,a)*D2Bb(2,3,b)
+     2           + Bb(3,2,a)*D2Bb(3,3,b)
+            lK(dof+3,a,b) = lK(dof+3,a,b) + w*BtDB
+
+            BtDB = Bb(1,3,a)*D2Bb(1,1,b) + Bb(2,3,a)*D2Bb(2,1,b)
+     2           + Bb(3,3,a)*D2Bb(3,1,b)
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*BtDB
+
+            BtDB = Bb(1,3,a)*D2Bb(1,2,b) + Bb(2,3,a)*D2Bb(2,2,b)
+     2           + Bb(3,3,a)*D2Bb(3,2,b)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*BtDB
+
+            BtDB = Bb(1,3,a)*D2Bb(1,3,b) + Bb(2,3,a)*D2Bb(2,3,b)
+     2           + Bb(3,3,a)*D2Bb(3,3,b)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + w*BtDB
+         END DO
+      END DO
+
+!---------------------------------------------------------------------
 !     Global assembly
 #ifdef WITH_TRILINOS
       IF (eq(cEq)%assmTLS) THEN
@@ -500,25 +536,26 @@
       DEALLOCATE(N, Nx, lR, lK)
 
       RETURN
-      END SUBROUTINE SHELLTRI
+      END SUBROUTINE SHELLCST
 !--------------------------------------------------------------------
 !     This subroutine computes bending strain, Eb, and its variational
-!     derivative, Bb, for triangular shell elements
-      SUBROUTINE SHELLBENDTRI(lM, e, ptr, x0, xc, Eb, Bb)
+!     derivative, Bb, for CST elements
+      SUBROUTINE SHELLBENDCST(lM, e, ptr, x0, xc, bb_0, bb_x, Bb, vflag)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
+      LOGICAL, INTENT(IN) :: vflag
       TYPE(mshType), INTENT(IN) :: lM
       INTEGER(KIND=IKIND), INTENT(IN) :: e, ptr(6)
-      REAL(KIND=RKIND), INTENT(INOUT) ::  x0(3,6), xc(3,6), Eb(3),
-     2   Bb(3,3,6)
+      REAL(KIND=RKIND), INTENT(INOUT) ::  x0(3,6), xc(3,6)
+      REAL(KIND=RKIND), INTENT(OUT) :: bb_0(2,2), bb_x(2,2), Bb(3,3,6)
 
       LOGICAL :: bFlag, lFix(3)
       INTEGER(KIND=IKIND) :: i, j, p, f, eNoN
 
       REAL(KIND=RKIND) :: Jac0, Jac, cI, aIi, nV0(3), nV(3), eI(3),
-     2   nI(3), eIeI(3,3), nInI(3,3), eIaP(3,3), Im(3,3), gCov(3,2),
-     3   gCnv(3,2), gCov0(3,2), gCnv0(3,2)
+     2   nI(3), eIeI(3,3), nInI(3,3), eIaP(3,3), Im(3,3), aCov(3,2),
+     3   aCnv(3,2), aCov0(3,2), aCnv0(3,2)
 
       REAL(KIND=RKIND) :: a0(3,6), a(3,6), adg0(3,3), adg(3,3),
      2   xi0(3,3), xi(3,3), Tm0(3,3), Tm(3,3), v0(3), v(3), B1b(3,6),
@@ -547,17 +584,18 @@
 
 !     Covariant and contravariant bases in reference config
       tmpA = x0(:,1:lM%eNoN)
-      CALL GNNS(lM%eNoN, lM%Nx(:,:,1), tmpA, nV0, gCov0, gCnv0)
+      CALL GNNS(lM%eNoN, lM%Nx(:,:,1), tmpA, nV0, aCov0, aCnv0)
       Jac0 = SQRT(NORM(nV0))
       nV0  = nV0/Jac0
 
 !     Covariant and contravariant bases in current config
       tmpA = xc(:,1:lM%eNoN)
-      CALL GNNS(lM%eNoN, lM%Nx(:,:,1), tmpA, nV, gCov, gCnv)
+      CALL GNNS(lM%eNoN, lM%Nx(:,:,1), tmpA, nV, aCov, aCnv)
       Jac = SQRT(NORM(nV))
       nV  = nV/Jac
 
-!     Update position vector of surrounding nodes, if boundary elements
+!     Update the position vector of the `artificial' or `ghost' nodes
+!     depending on the boundary condition.
       IF (bFlag) THEN
          DO j=lM%eNoN+1, eNoN
             IF (ptr(j) .NE. 0) CYCLE
@@ -613,26 +651,26 @@
       a(:,6)    = xc(:,6) - xc(:,1)
 
 !     a.gCnv (reference config)
-      adg0(1,1) = NORM(a0(:,4), gCnv0(:,1)) ! xi_4
-      adg0(1,2) = NORM(a0(:,5), gCnv0(:,1)) ! xi_5
-      adg0(1,3) = NORM(a0(:,6), gCnv0(:,1)) ! xi_6
+      adg0(1,1) = NORM(a0(:,4), aCnv0(:,1)) ! xi_4
+      adg0(1,2) = NORM(a0(:,5), aCnv0(:,1)) ! xi_5
+      adg0(1,3) = NORM(a0(:,6), aCnv0(:,1)) ! xi_6
 
-      adg0(2,1) = NORM(a0(:,4), gCnv0(:,2)) ! eta_4
-      adg0(2,2) = NORM(a0(:,5), gCnv0(:,2)) ! eta_5
-      adg0(2,3) = NORM(a0(:,6), gCnv0(:,2)) ! eta_6
+      adg0(2,1) = NORM(a0(:,4), aCnv0(:,2)) ! eta_4
+      adg0(2,2) = NORM(a0(:,5), aCnv0(:,2)) ! eta_5
+      adg0(2,3) = NORM(a0(:,6), aCnv0(:,2)) ! eta_6
 
       adg0(3,1) = NORM(a0(:,4), nV0)        ! z_4
       adg0(3,2) = NORM(a0(:,5), nV0)        ! z_5
       adg0(3,3) = NORM(a0(:,6), nV0)        ! z_6
 
 !     a.gCnv (current config)
-      adg(1,1)  = NORM(a(:,4), gCnv(:,1)) ! xi_4
-      adg(1,2)  = NORM(a(:,5), gCnv(:,1)) ! xi_5
-      adg(1,3)  = NORM(a(:,6), gCnv(:,1)) ! xi_6
+      adg(1,1)  = NORM(a(:,4), aCnv(:,1)) ! xi_4
+      adg(1,2)  = NORM(a(:,5), aCnv(:,1)) ! xi_5
+      adg(1,3)  = NORM(a(:,6), aCnv(:,1)) ! xi_6
 
-      adg(2,1)  = NORM(a(:,4), gCnv(:,2)) ! eta_4
-      adg(2,2)  = NORM(a(:,5), gCnv(:,2)) ! eta_5
-      adg(2,3)  = NORM(a(:,6), gCnv(:,2)) ! eta_6
+      adg(2,1)  = NORM(a(:,4), aCnv(:,2)) ! eta_4
+      adg(2,2)  = NORM(a(:,5), aCnv(:,2)) ! eta_5
+      adg(2,3)  = NORM(a(:,6), aCnv(:,2)) ! eta_6
 
       adg(3,1)  = NORM(a(:,4), nV)        ! z_4
       adg(3,2)  = NORM(a(:,5), nV)        ! z_5
@@ -640,13 +678,13 @@
 
 !     Xi matrix (reference config)
       xi0(:,:)  = adg0(:,:)
-      xi0(1,1)  = adg0(1,1) + 1._RKIND
-      xi0(2,2)  = adg0(2,2) + 1._RKIND
+      xi0(1,3)  = adg0(1,3) + 1._RKIND    ! xi_6
+      xi0(2,1)  = adg0(2,1) + 1._RKIND    ! eta_4
 
 !     Xi matrix (current config)
       xi(:,:)   = adg(:,:)
-      xi(1,1)   = adg(1,1) + 1._RKIND
-      xi(2,2)   = adg(2,2) + 1._RKIND
+      xi(1,3)   = adg(1,3) + 1._RKIND     ! xi_6
+      xi(2,1)   = adg(2,1) + 1._RKIND     ! eta_4
 
 !     Tmat and inverse (reference config)
       DO i=1, 3
@@ -669,13 +707,27 @@
       v0(2) = Tm0(2,1)*xi0(3,1) + Tm0(2,2)*xi0(3,2) + Tm0(2,3)*xi0(3,3)
       v0(3) = Tm0(3,1)*xi0(3,1) + Tm0(3,2)*xi0(3,2) + Tm0(3,3)*xi0(3,3)
 
+!     Curvature coefficients (ref. config)
+      bb_0(1,1) = 2._RKIND*v0(1)
+      bb_0(2,2) = 2._RKIND*v0(2)
+      bb_0(1,2) = v0(3)
+      bb_0(2,1) = bb_0(1,2)
+
 !     v = Inv(T) * z (current config)
       v(1) = Tm(1,1)*xi(3,1) + Tm(1,2)*xi(3,2) + Tm(1,3)*xi(3,3)
       v(2) = Tm(2,1)*xi(3,1) + Tm(2,2)*xi(3,2) + Tm(2,3)*xi(3,3)
       v(3) = Tm(3,1)*xi(3,1) + Tm(3,2)*xi(3,2) + Tm(3,3)*xi(3,3)
 
-!     Bending strain, Eb = 2*(v0-v) = 2*(Tinv0*z0 - Tinv*z)
-      Eb(:) = 2._RKIND * (v0(:) - v(:))
+!     Curvature coefficients (current config)
+      bb_x(1,1) = 2._RKIND*v(1)
+      bb_x(2,2) = 2._RKIND*v(2)
+      bb_x(1,2) = v(3)
+      bb_x(2,1) = bb_x(1,2)
+
+      IF (.NOT.vflag) THEN
+         Bb(:,:,:) = 0._RKIND
+         RETURN
+      END IF
 
 !     Now compute variation in bending strain
 !     B1 bar
@@ -696,26 +748,26 @@
 
 !     H1
       H1 = 0._RKIND
-      H1(1, 4: 6) =  gCnv(:,1)*adg(2,1)
-      H1(2, 4: 6) =  gCnv(:,2)*adg(2,1)
-      H1(3, 4: 6) =  gCnv(:,1)*adg(2,2)
-      H1(4, 4: 6) =  gCnv(:,2)*adg(2,2)
-      H1(5, 4: 6) =  gCnv(:,1)*adg(2,3)
-      H1(6, 4: 6) =  gCnv(:,2)*adg(2,3)
+      H1(1, 1: 3) =  aCnv(:,1)*adg(2,1)
+      H1(2, 1: 3) =  aCnv(:,2)*adg(2,1)
+      H1(3, 1: 3) =  aCnv(:,1)*adg(2,2)
+      H1(4, 1: 3) =  aCnv(:,2)*adg(2,2)
+      H1(5, 1: 3) =  aCnv(:,1)*adg(2,3)
+      H1(6, 1: 3) =  aCnv(:,2)*adg(2,3)
 
-      H1(1, 7: 9) = -gCnv(:,1)*adg(1,1)
-      H1(2, 7: 9) = -gCnv(:,2)*adg(1,1)
-      H1(3, 7: 9) = -gCnv(:,1)*adg(1,2)
-      H1(4, 7: 9) = -gCnv(:,2)*adg(1,2)
-      H1(5, 7: 9) = -gCnv(:,1)*adg(1,3)
-      H1(6, 7: 9) = -gCnv(:,2)*adg(1,3)
+      H1(1, 4: 6) = -aCnv(:,1)*adg(1,1)
+      H1(2, 4: 6) = -aCnv(:,2)*adg(1,1)
+      H1(3, 4: 6) = -aCnv(:,1)*adg(1,2)
+      H1(4, 4: 6) = -aCnv(:,2)*adg(1,2)
+      H1(5, 4: 6) = -aCnv(:,1)*adg(1,3)
+      H1(6, 4: 6) = -aCnv(:,2)*adg(1,3)
 
-      H1(1,10:12) =  gCnv(:,1)
-      H1(2,10:12) =  gCnv(:,2)
-      H1(3,13:15) =  gCnv(:,1)
-      H1(4,13:15) =  gCnv(:,2)
-      H1(5,16:18) =  gCnv(:,1)
-      H1(6,16:18) =  gCnv(:,2)
+      H1(1,10:12) =  aCnv(:,1)
+      H1(2,10:12) =  aCnv(:,2)
+      H1(3,13:15) =  aCnv(:,1)
+      H1(4,13:15) =  aCnv(:,2)
+      H1(5,16:18) =  aCnv(:,1)
+      H1(6,16:18) =  aCnv(:,2)
 
 !     H2
       H2 = 0._RKIND
@@ -757,9 +809,9 @@
 !     M1, M2 matrices
       Mm(:,:,:) = 0._RKIND
       DO i=1, 2
-         Mm(1,2,i) = -gCov(3,i)
-         Mm(1,3,i) =  gCov(2,i)
-         Mm(2,3,i) = -gCov(1,i)
+         Mm(1,2,i) = -aCov(3,i)
+         Mm(1,3,i) =  aCov(2,i)
+         Mm(2,3,i) = -aCov(1,i)
 
 !        Skew-symmetric
          Mm(2,1,i) = -Mm(1,2,i)
@@ -770,6 +822,20 @@
 !     H3 matrix
       H3 = 0._RKIND
       tmpA = MATMUL(Nm, Mm(:,:,1))
+      tmpA = -tmpA / Jac
+      H3(1,1) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
+      H3(1,2) = a(1,4)*tmpA(1,2) + a(2,4)*tmpA(2,2) + a(3,4)*tmpA(3,2)
+      H3(1,3) = a(1,4)*tmpA(1,3) + a(2,4)*tmpA(2,3) + a(3,4)*tmpA(3,3)
+
+      H3(2,1) = a(1,5)*tmpA(1,1) + a(2,5)*tmpA(2,1) + a(3,5)*tmpA(3,1)
+      H3(2,2) = a(1,5)*tmpA(1,2) + a(2,5)*tmpA(2,2) + a(3,5)*tmpA(3,2)
+      H3(2,3) = a(1,5)*tmpA(1,3) + a(2,5)*tmpA(2,3) + a(3,5)*tmpA(3,3)
+
+      H3(3,1) = a(1,6)*tmpA(1,1) + a(2,6)*tmpA(2,1) + a(3,6)*tmpA(3,1)
+      H3(3,2) = a(1,6)*tmpA(1,2) + a(2,6)*tmpA(2,2) + a(3,6)*tmpA(3,2)
+      H3(3,3) = a(1,6)*tmpA(1,3) + a(2,6)*tmpA(2,3) + a(3,6)*tmpA(3,3)
+
+      tmpA = MATMUL(Nm, Mm(:,:,2))
       tmpA = -tmpA / Jac
       H3(1,4) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
       H3(1,5) = a(1,4)*tmpA(1,2) + a(2,4)*tmpA(2,2) + a(3,4)*tmpA(3,2)
@@ -782,20 +848,6 @@
       H3(3,4) = a(1,6)*tmpA(1,1) + a(2,6)*tmpA(2,1) + a(3,6)*tmpA(3,1)
       H3(3,5) = a(1,6)*tmpA(1,2) + a(2,6)*tmpA(2,2) + a(3,6)*tmpA(3,2)
       H3(3,6) = a(1,6)*tmpA(1,3) + a(2,6)*tmpA(2,3) + a(3,6)*tmpA(3,3)
-
-      tmpA = MATMUL(Nm, Mm(:,:,2))
-      tmpA = -tmpA / Jac
-      H3(1,7) = a(1,4)*tmpA(1,1) + a(2,4)*tmpA(2,1) + a(3,4)*tmpA(3,1)
-      H3(1,8) = a(1,4)*tmpA(1,2) + a(2,4)*tmpA(2,2) + a(3,4)*tmpA(3,2)
-      H3(1,9) = a(1,4)*tmpA(1,3) + a(2,4)*tmpA(2,3) + a(3,4)*tmpA(3,3)
-
-      H3(2,7) = a(1,5)*tmpA(1,1) + a(2,5)*tmpA(2,1) + a(3,5)*tmpA(3,1)
-      H3(2,8) = a(1,5)*tmpA(1,2) + a(2,5)*tmpA(2,2) + a(3,5)*tmpA(3,2)
-      H3(2,9) = a(1,5)*tmpA(1,3) + a(2,5)*tmpA(2,3) + a(3,5)*tmpA(3,3)
-
-      H3(3,7) = a(1,6)*tmpA(1,1) + a(2,6)*tmpA(2,1) + a(3,6)*tmpA(3,1)
-      H3(3,8) = a(1,6)*tmpA(1,2) + a(2,6)*tmpA(2,2) + a(3,6)*tmpA(3,2)
-      H3(3,9) = a(1,6)*tmpA(1,3) + a(2,6)*tmpA(2,3) + a(3,6)*tmpA(3,3)
 
       H3(1,10:12) = nV(:)
       H3(2,13:15) = nV(:)
@@ -843,6 +895,9 @@
             END IF
 
 !           Update Bb now
+!           Free boundary conditions: assumed that the `artificial'
+!           triangle is always located in the plane of the main element
+!           of the patch
             IF (BTEST(lM%sbc(i,e),bType_free)) THEN
 !              E_I
                IF (.NOT.lFix(i)) THEN
@@ -861,6 +916,9 @@
                   Bb(:,:,f) = Bb(:,:,f) + MATMUL(Bb(:,:,j), tmpA)
                END IF
                Bb(:,:,j) = 0._RKIND
+
+!           Hinged boundary conditions: a special case of simple support
+!           in which no translation displacements are allowed.
             ELSE IF (BTEST(lM%sbc(i,e),bType_hing)) THEN
 !              E_I
                IF (.NOT.lFix(i)) THEN
@@ -872,6 +930,9 @@
                Bb(:,:,p) = 0._RKIND
                Bb(:,:,f) = 0._RKIND
                Bb(:,:,j) = 0._RKIND
+
+!           Fixed boundary condition: no displacements and no rotations
+!           are allowed.
             ELSE IF (BTEST(lM%sbc(i,e),bType_fix)) THEN
                IF (.NOT.lFix(i)) THEN
                   tmpA = Im - 2._RKIND*nInI
@@ -881,6 +942,8 @@
                lFix(f)   = .TRUE.
                Bb(:,:,f) = 0._RKIND
                Bb(:,:,p) = 0._RKIND
+
+!           Symmetric BCs (need to be verified)
             ELSE IF (BTEST(lM%sbc(i,e),bType_symm)) THEN
                IF (.NOT.lFix(i)) THEN
                   tmpA = Im - 2._RKIND*nInI
@@ -899,10 +962,449 @@
       END IF
 
       RETURN
-      END SUBROUTINE SHELLBENDTRI
-!--------------------------------------------------------------------
-!     Set follower pressure load/net traction on shells
-      SUBROUTINE SHELLFP (eNoN, w, N, Nx, dl, xl, tfl, lR, lK)
+      END SUBROUTINE SHELLBENDCST
+!####################################################################
+!     Construct shell mechanics for higher order elements/NURBS
+      SUBROUTINE SHELL3D (lM, g, eNoN, nFn, fN, al, yl, dl, xl, bfl,
+     2   lR, lK)
+      USE COMMOD
+      USE MATFUN
+      IMPLICIT NONE
+      TYPE(mshType), INTENT(IN) :: lM
+      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN, nFn
+      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
+     2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN), fN(3,nFn)
+      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
+     2   lK(dof*dof,eNoN,eNoN)
+
+      INTEGER(KIND=IKIND) :: i, j, k, l, a, b, iFn
+      REAL(KIND=RKIND) :: amd, afl, rho, dmp, ht, w, wh, Jac0, Jac,
+     2   lam3, fb(3), ud(3), nV0(3), nV(3), N(eNoN), x0(3,eNoN),
+     3   xc(3,eNoN), Nx(2,eNoN), Nxx(3,eNoN), aCov0(3,2), aCov(3,2),
+     4   aCnv0(3,2), aCnv(3,2), r0_xx(2,2,3), r_xx(2,2,3), aa_0(2,2),
+     5   aa_x(2,2), bb_0(2,2), bb_x(2,2), Sm(3,2), Dm(3,3,3), Kc(3,3),
+     6   Nm(3,3), Mm(3,3), KNmMm(3,3,2), Bm(3,3,eNoN), Bb(3,3,eNoN),
+     7   D0Bm(3,3,eNoN), D1Bm(3,3,eNoN), D1Bb(3,3,eNoN), D2Bb(3,3,eNoN),
+     8   T1, BmS, BbS, NxSNx, BmDBm, BmDBb, BbDBm, BbDBb, fNa0(2,nFn)
+
+!     Define parameters
+      rho   = eq(cEq)%dmn(cDmn)%prop(solid_density)
+      dmp   = eq(cEq)%dmn(cDmn)%prop(damping)
+      ht    = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
+      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
+      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
+      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
+
+      amd  = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
+      afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
+
+      i    = eq(cEq)%s
+      j    = i + 1
+      k    = j + 1
+
+!     Get the reference configuration
+      x0(:,:) = xl(:,:)
+
+!     Get the current configuration
+      DO a=1, eNoN
+         xc(1,a) = x0(1,a) + dl(i,a)
+         xc(2,a) = x0(2,a) + dl(j,a)
+         xc(3,a) = x0(3,a) + dl(k,a)
+      END DO
+
+!     Define shape functions and their derivatives at Gauss point
+      IF (lM%eType .EQ. eType_NRB) THEN
+         N   = lM%N(:,g)
+         Nx  = lM%Nx(:,:,g)
+         Nxx = lM%Nxx(:,:,g)
+      ELSE
+         N   = lM%fs(1)%N(:,g)
+         Nx  = lM%fs(1)%Nx(:,:,g)
+         Nxx = lM%fs(1)%Nxx(:,:,g)
+      END IF
+
+c=====================================================================
+c    TODO: Might have to call GNNxx for Jacobian transformation. Check
+c    formulation again.
+c
+c     CALL GNNxx(3, eNoN, 2, lM%fs(1)%Nx(:,:,g), lM%fs(1)%Nxx(:,:,g),
+c        xl, Nx, Nxx)
+c
+c=====================================================================
+
+!---------------------------------------------------------------------
+!     Compute preliminaries on the reference configuration
+!     Covariant and contravariant bases (reference config)
+      CALL GNNS(eNoN, Nx, x0, nV0, aCov0, aCnv0)
+      Jac0 = SQRT(NORM(nV0))
+      nV0  = nV0/Jac0
+
+!     Second derivatives for computing curvature coeffs. (ref. config)
+      r0_xx(:,:,:) = 0._RKIND
+      DO a=1, eNoN
+         r0_xx(1,1,:) = r0_xx(1,1,:) + Nxx(1,a)*x0(:,a)
+         r0_xx(2,2,:) = r0_xx(2,2,:) + Nxx(2,a)*x0(:,a)
+         r0_xx(1,2,:) = r0_xx(1,2,:) + Nxx(3,a)*x0(:,a)
+      END DO
+      r0_xx(2,1,:) = r0_xx(1,2,:)
+
+!     Compute metric tensor and curvature coefficients (ref. config)
+      aa_0 = 0._RKIND
+      bb_0 = 0._RKIND
+      DO l=1, nsd
+         aa_0(1,1) = aa_0(1,1) + aCov0(l,1)*aCov0(l,1)
+         aa_0(1,2) = aa_0(1,2) + aCov0(l,1)*aCov0(l,2)
+         aa_0(2,1) = aa_0(2,1) + aCov0(l,2)*aCov0(l,1)
+         aa_0(2,2) = aa_0(2,2) + aCov0(l,2)*aCov0(l,2)
+
+         bb_0(1,1) = bb_0(1,1) + r0_xx(1,1,l)*nV0(l)
+         bb_0(1,2) = bb_0(1,2) + r0_xx(1,2,l)*nV0(l)
+         bb_0(2,1) = bb_0(2,1) + r0_xx(2,1,l)*nV0(l)
+         bb_0(2,2) = bb_0(2,2) + r0_xx(2,2,l)*nV0(l)
+      END DO
+
+!     Compute fiber orientation in curvature coordinates
+      fNa0 = 0._RKIND
+      DO iFn=1, nFn
+         DO l=1, 3
+            fNa0(1,iFn) = fNa0(1,iFn) + fN(l,iFn)*aCnv0(l,1)
+            fNa0(2,iFn) = fNa0(2,iFn) + fN(l,iFn)*aCnv0(l,2)
+         END DO
+      END DO
+
+!---------------------------------------------------------------------
+!     Now compute preliminaries on the current configuration
+!     Covariant and contravariant bases (current/spatial config)
+      CALL GNNS(eNoN, Nx, xc, nV, aCov, aCnv)
+      Jac = SQRT(NORM(nV))
+      nV  = nV/Jac
+
+!     Second derivatives for computing curvature coeffs. (cur. config)
+      r_xx(:,:,:) = 0._RKIND
+      DO a=1, eNoN
+         r_xx(1,1,:) = r_xx(1,1,:) + Nxx(1,a)*xc(:,a)
+         r_xx(2,2,:) = r_xx(2,2,:) + Nxx(2,a)*xc(:,a)
+         r_xx(1,2,:) = r_xx(1,2,:) + Nxx(3,a)*xc(:,a)
+      END DO
+      r_xx(2,1,:) = r_xx(1,2,:)
+
+!     Compute metric tensor and curvature coefficients (cur. config)
+      aa_x = 0._RKIND
+      bb_x = 0._RKIND
+      DO l=1, nsd
+         aa_x(1,1) = aa_x(1,1) + aCov(l,1)*aCov(l,1)
+         aa_x(1,2) = aa_x(1,2) + aCov(l,1)*aCov(l,2)
+         aa_x(2,1) = aa_x(2,1) + aCov(l,2)*aCov(l,1)
+         aa_x(2,2) = aa_x(2,2) + aCov(l,2)*aCov(l,2)
+
+         bb_x(1,1) = bb_x(1,1) + r_xx(1,1,l)*nV(l)
+         bb_x(1,2) = bb_x(1,2) + r_xx(1,2,l)*nV(l)
+         bb_x(2,1) = bb_x(2,1) + r_xx(2,1,l)*nV(l)
+         bb_x(2,2) = bb_x(2,2) + r_xx(2,2,l)*nV(l)
+      END DO
+
+!---------------------------------------------------------------------
+!     Compute stress resultants by integrating 2nd Piola Kirchhoff
+!     stress and elasticity tensors through the shell thickness. These
+!     resultants are computed in Voigt notation.
+      CALL SHL_STRS_RES(eq(cEq)%dmn(cDmn), nFn, fNa0, aa_0, aa_x, bb_0,
+     2   bb_x, lam3, Sm, Dm)
+
+!---------------------------------------------------------------------
+!     Variation in the membrane strain
+      Bm = 0._RKIND
+      DO a=1, eNoN
+         Bm(1,1,a) = Nx(1,a)*aCov(1,1)
+         Bm(1,2,a) = Nx(1,a)*aCov(2,1)
+         Bm(1,3,a) = Nx(1,a)*aCov(3,1)
+
+         Bm(2,1,a) = Nx(2,a)*aCov(1,2)
+         Bm(2,2,a) = Nx(2,a)*aCov(2,2)
+         Bm(2,3,a) = Nx(2,a)*aCov(3,2)
+
+         Bm(3,1,a) = Nx(2,a)*aCov(1,1) + Nx(1,a)*aCov(1,2)
+         Bm(3,2,a) = Nx(2,a)*aCov(2,1) + Nx(1,a)*aCov(2,2)
+         Bm(3,3,a) = Nx(2,a)*aCov(3,1) + Nx(1,a)*aCov(3,2)
+      END DO
+
+!---------------------------------------------------------------------
+!     Variation in the bending strain
+!     dB = -(B1 + B2) du; B1 = N_xx * n;
+!     B2 = (r_xx Nm M1 Nx - r_xx N M2 Nx)
+
+!     Second derivatives of the position vector (current)
+      Kc(1,:) = r_xx(1,1,:)
+      Kc(2,:) = r_xx(2,2,:)
+      Kc(3,:) = r_xx(1,2,:)  + r_xx(2,1,:)
+
+!     N matrix
+      Nm = MAT_ID(3) - MAT_DYADPROD(nV, nV, 3)
+      Nm = Nm / Jac
+
+!     M1, M2 matrices
+      DO l=1, 2
+         Mm(:,:) = 0._RKIND
+         Mm(1,2) = -aCov(3,l)
+         Mm(1,3) =  aCov(2,l)
+         Mm(2,3) = -aCov(1,l)
+
+!        Skew-symmetric
+         Mm(2,1) = -Mm(1,2)
+         Mm(3,1) = -Mm(1,3)
+         Mm(3,2) = -Mm(2,3)
+
+         KNmMm(:,:,l) = MATMUL(Kc, MATMUL(Nm, Mm))
+      END DO
+
+!     Define variation in bending strain tensor (Bb), Voigt notation
+      Bb = 0._RKIND
+      DO a=1, eNoN
+         Bb(1,:,a) = -Nxx(1,a)*nV(:)
+         Bb(2,:,a) = -Nxx(2,a)*nV(:)
+         Bb(3,:,a) = -Nxx(3,a)*nV(:)*2._RKIND
+      END DO
+
+      DO a=1, eNoN
+         Bb(:,:,a) = Bb(:,:,a) + Nx(1,a)*KNmMm(:,:,2) -
+     2      Nx(2,a)*KNmMm(:,:,1)
+      END DO
+
+!---------------------------------------------------------------------
+!     Contribution to tangent matrices: Dm * Bm, Dm*Bb
+      DO a=1, eNoN
+         D0Bm(:,:,a) = MATMUL(Dm(:,:,1), Bm(:,:,a))
+         D1Bm(:,:,a) = MATMUL(Dm(:,:,2), Bm(:,:,a))
+         D1Bb(:,:,a) = MATMUL(Dm(:,:,2), Bb(:,:,a))
+         D2Bb(:,:,a) = MATMUL(Dm(:,:,3), Bb(:,:,a))
+      END DO
+
+!---------------------------------------------------------------------
+!     Acceleration and mass damping at the integration point
+      ud = -fb
+      DO a=1, eNoN
+         ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
+         ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
+         ud(3) = ud(3) + N(a)*(rho*(al(k,a)-bfl(3,a)) + dmp*yl(k,a))
+      END DO
+
+!     Local residue
+      w  = lM%w(g)*Jac0
+      wh = w*ht
+      DO a=1, eNoN
+         BmS = Bm(1,1,a)*Sm(1,1) + Bm(2,1,a)*Sm(2,1) + Bm(3,1,a)*Sm(3,1)
+         BbS = Bb(1,1,a)*Sm(1,2) + Bb(2,1,a)*Sm(2,2) + Bb(3,1,a)*Sm(3,2)
+         lR(1,a) = lR(1,a) + wh*N(a)*ud(1) + w*(BmS + BbS)
+
+         BmS = Bm(1,2,a)*Sm(1,1) + Bm(2,2,a)*Sm(2,1) + Bm(3,2,a)*Sm(3,1)
+         BbS = Bb(1,2,a)*Sm(1,2) + Bb(2,2,a)*Sm(2,2) + Bb(3,2,a)*Sm(3,2)
+         lR(2,a) = lR(2,a) + wh*N(a)*ud(2) + w*(BmS + BbS)
+
+         BmS = Bm(1,3,a)*Sm(1,1) + Bm(2,3,a)*Sm(2,1) + Bm(3,3,a)*Sm(3,1)
+         BbS = Bb(1,3,a)*Sm(1,2) + Bb(2,3,a)*Sm(2,2) + Bb(3,3,a)*Sm(3,2)
+         lR(3,a) = lR(3,a) + wh*N(a)*ud(3) + w*(BmS + BbS)
+      END DO
+
+!     Local stiffness
+      amd = wh*amd
+      afl = w*afl
+      DO b=1, eNoN
+         DO a=1, eNoN
+!           Contribution from inertia and geometric stiffness
+            NxSNx = Nx(1,a)*Nx(1,b)*Sm(1,1) + Nx(2,a)*Nx(2,b)*Sm(2,1)
+     2            + Nx(1,a)*Nx(2,b)*Sm(3,1) + Nx(2,a)*Nx(1,b)*Sm(3,1)
+            T1 = amd*N(a)*N(b) + afl*NxSNx
+
+            lK(1,a,b) = lK(1,a,b) + T1
+            lK(dof+2,a,b) = lK(dof+2,a,b) + T1
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + T1
+
+!           Contribution from material stiffness
+            BmDBm = Bm(1,1,a)*D0Bm(1,1,b) + Bm(2,1,a)*D0Bm(2,1,b)
+     2            + Bm(3,1,a)*D0Bm(3,1,b)
+            BmDBb = Bm(1,1,a)*D1Bb(1,1,b) + Bm(2,1,a)*D1Bb(2,1,b)
+     2            + Bm(3,1,a)*D1Bb(3,1,b)
+            BbDBm = Bb(1,1,a)*D1Bm(1,1,b) + Bb(2,1,a)*D1Bm(2,1,b)
+     2            + Bb(3,1,a)*D1Bm(3,1,b)
+            BbDBb = Bb(1,1,a)*D2Bb(1,1,b) + Bb(2,1,a)*D2Bb(2,1,b)
+     2            + Bb(3,1,a)*D2Bb(3,1,b)
+            lK(1,a,b) = lK(1,a,b) + afl*(BmDBm + BmDBb + BbDBm + BbDBb)
+
+            BmDBm = Bm(1,1,a)*D0Bm(1,2,b) + Bm(2,1,a)*D0Bm(2,2,b)
+     2            + Bm(3,1,a)*D0Bm(3,2,b)
+            BmDBb = Bm(1,1,a)*D1Bb(1,2,b) + Bm(2,1,a)*D1Bb(2,2,b)
+     2            + Bm(3,1,a)*D1Bb(3,2,b)
+            BbDBm = Bb(1,1,a)*D1Bm(1,2,b) + Bb(2,1,a)*D1Bm(2,2,b)
+     2            + Bb(3,1,a)*D1Bm(3,2,b)
+            BbDBb = Bb(1,1,a)*D2Bb(1,2,b) + Bb(2,1,a)*D2Bb(2,2,b)
+     2            + Bb(3,1,a)*D2Bb(3,2,b)
+            lK(2,a,b) = lK(2,a,b) + afl*(BmDBm + BmDBb + BbDBm + BbDBb)
+
+            BmDBm = Bm(1,1,a)*D0Bm(1,3,b) + Bm(2,1,a)*D0Bm(2,3,b)
+     2            + Bm(3,1,a)*D0Bm(3,3,b)
+            BmDBb = Bm(1,1,a)*D1Bb(1,3,b) + Bm(2,1,a)*D1Bb(2,3,b)
+     2            + Bm(3,1,a)*D1Bb(3,3,b)
+            BbDBm = Bb(1,1,a)*D1Bm(1,3,b) + Bb(2,1,a)*D1Bm(2,3,b)
+     2            + Bb(3,1,a)*D1Bm(3,3,b)
+            BbDBb = Bb(1,1,a)*D2Bb(1,3,b) + Bb(2,1,a)*D2Bb(2,3,b)
+     2            + Bb(3,1,a)*D2Bb(3,3,b)
+            lK(3,a,b) = lK(3,a,b) + afl*(BmDBm + BmDBb + BbDBm + BbDBb)
+
+            BmDBm = Bm(1,2,a)*D0Bm(1,1,b) + Bm(2,2,a)*D0Bm(2,1,b)
+     2            + Bm(3,2,a)*D0Bm(3,1,b)
+            BmDBb = Bm(1,2,a)*D1Bb(1,1,b) + Bm(2,2,a)*D1Bb(2,1,b)
+     2            + Bm(3,2,a)*D1Bb(3,1,b)
+            BbDBm = Bb(1,2,a)*D1Bm(1,1,b) + Bb(2,2,a)*D1Bm(2,1,b)
+     2            + Bb(3,2,a)*D1Bm(3,1,b)
+            BbDBb = Bb(1,2,a)*D2Bb(1,1,b) + Bb(2,2,a)*D2Bb(2,1,b)
+     2            + Bb(3,2,a)*D2Bb(3,1,b)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + afl*(BmDBm + BmDBb + BbDBm
+     2         + BbDBb)
+
+            BmDBm = Bm(1,2,a)*D0Bm(1,2,b) + Bm(2,2,a)*D0Bm(2,2,b)
+     2            + Bm(3,2,a)*D0Bm(3,2,b)
+            BmDBb = Bm(1,2,a)*D1Bb(1,2,b) + Bm(2,2,a)*D1Bb(2,2,b)
+     2            + Bm(3,2,a)*D1Bb(3,2,b)
+            BbDBm = Bb(1,2,a)*D1Bm(1,2,b) + Bb(2,2,a)*D1Bm(2,2,b)
+     2            + Bb(3,2,a)*D1Bm(3,2,b)
+            BbDBb = Bb(1,2,a)*D2Bb(1,2,b) + Bb(2,2,a)*D2Bb(2,2,b)
+     2            + Bb(3,2,a)*D2Bb(3,2,b)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + afl*(BmDBm + BmDBb + BbDBm
+     2         + BbDBb)
+
+            BmDBm = Bm(1,2,a)*D0Bm(1,3,b) + Bm(2,2,a)*D0Bm(2,3,b)
+     2            + Bm(3,2,a)*D0Bm(3,3,b)
+            BmDBb = Bm(1,2,a)*D1Bb(1,3,b) + Bm(2,2,a)*D1Bb(2,3,b)
+     2            + Bm(3,2,a)*D1Bb(3,3,b)
+            BbDBm = Bb(1,2,a)*D1Bm(1,3,b) + Bb(2,2,a)*D1Bm(2,3,b)
+     2            + Bb(3,2,a)*D1Bm(3,3,b)
+            BbDBb = Bb(1,2,a)*D2Bb(1,3,b) + Bb(2,2,a)*D2Bb(2,3,b)
+     2            + Bb(3,2,a)*D2Bb(3,3,b)
+            lK(dof+3,a,b) = lK(dof+3,a,b) + afl*(BmDBm + BmDBb + BbDBm
+     2         + BbDBb)
+
+            BmDBm = Bm(1,3,a)*D0Bm(1,1,b) + Bm(2,3,a)*D0Bm(2,1,b)
+     2            + Bm(3,3,a)*D0Bm(3,1,b)
+            BmDBb = Bm(1,3,a)*D1Bb(1,1,b) + Bm(2,3,a)*D1Bb(2,1,b)
+     2            + Bm(3,3,a)*D1Bb(3,1,b)
+            BbDBm = Bb(1,3,a)*D1Bm(1,1,b) + Bb(2,3,a)*D1Bm(2,1,b)
+     2            + Bb(3,3,a)*D1Bm(3,1,b)
+            BbDBb = Bb(1,3,a)*D2Bb(1,1,b) + Bb(2,3,a)*D2Bb(2,1,b)
+     2            + Bb(3,3,a)*D2Bb(3,1,b)
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + afl*(BmDBm + BmDBb
+     2         + BbDBm + BbDBb)
+
+            BmDBm = Bm(1,3,a)*D0Bm(1,2,b) + Bm(2,3,a)*D0Bm(2,2,b)
+     2            + Bm(3,3,a)*D0Bm(3,2,b)
+            BmDBb = Bm(1,3,a)*D1Bb(1,2,b) + Bm(2,3,a)*D1Bb(2,2,b)
+     2            + Bm(3,3,a)*D1Bb(3,2,b)
+            BbDBm = Bb(1,3,a)*D1Bm(1,2,b) + Bb(2,3,a)*D1Bm(2,2,b)
+     2            + Bb(3,3,a)*D1Bm(3,2,b)
+            BbDBb = Bb(1,3,a)*D2Bb(1,2,b) + Bb(2,3,a)*D2Bb(2,2,b)
+     2            + Bb(3,3,a)*D2Bb(3,2,b)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + afl*(BmDBm + BmDBb
+     2         + BbDBm + BbDBb)
+
+            BmDBm = Bm(1,3,a)*D0Bm(1,3,b) + Bm(2,3,a)*D0Bm(2,3,b)
+     2            + Bm(3,3,a)*D0Bm(3,3,b)
+            BmDBb = Bm(1,3,a)*D1Bb(1,3,b) + Bm(2,3,a)*D1Bb(2,3,b)
+     2            + Bm(3,3,a)*D1Bb(3,3,b)
+            BbDBm = Bb(1,3,a)*D1Bm(1,3,b) + Bb(2,3,a)*D1Bm(2,3,b)
+     2            + Bb(3,3,a)*D1Bm(3,3,b)
+            BbDBb = Bb(1,3,a)*D2Bb(1,3,b) + Bb(2,3,a)*D2Bb(2,3,b)
+     2            + Bb(3,3,a)*D2Bb(3,3,b)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + afl*(BmDBm + BmDBb
+     2         + BbDBm + BbDBb)
+         END DO
+      END DO
+
+      RETURN
+      END SUBROUTINE SHELL3D
+!####################################################################
+!     Compute stress resultants for shell elements
+      SUBROUTINE SHL_STRS_RES(lDmn, nFn, fNa0, aa_0, aa_x, bb_0, bb_x,
+     2   lam3, Sm, Dm)
+      USE COMMOD
+      IMPLICIT NONE
+      TYPE(dmnType), INTENT(IN) :: lDmn
+      INTEGER(KIND=IKIND), INTENT(IN) :: nFn
+      REAL(KIND=RKIND), INTENT(IN) :: aa_0(2,2), aa_x(2,2), bb_0(2,2),
+     2   bb_x(2,2), fNa0(2,nFn)
+      REAL(KIND=RKIND), INTENT(OUT) :: lam3, Sm(3,2), Dm(3,3,3)
+
+      LOGICAL :: flag
+      INTEGER(KIND=IKIND) :: g
+      REAL(KIND=RKIND) :: ht, nu, xis, g33, xi(3), wh(3), wl(3),
+     2   gg_0(2,2), gg_x(2,2), Sml(3), Dml(3,3)
+
+!     Set shell thickness
+      ht = lDmn%prop(shell_thickness)
+      nu = lDmn%prop(poisson_ratio)
+
+!     Check for incompressibility
+      flag = .FALSE.
+      IF (ISZERO(nu-0.5_RKIND)) flag = .TRUE.
+
+!     Set integration parameters (Gauss coordinates and weights)
+      wh(1) = 5._RKIND/9._RKIND
+      wh(2) = 5._RKIND/9._RKIND
+      wh(3) = 8._RKIND/9._RKIND
+
+      xi(1) = -SQRT(0.6_RKIND)
+      xi(2) =  SQRT(0.6_RKIND)
+      xi(3) =  0._RKIND
+
+!     Initialize stress-resultants
+      Sm   = 0._RKIND
+      Dm   = 0._RKIND
+
+      Sml  = 0._RKIND
+      Dml  = 0._RKIND
+
+!     Averaged SQRT(g33) over the thickness
+      lam3 = 0._RKIND
+
+!     Gauss integration through shell thickness
+      DO g=1, 3
+!        Local shell thickness coordinate
+         xis = .5_RKIND*ht*xi(g)
+
+!        Metric coefficients in shell continuum (ref/cur)
+         gg_0(:,:) = aa_0(:,:) - 2._RKIND*xis*bb_0(:,:)
+         gg_x(:,:) = aa_x(:,:) - 2._RKIND*xis*bb_x(:,:)
+
+!        Get 2nd Piola-Kirchhoff and elasticity tensors
+         IF (flag) THEN
+!           For incompressible materials
+            CALL GETPK2CC_SHLi(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml,
+     2         Dml)
+         ELSE
+!           For compressible materials
+            CALL GETPK2CC_SHLc(lDmn, nFn, fNa0, gg_0, gg_x, g33, Sml,
+     2         Dml)
+         END IF
+
+         wl(1) = .5_RKIND*wh(g)*ht
+         wl(2) = wl(1) * xis
+         wl(3) = wl(2) * xis
+
+         lam3  = lam3 + wl(1)*SQRT(g33)
+
+         Sm(:,1) = Sm(:,1) + wl(1)*Sml(:)
+         Sm(:,2) = Sm(:,2) + wl(2)*Sml(:)
+
+         Dm(:,:,1) = Dm(:,:,1) + wl(1)*Dml(:,:)
+         Dm(:,:,2) = Dm(:,:,2) + wl(2)*Dml(:,:)
+         Dm(:,:,3) = Dm(:,:,3) + wl(3)*Dml(:,:)
+      END DO
+      lam3 = lam3 / ht
+
+      RETURN
+      END SUBROUTINE SHL_STRS_RES
+!####################################################################
+!     Set follower pressure load/net traction on shells. The traction
+!     on shells is treated as body force and the subroutine is called
+!     from BF.f
+      SUBROUTINE SHELLBF (eNoN, w, N, Nx, dl, xl, tfl, lR, lK)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -962,341 +1464,6 @@
       END DO
 
       RETURN
-      END SUBROUTINE SHELLFP
-!####################################################################
-      SUBROUTINE SHELLNRB (lM, g, eNoN, al, yl, dl, xl, bfl, lR, lK)
-      USE COMMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(mshType), INTENT(IN) :: lM
-      INTEGER(KIND=IKIND), INTENT(IN) :: g, eNoN
-      REAL(KIND=RKIND), INTENT(IN) :: al(tDof,eNoN), yl(tDof,eNoN),
-     2   dl(tDof,eNoN), xl(3,eNoN), bfl(3,eNoN)
-      REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoN),
-     2   lK(dof*dof,eNoN,eNoN)
-
-      INTEGER(KIND=IKIND) :: i, j, k, l, a, b
-      REAL(KIND=RKIND) :: rho, dmp, elM, nu, ht, amd, afl, w, wb, Jac0,
-     2   Jac, ud(3), fb(3), nV0(3), nV(3), gCov0(3,2), gCnv0(3,2),
-     3   gCov(3,2), gCnv(3,2), N(eNoN), Nx(2,eNoN), Nxx(3,eNoN),
-     3   x0(3,eNoN), xc(3,eNoN),Jm(2,2), eLoc(3,3), Qm(3,3), Dm(3,3),
-     4   Em(3), Eb(3), DEm(3), DEb(3), Bm(3,3,eNoN), Bb(3,3,eNoN),
-     5   K0(3,3), Kc(3,3), Nm(3,3), Mm(3,3,2), NmMm(3,3,2),
-     6   KNmMm(3,3,2), DBm(3,3,eNoN), DBb(3,3,eNoN), BtDEm, BtDEb,
-     7   NxSNx, BtDBm, BtDBb, T1
-
-!     Define parameters
-      rho   = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      dmp   = eq(cEq)%dmn(cDmn)%prop(damping)
-      elM   = eq(cEq)%dmn(cDmn)%prop(elasticity_modulus)
-      nu    = eq(cEq)%dmn(cDmn)%prop(poisson_ratio)
-      ht    = eq(cEq)%dmn(cDmn)%prop(shell_thickness)
-      fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
-      fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
-      fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
-
-      amd  = eq(cEq)%am*rho + eq(cEq)%af*eq(cEq)%gam*dt*dmp
-      afl  = eq(cEq)%af*eq(cEq)%beta*dt*dt
-      i    = eq(cEq)%s
-      j    = i + 1
-      k    = j + 1
-
-!     Get the reference configuration
-      x0(:,:) = xl(:,:)
-
-!     Get the current configuration
-      DO a=1, eNoN
-         xc(1,a) = x0(1,a) + dl(i,a)
-         xc(2,a) = x0(2,a) + dl(j,a)
-         xc(3,a) = x0(3,a) + dl(k,a)
-      END DO
-
-!     Define shape functions and their derivatives at Gauss point
-      N   = lM%N(:,g)
-      Nx  = lM%Nx(:,:,g)
-      Nxx = lM%Nxx(:,:,g)
-
-!     Covariant and contravariant bases in reference config
-      CALL GNNS(eNoN, Nx, x0, nV0, gCov0, gCnv0)
-      Jac0 = SQRT(NORM(nV0))
-      nV0  = nV0/Jac0
-
-!     Covariant and contravariant bases in current config
-      CALL GNNS(eNoN, Nx, xc, nV, gCov, gCnv)
-      Jac = SQRT(NORM(nV))
-      nV  = nV/Jac
-
-!     Define local coordinates, Jacobian (J) and its inverse tensor
-!     defined in Voigt notation such that Q*E = J^{-T} * E * J^{-1})
-      eLoc(:,1) = gCov0(:,1)/SQRT(NORM(gCov0(:,1)))
-      eLoc(:,3) = nV0(:)
-
-      eLoc(1,2) = eLoc(2,3)*eLoc(3,1) - eLoc(3,3)*eLoc(2,1)
-      eLoc(2,2) = eLoc(3,3)*eLoc(1,1) - eLoc(1,3)*eLoc(3,1)
-      eLoc(3,2) = eLoc(1,3)*eLoc(2,1) - eLoc(2,3)*eLoc(1,1)
-
-      Jm(1,1) = NORM(gCov0(:,1), eLoc(:,1))
-      Jm(1,2) = NORM(gCov0(:,2), eLoc(:,1))
-      Jm(2,1) = NORM(gCov0(:,1), eLoc(:,2))
-      Jm(2,2) = NORM(gCov0(:,2), eLoc(:,2))
-
-      Qm = 0._RKIND
-      Qm(1,1) = 1._RKIND/(Jm(1,1)*Jm(1,1))
-      Qm(2,1) = (-Jm(1,2)/(Jm(1,1)*Jm(2,2)))**2._RKIND
-      Qm(2,2) = 1._RKIND/(Jm(2,2)*Jm(2,2))
-      Qm(2,3) = -Jm(1,2)/(Jm(1,1)*Jm(2,2)**2._RKIND)
-      Qm(3,1) = -2._RKIND*Jm(1,2)/(Jm(2,2)*Jm(1,1)*Jm(1,1))
-      Qm(3,3) = 1._RKIND/(Jm(1,1)*Jm(2,2))
-
-!     Material tensor D, isotropic St Venant Kirchhoff model
-      Dm = 0._RKIND
-      Dm(1,1) = 1._RKIND
-      Dm(1,2) = nu
-      Dm(2,1) = nu
-      Dm(2,2) = 1._RKIND
-      Dm(3,3) = 0.5_RKIND*(1._RKIND-nu)
-      Dm = elM/(1._RKIND-(nu*nu)) * Dm
-
-!     Compute Qt * D * Q
-      Dm = MATMUL(Dm, Qm)
-      Dm = MATMUL(TRANSPOSE(Qm), Dm)
-
-!     Membrane strain and its variation
-!     Define membrane strain tensor (Em), Voigt notation
-      Em = 0._RKIND
-      DO l=1, nsd
-         Em(1) = Em(1) + gCov(l,1)*gCov(l,1) - gCov0(l,1)*gCov0(l,1)
-         Em(2) = Em(2) + gCov(l,2)*gCov(l,2) - gCov0(l,2)*gCov0(l,2)
-         Em(3) = Em(3) + gCov(l,1)*gCov(l,2) - gCov0(l,1)*gCov0(l,2)
-      END DO
-      Em(1) = 0.5_RKIND * Em(1)
-      Em(2) = 0.5_RKIND * Em(2)
-
-!     Define variation in membrane strain
-      Bm = 0._RKIND
-      DO a=1, eNoN
-         Bm(1,1,a) = Nx(1,a)*gCov(1,1)
-         Bm(1,2,a) = Nx(1,a)*gCov(2,1)
-         Bm(1,3,a) = Nx(1,a)*gCov(3,1)
-
-         Bm(2,1,a) = Nx(2,a)*gCov(1,2)
-         Bm(2,2,a) = Nx(2,a)*gCov(2,2)
-         Bm(2,3,a) = Nx(2,a)*gCov(3,2)
-
-         Bm(3,1,a) = Nx(2,a)*gCov(1,1) + Nx(1,a)*gCov(1,2)
-         Bm(3,2,a) = Nx(2,a)*gCov(2,1) + Nx(1,a)*gCov(2,2)
-         Bm(3,3,a) = Nx(2,a)*gCov(3,1) + Nx(1,a)*gCov(3,2)
-      END DO
-
-!     Bending strain and its variation
-!     Second derivative of x, reference and current configurations
-!     Compute second derivatives of x in reference and current configs
-      K0 = 0._RKIND
-      Kc = 0._RKIND
-      DO a=1, eNoN
-         K0(1,:) = K0(1,:) + Nxx(1,a)*x0(:,a)
-         K0(2,:) = K0(2,:) + Nxx(2,a)*x0(:,a)
-         K0(3,:) = K0(3,:) + Nxx(3,a)*x0(:,a)*2._RKIND
-
-         Kc(1,:) = Kc(1,:) + Nxx(1,a)*xc(:,a)
-         Kc(2,:) = Kc(2,:) + Nxx(2,a)*xc(:,a)
-         Kc(3,:) = Kc(3,:) + Nxx(3,a)*xc(:,a)*2._RKIND
-      END DO
-
-!     Define bending strain tensor (Eb), Voigt notation
-      Eb = 0._RKIND
-      DO l=1, nsd
-         Eb(1) = Eb(1) + K0(l,1)*nV0(l) - Kc(l,1)*nV(l)
-         Eb(2) = Eb(2) + K0(l,2)*nV0(l) - Kc(l,2)*nV(l)
-         Eb(3) = Eb(3) + K0(l,3)*nV0(l) - Kc(l,3)*nV(l)
-      END DO
-
-!     Preliminaries to define variation in Eb
-!     N matrix
-      Nm = MAT_ID(3) - MAT_DYADPROD(nV, nV, 3)
-      Nm = Nm / Jac
-!     M1, M2 matrices
-      Mm(:,:,:) = 0._RKIND
-      DO l=1, 2
-         Mm(1,2,l) = -gCov(3,l)
-         Mm(1,3,l) =  gCov(2,l)
-         Mm(2,3,l) = -gCov(1,l)
-
-!        Skew-symmetric
-         Mm(2,1,l) = -Mm(1,2,l)
-         Mm(3,1,l) = -Mm(1,3,l)
-         Mm(3,2,l) = -Mm(2,3,l)
-
-         NmMm(:,:,l)  = MATMUL(Nm, Mm(:,:,l))
-         KNmMm(:,:,l) = MATMUL(Kc, NmMm(:,:,l))
-      END DO
-
-!     Define variation in bending strain tensor (Bb), Voigt notation
-      Bb = 0._RKIND
-      DO a=1, eNoN
-         Bb(1,:,a) = -Nxx(1,a)*nV(:)
-         Bb(2,:,a) = -Nxx(2,a)*nV(:)
-         Bb(3,:,a) = -Nxx(3,a)*nV(:)*2._RKIND
-      END DO
-
-      DO a=1, eNoN
-         Bb(:,:,a) = Bb(:,:,a) + Nx(1,a)*KNmMm(:,:,2) -
-     2      Nx(2,a)*KNmMm(:,:,1)
-      END DO
-
-!     Contribution to residue and tangent matrices from membrane strain
-!     D * Em
-      DEm(1) = Dm(1,1)*Em(1) + Dm(1,2)*Em(2) + Dm(1,3)*Em(3)
-      DEm(2) = Dm(2,1)*Em(1) + Dm(2,2)*Em(2) + Dm(2,3)*Em(3)
-      DEm(3) = Dm(3,1)*Em(1) + Dm(3,2)*Em(2) + Dm(3,3)*Em(3)
-
-!     D * Bm
-      DO a=1, eNoN
-         DBm(1,1,a) = Dm(1,1)*Bm(1,1,a) + Dm(1,2)*Bm(2,1,a) +
-     2      Dm(1,3)*Bm(3,1,a)
-         DBm(1,2,a) = Dm(1,1)*Bm(1,2,a) + Dm(1,2)*Bm(2,2,a) +
-     2      Dm(1,3)*Bm(3,2,a)
-         DBm(1,3,a) = Dm(1,1)*Bm(1,3,a) + Dm(1,2)*Bm(2,3,a) +
-     2      Dm(1,3)*Bm(3,3,a)
-
-         DBm(2,1,a) = Dm(2,1)*Bm(1,1,a) + Dm(2,2)*Bm(2,1,a) +
-     2      Dm(2,3)*Bm(3,1,a)
-         DBm(2,2,a) = Dm(2,1)*Bm(1,2,a) + Dm(2,2)*Bm(2,2,a) +
-     2      Dm(2,3)*Bm(3,2,a)
-         DBm(2,3,a) = Dm(2,1)*Bm(1,3,a) + Dm(2,2)*Bm(2,3,a) +
-     2      Dm(2,3)*Bm(3,3,a)
-
-         DBm(3,1,a) = Dm(3,1)*Bm(1,1,a) + Dm(3,2)*Bm(2,1,a) +
-     2      Dm(3,3)*Bm(3,1,a)
-         DBm(3,2,a) = Dm(3,1)*Bm(1,2,a) + Dm(3,2)*Bm(2,2,a) +
-     2      Dm(3,3)*Bm(3,2,a)
-         DBm(3,3,a) = Dm(3,1)*Bm(1,3,a) + Dm(3,2)*Bm(2,3,a) +
-     2      Dm(3,3)*Bm(3,3,a)
-      END DO
-
-!     Contribution to residue and tangent matrices from bending strain
-!     D * Eb
-      DEb(1) = Dm(1,1)*Eb(1) + Dm(1,2)*Eb(2) + Dm(1,3)*Eb(3)
-      DEb(2) = Dm(2,1)*Eb(1) + Dm(2,2)*Eb(2) + Dm(2,3)*Eb(3)
-      DEb(3) = Dm(3,1)*Eb(1) + Dm(3,2)*Eb(2) + Dm(3,3)*Eb(3)
-
-!     D * Bb
-      DO a=1, eNoN
-         DBb(1,1,a) = Dm(1,1)*Bb(1,1,a) + Dm(1,2)*Bb(2,1,a) +
-     2      Dm(1,3)*Bb(3,1,a)
-         DBb(1,2,a) = Dm(1,1)*Bb(1,2,a) + Dm(1,2)*Bb(2,2,a) +
-     2      Dm(1,3)*Bb(3,2,a)
-         DBb(1,3,a) = Dm(1,1)*Bb(1,3,a) + Dm(1,2)*Bb(2,3,a) +
-     2      Dm(1,3)*Bb(3,3,a)
-
-         DBb(2,1,a) = Dm(2,1)*Bb(1,1,a) + Dm(2,2)*Bb(2,1,a) +
-     2      Dm(2,3)*Bb(3,1,a)
-         DBb(2,2,a) = Dm(2,1)*Bb(1,2,a) + Dm(2,2)*Bb(2,2,a) +
-     2      Dm(2,3)*Bb(3,2,a)
-         DBb(2,3,a) = Dm(2,1)*Bb(1,3,a) + Dm(2,2)*Bb(2,3,a) +
-     2      Dm(2,3)*Bb(3,3,a)
-
-         DBb(3,1,a) = Dm(3,1)*Bb(1,1,a) + Dm(3,2)*Bb(2,1,a) +
-     2      Dm(3,3)*Bb(3,1,a)
-         DBb(3,2,a) = Dm(3,1)*Bb(1,2,a) + Dm(3,2)*Bb(2,2,a) +
-     2      Dm(3,3)*Bb(3,2,a)
-         DBb(3,3,a) = Dm(3,1)*Bb(1,3,a) + Dm(3,2)*Bb(2,3,a) +
-     2      Dm(3,3)*Bb(3,3,a)
-      END DO
-
-!     Acceleration and mass damping at the integration point
-      ud = -fb
-      DO a=1, eNoN
-         ud(1) = ud(1) + N(a)*(rho*(al(i,a)-bfl(1,a)) + dmp*yl(i,a))
-         ud(2) = ud(2) + N(a)*(rho*(al(j,a)-bfl(2,a)) + dmp*yl(j,a))
-         ud(3) = ud(3) + N(a)*(rho*(al(k,a)-bfl(3,a)) + dmp*yl(k,a))
-      END DO
-
-!     Local residue
-      w  = lM%w(g)*Jac0*ht
-      wb = w*ht*ht/12._RKIND
-      DO a=1, eNoN
-         BtDEm = Bm(1,1,a)*DEm(1) + Bm(2,1,a)*DEm(2) + Bm(3,1,a)*DEm(3)
-         BtDEb = Bb(1,1,a)*DEb(1) + Bb(2,1,a)*DEb(2) + Bb(3,1,a)*DEb(3)
-         lR(1,a) = lR(1,a) + w*N(a)*ud(1) + w*BtDEm + wb*BtDEb
-
-         BtDEm = Bm(1,2,a)*DEm(1) + Bm(2,2,a)*DEm(2) + Bm(3,2,a)*DEm(3)
-         BtDEb = Bb(1,2,a)*DEb(1) + Bb(2,2,a)*DEb(2) + Bb(3,2,a)*DEb(3)
-         lR(2,a) = lR(2,a) + w*N(a)*ud(2) + w*BtDEm + wb*BtDEb
-
-         BtDEm = Bm(1,3,a)*DEm(1) + Bm(2,3,a)*DEm(2) + Bm(3,3,a)*DEm(3)
-         BtDEb = Bb(1,3,a)*DEb(1) + Bb(2,3,a)*DEb(2) + Bb(3,3,a)*DEb(3)
-         lR(3,a) = lR(3,a) + w*N(a)*ud(3) + w*BtDEm + wb*BtDEb
-      END DO
-
-!     Local stiffness
-      DO b=1, eNoN
-         DO a=1, eNoN
-            NxSNx = ( Nx(1,a)*Nx(1,b)*DEm(1) + Nx(2,a)*Nx(2,b)*DEm(2) +
-     2                Nx(1,a)*Nx(2,b)*DEm(3) + Nx(2,a)*Nx(1,b)*DEm(3) )
-            T1 = w*( amd*N(a)*N(b) + afl*NxSNx )
-
-            lK(1,a,b) = lK(1,a,b) + T1
-            lK(dof+2,a,b) = lK(dof+2,a,b) + T1
-            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + T1
-
-            BtDBm = Bm(1,1,a)*DBm(1,1,b) + Bm(2,1,a)*DBm(2,1,b) +
-     2              Bm(3,1,a)*DBm(3,1,b)
-            BtDBb = Bb(1,1,a)*DBb(1,1,b) + Bb(2,1,a)*DBb(2,1,b) +
-     2              Bb(3,1,a)*DBb(3,1,b)
-            lK(1,a,b) = lK(1,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,1,a)*DBm(1,2,b) + Bm(2,1,a)*DBm(2,2,b) +
-     2              Bm(3,1,a)*DBm(3,2,b)
-            BtDBb = Bb(1,1,a)*DBb(1,2,b) + Bb(2,1,a)*DBb(2,2,b) +
-     2              Bb(3,1,a)*DBb(3,2,b)
-            lK(2,a,b) = lK(2,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,1,a)*DBm(1,3,b) + Bm(2,1,a)*DBm(2,3,b) +
-     2              Bm(3,1,a)*DBm(3,3,b)
-            BtDBb = Bb(1,1,a)*DBb(1,3,b) + Bb(2,1,a)*DBb(2,3,b) +
-     2              Bb(3,1,a)*DBb(3,3,b)
-            lK(3,a,b) = lK(3,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,2,a)*DBm(1,1,b) + Bm(2,2,a)*DBm(2,1,b) +
-     2              Bm(3,2,a)*DBm(3,1,b)
-            BtDBb = Bb(1,2,a)*DBb(1,1,b) + Bb(2,2,a)*DBb(2,1,b) +
-     2              Bb(3,2,a)*DBb(3,1,b)
-            lK(dof+1,a,b) = lK(dof+1,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,2,a)*DBm(1,2,b) + Bm(2,2,a)*DBm(2,2,b) +
-     2              Bm(3,2,a)*DBm(3,2,b)
-            BtDBb = Bb(1,2,a)*DBb(1,2,b) + Bb(2,2,a)*DBb(2,2,b) +
-     2              Bb(3,2,a)*DBb(3,2,b)
-            lK(dof+2,a,b) = lK(dof+2,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,2,a)*DBm(1,3,b) + Bm(2,2,a)*DBm(2,3,b) +
-     2              Bm(3,2,a)*DBm(3,3,b)
-            BtDBb = Bb(1,2,a)*DBb(1,3,b) + Bb(2,2,a)*DBb(2,3,b) +
-     2              Bb(3,2,a)*DBb(3,3,b)
-            lK(dof+3,a,b) = lK(dof+3,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,3,a)*DBm(1,1,b) + Bm(2,3,a)*DBm(2,1,b) +
-     2              Bm(3,3,a)*DBm(3,1,b)
-            BtDBb = Bb(1,3,a)*DBb(1,1,b) + Bb(2,3,a)*DBb(2,1,b) +
-     2              Bb(3,3,a)*DBb(3,1,b)
-            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,3,a)*DBm(1,2,b) + Bm(2,3,a)*DBm(2,2,b) +
-     2              Bm(3,3,a)*DBm(3,2,b)
-            BtDBb = Bb(1,3,a)*DBb(1,2,b) + Bb(2,3,a)*DBb(2,2,b) +
-     2              Bb(3,3,a)*DBb(3,2,b)
-            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + afl*(w*BtDBm + wb*BtDBb)
-
-            BtDBm = Bm(1,3,a)*DBm(1,3,b) + Bm(2,3,a)*DBm(2,3,b) +
-     2              Bm(3,3,a)*DBm(3,3,b)
-            BtDBb = Bb(1,3,a)*DBb(1,3,b) + Bb(2,3,a)*DBb(2,3,b) +
-     2              Bb(3,3,a)*DBb(3,3,b)
-            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + afl*(w*BtDBm + wb*BtDBb)
-         END DO
-      END DO
-
-      RETURN
-      END SUBROUTINE SHELLNRB
+      END SUBROUTINE SHELLBF
 !####################################################################
 

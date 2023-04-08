@@ -392,7 +392,7 @@
      2         sl(eNoN), tmps(nsd,insd))
 
             DO e=1, msh(iM)%nEl
-               IF (dId.GT.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
+               IF (dId.GE.0 .AND. ALLOCATED(msh(iM)%eId)) THEN
                   IF (.NOT.BTEST(msh(iM)%eId(e),dId)) CYCLE
                END IF
 !           Updating the shape functions, if this is a NURB
@@ -1175,6 +1175,7 @@
       IF (ALLOCATED(lM%Nb))      DEALLOCATE(lM%Nb)
       IF (ALLOCATED(lM%nV))      DEALLOCATE(lM%nV)
       IF (ALLOCATED(lM%fN))      DEALLOCATE(lM%fN)
+      IF (ALLOCATED(lM%tmX))     DEALLOCATE(lM%tmX)
       IF (ALLOCATED(lM%Nx))      DEALLOCATE(lM%Nx)
       IF (ALLOCATED(lM%Nxx))     DEALLOCATE(lM%Nxx)
 
@@ -1297,6 +1298,10 @@
       lDmn%stM%afs     = 0._RKIND
       lDmn%stM%bfs     = 0._RKIND
       lDmn%stM%khs     = 100._RKIND
+      lDmn%stM%a0      = 0._RKIND
+      lDmn%stM%b1      = 0._RKIND
+      lDmn%stM%b2      = 0._RKIND
+      lDmn%stM%mu0     = 0._RKIND
 
       lDmn%stM%Tf%g     = 0._RKIND
       lDmn%stM%Tf%fType = 0
@@ -1304,6 +1309,7 @@
       IF (ALLOCATED(lDmn%stM%Tf%gt%qs)) DEALLOCATE(lDmn%stM%Tf%gt%qs)
       IF (ALLOCATED(lDmn%stM%Tf%gt%r))  DEALLOCATE(lDmn%stM%Tf%gt%r)
       IF (ALLOCATED(lDmn%stM%Tf%gt%i))  DEALLOCATE(lDmn%stM%Tf%gt%i)
+      lDmn%stM%Tf%eta_s = 0._RKIND
 
       ! lDmn%cep
       lDmn%cep%cepType  = cepModel_NA
