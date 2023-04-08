@@ -51,8 +51,8 @@
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), al(:,:), yl(:,:),
-     2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), ya_l(:),
-     3   lR(:,:), lK(:,:,:), lKd(:,:,:)
+     2   dl(:,:), bfl(:,:), fN(:,:), pS0l(:,:), pSl(:), tmXl(:),
+     3   ya_l(:), lR(:,:), lK(:,:,:), lKd(:,:,:)
       REAL(KIND=RKIND), ALLOCATABLE :: xwl(:,:), xql(:,:), Nwx(:,:),
      2   Nwxx(:,:), Nqx(:,:)
 
@@ -71,8 +71,8 @@
 
       ALLOCATE(ptr(eNoN), xl(nsd,eNoN), al(tDof,eNoN), yl(tDof,eNoN),
      2   dl(tDof,eNoN), bfl(nsd,eNoN), fN(nsd,nFn), pS0l(nsymd,eNoN),
-     3   pSl(nsymd), ya_l(eNoN), lR(dof,eNoN), lK(dof*dof,eNoN,eNoN),
-     4   lKd(dof*nsd,eNoN,eNoN))
+     3   pSl(nsymd), tmXl(eNoN), ya_l(eNoN), lR(dof,eNoN),
+     4   lK(dof*dof,eNoN,eNoN), lKd(dof*nsd,eNoN,eNoN))
 
 !     Loop over all elements of mesh
       DO e=1, lM%nEl
@@ -105,6 +105,9 @@
             END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
             IF (ecCpld) THEN
+               IF (ALLOCATED(lM%tmX)) THEN
+                  tmXl(a) = lM%tmX(lM%lN(Ac))
+               END IF
                IF (ALLOCATED(ec_Ya)) THEN
                   ya_l(a) = ec_Ya(Ac)
                ELSE
@@ -167,12 +170,12 @@
 
                CASE (phys_struct)
                   CALL STRUCT3D(fs(1)%eNoN, nFn, w, fs(1)%N(:,g), Nwx,
-     2               al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK)
+     2               al, yl, dl, bfl, fN, pS0l, pSl, tmXl, ya_l, lR, lK)
 
                CASE (phys_ustruct)
                   CALL USTRUCT3D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn,
      2               w, Jac, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, al, yl,
-     3               dl, bfl, fN, ya_l, lR, lK, lKd)
+     3               dl, bfl, fN, tmXl, ya_l, lR, lK, lKd)
 
                END SELECT
 
@@ -189,12 +192,12 @@
 
                CASE (phys_struct)
                   CALL STRUCT2D(fs(1)%eNoN, nFn, w, fs(1)%N(:,g), Nwx,
-     2               al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK)
+     2               al, yl, dl, bfl, fN, pS0l, pSl, tmXl, ya_l, lR, lK)
 
                CASE (phys_ustruct)
                   CALL USTRUCT2D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn,
      2               w, Jac, fs(1)%N(:,g), fs(2)%N(:,g), Nwx, al, yl,
-     3               dl, bfl, fN, ya_l, lR, lK, lKd)
+     3               dl, bfl, fN, tmXl, ya_l, lR, lK, lKd)
 
                END SELECT
             END IF
@@ -266,8 +269,8 @@
 #endif
       END DO ! e: loop
 
-      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, ya_l, lR, lK,
-     2   lKd)
+      DEALLOCATE(ptr, xl, al, yl, dl, bfl, fN, pS0l, pSl, tmXl, ya_l,
+     2    lR, lK, lKd)
 
       CALL DESTROY(fs(1))
       CALL DESTROY(fs(2))

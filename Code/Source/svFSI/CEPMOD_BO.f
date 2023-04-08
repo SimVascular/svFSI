@@ -741,7 +741,8 @@ c      dFa = alfa * dRFL * (c_c - c_0)**2
          IF (TRIM(skwrd) .EQ. TRIM(scmd)) THEN
             READ(sval,*,IOSTAT=ios) rval
             IF (ios .NE. 0) THEN
-               STOP " Error: while reading "//TRIM(skwrd)
+               WRITE(*,'(A)') " Error: while reading "//TRIM(skwrd)
+               STOP
             END IF
             EXIT
          END IF
@@ -749,8 +750,9 @@ c      dFa = alfa * dRFL * (c_c - c_0)**2
 
  001  RETURN
 
-! 001  STOP " Error: EOF reached while finding command <"//
+! 001  WRITE(*,'(A)') " Error: EOF reached while finding command <"//
 !     2   TRIM(skwrd)//">"
+!      STOP
 
       END SUBROUTINE GETRVAL
 !-----------------------------------------------------------------------
@@ -797,13 +799,16 @@ c      dFa = alfa * dRFL * (c_c - c_0)**2
                DO i=1, nt
                   WRITE(*,'(I2,2X,A)') i, TRIM(tokList(i))
                END DO
-               STOP " Error: Unexpected token length "//TRIM(skwrd)
+               WRITE(*,'(A)') " Error: Unexpected token length "//
+     2            TRIM(skwrd)
+               STOP
             END IF
 
             DO i=1, nt
                READ(tokList(i),*,IOSTAT=ios) rvec(i)
                IF (ios .NE. 0) THEN
-                  STOP " Error: while reading "//TRIM(skwrd)
+                  WRITE(*,'(A)') " Error: while reading "//TRIM(skwrd)
+                  STOP
                END IF
             END DO
             EXIT
@@ -812,8 +817,9 @@ c      dFa = alfa * dRFL * (c_c - c_0)**2
 
       RETURN
 
- 001  STOP " Error: EOF reached while finding command <"//
+ 001  WRITE(*,'(A)') " Error: EOF reached while finding command <"//
      2   TRIM(skwrd)//">"
+      STOP
 
       END SUBROUTINE GETRVEC
 !-----------------------------------------------------------------------
