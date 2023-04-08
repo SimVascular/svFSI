@@ -725,7 +725,11 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #  |-----------------------|-------------------------------------|
    #  |         CEP           | Action_potential                    |
    #  |-----------------------|-------------------------------------|
-   #  |         shell         | Displacement, Velocity, Area        |
+   #  |         shell         | Displacement, Stress, Strain (Green-|
+   #  |                       | Lagrange in-plane), Def_grad, Area, |
+   #  |                       | Jacobian, Velocity, 1st invariant of|
+   #  |                       | Cauchy-Green strain (in-plane),     |
+   #  |                       | Cauchy-Green strain tensor          |
    #  |-----------------------|-------------------------------------|
    #
    #  In the above equations, "lElas (p)/struct (p)" indicates that
@@ -1006,7 +1010,7 @@ Add equation: FSI  # [heatS/heatF/lElas/struct/ustruct/stokes/fluid/CMM/FSI/mesh
    #             Value: 0.0
    #             Stiffness : 1.0e5
    #             Damping: 0.0
-   #             Applied along normal direction: f
+   #             Apply along normal direction: f
    #          }
    #
    #           When the Robin BC is applied along the normal direction,
@@ -1364,9 +1368,12 @@ Add equation: mesh
 #
 #------------------  Material Properties Settings  ------------------|
 #
-#  2. Specifying material properties for struct/ustruct:
-#     If the equation or domain physics is struct/ustruct, svFSI
-#  looks for the following commands to read material properties.
+#  2. Specifying material properties for struct/ustruct/shell:
+#     If the equation or domain physics is struct/ustruct/shell, svFSI
+#     looks for the following commands to read material properties.
+#     Note that shell mechanics is formulated with some restrictions
+#     on the choice of the isochoric constitutive model and the
+#     dilational penalty model. See below.
 #
 #  o Constitutive model: This command defines the constitutive model
 #    for the isochoric component of the strain energy function.
@@ -1483,6 +1490,23 @@ Add equation: mesh
 #    |                      | For this model to be used, two families|
 #    |                      | of fibers must be loaded in "Add mesh" |
 #    |----------------------|----------------------------------------|
+#    |                      | Lee-Sacks material model for valve-    |
+#    |                      | like tissues that are modeled as shells|
+#    |                      | This is a nested block that requires   |
+#    |                      | additional parameter inputs including, |
+#    |                      | "a", "a0", "b1", "b2", "mu0". For e.g.,|
+#    |                      |    Constitutive model: LS {            |
+#    |  "Lee-Sacks"/LS"     |       a:                               |
+#    |                      |       a0:                              |
+#    |                      |       b1:                              |
+#    |                      |       b2:                              |
+#    |                      |       mu0:                             |
+#    |                      |    }                                   |
+#    |----------------------|----------------------------------------|
+#
+#  Note: The shell equation is formulated for Neo-Hookean, Mooney-
+#        Rivlin, modified Holzapfel-Ogden, and Lee-Sacks constitutive
+#        models only.
 #
 #  o Fiber reinforcement stress: This setting applies additional fiber
 #    reinforcement stress and can be prescribed as either a "Steady"
@@ -1500,6 +1524,8 @@ Add equation: mesh
 #    -  "Quad" or "Quadratic"
 #    -  "ST91" or "Simo-Taylor91"   [DEFAULT]
 #    -  "M94"  or "Miehe94"
+#
+#    Note: Shell equation uses ST91 dilational penalty model only.
 #
 #  o Penalty parameter: If the Poisson ratio for a given case is close
 #    to 0.5, then calculated bulk modulus used for dilational penalty
