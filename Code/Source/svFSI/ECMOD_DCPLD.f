@@ -239,7 +239,8 @@
          IF (TRIM(skwrd) .EQ. TRIM(scmd)) THEN
             READ(sval,*,IOSTAT=ios) rval
             IF (ios .NE. 0) THEN
-               STOP " Error: while reading "//TRIM(skwrd)
+               WRITE(*,'(A)') " Error: while reading "//TRIM(skwrd)
+               STOP
             END IF
             EXIT
          END IF
@@ -247,8 +248,9 @@
 
  001  RETURN
 
-!  001  STOP " Error: EOF reached while finding command <"//
+! 001  WRITE(*,'(A)') " Error: EOF reached while finding command <"//
 !     2   TRIM(skwrd)//">"
+!      STOP
 
       END SUBROUTINE GETRVAL
 !-----------------------------------------------------------------------
