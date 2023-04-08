@@ -666,9 +666,12 @@
             propL(3,1) = solid_density
             propL(4,1) = poisson_ratio
             propL(5,1) = damping
+            propL(6,1) = f_x
+            propL(7,1) = f_y
+            propL(8,1) = f_z
             IF (.NOT.cmmVarWall) THEN
-               propL(6,1) = shell_thickness
-               propL(7,1) = elasticity_modulus
+               propL(9,1 ) = shell_thickness
+               propL(10,1) = elasticity_modulus
             END IF
 
             nDOP = (/12,4,3,0/)
@@ -685,10 +688,14 @@
             outPuts(11) = out_divergence
             outPuts(12) = out_acceleration
          ELSE
-            propL(1,1) = poisson_ratio
+            propL(1,1) = solid_density
+            propL(2,1) = poisson_ratio
+            propL(3,1) = f_x
+            propL(4,1) = f_y
+            propL(5,1) = f_z
             IF (.NOT.cmmVarWall) THEN
-               propL(2,1) = shell_thickness
-               propL(3,1) = elasticity_modulus
+               propL(6,1) = shell_thickness
+               propL(7,1) = elasticity_modulus
             END IF
 
             IF (pstEq) THEN
@@ -702,7 +709,6 @@
          END IF
 
          CALL READDOMAIN(lEq, propL, list)
-         IF (cmmInit) lEq%dmn(:)%prop(solid_density) = 0._RKIND
 
          CALL READLS(lSolver_GMRES, lEq, list)
 
