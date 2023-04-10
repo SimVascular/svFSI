@@ -532,7 +532,6 @@
             END SELECT
          END IF
       END IF
-
       RETURN
       END SUBROUTINE READMSH
 !####################################################################

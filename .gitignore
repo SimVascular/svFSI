@@ -33,3 +33,6 @@
 
 # System files osx 
 **/.DS_Store
+*.log
+
+**/.vscode/

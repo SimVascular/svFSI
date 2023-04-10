@@ -136,6 +136,8 @@
       END FUNCTION OPENFILE
 !####################################################################
 !     This function will compute second NORM of a vector
+!     AB 5/11/22: Actually, looks like this computes u.u, or u.v. u.u is actually
+!     the SQUARE of the Euclidean norm of u.
       PURE FUNCTION NORMS(U, V)
       IMPLICIT NONE
       REAL(KIND=RKIND), INTENT(IN) :: U(:)

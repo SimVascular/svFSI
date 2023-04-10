@@ -128,11 +128,16 @@
             DO a=1, lFa%eNoN
                Ac = lFa%IEN(a,e)+1
                Ac = lFa%gN(Ac)
-               lFa%IEN(a,e) = Ac
+               lFa%IEN(a,e) = Ac ! lFa%IEN(a,e) is the GlobalNodeID of node a on element e
             END DO
          END DO
       END IF
 
+!     Read GlobalElementID from face mesh. This is the ID of the volume element
+!     that the face element lies on. If the face is virtual, then elements of
+!     the face mesh do not lie on volume elements, so there is no GlobalElementID
+!     In this case, gE(e) = 0 for all e.
+!     ?? How does it even find GlobalElementID. There is no array named that for cap.vtp
       ALLOCATE(lFa%gE(lFa%nEl))
       CALL getVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
       IF (iStat .LT. 0) THEN
@@ -532,18 +537,21 @@
                CASE (outGrp_A)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
+                     ! Why don't we divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lA(s:e,Ac)
                   END DO
 
                CASE (outGrp_Y)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
+                     ! Why don't we divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lY(s:e,Ac)
                   END DO
 
                CASE (outGrp_D)
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
+                     ! Divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lD(s:e,Ac)/msh(iM)%scF
                   END DO
 

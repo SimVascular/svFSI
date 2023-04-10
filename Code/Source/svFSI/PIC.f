@@ -33,6 +33,10 @@
 !
 !     This routine contains predictor/initiator/corrector routines, as
 !     part of time integration scheme.
+!     
+!     See the following publication section 4.4 for theory and derivation:
+!     Bazilevs, Yuri, et al. "Isogeometric fluid-structure interaction: theory, 
+!     algorithms, and computations." Computational mechanics 43 (2008): 3-37.
 !
 !--------------------------------------------------------------------
 
@@ -151,6 +155,8 @@
          coef(4) = eq(i)%af
 
          DO a=1, tnNo
+         !  An values are updated each Newton iteration in PICC
+         !  This seems different from https://www.scorec.rpi.edu/~kjansen/genalf.pdf
             Ag(s:e,a) = Ao(s:e,a)*coef(1) + An(s:e,a)*coef(2)
             Yg(s:e,a) = Yo(s:e,a)*coef(3) + Yn(s:e,a)*coef(4)
             Dg(s:e,a) = Do(s:e,a)*coef(3) + Dn(s:e,a)*coef(4)
@@ -260,6 +266,7 @@
 !     IB treatment
       IF (ibFlag) CALL IB_PICC()
 
+!     Check for convergence or max iterations of Newton-Raphson iteration
       IF (ISZERO(eq(cEq)%FSILS%RI%iNorm)) eq(cEq)%FSILS%RI%iNorm = eps
       IF (ISZERO(eq(cEq)%iNorm)) eq(cEq)%iNorm = eq(cEq)%FSILS%RI%iNorm
       IF (eq(cEq)%itr .EQ. 1) THEN

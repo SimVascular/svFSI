@@ -107,6 +107,8 @@
          END IF
 
 !     Predictor step
+!     Predicts new quantities (An, Yn, Dn) from old quantities (Ao, Yo, Do) using
+!     gen-alpha relations
          CALL PICP
 
 !     Apply Dirichlet BCs strongly
@@ -115,7 +117,8 @@
 !     Inner loop for iteration
          DO
             iEqOld = cEq
-
+!           If cplBC is being used, compute cplBC quantities (pressure, flowrate, resistance)
+!           by communicating with cplBC/genBC
 !           cplBC is invoked only for the first equation
             IF (cplBC%coupled .AND. cEq.EQ.1) THEN
                CALL SETBCCPL
@@ -189,7 +192,12 @@
             DO iBc=1, eq(cEq)%nBc
                i = eq(cEq)%bc(iBc)%lsPtr
                IF (i .NE. 0) THEN
-                  res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r
+!                 scaled resistance value for Neumann surface, to be "added" to stiffness matrix in LSSOLVE
+                  res(i) = eq(cEq)%gam*dt*eq(cEq)%bc(iBc)%r 
+!                 For DEBUGGING
+!                  IF (cm%mas()) THEN
+!                     PRINT*, "iBc: ", iBc, 'i: ', i, 'res(i): ', res(i)
+!                  END IF
                   incL(i) = 1
                END IF
             END DO
@@ -198,6 +206,8 @@
             CALL LSSOLVE(eq(cEq), incL, res)
 
 !        Solution is obtained, now updating (Corrector)
+!        Note the corrector step inside the NR loop, which is
+!        slightly different from https://www.scorec.rpi.edu/~kjansen/genalf.pdf
             CALL PICC
 
 !        Checking for exceptions

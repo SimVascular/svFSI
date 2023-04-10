@@ -44,7 +44,7 @@
       TYPE(listType), INTENT(INOUT) :: list
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      INTEGER(KIND=IKIND) :: iFa, e, a, Ac
+      INTEGER(KIND=IKIND) :: iFa, jFa, e, a, Ac, i
       TYPE(listType), POINTER :: lPtr, lPBC
       TYPE(fileType) :: ftmp
 
@@ -78,6 +78,11 @@
                   END DO
                END DO
             END IF
+!           AB 5/23/22: Read virtual face flag
+            lM%fa(iFa)%virtual = .FALSE.
+            lPtr => lPBC%get(lM%fa(iFa)%virtual,"Virtual")
+
+
          ELSE
             lPtr => lPBC%get(ftmp,"End nodes face file path")
             IF (.NOT.ASSOCIATED(lPtr)) err =

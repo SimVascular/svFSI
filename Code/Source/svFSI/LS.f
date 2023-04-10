@@ -71,7 +71,7 @@
       IMPLICIT NONE
       TYPE(eqType), INTENT(INOUT) :: lEq
       INTEGER(KIND=IKIND), INTENT(IN) :: incL(nFacesLS)
-      REAL(KIND=RKIND), INTENT(IN) :: res(nFacesLS)
+      REAL(KIND=RKIND), INTENT(IN) :: res(nFacesLS) ! Neumann cplBC resistance
 
 #ifdef WITH_TRILINOS
       INTEGER(KIND=IKIND) a

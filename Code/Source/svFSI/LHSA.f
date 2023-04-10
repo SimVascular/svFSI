@@ -263,6 +263,7 @@
 !####################################################################
 !     This subroutine assembels the element stiffness matrix into the
 !     global stiffness matrix (Val sparse matrix formatted as a vector)
+!     Also assembles residual vector into global residual vector
       SUBROUTINE DOASSEM (d, eqN, lK, lR)
       USE TYPEMOD
       USE COMMOD, ONLY: dof, rowPtr, colPtr, R, Val

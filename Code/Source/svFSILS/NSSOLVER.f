@@ -125,6 +125,13 @@
 !        MU2 = K*U
          CALL FSILS_SPARMULVV(lhs, lhs%rowPtr, lhs%colPtr, nsd, mK,     &
      &      U(:,:,i), MU(:,:,iBB))
+!        The contribution of coupled BCs is added to the matrix-vector
+!        product operation. These coupled BCs contribute through a "resistance"
+!        that relates velocity (integrated to give flow rate) to pressure. 
+!        See Moghadam et al. 2013 eq. 27. The coupled BC contribution is not
+!        explicitly added to the tangent matrix because this would destroy the
+!        sparsity pattern of the tangent matrix, since the coupled BC
+!        contribution is dense.
          CALL ADDBCMUL(lhs, BCOP_TYPE_ADD, nsd, U(:,:,i), MU(:,:,iBB))
 !        MP1 = L*P
          CALL FSILS_SPARMULSS(lhs, lhs%rowPtr, lhs%colPtr, mL, P(:,i),  &

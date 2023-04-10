@@ -1852,8 +1852,14 @@ c        N(8) = lx*my*0.5_RKIND
 !--------------------------------------------------------------------
 !     This routine returns a vector at element "e" and Gauss point
 !     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
-!     Jac = SQRT(NORM(n)).
-      SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n)
+!     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
+!     ref configuration surface element.
+!     
+!     cfg determines in which configuration to return the normal vector
+!     if cfg = 'r', reference configuration
+!     if cfg = 'o', old configuration (at timestep n)
+!     if cfg = 'n', new configuration (at timestep n+1)
+      SUBROUTINE GNNB(lFa, e, g, insd, eNoNb, Nx, n, cfgin)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -1861,9 +1867,11 @@ c        N(8) = lx*my*0.5_RKIND
       REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
       REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
       TYPE(faceType), INTENT(IN) :: lFa
+      CHARACTER, OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
 
       INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
       REAL(KIND=RKIND) v(nsd)
+      CHARACTER cfg
 
       LOGICAL, ALLOCATABLE :: setIt(:)
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
@@ -1872,6 +1880,21 @@ c        N(8) = lx*my*0.5_RKIND
       iM   = lFa%iM
       Ec   = lFa%gE(e)
       eNoN = msh(iM)%eNoN
+
+! Deal with optional config flag. If cfg is not provided, use reference config
+      cfg = 'r'
+      IF(PRESENT(cfgin)) THEN
+         cfg = cfgin
+      END IF
+
+!     If this is a virtual face, then this face element does not lie on a volume 
+!     element, and we compute the normal vector slightly differently.
+      IF (lFa%virtual) THEN
+!         WRITE(*,'(A)') "Face element not on volume element."
+!         WRITE(*,'(A)') "Calculate normal vector anyway."
+         CALL GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n, cfg)
+         RETURN
+      END IF
 
       ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
 
@@ -1887,7 +1910,7 @@ c        N(8) = lx*my*0.5_RKIND
                IF (Bc .EQ. Ac) EXIT
             END IF
          END DO
-         IF (b .GT. eNoN) THEN
+         IF (b .GT. eNoN) THEN ! This occurs if a face element does not lie on a volume element
             WRITE(*,'(A)')
             WRITE(*,'(A)') "=========================================="
             WRITE(*,'(A)') " ERROR: could not find matching face nodes"
@@ -1918,15 +1941,27 @@ c        N(8) = lx*my*0.5_RKIND
          END IF
       END DO
 
-!     Correcting the position vector if mesh is moving
+!     Correcting the position vector if mesh is moving or we want to integrate
+!     over a different configuration
       DO a=1, eNoN
          Ac = msh(iM)%IEN(a,Ec)
-         lX(:,a) = x(:,Ac)
-         IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
+
+         IF (mvMsh) THEN 
+            ! Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
+            lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac)
+         ELSE
+            IF (cfg .EQ. 'o') THEN ! Use Do to deform geometry
+               lX(:,a) = lX(:,a) + Do(1:nsd,Ac) 
+            ELSE IF (cfg .EQ. 'n') THEN ! Use Dn to deform geometry
+               lX(:,a) = lX(:,a) + Dn(1:nsd,Ac)
+            ! If cfg == 'r', do nothing
+            END IF
+         END IF
       END DO
 
 !     Calculating surface deflation
-      IF (msh(iM)%lShl) THEN
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell
 !        Since the face has only one parametric coordinate (edge), find
 !        its normal from cross product of mesh normal and interior edge
 
@@ -1973,6 +2008,172 @@ c        N(8) = lx*my*0.5_RKIND
       ELSE
          ALLOCATE(xXi(nsd,insd))
          xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
+         DO a=1, eNoNb
+            b = ptr(a) ! get local node index of the boundary element
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,b)
+            END DO
+         END DO
+         n = CROSS(xXi)
+         DEALLOCATE(xXi)
+      END IF
+
+!     Changing the sign if neccessary. a locates on the face and b
+!     outside of the face, in the parent element
+      a = ptr(1) ! a is a node that lies on the boundary
+      b = ptr(lFa%eNoN+1) ! b is a node that lies in the interior
+      v = lX(:,a) - lX(:,b) ! v points outward
+      IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+      DEALLOCATE(setIt, ptr, lX)
+
+      RETURN
+      END SUBROUTINE GNNB
+
+!--------------------------------------------------------------------
+!     AB: 5/11/22
+!     This routine returns a vector at element "e" and Gauss point
+!     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!     Jac = SQRT(NORM(n)). The normal is the surface normal in the current 
+!     configuration, and the Jacobian is the Jacobian of the mapping from parent
+!     surface element to current configuration surface element
+!
+!     AB 2/16/23: Redundant after modifying GNNB to take a flag telling what 
+!     configuration to use
+      SUBROUTINE GNNBT(lFa, e, g, insd, eNoNb, Nx, n)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
+      REAL(KIND=RKIND) v(nsd)
+
+      LOGICAL, ALLOCATABLE :: setIt(:)
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+
+      iM   = lFa%iM
+      Ec   = lFa%gE(e)
+      eNoN = msh(iM)%eNoN
+
+!     If this is a virtual face, then this face element does not lie on a volume 
+!     element, and we compute the normal vector slightly differently.
+      IF (lFa%virtual) THEN
+         !WRITE(*,'(A)') "Face element not on volume element."
+         !WRITE(*,'(A)') "Calculate normal vector anyway."
+         CALL GNNBSURFT(lFa, e, g, insd, eNoNb, Nx, n)
+         RETURN
+      END IF
+
+      ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+
+!     Creating a ptr list that contains pointer to the nodes of elements
+!     that are at the face at the beginning of the list and the rest at
+!     the end
+      setIt = .TRUE.
+      DO a=1, eNoNb
+         Ac = lFa%IEN(a,e)
+         DO b=1, eNoN
+            IF (setIt(b)) THEN
+               Bc = msh(iM)%IEN(b,Ec)
+               IF (Bc .EQ. Ac) EXIT
+            END IF
+         END DO
+         IF (b .GT. eNoN) THEN
+            WRITE(*,'(A)')
+            WRITE(*,'(A)') "=========================================="
+            WRITE(*,'(A)') " ERROR: could not find matching face nodes"
+            WRITE(*,'(A)',ADVANCE='NO') "    Face "//TRIM(lFa%name)//
+     2         " e: "//STR(e)
+            DO b=1, eNoNb
+               WRITE(*,'(A)',ADVANCE='NO') " "//STR(lFa%IEN(b,e))
+            END DO
+            WRITE(*,'(A)')
+            WRITE(*,'(A)',ADVANCE='NO') "    Mesh "//
+     2         TRIM(msh(iM)%name)//" Ec: "//STR(Ec)
+            DO b=1, eNoN
+               WRITE(*,'(A)',ADVANCE='NO') " "//STR(msh(iM)%IEN(b,Ec))
+            END DO
+            WRITE(*,'(A)')
+            WRITE(*,'(A)') "=========================================="
+            WRITE(*,'(A)')
+            CALL STOPSIM()
+         END IF
+         ptr(a)   = b
+         setIt(b) = .FALSE.
+      END DO
+      a = eNoNb
+      DO b=1, eNoN
+         IF (setIt(b)) THEN
+            a      = a + 1
+            ptr(a) = b
+         END IF
+      END DO
+
+!     Correcting the position vector with the displacement 
+!     (this part different from GNNB() above)
+      DO a=1, eNoN
+         Ac = msh(iM)%IEN(a,Ec)
+         lX(:,a) = x(:,Ac) ! get nodal coordinates from x (of reference configuration mesh)
+!        IF (mvMsh) lX(:,a) = lX(:,a) + Do(nsd+2:2*nsd+1,Ac) ! Why this range of the Do vector? I believe these components are the fluid mesh displacements
+!        Deform the geometry by the new displacements Dn?
+         lX(:,a) = lX(:,a) + Dn(1:nsd,Ac) 
+      END DO
+
+!     Calculating surface deflation
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell
+!        Since the face has only one parametric coordinate (edge), find
+!        its normal from cross product of mesh normal and interior edge
+
+!        Update shape functions if NURBS
+         IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
+
+!        Compute adjoining mesh element normal
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+         DO a=1, eNoN
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            END DO
+         END DO
+         v(:) = CROSS(xXi)
+         v(:) = v(:) / SQRT(NORM(v))
+         DEALLOCATE(xXi)
+
+!        Face element surface deflation
+         ALLOCATE(xXi(nsd,1))
+         xXi = 0._RKIND
+         DO a=1, eNoNb
+            b = ptr(a)
+            xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
+         END DO
+
+!        Face normal
+         n(1) = v(2)*xXi(3,1) - v(3)*xXi(2,1)
+         n(2) = v(3)*xXi(1,1) - v(1)*xXi(3,1)
+         n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
+
+!        I choose Gauss point of the mesh element for calculating
+!        interior edge
+         v(:) = 0._RKIND
+         DO a=1, eNoN
+            v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)
+         END DO
+         a = ptr(1)
+         v(:) = lX(:,a) - v(:)
+         IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+         DEALLOCATE(xXi)
+         RETURN
+      ELSE
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
          DO a=1, eNoNb
             b = ptr(a)
             DO i=1, insd
@@ -1993,6 +2194,295 @@ c        N(8) = lx*my*0.5_RKIND
       DEALLOCATE(setIt, ptr, lX)
 
       RETURN
-      END SUBROUTINE GNNB
+      END SUBROUTINE GNNBT
+
+!--------------------------------------------------------------------
+!     This routine returns a vector at element "e" and Gauss point
+!     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
+!     ref configuration surface element.
+!     This function is called for virtual face elements (face elements that do 
+!     not lie on a volume element).
+!     For these elements, the direction of the normal vector is assumed from the
+!     nodal ordering.
+!
+!     cfg determines in which configuration to return the normal vector
+!     if cfg = 'r', reference configuration
+!     if cfg = 'o', old configuration (at timestep n)
+!     if cfg = 'n', new configuration (at timestep n+1)
+      SUBROUTINE GNNBSURF(lFa, e, g, insd, eNoNb, Nx, n, cfg)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      TYPE(faceType), INTENT(IN) :: lFa
+      !CHARACTER, OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
+      CHARACTER, INTENT(IN) :: cfg
+
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
+      REAL(KIND=RKIND) v(nsd)
+      !CHARACTER cfg
+
+      LOGICAL, ALLOCATABLE :: setIt(:)
+      ! ptr not needed in this function
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDo(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDn(:)
+      INTEGER(KIND=IKIND) ierr, p
+
+      iM   = lFa%iM
+      Ec   = lFa%gE(e)
+      eNoN = msh(iM)%eNoN
+
+      ! Deal with optional config flag. If cfg is not provided, use reference config
+      !cfg = 'r'
+      !IF(PRESENT(cfgin)) THEN
+      !   cfg = cfgin
+      !END IF
+
+      ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+      ! Arrays to hold nodal positions for MPI gather operation
+      ALLOCATE(tmpX(nsd))
+      ALLOCATE(tmpDo(SIZE(Do(:,1)))) ! In case Dn has more than nsd dof per node
+      ALLOCATE(tmpDn(SIZE(Dn(:,1)))) ! In case Dn has more than nsd dof per node
+
+!     Communicating nodal positions and correcting the position vector if mesh is moving
+      DO a=1, eNoNb ! Loop over nodes of boundary surface element
+         Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
+         ! Collect node position onto Master. On slaves
+         ! set tmpX to zero.
+         CALL GatherMasterV(x, Ac, tmpX)
+
+         ! Transfer nodal position to lX array
+         lX(:,a) = tmpX(:)
+
+         IF (mvMsh) THEN 
+            ! Do(nsd+2:2*nsd+1) are the fluid mesh displacement in FSI
+            CALL GatherMasterV(Do, Ac, tmpDo)
+            lX(:,a) = lX(:,a) + tmpDo(nsd+2:2*nsd+1)
+         ELSE
+            IF (cfg .EQ. 'o') THEN ! Use Do to deform geometry
+               CALL GatherMasterV(Do, Ac, tmpDo)
+               lX(:,a) = lX(:,a) + tmpDo(1:nsd) 
+            ELSE IF (cfg .EQ. 'n') THEN ! Use Dn to deform geometry
+               CALL GatherMasterV(Dn, Ac, tmpDn)
+               lX(:,a) = lX(:,a) + tmpDn(1:nsd) 
+            ! If cfg == 'r', do nothing
+            END IF
+         END IF
+      END DO
+
+!     If slave, don't perform calculation of n. Wait for master to complete
+!     calculation and broadcast value of n
+      IF (cm%slv()) THEN 
+         CALL MPI_BCAST(n, nsd, mpreal, master, cm%com(), ierr)
+         RETURN 
+      END IF
+
+!     Calculating surface deflation
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell. I think this is unnecessary in this function
+!        Since the face has only one parametric coordinate (edge), find
+!        its normal from cross product of mesh normal and interior edge
+
+!        Update shape functions if NURBS
+         IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
+
+!        Compute adjoining mesh element normal
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+         DO a=1, eNoN
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            END DO
+         END DO
+         v(:) = CROSS(xXi)
+         v(:) = v(:) / SQRT(NORM(v))
+         DEALLOCATE(xXi)
+
+!        Face element surface deflation
+         ALLOCATE(xXi(nsd,1))
+         xXi = 0._RKIND
+         DO a=1, eNoNb
+            b = ptr(a)
+            xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
+         END DO
+
+!        Face normal
+         n(1) = v(2)*xXi(3,1) - v(3)*xXi(2,1)
+         n(2) = v(3)*xXi(1,1) - v(1)*xXi(3,1)
+         n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
+
+!        I choose Gauss point of the mesh element for calculating
+!        interior edge
+         v(:) = 0._RKIND
+         DO a=1, eNoN
+            v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)
+         END DO
+         a = ptr(1)
+         v(:) = lX(:,a) - v(:)
+         IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+         DEALLOCATE(xXi)
+         RETURN
+      ELSE
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
+         DO a=1, eNoNb
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,a)
+            END DO
+         END DO
+         n = CROSS(xXi)
+         DEALLOCATE(xXi)
+      END IF
+      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(tmpX, tmpDo, tmpDn)
+
+
+      ! If master, broadcast value of n to slaves
+      IF (cm%mas()) THEN 
+         CALL MPI_Bcast(n, nsd, mpreal, master, cm%com(), ierr)
+      END IF
+
+      RETURN
+      END SUBROUTINE GNNBSURF
+
+!--------------------------------------------------------------------
+!     This routine returns a vector at element "e" and Gauss point
+!     "g" of face "lFa" that is the normal weigthed by Jac, i.e.
+!     Jac = SQRT(NORM(n)), the Jacobian of mapping from parent surface element to 
+!     current configuration surface element.
+!     This function is called for virtual face elements (face elements that do 
+!     not lie on a volume element). For virtual elements, we must communicate
+!     node information.
+!     For these elements, the direction of the normal vector is assumed from the
+!     nodal ordering.
+!     Same as GNNBSURF(), except uses current configuration nodal positions.
+!
+!     AB 3/09/23: Redundant after modifying GNNBSURF to take a flag telling what 
+!     configuration to use
+      SUBROUTINE GNNBSURFT(lFa, e, g, insd, eNoNb, Nx, n)
+      USE COMMOD
+      USE ALLFUN
+      IMPLICIT NONE
+      INTEGER(KIND=IKIND), INTENT(IN) :: e, g, insd, eNoNb
+      REAL(KIND=RKIND), INTENT(IN) :: Nx(insd,eNoNb)
+      REAL(KIND=RKIND), INTENT(OUT) :: n(nsd)
+      TYPE(faceType), INTENT(IN) :: lFa
+
+      INTEGER(KIND=IKIND) a, Ac, i, iM, Ec, b, Bc, eNoN
+      REAL(KIND=RKIND) v(nsd)
+
+      LOGICAL, ALLOCATABLE :: setIt(:)
+      ! ptr not needed in this function
+      INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: lX(:,:), xXi(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpX(:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpDn(:)
+      INTEGER(KIND=IKIND) ierr, p
+
+      iM   = lFa%iM
+      Ec   = lFa%gE(e)
+      eNoN = msh(iM)%eNoN
+
+      ALLOCATE(lX(nsd,eNoN), ptr(eNoN), setIt(eNoN))
+      ! Arrays to hold nodal positions and displacements for MPI gather operation
+      ALLOCATE(tmpX(nsd))
+      ALLOCATE(tmpDn(SIZE(Dn(:,1)))) ! In case Dn has more than nsd dof per node
+
+!     Collecting node information on master, so master can compute the normal
+!     Also, updating nodal position with nodal displacement, so that we
+!     are computing the surface normal in the current configuration
+      DO a=1, eNoNb ! Loop over nodes of boundary surface element
+         Ac = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
+         ! Collect node position and node displacement onto Master. On slaves
+         ! set both (tmpX and tmpDn) to zero.
+         CALL GatherMasterV(x, Ac, tmpX)
+         CALL GatherMasterV(Dn, Ac, tmpDn)
+
+!        Update local position with displacement for normal computation
+         lX(:,a) = tmpX(:) + tmpDn(1:nsd) 
+      END DO
+
+!     If slave, don't perform calculation of n. Wait for master to complete
+!     calculation and broadcast value of n
+      IF (cm%slv()) THEN 
+         CALL MPI_BCAST(n, nsd, mpreal, master, cm%com(), ierr)
+         RETURN 
+      END IF
+
+!     Calculating surface deflation
+      IF (msh(iM)%lShl) THEN ! If mesh is a shell. I think this is unnecessary in this function
+!        Since the face has only one parametric coordinate (edge), find
+!        its normal from cross product of mesh normal and interior edge
+
+!        Update shape functions if NURBS
+         IF (msh(iM)%eType .EQ. eType_NRB) CALL NRBNNX(msh(iM), Ec)
+
+!        Compute adjoining mesh element normal
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+         DO a=1, eNoN
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + lX(:,a)*msh(iM)%Nx(i,a,g)
+            END DO
+         END DO
+         v(:) = CROSS(xXi)
+         v(:) = v(:) / SQRT(NORM(v))
+         DEALLOCATE(xXi)
+
+!        Face element surface deflation
+         ALLOCATE(xXi(nsd,1))
+         xXi = 0._RKIND
+         DO a=1, eNoNb
+            b = ptr(a)
+            xXi(:,1) = xXi(:,1) + lFa%Nx(1,a,g)*lX(:,b)
+         END DO
+
+!        Face normal
+         n(1) = v(2)*xXi(3,1) - v(3)*xXi(2,1)
+         n(2) = v(3)*xXi(1,1) - v(1)*xXi(3,1)
+         n(3) = v(1)*xXi(2,1) - v(2)*xXi(1,1)
+
+!        I choose Gauss point of the mesh element for calculating
+!        interior edge
+         v(:) = 0._RKIND
+         DO a=1, eNoN
+            v(:) = v(:) + lX(:,a)*msh(iM)%N(a,g)
+         END DO
+         a = ptr(1)
+         v(:) = lX(:,a) - v(:)
+         IF (NORM(n,v) .LT. 0._RKIND) n = -n
+
+         DEALLOCATE(xXi)
+         RETURN
+      ELSE
+         ALLOCATE(xXi(nsd,insd))
+         xXi = 0._RKIND
+!        AB 5/11/22: How does this calculation work?
+         DO a=1, eNoNb
+            DO i=1, insd
+               xXi(:,i) = xXi(:,i) + Nx(i,a)*lX(:,a)
+            END DO
+         END DO
+         n = CROSS(xXi)
+         DEALLOCATE(xXi)
+      END IF
+      DEALLOCATE(setIt, ptr, lX)
+      DEALLOCATE(tmpDn)
+      DEALLOCATE(tmpX)
+
+      ! If master, broadcast value of n to slaves
+      IF (cm%mas()) THEN 
+         CALL MPI_Bcast(n, nsd, mpreal, master, cm%com(), ierr)
+      END IF
+
+      RETURN
+      END SUBROUTINE GNNBSURFT
 !####################################################################
 
