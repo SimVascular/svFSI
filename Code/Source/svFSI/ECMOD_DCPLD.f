@@ -76,6 +76,8 @@
 
       OPEN(fid, FILE=TRIM(fname))
 
+      CALL GETRVAL(fid, "cycle_length", t_CL)
+
 !     Excitaton-contraction coupling: active stress
       CALL GETRVAL(fid, "sigm0", sigm0)
       CALL GETRVAL(fid, "min_alpha", min_alpha)
@@ -168,10 +170,12 @@
       REAL(KIND=RKIND), INTENT(IN) :: t, Ta
       REAL(KIND=RKIND), INTENT(OUT) :: f
 
-      REAL(KIND=RKIND) :: sp, sm, ft, a, ap
+      REAL(KIND=RKIND) :: t1, sp, sm, ft, a, ap
 
-      sp = 0.5_RKIND*(1._RKIND + TANH((t-t_sys)/gamma))
-      sm = 0.5_RKIND*(1._RKIND - TANH((t-t_dia)/gamma))
+      t1 = MOD(t, t_CL)
+
+      sp = 0.5_RKIND*(1._RKIND + TANH((t1-t_sys)/gamma))
+      sm = 0.5_RKIND*(1._RKIND - TANH((t1-t_dia)/gamma))
       ft = sp * sm
 
       a  = max_alpha*ft + min_alpha*(1._RKIND - ft)
@@ -189,11 +193,13 @@
       REAL(KIND=RKIND), INTENT(IN) :: t
       REAL(KIND=RKIND), INTENT(INOUT) :: gf
 
-      REAL(KIND=RKIND) a
+      REAL(KIND=RKIND) a, t1
+
+      t1 = MOD(t, t_CL)
 
       gf = 0._RKIND
-      IF ((t.GE.ta_s) .AND. (t.LE.ta_e)) THEN
-         a  = (t - ta_s)/(ta_e - ta_s)
+      IF ((t1.GE.ta_s) .AND. (t1.LE.ta_e)) THEN
+         a  = (t1 - ta_s)/(ta_e - ta_s)
          gf = gf_min * (SIN(pi*a)**2)
       END IF
 
