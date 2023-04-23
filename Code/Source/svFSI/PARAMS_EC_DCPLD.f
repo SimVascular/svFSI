@@ -51,6 +51,9 @@
 !--------------------------------------------------------------------
 
 !--------------------------------------------------------------------
+!     Cardiac cycle length (ms)
+      REAL(KIND=RKIND) :: t_CL = 1000._RKIND
+!--------------------------------------------------------------------
 !     Electromechanics coupling parameters: active stress model
 !     Contractility (Pa)
       REAL(KIND=RKIND) :: sigm0 = 9.0E4_RKIND
