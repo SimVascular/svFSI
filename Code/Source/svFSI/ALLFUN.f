@@ -233,24 +233,29 @@
       END SUBROUTINE GatherMasterS
 
 !####################################################################
-!     This routine integrate s over the surface faId.
-!     I believe s is scalar valued at each node, and this function stands for 
-!     Integrate Scalar
+!     This routine integrates scalar variable s over the mesh face lFa.
+!     (Integrate Scalar)
+!     ARGS:
+!     lFa: A face type, representing a face on the computational mesh
+!     s: An array containing scalar value at each node 
+!     pflag: Flag for using Taylor-Hood function space for pressure
+!     cfgin: A character ('r', 'o', or 'n') denoting which configuration 
+!     (reference = timestep 0, old = timestep n, or new = timestep n+1) to 
+!     integrate in.
       FUNCTION IntegS(lFa, s, pflag, cfgin)
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: s(:)
       LOGICAL, INTENT(IN), OPTIONAL :: pflag
-      CHARACTER, INTENT(IN), OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
+      CHARACTER, INTENT(IN), OPTIONAL :: cfgin
       REAL(KIND=RKIND) IntegS, snode
 
       LOGICAL isIB, flag
       CHARACTER cfg 
-      INTEGER(KIND=IKIND) a, e, g, Ac, nNo, insd, p, ierr
+      INTEGER(KIND=IKIND) a, e, g, Ac, nNo, insd
       REAL(KIND=RKIND) sHat, Jac, n(nsd)
       TYPE(fsType) :: fs
-
 
       flag = .FALSE.
       IF (PRESENT(pflag)) flag = pFlag
@@ -265,7 +270,7 @@
       IF (msh(lFa%iM)%lShl) insd = insd - 1
       IF (msh(lFa%iM)%lFib) insd = 0
 
-      nNo = SIZE(s) ! This must be tnNo, the total number of nodes on a proc
+      nNo = SIZE(s) ! Should be tnNo, the total number of nodes on a proc
       IF (nNo .NE. tnNo) THEN
          IF (ibFlag) THEN
             IF (nNo .NE. ib%tnNo) err =
@@ -309,8 +314,6 @@
          END IF
       END IF
 
-      CALL MPI_BARRIER(cm%com(), err)
-
       IntegS = 0._RKIND
 
       DO e=1, lFa%nEl
@@ -327,7 +330,6 @@
          END IF
 
          DO g=1, fs%nG
-            
             IF (.NOT.isIB) THEN
                CALL GNNB(lFa, e, g, insd, fs%eNoN, fs%Nx(:,:,g), n, cfg)
             ELSE
@@ -339,11 +341,13 @@
             sHat = 0._RKIND
             DO a=1, fs%eNoN
                IF (.NOT. lFa%virtual) THEN
-                  Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
-                  snode = s(Ac) ! Get nodal function value to use
+!                 Get local node number on proc. Ac in [1,tnNo]
+                  Ac   = lFa%IEN(a,e)  
+!                 Get nodal function value to use
+                  snode = s(Ac)        
                ELSE ! If virtual face, then master may need to get value from another proc
-                  Ac   = lFa%IEN(a,e) ! Get local node number on proc. Ac in [1,tnNo]
-                  ! Gather face node (a,e) value to master snode. On slaves, snode = 0 
+                  Ac   = lFa%IEN(a,e) 
+                  ! Gather face node (a,e) value to master snode. On follower procs, snode = 0 
                   CALL GatherMasterS(s, Ac, snode)
                END IF  
                sHat = sHat + snode*fs%N(a,g)
@@ -359,32 +363,37 @@
       RETURN
       END FUNCTION IntegS
 !--------------------------------------------------------------------
-!     This routine integrate s over the surface faId.
-!     AB: I believe s is vector-valued at each node, and this function stands for
-!     Integrate Vector. This function computes the integral over the face of 
-!     v . n. For example, if v contains the velocities at each node on the face,
-!     this function computes the velocity flux through this face.
-!
-!     AB 2/15/23: Modify to accept flag 'r' for reference config, 'o' for timestep n config, 'n' for timestep n+1 config
-!     If 'r', call GNNB() with 'r' flag, which returns normal vector in reference configuration
-!     If 'o', call GNNB() with 'o' flag, which returns normal vector in timestep n configuration
-!     If 'n', call CNNB() with 'n' flag, which returns normal vector in timestep n+1 configuration
+!     This routine integrates vector variable s dotted with the face normal n
+!     over the mesh face lFa. For example, if s contains the velocities at each 
+!     node on the face, this function computes the velocity flux through this face.
+!     (Integrate Vector)
+!     ARGS:
+!     lFa: A face type, representing a face on the computational mesh
+!     s: An array containing a vector value at each node
+!     cfgin: A character ('r', 'o', or 'n') denoting which configuration 
+!     (reference = timestep 0, old = timestep n, or new = timestep n+1) to 
+!     integrate in.
+
       FUNCTION IntegV(lFa, s, cfgin)
       USE COMMOD
       IMPLICIT NONE
       TYPE(faceType), INTENT(IN) :: lFa
       REAL(KIND=RKIND), INTENT(IN) :: s(:,:)
-      CHARACTER, INTENT(IN), OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
+      CHARACTER, INTENT(IN), OPTIONAL :: cfgin 
       REAL(KIND=RKIND) IntegV
 
       LOGICAL isIB
       CHARACTER cfg
-      INTEGER(KIND=IKIND) a, i, e, Ac, g, nNo, p, ierr
+      INTEGER(KIND=IKIND) a, i, e, Ac, g, nNo
       REAL(KIND=RKIND) sHat, n(nsd)
       ! Temporary vector containing s at a node
       REAL(KIND=RKIND) snode(nsd)
 
-
+      ! Deal with optional config flag. If cfg is not provided, use reference config
+      cfg = 'r'
+      IF(PRESENT(cfgin)) THEN
+         cfg = cfgin
+      END IF
 
       IF (SIZE(s,1) .NE. nsd) err = "Incompatible vector size in IntegV"
 
@@ -398,18 +407,13 @@
          END IF
       END IF
 
-! Deal with optional config flag. If cfg is not provided, use reference config
-      cfg = 'r'
-      IF(PRESENT(cfgin)) THEN
-         cfg = cfgin
-      END IF
 !     If using Immersed Boundary method
       isIB = .FALSE.
       IF (ibFlag) THEN
          IF (nNo .EQ. ib%tnNo) isIB = .TRUE.
       END IF
 
-!     Initialize integral to be 0.
+!     Initialize integral to be 0
       IntegV = 0._RKIND
 
       DO e=1, lFa%nEl ! For each element on face
@@ -424,38 +428,23 @@
 
          DO g=1, lFa%nG ! For each Gauss integration point
             IF (.NOT.isIB) THEN
-!              AB 5/11/22:
-!              If struct, compute weighted normal in current config, so that we
-!              integrate over the current config surface
-!              When this function is called during INITIALIZE()->BAFINI()->CALCDERCPLBC(), 
-!              cEq = 0. Should probably change this to use some other condition
-!               IF ((eq(cEq)%phys .EQ. phys_struct) .OR.
-!     2             (eq(cEq)%phys .EQ. phys_ustruct) ) THEN
-!                 Returns a vector (n) at element e and Gauss point g on face lFa
-!                 that is the current config normal weighted by Jac
-!               CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), n)
-!               ELSE ! Else, compute weighted normal in reference config
-!                 Returns a vector (n) at element e and Gauss point g on face lFa
-!                 that is the normal weighted by Jac
-!
-!                 AB 2/15/23: Modify GNNB to accept 'r','o','n' flags to replace function GNNBT
-!                 GNNBT seems identical to GNNB, except for line 2098
                CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, 
      2          lFa%Nx(:,:,g), n, cfg)
-!               END IF
             ELSE
                CALL GNNIB(lFa, e, g, n)
             END IF
 
-!     Calculating the function value (v . n)dA at this Gauss point
+!     Calculating the function value (s . n)dA at this Gauss point
             sHat = 0._RKIND
             DO a=1, lFa%eNoN ! For each node on element
                IF (.NOT. lFa%virtual) THEN 
-                  Ac = lFa%IEN(a,e) ! Get local node number of proc. Ac in [1,tnNo]
-                  snode(:) = s(:,Ac) ! Get nodal function value to use
-               ELSE ! Master must get function value from other procs
+!                 Get local node number of proc. Ac in [1,tnNo]
+                  Ac = lFa%IEN(a,e) 
+!                 Get nodal function value to use
+                  snode(:) = s(:,Ac) 
+               ELSE ! If virtual face, then master may need to get value from another proc
                   Ac = lFa%IEN(a,e)
-                  ! Gather face node (a,e) value to master snode. On slaves, snode = 0 
+                  ! Gather face node (a,e) value to master snode. On follower procs, snode = 0 
                   CALL GatherMasterV(s, Ac, snode)
                END IF
 !              Compute dot product of s and n at Gauss point
@@ -463,7 +452,7 @@
                   sHat = sHat + lFa%N(a,g)*snode(i)*n(i)
                END DO
             END DO
-!     Now integrating. Add product of Gauss weight and dot product at Gauss point
+!           Now integrating. Add product of Gauss weight and dot product at Gauss point
             IntegV = IntegV + lFa%w(g)*sHat
          END DO
       END DO
@@ -474,10 +463,11 @@
       RETURN
       END FUNCTION IntegV
 !--------------------------------------------------------------------
-!     This routine integrate s(l:u,:) over the surface faId.
-!     I believe s is vector or scalar-valued at each node, and this function stands for 
-!     Integrate General. This function is a general interface to integrating
+!     This routine integrates s(l:u,:) over the mesh face lFa.
+!     This function is a general interface to integrating
 !     scalar or vector values over the face. 
+!     If s is array of scalars, calls IntegS
+!     If s is array of vectors, calls IntegV
       FUNCTION IntegG(lFa, s, l, uo, THflag, cfgin)
       USE COMMOD
       IMPLICIT NONE
@@ -486,7 +476,7 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: l
       INTEGER(KIND=IKIND), INTENT(IN), OPTIONAL :: uo
       LOGICAL, INTENT(IN), OPTIONAL :: THflag
-      CHARACTER, INTENT(IN), OPTIONAL :: cfgin   ! can be 'r', 'o', 'n'
+      CHARACTER, INTENT(IN), OPTIONAL :: cfgin
 
       LOGICAL flag
       CHARACTER cfg
@@ -527,7 +517,6 @@
          ALLOCATE (sclr(nNo))
          DO a=1, nNo
             sclr(a) = s(l,a)
-            !PRINT*, 'proc: ', cm%id(), 'sclr(:,a): ', sclr(a)
          END DO
          IntegG = IntegS(lFa,sclr,flag,cfg)
       ELSE
