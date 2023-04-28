@@ -92,8 +92,10 @@
       CONTAINS
 
 !--------------------------------------------------------------------
-!     This routine gathers a nodal vector from a locals arrays across all procs 
-!     and sets a local vector to that value on master, and to zero on slaves
+!     This routine gathers a vector quantity (e.g. position) for node Ac from 
+!     local arrays across all procs. Then sets a local vector snode on the master
+!     proc to the vector quantity, and sets the local vector snode on all 
+!     follower procs to zero.
 !     
 !     In IntegV, a integral over a virtual face is performed by master
 !     alone, which must gather virtual face nodal values from other
@@ -102,12 +104,13 @@
 !     among procs. 
 !
 !     ARGS:
-!     s(nsd, tnNo): a 2D array of values at each node. Ex. position vector at each node
+!     s(nsd, tnNo): a 2D array of values at each node. E.g. position vector at each node
 !     Ac: Index of node belonging to this proc. If Ac = 0, then the desired
 !     node does not belong to this proc
-!     snode(nsd): The vector value at the desired node. At the end of this routine
-!     snode is the vector value at the desired node on master, and zero on all slaves.
-!
+!     snode(nsd): The vector value at the desired node. 
+
+!     At the end of this routine, snode is the vector value at the desired node 
+!     on master, and zero on all slaves.
       SUBROUTINE GatherMasterV(s, Ac, snode)
       USE COMMOD
       IMPLICIT NONE
@@ -127,7 +130,6 @@
       REAL(KIND=RKIND), ALLOCATABLE :: sgather(:,:) 
       ! Get size of snode
       sz = SIZE(snode) ! usually nsd or nsd+1
-      ALLOCATE(sgather(sz, cm%np()))
 
       IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
          snode = 0._RKIND
@@ -135,9 +137,10 @@
          snode = s(:,Ac) ! Get nodal function value to use
       END IF
 !     Communicate the true snode value among all procs. We use the 
-!     gather operation to get snode from all procs onto master
+!     gather operation to get snode from all procs onto master.
       ! First, allocate space for snode values. The size of sgather
       ! vector is the number of procs being used.
+      ALLOCATE(sgather(sz, cm%np()))
       sgather = 0._RKIND
       CALL MPI_GATHER(snode, sz, mpreal, sgather, sz,
      2            mpreal, master, cm%com(), ierr)
@@ -161,9 +164,11 @@
       END SUBROUTINE GatherMasterV
 
 !--------------------------------------------------------------------
-!     This routine gathers a nodal scalar from a locals arrays across all procs 
-!     and sets a local variable to that value on master, and to zero on slaves.
-!     
+!     This routine gathers a scalar quantity for node Ac from 
+!     local arrays across all procs. Then sets a local scalar snode on the master
+!     proc to the scalar quantity, and sets the local scalar snode on all 
+!     follower procs to zero.
+!
 !     In IntegS, a integral over a virtual face is performed by master
 !     alone, which must gather virtual face nodal values from other
 !     procs if master does not own the desired node. This function gathers
@@ -174,7 +179,9 @@
 !     s(tnNo): a 1D array of values at each node
 !     Ac: Index of node belonging to this proc. If Ac = 0, then the desired
 !     node does not belong to this proc
-!     snode: The scalar value at the desired node. At the end of this routine
+!     snode: The scalar value at the desired node. 
+!     
+!     At the end of this routine
 !     snode is the value at the desired node on master, and zero on all slaves.
       SUBROUTINE GatherMasterS(s, Ac, snode)
       USE COMMOD
@@ -193,7 +200,6 @@
       
       ! Temporary array containing scalar value snode from all procs
       REAL(KIND=RKIND), ALLOCATABLE :: sgather(:)
-      ALLOCATE(sgather(cm%np()))
 
       IF (Ac .EQ. 0) THEN ! This proc doesn't own this node
          snode = 0._RKIND
@@ -201,9 +207,10 @@
          snode = s(Ac) ! Get nodal function value to use
       END IF
 !     Communicate the true snode value among all procs. We use the 
-!     gather operation to get snode from all procs onto master
+!     gather operation to get snode from all procs onto master.
       ! First, allocate space for snode values. The size of sgather
       ! vector is the number of procs being used.
+      ALLOCATE(sgather(cm%np()))
       sgather = 0._RKIND
       CALL MPI_GATHER(snode, 1, mpreal, sgather, 1,
      2            mpreal, master, cm%com(), ierr)
