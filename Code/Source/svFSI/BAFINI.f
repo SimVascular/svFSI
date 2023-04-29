@@ -82,12 +82,14 @@
                cplBC%fa(i)%name = TRIM(msh(iM)%fa(iFa)%name)
                cplBC%fa(i)%y    = 0._RKIND
                IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Dir)) THEN
-                  cplBC%fa(i)%bGrp = cplBC_Dir ! Set cplBC internal flag to Dirichlet
+!                 Set cplBC internal flag to Dirichlet
+                  cplBC%fa(i)%bGrp = cplBC_Dir 
                ELSE IF (BTEST(eq(iEq)%bc(iBc)%bType,bType_Neu)) THEN
-                  cplBC%fa(i)%bGrp = cplBC_Neu ! Set cplBC internal flag to Neumann
-                  ! If coupled scheme is implicit or semi-implicit, set bType to resistance
+!                 Set cplBC internal flag to Neumann
+                  cplBC%fa(i)%bGrp = cplBC_Neu 
+!                 If coupled scheme is implicit or semi-implicit, set bType to resistance
                   IF (cplBC%schm .NE. cplBC_E) eq(iEq)%bc(iBc)%bType=
-     2               IBSET(eq(iEq)%bc(iBc)%bType,bType_res) 
+     2               IBSET(eq(iEq)%bc(iBc)%bType,bType_res)
 
 !                 Copy RCR structure from bc() to cplBC()
                   cplBC%fa(i)%RCR%Rp = eq(iEq)%bc(iBc)%RCR%Rp
@@ -113,7 +115,10 @@
             iM  = eq(iEq)%bc(iBc)%iM
             eq(iEq)%bc(iBc)%lsPtr = 0
             CALL FSILSINI(eq(iEq)%bc(iBc), msh(iM)%fa(iFa), lsPtr)
-!           Store mesh and face index in corresponding lhs%face(i)
+!           Store mesh and face index in corresponding lhs%face(i). This
+!           explicitly maps mesh and face indices between lhs object
+!           (used in the linear solver for coupled surfaces) and the
+!           msh object. Used in MATCHFACE below.
             IF (eq(iEq)%bc(iBc)%lsPtr .NE. 0) THEN 
                lhs%face(eq(iEq)%bc(iBc)%lsPtr)%iM = iM
                lhs%face(eq(iEq)%bc(iBc)%lsPtr)%iFa = iFa
@@ -195,7 +200,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), sA(:), sV(:,:)
 
 !     Calculating face area
-      ALLOCATE(sA(tnNo)) ! Total number of nodes on this proc
+      ALLOCATE(sA(tnNo)) ! tnNo: Total number of nodes on this proc across all meshes
       sA   = 1._RKIND
       area = Integ(lFa, sA)
       std  = "    Area of face <"//TRIM(lFa%name)//"> is "//STR(area)
@@ -205,7 +210,7 @@
       lFa%area = area
       DEALLOCATE(sA)
 
-!     Compute face normals at nodes, to be stored in nV
+!     Compute face normals at nodes, stored in nV
       IF (ALLOCATED(lFa%nV)) DEALLOCATE(lFa%nV)
       ALLOCATE(lFa%nV(nsd,lFa%nNo), sV(nsd,tnNo))
       sV = 0._RKIND
@@ -226,7 +231,8 @@
                CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g), nV)
                DO a=1, lFa%eNoN
                   Ac       = lFa%IEN(a,e)
-                  IF (Ac .NE. 0) THEN 
+                  IF (Ac .NE. 0) THEN ! Ac could equal zero if virtual face
+!                    Compute integral of normal vector over face
                      sV(:,Ac) = sV(:,Ac) + nV*lFa%N(a,g)*lFa%w(g)
                   END IF
                END DO
@@ -295,6 +301,7 @@
                DO a=1, fs%eNoN
                   Ac = lFa%IEN(a,e)
                   IF (Ac .NE. 0) THEN
+!                    Compute integral of normal vector over face
                      sV(:,Ac) = sV(:,Ac) + fs%w(g)*fs%N(a,g)*nV(:)
                   END IF
                END DO
@@ -309,6 +316,7 @@
                   DO b=1, fs%eNoN
                      Bc = lFa%IEN(b,e)
                      IF (Bc .NE. 0) THEN 
+!                       Averaging sV? For higher order elements
                         sV(:,Ac) = sV(:,Ac) + sV(:,Bc)
                      END IF
                   END DO
@@ -547,35 +555,28 @@
      2         gNodes, sVl)
          END IF
       ELSE IF (BTEST(lBc%bType,bType_Neu)) THEN
-!        AB 5/13/22: I think this is where integrals in Moghadam et al. 
-!        eq. 27 are computed. Note that this function is only computed
-!        once (at initialization)
+!        Compute integral of normal vector over face in Moghadam et al. eq. 27. 
+!        Note that this function is only computed once at initialization
          IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
-!            PRINT*, 'Inside FSILINI, ','proc: ', cm%id(), 'lFa%name: ', 
-!     2       lFa%name, 'lFa%nEl: ', lFa%nEl, 'lFa%nNo: ', lFa%nNo
-
-            sV = 0._RKIND
-            DO e=1, lFa%nEl ! Loop over elements on face
+            sV = 0._RKIND     ! The value of the integral
+            DO e=1, lFa%nEl   ! Loop over elements on face
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
                DO g=1, lFa%nG ! Loop over Gauss point
                   CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),n) ! get weighted normal vector in ref config
-                  DO a=1, lFa%eNoN ! Loop over nodes in element
+                  DO a=1, lFa%eNoN     ! Loop over nodes in element
                      Ac = lFa%IEN(a,e) ! Extract global nodal index
-!                     IF (cm%mas()) THEN 
-!                        PRINT*, 'Inside FSILINI, Ac: ', Ac
-!                     END IF
-!                    Ac should be 0 if a proc does not own it. Could possibly get
-!                    a segfault here. Should we have an if Ac .NE. 0?
+!                    For a virtual face, Ac can be 0 if a proc does not own node Ac
                      IF (Ac .NE. 0) THEN 
-                        sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
+!                       Integral of shape function times weighted normal
+                        sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n 
                      END IF
                   END DO
                END DO
             END DO
             DO a=1, lFa%nNo
-!              For a virtual face, Ac should be obtained correctly. It 
-!              should be the index of the node local to this proc, Ac in [1, tnNo]
-!              If lFa%nNo = 0, we do not enter loop, Moreover, sVl is allocated with no space
+!              For a virtual face, Ac is obtained correctly as the index of the 
+!              node local to this proc, Ac in [1, tnNo].
+!              If lFa%nNo = 0, we do not enter loop and sVl is allocated with no space
                Ac       = lFa%gN(a)
                IF (Ac .EQ. 0) THEN
                   err = "Ac = 0"
