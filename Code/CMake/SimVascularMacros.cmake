@@ -37,6 +37,8 @@ endmacro()
 # and create the necessary variables to load and link them.
 #
 macro(simvascular_external _pkg)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu90")
+  
   string(TOLOWER "${_pkg}" _lower)
 
   dev_message("Configuring ${_pkg}")
