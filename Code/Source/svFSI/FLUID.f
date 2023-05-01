@@ -1314,9 +1314,10 @@
 !     Add Neumann BC contributions to residual (lR) and stiffness (lK).
 !     These include both backflow stabilization and boundary pressure.
 !     Note, if the boundary is a coupled or resistance boundary, the boundary
-!     pressure is added to the residual here, but the boundary resistance is not
-!     explicitly added to the tangent here. The resistance is accounted for by
-!     the ADDBCMUL() function within the linear solve.
+!     pressure is added to the residual here, but the boundary resistance 
+!     (Moghadam et al, 2013, eq. 27)is not explicitly added to the tangent here. 
+!     The resistance is accounted for by the ADDBCMUL() function within the 
+!     linear solve.
       IF (nsd .EQ. 2) THEN
          DO a=1, eNoN
             lR(1,a) = lR(1,a) - w*N(a)*hc(1)
@@ -1334,6 +1335,7 @@
             lR(2,a) = lR(2,a) - w*N(a)*hc(2)
             lR(3,a) = lR(3,a) - w*N(a)*hc(3)
             DO b=1, eNoN
+!              ? Where is the coupling term added to the tangent matrix (Moghadam 2013 eq 27)?
                T1 = wl*N(a)*N(b)*udn ! This is only the backflow stabilization contribution
                lK(1,a,b)  = lK(1,a,b)  - T1
                lK(6,a,b)  = lK(6,a,b)  - T1
