@@ -1315,7 +1315,7 @@
 !     These include both backflow stabilization and boundary pressure.
 !     Note, if the boundary is a coupled or resistance boundary, the boundary
 !     pressure is added to the residual here, but the boundary resistance 
-!     (Moghadam et al, 2013, eq. 27)is not explicitly added to the tangent here. 
+!     (Moghadam et al, 2013, eq. 27) is not explicitly added to the tangent here. 
 !     The resistance is accounted for by the ADDBCMUL() function within the 
 !     linear solve.
       IF (nsd .EQ. 2) THEN
