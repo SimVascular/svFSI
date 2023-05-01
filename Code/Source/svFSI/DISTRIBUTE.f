@@ -82,9 +82,12 @@
       CALL SPLITJOBS(nMsh, cm%np(), wgt, wrk)
 
 !     First partitioning the meshes
-!     gmtl:  gtnNo --> tnNo. What is gmtl? I think gmtl is a mapping from
-!     global nodal index to nodal index local to this proc. If this proc does
-!     not own an element with global nodal index Ac, then gmtl(Ac) = 0.
+!     gmtl:  gtnNo --> tnNo, where gtnNo is the global total number of nodes 
+!     (numbe of nodes across all procs and all meshes) and tnNo is the total 
+!     number of nodes (number of nodes on this proc across all meshes). Thus,
+!     gmtl is a mapping from a global nodal index to a nodal index 
+!     local to this proc. If a proc does not own an element with global nodal 
+!     index Ac, then gmtl(Ac) = 0.
       tnNo = 0
       gmtl = 0
       IF (cm%seq()) THEN
@@ -97,7 +100,6 @@
       DO iM=1, nMsh
          dbg = "Partitioning mesh "//iM
          iWgt = REAL(wgt(iM,:)/SUM(wgt(iM,:)), KIND=RKIND4)
-!        what is gmtl??
          CALL PARTMSH(msh(iM), gmtl, cm%np(), iWgt)
       END DO
 
@@ -1160,7 +1162,7 @@
       IMPLICIT NONE
       INTEGER(KIND=IKIND), INTENT(IN) :: nP
       REAL(KIND=RKIND4), INTENT(IN) :: wgt(nP)
-      INTEGER(KIND=IKIND), INTENT(INOUT) :: gmtl(gtnNo) ! gtnNo = global total number of nodes
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: gmtl(gtnNo)
       TYPE(mshType), INTENT(INOUT) :: lM
 
       LOGICAL :: flag, fnFlag
@@ -1175,13 +1177,13 @@
 
 !     If sequential, copy global parameters as local parameters and return
       IF (cm%seq()) THEN
-         lM%nEl = lM%gnEl ! number of elements in this mesh
-         lM%nNo = lM%gnNo ! number of nodes in this mesh
+         lM%nEl = lM%gnEl  ! Global number of elements in this mesh
+         lM%nNo = lM%gnNo  ! Global number of nodes in this mesh
          ALLOCATE(lM%IEN(lM%eNoN,lM%nEl), lM%eDist(0:cm%np()))
-         lM%IEN      = lM%gIEN ! IEN array (maps element e (of mesh) and node a to global node A (of mesh))
+         lM%IEN      = lM%gIEN   ! IEN array (maps element e (of mesh) and node a to global node A (of mesh))
          lM%eDist(0) = 0
-         lM%eDist(1) = lM%gnEl ! element distribution array, lM%eDist(i) represents first element which belong to cm%id()=i
-         ALLOCATE(lM%otnIEN(lM%nEl))! old to new IEN array (maps ??)
+         lM%eDist(1) = lM%gnEl   ! element distribution array, lM%eDist(i) represents first element which belong to cm%id()=i
+         ALLOCATE(lM%otnIEN(lM%nEl))   ! old to new IEN array (maps ??)
          DO e=1, lM%nEl
             lM%otnIEN(e) = e
          END DO
@@ -1210,7 +1212,7 @@
       IF (lM%lShl) insd = nsd - 1
       IF (lM%lFib) insd = 1
 
-      eNoN = lM%eNoN ! number of nodes in the element
+      eNoN = lM%eNoN    ! number of nodes in the element
       IF (cm%slv()) THEN
          CALL SELECTELE(lM)
          ALLOCATE(lM%gIEN(0,0), lM%fa(lM%nFa))
@@ -1241,7 +1243,7 @@
       ELSE
 !     A draft of splitting the mesh between processors
 !     lM%eDist(i) represents first element which belong to cm%id()=i
-         DO i=0, cm%np() ! Loop over procs
+         DO i=0, cm%np()   ! Loop over procs
             lM%eDist(i) = NINT(SUM(wgt(1:i))*lM%gnEl, KIND=IKIND)
             IF (lM%eDist(i) .GT. lM%gnEl) lM%eDist(i) = lM%gnEl
          END DO
@@ -1277,13 +1279,13 @@
       ELSE
 !        lM%IEN maps node a in element e (on this proc) to global node Ac on this proc?
          ALLOCATE(lM%IEN(eNoN,nEl))
-!     Scattering the lM%gIEN array to processors. Splits IEN array according to
-!     rough partition computed above. Places data in lM%IEN. I think this step
-!     is needed to do the final partition in SPLIT() below
+!        Scattering the lM%gIEN array to processors. Splits IEN array according to
+!        rough partition computed above. Places data in lM%IEN. I think this step
+!        is needed to do the final partition in SPLIT() below
          CALL MPI_SCATTERV(lM%gIEN, sCount, disp, mpint, lM%IEN,
      2      nEl*eNoN, mpint, master, cm%com(), ierr)
 
-!     This is to get eNoNb
+!        This is to get eNoNb
          SELECT CASE (lM%eType)
          CASE(eType_TET4)
             eNoNb = 3
@@ -1314,9 +1316,9 @@
          CASE DEFAULT
             err = "Undefined element type"
          END SELECT
-!     The output of this process is "part" array. part(i) says
-!     which processor element "i" belongs to
-!     Doing partitioning, using ParMetis
+!        The output of this process is "part" array. part(i) says
+!        which processor element "i" belongs to
+!        Doing partitioning, using ParMetis
          edgecut = SPLIT(nEl, eNoN, eNoNb, lM%IEN, cm%np(), lM%eDist,
      2      wgt, part)
          IF (edgecut .EQ. 0) THEN
@@ -1325,9 +1327,9 @@ c            wrn = " ParMETIS failed to partition the mesh"
          ELSE IF (edgecut .GT. 0) THEN
             std = " ParMETIS partitioned the mesh by cutting "//
      2         STR(edgecut)//" elements"
-!     LT 0 is for the case that all elements reside in one processor
+!        LT 0 is for the case that all elements reside in one processor
          END IF
-         DEALLOCATE(lM%IEN) ! Destroy lM%IEN
+         DEALLOCATE(lM%IEN)
          IF (rmsh%isReqd) THEN
             std = " Writing partition data to file"
             CALL MPI_FILE_OPEN(cm%com(), TRIM(fTmp), MPI_MODE_WRONLY +
@@ -1340,8 +1342,8 @@ c            wrn = " ParMETIS failed to partition the mesh"
          END IF
       END IF
 
-!     Compute first element belonging to each proc (disp(i) and number 
-!     of elements belonging to each proc (sCount(i))
+!     Compute first element belonging to each proc, disp(i), and number 
+!     of elements belonging to each proc, sCount(i),
       DO i=1, cm%np() ! Loop over procs
          disp(i)   = lM%eDist(i-1)
          sCount(i) = lM%eDist(i) - disp(i)
@@ -1377,9 +1379,9 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !        eDist(i) = global index of first element that belong to proc i
 
          ALLOCATE(tempIEN(eNoN,lM%gnEl), lM%otnIEN(lM%gnEl))
-!     Making the lM%IEN array in order, based on the cm%id() number in
-!     master. lM%otnIEN maps old IEN order to new IEN order.
-!     Why does the IEN order change? I think to facilitate scattering later.
+!        Making the lM%IEN array in order, based on the cm%id() number in
+!        master. lM%otnIEN maps old IEN order to new IEN order.
+!        Why does the IEN order change? I think to facilitate scattering later.
          disp = 0
          DO e=1, lM%gnEl ! Loop over global elements in mesh
 !           gPart(e) = proc that owns e
@@ -1533,15 +1535,22 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     mapping and converting other parameters.
 !     I will use an upper bound for gPart as a container for ltg,
 !     since there can be repeated nodes. gPart is just a temp variable.
-!     gmtl:  gtnNo --> tnNo. Maps global node index across all meshes to local node index (across all meshes or parts of meshes belong to this proc). gmtl is zero global node Ac does not belong to this proc
-!     gPart: tnNo  --> gtnNo. Maps local node index on this proc (across multiple parts of meshes) to global node index across all meshes. Inverse of gmtl
-!     ltg:   tnNo  --> gtnNo. How is this different from gPart, if at all? I think they contain the same info, gPart is just temporary as we assemble the info
-!     lM%gN: nNo   --> tnNo. Changing gN to map local node index on this proc and this mesh to local node index on this proc across all meshes or parts of meshes belonging to this proc
+!     gmtl:  gtnNo --> tnNo. Maps global node index across all meshes to local 
+!            node index (across all meshes or parts of meshes belong to this proc). 
+!            If gmtl is zero, global node Ac does not belong to this proc
+!     gPart: tnNo  --> gtnNo. Maps local node index on this proc (across
+!            multiple parts of meshes) to global node index across all meshes. 
+!            Inverse of gmtl
+!     ltg:   tnNo  --> gtnNo. Contains the same info as gPart (I think), gPart 
+!            is just temporary as we assemble the info
+!     lM%gN: nNo   --> tnNo. Changing gN to map local node index on this proc 
+!                      and this mesh to local node index on this proc across all 
+!                       meshes or parts of meshes belonging to this proc
       DEALLOCATE(lM%gN)
       ALLOCATE(gPart(tnNo+nNo), lM%gN(nNo))
 !     Loop over nodes on this proc (potentially multiple meshes or parts of meshes).
 !     If this is the first mesh, then tnNo = 0 and ltg is unfilled. So this loop
-!     is only meaningful if we are partitioning the second mesh or later
+!     is only executed if we are partitioning the second mesh or later
       DO a=1, tnNo
          Ac       = ltg(a)
          gPart(a) = Ac
@@ -1612,13 +1621,13 @@ c            wrn = " ParMETIS failed to partition the mesh"
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
       TYPE(faceType), INTENT(INOUT) :: lFa, gFa
-      INTEGER(KIND=IKIND), INTENT(INOUT) :: gmtl(gtnNo)
+      INTEGER(KIND=IKIND), INTENT(IN) :: gmtl(gtnNo)
 
       INTEGER(KIND=IKIND) eNoNb, e, a, Ac, Ec, i, j, iM
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), ePtr(:)
 
-!     Broadcasting the number of nodes and elements off to slaves and
+!     Broadcasting the number of nodes and elements off to followers and
 !     populating gFa to all procs. gFa is a global face object that contains
 !     info about the entire face, accessible by all procs.
       IF (cm%mas()) THEN
@@ -1693,7 +1702,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     Create and fill a structure (part) to communicate global face data among
 !     all procs
       i = gFa%nEl*(2+eNoNb) + gFa%nNo
-      ALLOCATE(part(i)) 
+      ALLOCATE(part(i))
       IF (cm%mas()) THEN ! if master, fill part array with global face data
          DO e=1, gFa%nEl
             j  = (e-1)*(2+eNoNb) + 1
@@ -1713,7 +1722,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
       END IF
 
       CALL cm%bcast(part)
-!     If slave proc, extract face data from part(:) and place into proper structures
+!     If follower proc, extract face data from part(:) and place into proper structures
       IF (cm%slv()) THEN
          DO e=1, gFa%nEl
             j = (e-1)*(2+eNoNb) + 1
@@ -1723,7 +1732,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
          END DO
          DO a=1, gFa%nNo
             j = gFa%nEl*(2+eNoNb) + a
-            gFa%gN(a) = part(j)        !
+            gFa%gN(a) = part(j)
          END DO
       END IF
       DEALLOCATE(part)
@@ -1804,6 +1813,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !--------------------------------------------------------------------
 !     This routine partitions a virtual face. Since a virtual face does not
 !     lie on the computational domain, it must be treated separately.
+!     This function is much the same as PARTFACE.
       SUBROUTINE PARTFACEV(lM, lFa, gFa, gmtl)
       USE COMMOD
       USE ALLFUN
@@ -1837,7 +1847,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !           lM%otnIEN maps old IEN order to new IEN order. Indexing should start
 !           at 1, so for virtual face (for which Ec = 0), otnIEN(Ec) = trash
 !           Instead, just set ePtr(e) = 0
-!            ePtr(e)   = lM%otnIEN(Ec)  
+!           ePtr(e)   = lM%otnIEN(Ec)  ! In PARTFACE
             ePtr(e)   = 0
             part(j)   = Ec             ! 0 for virtual face 
             part(j+1) = ePtr(e)        ! New element index for element e
@@ -1854,7 +1864,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     Broadcast part array to all processors
       CALL cm%bcast(part)
 
-!     If slave proc, extract face data from part(:) and place into proper structures
+!     If follower proc, extract face data from part(:) and place into proper structures
       IF (cm%slv()) THEN
          ! Extract element information from part
          DO e=1, gFa%nEl
@@ -1879,7 +1889,7 @@ c            wrn = " ParMETIS failed to partition the mesh"
 !     virtual face do not lie on the mesh. In this case, set lFa%nEl
 !     equal to gFa%nEl for all procs. We'll deal with the parallelization
 !     and communication when we need to integrate (in IntegS and IntegV)
-!     Also, set gFa%gE(e) = -1 so we don't get confused
+!     Also, set gFa%gE(e) = 0 so we don't get confused
 !     and behavior will be defined.
       lFa%nEl = gFa%nEl
 !     This loop is not necessary, but including to match PARTFACE()
