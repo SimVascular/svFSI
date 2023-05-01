@@ -214,7 +214,7 @@
       iM    = lFa%iM
       eNoN  = msh(iM)%eNoN
       eNoNb = lFa%eNoN
-      DO e=1, lFa%nEl
+      DO e=1, lFa%nEl   ! Begin loop over elements
          Ec    = lFa%gE(e)
          cDmn  = DOMAIN(msh(iM), cEq, Ec)
          cPhys = eq(cEq)%dmn(cDmn)%phys
@@ -234,8 +234,8 @@
             Ac      = msh(iM)%IEN(a,Ec)
             ptr(a)  = Ac
             hl(a)   = hg(Ac)
-            xl(:,a) = x(:,Ac) ! reference config position vector at each node
-            dl(:,a) = Dg(:,Ac) ! displacement vector at each node
+            xl(:,a) = x(:,Ac)    ! reference config position vector at each node
+            dl(:,a) = Dg(:,Ac)   ! displacement vector at each node
          END DO
 
 !        Initialize parameteric coordinate for Newton's iterations
@@ -245,7 +245,7 @@
          END DO
          xi0 = xi0 / REAL(msh(iM)%nG, KIND=RKIND)
 
-         DO g=1, lFa%nG
+         DO g=1, lFa%nG ! Begin loop over Gauss point
             xp = 0._RKIND
             DO a=1, eNoNb
                Ac = lFa%IEN(a,e)
@@ -259,18 +259,19 @@
             IF (g.EQ.1 .OR. .NOT.msh(iM)%lShpF)
      2         CALL GNN(eNoN, nsd, Nxi, xl, Nx, Jac, ksix)
 
-!           Get a vector (nV) at element "e" and Gauss point
-!           "g" of face "lFa" that is the normal weigthed by Jac, i.e.
-!           Jac = SQRT(NORM(n)). Note, NORM(u) gives the SQUARE of the Euclidean
-!           norm of u
+!           Get a vector (nV) at element e and Gauss point g of face lFa that 
+!           is the normal weighted by Jac, i.e. Jac = SQRT(NORM(n)), where 
+!           NORM(u) gives the SQUARE of the Euclidean norm of u
             CALL GNNB(lFa, e, g, nsd-1, eNoNb, lFa%Nx(:,:,g), nV)
             Jac = SQRT(NORM(nV)) ! Extract Jacobian
-!           AB 5/11/22: I believe this is the Jacobian of the mapping from parent
-!           surface element to ref configuration surface element, so this encodes 
+!           Note, this is the Jacobian of the mapping from parent surface 
+!           element to ref configuration surface element, so this encodes 
 !           the area of the ref configuration surface element
-            nV  = nV / Jac ! Normalize element surface normal
-            w   = lFa%w(g)*Jac ! Scale Gauss point weights by Jacobian
+            nV  = nV / Jac       ! Normalize element surface normal
+            w   = lFa%w(g)*Jac   ! Scale Gauss point weights by Jacobian
 
+!           Calculate residual and tangent contributions due to follower pressure
+!           load. These are stored in local arrays lR and lK
             IF (cPhys .EQ. phys_ustruct) THEN
                IF (nsd .EQ. 3) THEN
                   CALL BUSTRUCT3D(eNoN, w, N, Nx, dl, hl, nV, lR, lK,
@@ -286,9 +287,10 @@
                   CALL BSTRUCT2D(eNoN, w, N, Nx, dl, hl, nV, lR, lK)
                END IF
             END IF
-         END DO ! Loop over Gauss point
+         END DO   ! End loop over Gauss point
 
-!        Now doing the assembly part
+!        Now assemble contributions into global residual and stiffness arrays,
+!        R and Val
 #ifdef WITH_TRILINOS
          IF (eq(cEq)%assmTLS) THEN
             CALL TRILINOS_DOASSEM(eNoN, ptr, lK, lR)
@@ -299,8 +301,6 @@
                DEALLOCATE(lKd)
 
             ELSE IF (cPhys .EQ. phys_struct) THEN
-!              Assemble tangent matrix into global sparse tangent matrix Val
-!              and residual vector into global residual vector R
                CALL DOASSEM(eNoN, ptr, lK, lR)
 
             END IF
@@ -308,17 +308,19 @@
          END IF
 #endif
          DEALLOCATE(ptr, hl, xl, dl, N, Nxi, Nx, lR, lK)
-      END DO ! Loop over elements
+      END DO ! End loop over elements
 
 !     AB 5/16/22:
-!     Now update surface integrals involved in resistance BC contribution to
+!     Now update surface integrals involved in coupled/resistance BC contribution to
 !     stiffness matrix to reflect deformed geometry. The value of this
 !     integral is stored in lhs%face%val. Since we are using
 !     the deformed geometry to compute the contribution of the pressure
-!     load to the residual vector, we must also use the deformed geometry
-!     to compute the contribution of the resistance BC to the tangent
+!     load to the residual vector (i.e. follower pressure), we must also use the 
+!     deformed geometry to compute the contribution of the resistance BC to the tangent
 !     matrix
-      CALL FSILSUPD(lBc, lFa, lBc%lsPtr)
+      IF (BTEST(lBc%bType, bType_res)) THEN
+         CALL FSILSUPD(lBc, lFa, lBc%lsPtr)
+      END IF
       
 
       RETURN
@@ -326,15 +328,15 @@
 
 ! ----------------------------------------------------------------------
 !     AB 5/16/22:
-!     Update the surface integral involved in the resistance BC input to the 
+!     Update the surface integral involved in the coupled/resistance BC input to the 
 !     linear solver to take into account the deformed geometry.
 !     This integral is sV = int_Gammat (Na * n_i) (See Moghadam 2013 eq. 27.)
 !     This function recomputes this integral and updates the variable 
 !     lhs%face%val with the new value, which is eventually used in ADDBCMUL() 
 !     to add the resistance BC contribution to the matrix-vector product 
 !     of the tangent matrix and an arbitrary vector. 
-!     This code was more or less copied from BAFINI.f -> FSILSINI(). The
-!     major differences is that I call a new one function GNNBT() to get 
+!     This code was more or less copied from BAFINI.f::FSILSINI(). The
+!     major differences is that I call GNNB() with the 'n' flag to get 
 !     the weighted normal in the current configuration, rather than the 
 !     weighted normal in the reference configuration, and that I call a
 !     new function FSILS_BC_UPDATE() to update lhs values rather than
@@ -353,6 +355,7 @@
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: gNodes(:)
       REAL(KIND=RKIND), ALLOCATABLE :: sV(:,:), sVl(:,:)
+      CHARACTER cfg
 
       iM  = lFa%iM
       nNo = lFa%nNo
@@ -386,22 +389,19 @@
      2         gNodes, sVl)
          END IF
       ELSE IF (BTEST(lBc%bType,bType_Neu)) THEN
-!        AB 5/13/22: I think this is where integrals in Moghadam et al. 
-!        eq. 27 are computed. Note that this function is only computed
-!        once (at initialization)
+!        AB 5/13/22: This is where integrals in Moghadam et al. 
+!        eq. 27 are computed.
          IF (BTEST(lBc%bType,bType_res)) THEN ! If resistance BC (or cpl BC)
             sV = 0._RKIND
             DO e=1, lFa%nEl ! Loop over elements on face
                IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM),lFa,e) ! If NURBS
                DO g=1, lFa%nG ! Loop over Gauss point
-               
-!                 Changed this to GNNBT() instead of GNNB() in FSILSINI()
 !                 Get weighted normal vector in current config
-                  CALL GNNBT(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
-     2             n) ! get weighted normal vector in ref config
+                  cfg = 'n'
+                  CALL GNNB(lFa, e, g, nsd-1, lFa%eNoN, lFa%Nx(:,:,g),
+     2             n, cfg)
 
-
-                  DO a=1, lFa%eNoN ! Loop over nodes  in element
+                  DO a=1, lFa%eNoN     ! Loop over nodes  in element
                      Ac = lFa%IEN(a,e) ! Extract global nodal index
                      IF (Ac .NE. 0) THEN 
                         sV(:,Ac) = sV(:,Ac) + lFa%N(a,g)*lFa%w(g)*n ! Integral of shape function times weighted normal
