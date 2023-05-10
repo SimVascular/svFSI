@@ -417,11 +417,11 @@
          TYPE(adjType) :: eAdj
 !        Function spaces (basis)
          TYPE(fsType), ALLOCATABLE :: fs(:)
-!        Is face a virtual face (i.e. does not lie on computational domain)
+!        Flag for virtual face (i.e. face does not lie on volume mesh)
          LOGICAL :: virtual = .FALSE.
-!        Name of (virtual) face that caps this surface
+!        Name of (virtual) face that caps this face
          CHARACTER(LEN=stdL) :: capFaceName = ""
-!        ID number of (virtual) face that caps this surface
+!        ID number of (virtual) face that caps this face
          INTEGER(KIND=IKIND) :: capFaceID = 0
       END TYPE faceType
 
@@ -931,7 +931,7 @@
       INTEGER(KIND=IKIND) startTS
 !     Current equation degrees of freedom
       INTEGER(KIND=IKIND) dof
-!     Global total number of nodes (across all meshes (total) and all procs (global))
+!     Global total number of nodes, across all meshes (total) and all procs (global)
       INTEGER(KIND=IKIND) gtnNo
 !     Number of equations
       INTEGER(KIND=IKIND) nEq
@@ -1011,7 +1011,7 @@
       REAL(KIND=RKIND), ALLOCATABLE :: R(:,:)
 !     LHS matrix
       REAL(KIND=RKIND), ALLOCATABLE :: Val(:,:)
-!     Position vector of ref configuration mesh nodes
+!     Position vector of mesh nodes (in ref config)
       REAL(KIND=RKIND), ALLOCATABLE :: x(:,:)
 !     Old variables (velocity)
       REAL(KIND=RKIND), ALLOCATABLE :: Yo(:,:)
