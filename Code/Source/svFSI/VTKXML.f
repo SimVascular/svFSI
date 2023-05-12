@@ -137,7 +137,7 @@
 !     that the face element lies on. If the face is virtual, then elements of
 !     the face mesh do not lie on volume elements, so there is no GlobalElementID
 !     In this case, gE(e) = 0 for all e.
-!     ?? How does it even find GlobalElementID. There is no array named that for cap.vtp
+!     AB: How does it even find GlobalElementID? There is no array named that for cap.vtp
       ALLOCATE(lFa%gE(lFa%nEl))
       CALL getVTK_elemData(vtp, "GlobalElementID", lFa%gE, iStat)
       IF (iStat .LT. 0) THEN
@@ -534,21 +534,19 @@
                CASE (outGrp_NA)
                   err = "Undefined output grp in VTK"
 
-               CASE (outGrp_A)
+               CASE (outGrp_A) ! Acceleration
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
-                     ! Why don't we divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lA(s:e,Ac)
                   END DO
 
-               CASE (outGrp_Y)
+               CASE (outGrp_Y) ! Velocity
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
-                     ! Why don't we divide by mesh scale factor
                      d(iM)%x(is:ie,a) = lY(s:e,Ac)
                   END DO
 
-               CASE (outGrp_D)
+               CASE (outGrp_D) ! Displacement
                   DO a=1, msh(iM)%nNo
                      Ac = msh(iM)%gN(a)
                      ! Divide by mesh scale factor
