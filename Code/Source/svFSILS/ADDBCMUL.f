@@ -46,11 +46,15 @@
 !--------------------------------------------------------------------
 !     The contribution of coupled BCs is added to the matrix-vector
 !     product operation. Depending on the type of operation (adding the
-!     contribution or compution the PC contribution) different
+!     contribution or computing the PC contribution) different
 !     coefficients are used.
-!     The resistance is stored in lhs%face(faIn)%res
+!     
+!     AB: The resistance is stored in lhs%face(faIn)%res.
 !     The current matrix vector product is in Y. The vector to be 
 !     multiplied and added is in X. The matrix is represented by res.
+!     See for reference
+!        - Moghadam et al. 2013 eq. 27 (https://doi.org/10.1016/j.jcp.2012.07.035)
+!        - Moghadam et al. 2013b (https://doi.org/10.1007/s00466-013-0868-1)
 !        
 !--------------------------------------------------------------------
 
@@ -68,10 +72,8 @@
 
       ALLOCATE(coef(lhs%nFaces), v(dof,lhs%nNo), vcap(dof,lhs%nNo))
 
-!     Here is where the res(istance) value is "added" to the stiffness
-!     matrix (Moghadam et al. 2013 eq. 27).
-!     res is transfered to a variable coef
-!     See FSILS_STRUCT.h for lhs%face variable descriptions
+!     Setting coef depending on adding resistance to stiffness or computing 
+!     preconditioner
       IF (op_Type .EQ. BCOP_TYPE_ADD) THEN
          coef = lhs%face%res
       ELSE IF(op_Type .EQ. BCOP_TYPE_PRE) THEN
@@ -84,14 +86,25 @@
       DO faIn=1, lhs%nFaces
    
 !        If the face is virtual, don't add anything to tangent matrix.
-!        If the virtual face is a cap, it's contribution will be added
-!        when the face that it caps is processed
+!        If the virtual face is a capping face, it's contribution is added 
+!        when the capped face processed
          IF (lhs%face(faIn)%virtual) CYCLE
 
+!        In the following calculations, we are computing the product of the 
+!        coupled BC tangent contribution with the vector X (refer to Moghadam 
+!        et al. 2013 eq. 27). This is computed by first constructing the vector
+!        v, which one of the integrals found in the expression, int{N_A * n_i} dGamma.
+!        Then, v is dotted with X to yield a quantity S. Then S is multiplied by
+!        by v again, and also multiplied by the appropriate coefficients in 
+!        the expression.
+!        The calculations are complicated somewhat if there is a capping surface,
+!        but these complications are explained below.
+
+
+!        Calculating S, which is the inner product of the right integral (v) and
+!        the vector to be multiplied (X).
          nsd = MIN(lhs%face(faIn)%dof,dof)
          IF (lhs%face(faIn)%coupledFlag) THEN
-!            PRINT*, "faIn: ", faIn, "sharedFlag: ", 
-!     2      lhs%face(faIn)%sharedFlag
             IF (lhs%face(faIn)%sharedFlag) THEN ! if face is shared between procs
                v = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo
@@ -103,15 +116,13 @@
                S = coef(faIn)*FSILS_DOTV(dof,lhs%mynNo, lhs%commu, v, X)
 
 !              If a virtual face caps this face, add it's contribution to S
-!              Explanation: If the coupled surface is virtually capped to compute flow rate
-!              then the right integral should be over the capped surface, while
-!              the left integral should be over the uncapped surface. We
-!              can satisfy this by adding the cap's contribution to S
-!              which is the matrix-vector product of the right integral
-!              and a vector X.
-               IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
-!                 DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
-!                    faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
+!              Explanation: If the coupled surface is virtually capped to 
+!              compute flow rate then the right integral should be over the 
+!              capped surface + capping surface, while the left integral should 
+!              be over the uncapped surface (because we do not apply a pressure 
+!              to the capping surface). We can achieve this by adding the capping 
+!              surface's contribution to S.
+               IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has a cap
                      faInCap = lhs%face(faIn)%faInCap ! Get cap face id
                      IF(.NOT. lhs%face(faInCap)%coupledFlag) THEN
                         PRINT*, 'ADDBCMUL(): Cap face is not coupled.',
@@ -124,32 +135,21 @@
                         DO i=1, nsd
                            vcap(i,Ac) = lhs%face(faInCap)%valM(i,a)
                         END DO
-!                        PRINT*, "vcap(:,Ac)", vcap(:,Ac)
                      END DO
-                     !PRINT*, 'faInCap: ', faInCap, 'coef', coef(faInCap)
-                     ! coef(FaIn) or coef(FaInCap)? I think FaIn
                      S = S + coef(faIn)*FSILS_DOTV(dof,lhs%mynNo, 
      2                                     lhs%commu, vcap, X)
-!                 END DO
                END IF
 
-!              Add S times second integral to the current matrix-vector product Y
+!              Add S times left integral to the current matrix-vector product Y.
+!              Note that we do not add the capping surface's contribution to v 
+!              (vcap), since the left integral should be over the uncapped surface.
                DO a=1, lhs%face(faIn)%nNo
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      Y(i,Ac) = Y(i,Ac) + v(i,Ac)*S
                   END DO
                END DO
-            ELSE
-!              What is valM(i,a)? See PRECOND.F for where is it set
-!              lhs%face(faIn)%valM(i,a) =                            &
-!     &               lhs%face(faIn)%val(i,a)*W(i,Ac)
-!              val(i,a) contains the integrals of Na * n_i over a surface
-!              which is precisely the integral in Moghadam et al. 2013, eq. 27
-!              Note, val should contain integrals over deformed config surface
-!              if follower pressure load is used (BNEUFOLWP)
-!              I believe valM is val, scaled by some factor to account
-!              for preconditioning
+            ELSE ! else face is not shared between procs
                S = 0._LSRP
                DO a=1, lhs%face(faIn)%nNo ! Loop over nodes on face
                   Ac = lhs%face(faIn)%glob(a) ! Get global node number
@@ -157,17 +157,7 @@
                      S = S + lhs%face(faIn)%valM(i,a)*X(i,Ac)
                   END DO
                END DO
-!              If a virtual face caps this face, add it's contribution to S
-!              Explanation: If the coupled surface is virtually capped to compute flow rate
-!              then the right integral should be over the capped surface, while
-!              the left integral should be over the uncapped surface. We
-!              can satisfy this by adding the cap's contribution to S
-!              which is the matrix-vector product of the right integral
-!              and a vector X.
                IF (lhs%face(faIn)%faInCap .NE. 0) THEN ! If this face has caps
-
-!                 DO fid=1, lhs%face(faIn)%nCaps ! Loop over caps
-!                    faInCap = lhs%face(faIn)%caps(fid) ! Get cap face id
                      faInCap = lhs%face(faIn)%faInCap ! Get cap face id
                      IF(.NOT. lhs%face(faInCap)%coupledFlag) THEN
                         PRINT*, 'ADDBCMUL(): Cap face is not coupled.',
@@ -181,22 +171,15 @@
                            S = S + lhs%face(faInCap)%valM(i,a)*X(i,Ac)
                         END DO
                      END DO
-!                 END DO
                END IF
 
-!              Multiply S by the resistance (equal to coef, see above)
+!              Multiply S by the resistance or related quantity if preconditioning
                S = coef(faIn)*S
-!              Add S times second integral to the current matrix-vector product Y
+
+!              Add S times left integral to the current matrix-vector product Y.
+!              Note that we do not add the capping surface's contribution to v 
+!              (vcap), since the left integral should be over the uncapped surface.
                DO a=1, lhs%face(faIn)%nNo
-!                 If the coupled surface is virtually capped to compute flow rate
-!                 then the right integral should be over the capped surface, while
-!                 the left integral should be over the uncapped surface. We
-!                 can satisfy this by skipping the addition below if the face 
-!                 is virtual
-                  IF (lhs%face(faIn)%virtual) THEN
-                     PRINT*, "virtual inside ADDBCMUL()"
-                  END IF 
-                  IF (lhs%face(faIn)%virtual) CYCLE
                   Ac = lhs%face(faIn)%glob(a)
                   DO i=1, nsd
                      Y(i,Ac) = Y(i,Ac) + lhs%face(faIn)%valM(i,a)*S
