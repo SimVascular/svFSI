@@ -106,12 +106,12 @@
 !        ||Sai||**2._LSRP                   (USE)
          REAL(KIND=LSRP) nS
 !        Neu: P = res*Q                 (IN)
-         REAL(KIND=LSRP) :: res = 0._LSRP    ! Resistance value for Neumann face
+         REAL(KIND=LSRP) :: res = 0._LSRP
 !        nodal Sai for Neu              (IN)
          REAL(KIND=LSRP), ALLOCATABLE :: val(:,:)
 !        Neu W*Sai                      (TMP)
          REAL(KIND=LSRP), ALLOCATABLE :: valM(:,:)
-!        Is face a virtual face        (USE)
+!        Flag for virtual face        (USE)
          LOGICAL :: virtual = .FALSE.
 !        Index of mesh in msh(:) associated with this face
          INTEGER(KIND=LSIP) :: iM = 0
