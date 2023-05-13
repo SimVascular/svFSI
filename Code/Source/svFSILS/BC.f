@@ -91,7 +91,7 @@
 
       DO a=1, nNo
 !        gNodes(a) gives the proc local node id of face node a. gNodes(a) in 1:tnNo
-!        map() gives a reordering of proc local node ids, I think. map(a) in 1:tnNo
+!        map() gives a reordering of proc local node ids, I think map(a) in 1:tnNo
          Ac = lhs%map(gNodes(a))
          lhs%face(faIn)%glob(a) = Ac
       END DO
@@ -103,11 +103,6 @@
       ELSE
          lhs%face(faIn)%val = 0._LSRP
       END IF
-
-!      DO a=1, nNo
-!         PRINT*, 'lhs%face(faIn)%val(:,a) in FSILS_BC_CREATE(): ', 
-!     2     faIn, lhs%face(faIn)%val(:,a)
-!      END DO
 
 !     Synchronize val on nodes on boundary between procs
       IF (lhs%commu%nTasks .GT. 1) THEN
@@ -229,7 +224,7 @@
 !####################################################################
 !     AB 5/16/22:
 !     Update and communicate lhs%face%val with new values provided by Val
-!     These are the surface integrals in the resistance BC contribution 
+!     Val the surface integrals in the resistance BC contribution 
 !     to the tangent matrix. Since FSILS_BC_CREATE() was already called
 !     at initialization, we don't need to reallocate data structures.
       SUBROUTINE FSILS_BC_UPDATE (lhs, faIn, nNo, dof, BC_type, gNodes, &
