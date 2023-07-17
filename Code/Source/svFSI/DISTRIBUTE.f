@@ -179,6 +179,7 @@
          CALL cm%bcast(nITS)
          CALL cm%bcast(nTS)
          CALL cm%bcast(startTS)
+         CALL cm%bcast(start_time)
          CALL cm%bcast(nEq)
          CALL cm%bcast(dt)
          CALL cm%bcast(zeroAve)

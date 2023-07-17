@@ -959,6 +959,8 @@
       REAL(KIND=RKIND) dt
 !     Time
       REAL(KIND=RKIND) time
+!     Simulation starting time
+      REAL(KIND=RKIND) :: start_time = 0._RKIND
 
 !     CHARACTER VARIABLES
 !     Initialization file path
