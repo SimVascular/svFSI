@@ -84,6 +84,7 @@
          saveIncr     = 10
          nITs         = 0
          startTS      = 0
+         start_time   = 0._RKIND
          roInf        = 0.2_RKIND
          stFileName   = "stFile"
          iniFilePath  = ""
@@ -164,13 +165,14 @@
 
          lPtr => list%get(fTmp,"Simulation initialization file path")
          IF (ASSOCIATED(lPtr)) iniFilePath = fTmp%fname
+         lPtr => list%get(startTS,"Starting time step",ll=0)
+         lPtr => list%get(start_time,"Simulation start time")
 
          lPtr => list%get(nsd,"Number of spatial dimensions",
      2      1,ll=2,ul=3)
          nsymd = 3*(nsd-1)
 
          lPtr => list%get(nTs,"Number of time steps",1,ll=1)
-         lPtr => list%get(startTS,"Starting time step",ll=0)
          lPtr => list%get(dt,"Time step size",1,lb=0._RKIND)
          lPtr => list%get(nITs,"Number of initialization time steps",
      2      ll=0)
