@@ -176,10 +176,10 @@
 
       INTEGER(KIND=IKIND) :: a, b, i, j, k
       REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, tmXg, ya_g,
-     2   fb(3), ud(3), vx(3,3), F(3,3), Fi(3,3), ddev(3,3), Svis(3,3),
-     3   VxFi(3,eNoN), S(3,3), P(3,3), S0(3,3), Dm(6,6), NxFi(3,eNoN),
-     4   Bm(6,3,eNoN), VxNx(3,eNoN), DdNx(3,eNoN), DBm(6,3), BmDBm,
-     4   NxSNx, NxNx, r13, r23, rmu, rmv, T1, Tv
+     2   fb(3), ud(3), vx(3,3), F(3,3), FFt(3,3), FtVx(3,3), FVxt(3,3),
+     3   Svis(3,3), S(3,3), P(3,3), S0(3,3), Dm(6,6), Bm(6,3,eNoN),
+     4   FNx(3,eNoN), VxNx(3,eNoN), DBm(6,3), BmDBm, NxSNx, NxNx,
+     4   rmu, rmv, T1, Tv
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -195,7 +195,8 @@
       j       = i + 1
       k       = j + 1
 
-!     Inertia, body force and deformation tensor (F)
+!     Inertia, body force, and deformation tensor (F)
+!     Note that the gradients are in reference configuration
       ud     = -rho*fb
       vx     = 0._RKIND
       F      = 0._RKIND
@@ -245,19 +246,15 @@
       S0(1,3) = S0(3,1)
 
       Jac = MAT_DET(F, 3)
-      Fi  = MAT_INV(F, 3)
+      FFt = MATMUL(F, TRANSPOSE(F))
 
 !----------------------------------
 !     Viscous contribution
-!     Velocity gradient in current configuration
-      VxFi = MATMUL(vx, Fi)
-
-!     Deviatoric strain tensor
-      ddev = MAT_DEV(MAT_SYMM(VxFi,3), 3)
+      FtVx = MATMUL(TRANSPOSE(F), vx)
+      FVxt = MATMUL(F, TRANSPOSE(vx))
 
 !     2nd Piola-Kirchhoff stress due to viscosity
-      Svis = MATMUL(ddev, TRANSPOSE(Fi))
-      Svis = 2._RKIND*mu*Jac*MATMUL(Fi, Svis)
+      Svis = mu*MAT_SYMM(FtVx,3)
 !----------------------------------
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
@@ -319,32 +316,20 @@
       END DO
 
 !     Below quantities are used for viscous stress contribution
-!     Shape function gradients in the current configuration
+!     Shape function gradients in the reference configuration
       DO a=1, eNoN
-         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1) + Nx(3,a)*Fi(3,1)
-         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2) + Nx(3,a)*Fi(3,2)
-         NxFi(3,a) = Nx(1,a)*Fi(1,3) + Nx(2,a)*Fi(2,3) + Nx(3,a)*Fi(3,3)
+         FNx(1,a) = F(1,1)*Nx(1,a) + F(1,2)*Nx(2,a) + F(1,3)*Nx(3,a)
+         FNx(2,a) = F(2,1)*Nx(1,a) + F(2,2)*Nx(2,a) + F(2,3)*Nx(3,a)
+         FNx(3,a) = F(3,1)*Nx(1,a) + F(3,2)*Nx(2,a) + F(3,3)*Nx(3,a)
 
-         DdNx(1,a) = ddev(1,1)*NxFi(1,a) + ddev(1,2)*NxFi(2,a) +
-     2               ddev(1,3)*NxFi(3,a)
-         DdNx(2,a) = ddev(2,1)*NxFi(1,a) + ddev(2,2)*NxFi(2,a) +
-     2               ddev(2,3)*NxFi(3,a)
-         DdNx(3,a) = ddev(3,1)*NxFi(1,a) + ddev(3,2)*NxFi(2,a) +
-     2               ddev(3,3)*NxFi(3,a)
-
-         VxNx(1,a) = VxFi(1,1)*NxFi(1,a) + VxFi(2,1)*NxFi(2,a) +
-     2               VxFi(3,1)*NxFi(3,a)
-         VxNx(2,a) = VxFi(1,2)*NxFi(1,a) + VxFi(2,2)*NxFi(2,a) +
-     2               VxFi(3,2)*NxFi(3,a)
-         VxNx(3,a) = VxFi(1,3)*NxFi(1,a) + VxFi(2,3)*NxFi(2,a) +
-     2               VxFi(3,3)*NxFi(3,a)
+         VxNx(1,a) = vx(1,1)*Nx(1,a) + vx(1,2)*Nx(2,a) + vx(1,3)*Nx(3,a)
+         VxNx(2,a) = vx(2,1)*Nx(1,a) + vx(2,2)*Nx(2,a) + vx(2,3)*Nx(3,a)
+         VxNx(3,a) = vx(3,1)*Nx(1,a) + vx(3,2)*Nx(2,a) + vx(3,3)*Nx(3,a)
       END DO
 
 !     Local stiffness tensor
-      r13 = 1._RKIND / 3._RKIND
-      r23 = 2._RKIND / 3._RKIND
-      rmu = afu*mu*Jac
-      rmv = afv*mu*Jac
+      rmu = 0.5_RKIND*mu*afu
+      rmv = 0.5_RKIND*mu*afv
       DO b=1, eNoN
          DO a=1, eNoN
 !           Geometric stiffness
@@ -358,8 +343,7 @@
 !           Material Stiffness (Bt*D*B)
             DBm = MATMUL(Dm, Bm(:,:,b))
 
-            NxNx = NxFi(1,a)*NxFi(1,b) + NxFi(2,a)*NxFi(2,b)
-     2           + NxFi(3,a)*NxFi(3,b)
+            NxNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
 
 !----------------------------------
 !           dM1/du1
@@ -369,10 +353,8 @@
      3              Bm(5,1,a)*DBm(5,1) + Bm(6,1,a)*DBm(6,1)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(1,a)*NxFi(1,b) - DdNx(1,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(1,1) + NxFi(1,b)*VxNx(1,a)
-     3           -  r23*NxFi(1,a)*VxNx(1,b))) * rmu
-     4         + (r13*NxFi(1,a)*NxFi(1,b) + NxNx) * rmv
+            Tv = rmu * (FNx(1,b)*VxNx(1,a) + NxNx*FVxt(1,1))
+     2         + rmv * (NxNx*FFt(1,1) + FNx(1,b)*FNx(1,a))
 
             lK(1,a,b) = lK(1,a,b) + w*(T1 + afu*BmDBm + Tv)
 !----------------------------------
@@ -383,10 +365,8 @@
      3              Bm(5,1,a)*DBm(5,2) + Bm(6,1,a)*DBm(6,2)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(1,a)*NxFi(2,b) - DdNx(1,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(1,2) + NxFi(1,b)*VxNx(2,a)
-     3           -  r23*NxFi(1,a)*VxNx(2,b))) * rmu
-     4         + (NxFi(2,a)*NxFi(1,b) - r23*NxFi(1,a)*NxFi(2,b)) * rmv
+            Tv = rmu * (FNx(1,b)*VxNx(2,a) + NxNx*FVxt(1,2))
+     2         + rmv * (NxNx*FFt(1,2) + FNx(1,b)*FNx(2,a))
 
             lK(2,a,b) = lK(2,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -397,10 +377,8 @@
      3              Bm(5,1,a)*DBm(5,3) + Bm(6,1,a)*DBm(6,3)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(1,a)*NxFi(3,b) - DdNx(1,b)*NxFi(3,a))
-     2           - (NxNx*VxFi(1,3) + NxFi(1,b)*VxNx(3,a)
-     3           -  r23*NxFi(1,a)*VxNx(3,b))) * rmu
-     4         + (NxFi(3,a)*NxFi(1,b) - r23*NxFi(1,a)*NxFi(3,b)) * rmv
+            Tv = rmu * (FNx(1,b)*VxNx(3,a) + NxNx*FVxt(1,3))
+     2         + rmv * (NxNx*FFt(1,3) + FNx(1,b)*FNx(3,a))
 
             lK(3,a,b) = lK(3,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -411,10 +389,8 @@
      3              Bm(5,2,a)*DBm(5,1) + Bm(6,2,a)*DBm(6,1)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(2,a)*NxFi(1,b) - DdNx(2,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(2,1) + NxFi(2,b)*VxNx(1,a)
-     3           -  r23*NxFi(2,a)*VxNx(1,b))) * rmu
-     4         + (NxFi(1,a)*NxFi(2,b) - r23*NxFi(2,a)*NxFi(1,b)) * rmv
+            Tv = rmu * (FNx(2,b)*VxNx(1,a) + NxNx*FVxt(2,1))
+     2         + rmv * (NxNx*FFt(2,1) + FNx(2,b)*FNx(1,a))
 
             lK(dof+1,a,b) = lK(dof+1,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -425,10 +401,8 @@
      3              Bm(5,2,a)*DBm(5,2) + Bm(6,2,a)*DBm(6,2)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(2,a)*NxFi(2,b) - DdNx(2,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(2,2) + NxFi(2,b)*VxNx(2,a)
-     3           -  r23*NxFi(2,a)*VxNx(2,b))) * rmu
-     4         + (r13*NxFi(2,a)*NxFi(2,b) + NxNx) * rmv
+            Tv = rmu * (FNx(2,b)*VxNx(2,a) + NxNx*FVxt(2,2))
+     2         + rmv * (NxNx*FFt(2,2) + FNx(2,b)*FNx(2,a))
 
             lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + afu*BmDBm + Tv)
 !----------------------------------
@@ -439,10 +413,8 @@
      3              Bm(5,2,a)*DBm(5,3) + Bm(6,2,a)*DBm(6,3)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(2,a)*NxFi(3,b) - DdNx(2,b)*NxFi(3,a))
-     2           - (NxNx*VxFi(2,3) + NxFi(2,b)*VxNx(3,a)
-     3           -  r23*NxFi(2,a)*VxNx(3,b))) * rmu
-     4         + (NxFi(3,a)*NxFi(2,b) - r23*NxFi(2,a)*NxFi(3,b)) * rmv
+            Tv = rmu * (FNx(2,b)*VxNx(3,a) + NxNx*FVxt(2,3))
+     2         + rmv * (NxNx*FFt(2,3) + FNx(2,b)*FNx(3,a))
 
             lK(dof+3,a,b) = lK(dof+3,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -453,10 +425,8 @@
      3              Bm(5,3,a)*DBm(5,1) + Bm(6,3,a)*DBm(6,1)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(3,a)*NxFi(1,b) - DdNx(3,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(3,1) + NxFi(3,b)*VxNx(1,a)
-     3           -  r23*NxFi(3,a)*VxNx(1,b))) * rmu
-     4         + (NxFi(1,a)*NxFi(3,b) - r23*NxFi(3,a)*NxFi(1,b)) * rmv
+            Tv = rmu * (FNx(3,b)*VxNx(1,a) + NxNx*FVxt(3,1))
+     2         + rmv * (NxNx*FFt(3,1) + FNx(3,b)*FNx(1,a))
 
             lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -467,10 +437,8 @@
      3              Bm(5,3,a)*DBm(5,2) + Bm(6,3,a)*DBm(6,2)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(3,a)*NxFi(2,b) - DdNx(3,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(3,2) + NxFi(3,b)*VxNx(2,a)
-     3           -  r23*NxFi(3,a)*VxNx(2,b))) * rmu
-     4         + (NxFi(2,a)*NxFi(3,b) - r23*NxFi(3,a)*NxFi(2,b)) * rmv
+            Tv = rmu * (FNx(3,b)*VxNx(2,a) + NxNx*FVxt(3,2))
+     2         + rmv * (NxNx*FFt(3,2) + FNx(3,b)*FNx(2,a))
 
             lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -481,10 +449,8 @@
      3              Bm(5,3,a)*DBm(5,3) + Bm(6,3,a)*DBm(6,3)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(3,a)*NxFi(3,b) - DdNx(3,b)*NxFi(3,a))
-     2           - (NxNx*VxFi(3,3) + NxFi(3,b)*VxNx(3,a)
-     3           -  r23*NxFi(3,a)*VxNx(3,b))) * rmu
-     4         + (r13*NxFi(3,a)*NxFi(3,b) + NxNx) * rmv
+            Tv = rmu * (FNx(3,b)*VxNx(3,a) + NxNx*FVxt(3,3))
+     2         + rmv * (NxNx*FFt(3,3) + FNx(3,b)*FNx(3,a))
 
             lK(2*dof+3,a,b) = lK(2*dof+3,a,b)
      2                      + w*(T1 + afu*BmDBm + Tv)
@@ -510,10 +476,10 @@
 
       INTEGER(KIND=IKIND) :: a, b, i, j
       REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, tmXg, ya_g,
-     2   fb(2), ud(2), vx(2,2), F(2,2), Fi(2,2), ddev(2,2), Svis(2,2),
-     3   VxFi(2,eNoN), S(2,2), P(2,2), S0(2,2), Dm(3,3), NxFi(2,eNoN),
-     4   Bm(3,2,eNoN), VxNx(2,eNoN), DdNx(2,eNoN), DBm(3,2),BmDBm,
-     5   NxSNx, NxNx, rmu, rmv, T1, Tv
+     2   fb(2), ud(2), vx(2,2), F(2,2), FFt(2,2), FtVx(2,2), FVxt(2,2),
+     3   Svis(2,2), S(2,2), P(2,2), S0(2,2), Dm(3,3), Bm(3,2,eNoN),
+     4   FNx(2,eNoN), VxNx(2,eNoN), DBm(3,2), BmDBm, NxSNx, NxNx,
+     4   rmu, rmv, T1, Tv
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
@@ -528,6 +494,7 @@
       j       = i + 1
 
 !     Inertia, body force and deformation tensor (F)
+!     Note that the gradients are in reference configuration
       ud     = -rho*fb
       vx     = 0._RKIND
       F      = 0._RKIND
@@ -560,19 +527,15 @@
       S0(2,1) = S0(1,2)
 
       Jac = MAT_DET(F, 2)
-      Fi  = MAT_INV(F, 2)
+      FFt = MATMUL(F, TRANSPOSE(F))
 
 !----------------------------------
 !     Viscous contribution
-!     Velocity gradient in current configuration
-      VxFi = MATMUL(vx, Fi)
-
-!     Deviatoric strain tensor
-      ddev = MAT_DEV(MAT_SYMM(VxFi,2), 2)
+      FtVx = MATMUL(TRANSPOSE(F), vx)
+      FVxt = MATMUL(F, TRANSPOSE(vx))
 
 !     2nd Piola-Kirchhoff stress due to viscosity
-      Svis = MATMUL(ddev, TRANSPOSE(Fi))
-      Svis = 2._RKIND*mu*Jac*MATMUL(Fi, Svis)
+      Svis = mu*MAT_SYMM(FtVx,2)
 !----------------------------------
 
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
@@ -614,19 +577,16 @@
       END DO
 
       DO a=1, eNoN
-         NxFi(1,a) = Nx(1,a)*Fi(1,1) + Nx(2,a)*Fi(2,1)
-         NxFi(2,a) = Nx(1,a)*Fi(1,2) + Nx(2,a)*Fi(2,2)
+         FNx(1,a) = F(1,1)*Nx(1,a) + F(1,2)*Nx(2,a)
+         FNx(2,a) = F(2,1)*Nx(1,a) + F(2,2)*Nx(2,a)
 
-         DdNx(1,a) = ddev(1,1)*NxFi(1,a) + ddev(1,2)*NxFi(2,a)
-         DdNx(2,a) = ddev(2,1)*NxFi(1,a) + ddev(2,2)*NxFi(2,a)
-
-         VxNx(1,a) = VxFi(1,1)*NxFi(1,a) + VxFi(2,1)*NxFi(2,a)
-         VxNx(2,a) = VxFi(1,2)*NxFi(1,a) + VxFi(2,2)*NxFi(2,a)
+         VxNx(1,a) = vx(1,1)*Nx(1,a) + vx(1,2)*Nx(2,a)
+         VxNx(2,a) = vx(2,1)*Nx(1,a) + vx(2,2)*Nx(2,a)
       END DO
 
 !     Local stiffness tensor
-      rmu = afu*mu*Jac
-      rmv = afv*mu*Jac
+      rmu = 0.5_RKIND*mu*afu
+      rmv = 0.5_RKIND*mu*afv
       DO b=1, eNoN
          DO a=1, eNoN
 !           Geometric stiffness
@@ -650,7 +610,7 @@
             DBm(3,2) = Dm(3,1)*Bm(1,2,b) + Dm(3,2)*Bm(2,2,b) +
      2         Dm(3,3)*Bm(3,2,b)
 
-            NxNx = NxFi(1,a)*NxFi(1,b) + NxFi(2,a)*NxFi(2,b)
+            NxNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)
 
 !----------------------------------
 !           dM1/du1
@@ -659,10 +619,8 @@
      2         Bm(3,1,a)*DBm(3,1)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(1,a)*NxFi(1,b) - DdNx(1,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(1,1) + NxFi(1,b)*VxNx(1,a)
-     3           -  NxFi(1,a)*VxNx(1,b))) * rmu
-     4         + (NxNx) * rmv
+            Tv = rmu * (FNx(1,b)*VxNx(1,a) + NxNx*FVxt(1,1))
+     2         + rmv * (NxNx*FFt(1,1) + FNx(1,b)*FNx(1,a))
 
             lK(1,a,b) = lK(1,a,b) + w*(T1 + afu*BmDBm + Tv)
 !----------------------------------
@@ -672,10 +630,8 @@
      2         Bm(3,1,a)*DBm(3,2)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(1,a)*NxFi(2,b) - DdNx(1,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(1,2) + NxFi(1,b)*VxNx(2,a)
-     3           -  NxFi(1,a)*VxNx(2,b))) * rmu
-     4         + (NxFi(2,a)*NxFi(1,b) - NxFi(1,a)*NxFi(2,b)) * rmv
+            Tv = rmu * (FNx(1,b)*VxNx(2,a) + NxNx*FVxt(1,2))
+     2         + rmv * (NxNx*FFt(1,2) + FNx(1,b)*FNx(2,a))
 
             lK(2,a,b) = lK(2,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -685,10 +641,8 @@
      2         Bm(3,2,a)*DBm(3,1)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(2,a)*NxFi(1,b) - DdNx(2,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(2,1) + NxFi(2,b)*VxNx(1,a)
-     3           -  NxFi(2,a)*VxNx(1,b))) * rmu
-     4         + (NxFi(1,a)*NxFi(2,b) - NxFi(2,a)*NxFi(1,b)) * rmv
+            Tv = rmu * (FNx(2,b)*VxNx(1,a) + NxNx*FVxt(2,1))
+     2         + rmv * (NxNx*FFt(2,1) + FNx(2,b)*FNx(1,a))
 
             lK(dof+1,a,b) = lK(dof+1,a,b) + w*(afu*BmDBm + Tv)
 !----------------------------------
@@ -698,10 +652,8 @@
      2         Bm(3,2,a)*DBm(3,2)
 
 !           Viscous terms contribution
-            Tv = (2._RKIND*(DdNx(2,a)*NxFi(2,b) - DdNx(2,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(2,2) + NxFi(2,b)*VxNx(2,a)
-     3           -  NxFi(2,a)*VxNx(2,b))) * rmu
-     4         + (NxNx) * rmv
+            Tv = rmu * (FNx(2,b)*VxNx(2,a) + NxNx*FVxt(2,2))
+     2         + rmv * (NxNx*FFt(2,2) + FNx(2,b)*FNx(2,a))
 
             lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + afu*BmDBm + Tv)
 !----------------------------------
