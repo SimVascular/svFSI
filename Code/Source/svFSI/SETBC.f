@@ -424,7 +424,7 @@
       RETURN
       END SUBROUTINE SETBCTRACL
 !--------------------------------------------------------------------
-!     Set Robin BC
+!     Set Robin BC contribution to residual and tangent
       SUBROUTINE SETBCRBNL(lFa, ks, cs, isN, Yg, Dg)
       USE COMMOD
       USE ALLFUN
@@ -457,7 +457,7 @@
       DO e=1, lFa%nEl
          cDmn  = DOMAIN(msh(iM), cEq, lFa%gE(e))
          cPhys = eq(cEq)%dmn(cDmn)%phys
-
+         ! Local copies of position, velocity, and displacement
          DO a=1, eNoN
             Ac      = lFa%IEN(a,e)
             ptr(a)  = Ac
@@ -467,16 +467,19 @@
          END DO
          IF (lFa%eType .EQ. eType_NRB) CALL NRBNNXB(msh(iM), lFa, e)
 
+         ! Begin assembling tangent and residual contribution
          lK  = 0._RKIND
          lR  = 0._RKIND
          lKd = 0._RKIND
          DO g=1, lFa%nG
+            ! Get reference config normal vector
             CALL GNNB(lFa, e, g, nsd-1, eNoN, lFa%Nx(:,:,g), nV)
-            Jac = SQRT(NORM(nV))
-            nV  = nV/Jac
-            w   = lFa%w(g) * Jac
-            N   = lFa%N(:,g)
+            Jac = SQRT(NORM(nV)) ! dA_ref / dA_parent
+            nV  = nV/Jac         ! ref config normal
+            w   = lFa%w(g) * Jac ! Scale Gauss weight by ref area
+            N   = lFa%N(:,g)     ! Shape function (on parent element)
 
+            ! Displacement (u) and Velocity (ud)
             u  = 0._RKIND
             ud = 0._RKIND
             DO a=1, eNoN
@@ -485,8 +488,10 @@
             END DO
 
             nDn  = MAT_ID(nsd)
+            ! Magnitude of Robin BC stress
             h(:) = ks*u(:) + cs*ud(:)
-            IF (isN) THEN
+            IF (isN) THEN ! If applied only in normal direction
+               ! h = (h . N) N
                h(:) = NORM(h, nV) * nV(:)
                DO a=1, nsd
                   DO b=1, nsd
@@ -496,12 +501,14 @@
             END IF
 
             IF (nsd .EQ. 3) THEN
+               ! Residual contribution
                DO a=1, eNoN
                   lR(1,a) = lR(1,a) + w*N(a)*h(1)
                   lR(2,a) = lR(2,a) + w*N(a)*h(2)
                   lR(3,a) = lR(3,a) + w*N(a)*h(3)
                END DO
 
+               ! Tangent contribution
                IF (cPhys .EQ. phys_ustruct) THEN
                   wl = w*afv
                   DO a=1, eNoN
