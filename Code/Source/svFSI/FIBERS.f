@@ -110,6 +110,7 @@
          fib%nFn = list%srch("Fiber direction")
 
          IF (fib%nFn .NE. 0) THEN
+            fib%locNd = .TRUE.
             fib_alloc = .TRUE.
             ALLOCATE(fib%fN(nsd*fib%nFn,1,lM%gnNo))
             fib%fN = 0._RKIND
@@ -225,7 +226,8 @@
 !     If the fibers are not found at elements, we will look for fibers
 !     at nodal locations
       IF (nFn .EQ. 0) THEN
-         nvar = 0
+         nvar  = 0
+         istat = 0
          CALL getVTK_numPointData(vtu, nvar, istat)
          IF (istat .LT. 0) THEN
             err = " VTU file read error (numPointData). Could not "//
@@ -518,6 +520,7 @@
 !        fibers are located at points. If not found at points, an error
 !        is thrown later.
          IF (.NOT.fib%locEl) THEN
+            istat = 0
             fib%locNd = .TRUE.
             ALLOCATE(fib%fN(nsd*fib%nFn,1,lM%gnNo))
             fib%fN = 0._RKIND
@@ -527,6 +530,7 @@
       IF (fib%locEl) THEN
          ALLOCATE(tmpR(maxNSD,lM%gnEl))
          tmpR = 0._RKIND
+         istat = 0
          CALL getVTK_elemData(vtu, TRIM(kwrd), tmpR, iStat)
          IF (istat .LT. 0) err = " VTU file read error "//TRIM(kwrd)
 
@@ -540,6 +544,7 @@
       ELSE IF (fib%locNd) THEN
          ALLOCATE(tmpR(maxNSD,lM%gnNo))
          tmpR = 0._RKIND
+         istat = 0
          CALL getVTK_pointData(vtu, TRIM(kwrd), tmpR, iStat)
          IF (istat .LT. 0) THEN
             err = " VTU file read error "//TRIM(kwrd)//
