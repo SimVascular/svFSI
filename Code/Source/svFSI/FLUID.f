@@ -1696,18 +1696,18 @@
 
       REAL(KIND=RKIND) :: mu_i, mu_o, lam, a, n, T1, T2
 
-      SELECT CASE (lDmn%visc%viscType)
-      CASE (viscType_Const)
-         mu   = lDmn%visc%mu_i
+      SELECT CASE (lDmn%viscF%viscTypeF)
+      CASE (viscTypeF_Const)
+         mu   = lDmn%viscF%mu_i
          mu_s = mu
          mu_x = 0._RKIND
 
-      CASE (viscType_CY)
-         mu_i = lDmn%visc%mu_i
-         mu_o = lDmn%visc%mu_o
-         lam  = lDmn%visc%lam
-         a    = lDmn%visc%a
-         n    = lDmn%visc%n
+      CASE (viscTypeF_CY)
+         mu_i = lDmn%viscF%mu_i
+         mu_o = lDmn%viscF%mu_o
+         lam  = lDmn%viscF%lam
+         a    = lDmn%viscF%a
+         n    = lDmn%viscF%n
 
          T1   = 1._RKIND + (lam*gamma)**a
          T2   = T1**((n-1._RKIND)/a)
@@ -1718,10 +1718,10 @@
          T2   = lam**a * gamma**(a-1._RKIND) * T1
          mu_x = (mu_o-mu_i)*(n-1._RKIND)*T2
 
-      CASE (viscType_Cass)
-         mu_i = lDmn%visc%mu_i
-         mu_o = lDmn%visc%mu_o
-         lam  = lDmn%visc%lam
+      CASE (viscTypeF_Cass)
+         mu_i = lDmn%viscF%mu_i
+         mu_o = lDmn%viscF%mu_o
+         lam  = lDmn%viscF%lam
 
          IF (gamma .LT. lam) THEN
             mu_o  = mu_o/SQRT(lam)

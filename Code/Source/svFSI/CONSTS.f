@@ -198,8 +198,12 @@
 !--------------------------------------------------------------------
 !     Type of fluid viscosity: constant, Carreau-Yasuda shear-thinning
 !     model, Cassons non-Newtonian model
-      INTEGER(KIND=IKIND), PARAMETER :: viscType_NA = 699,
-     2   viscType_Const = 698, viscType_CY = 697, viscType_Cass = 696
+      INTEGER(KIND=IKIND), PARAMETER :: viscTypeF_NA = 699,
+     2   viscTypeF_Const = 698, viscTypeF_CY = 697, viscTypeF_Cass = 696
+!--------------------------------------------------------------------
+!     Type of solid viscosity: potential-based, newtonian fluid
+      INTEGER(KIND=IKIND), PARAMETER :: viscTypeS_NA = 689,
+     2   viscTypeS_Pot = 688, viscTypeS_NF = 687
 !--------------------------------------------------------------------
 !     Type of excitation-contraction coupling for active strain-based
 !     electromechanics formulation: transversely isotropic,

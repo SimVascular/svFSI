@@ -287,9 +287,9 @@
       END TYPE eccModelType
 
 !     Fluid viscosity model type
-      TYPE viscModelType
+      TYPE viscModelTypeFluid
 !        Type of constitutive model for fluid viscosity
-         INTEGER(KIND=IKIND) :: viscType = viscType_NA
+         INTEGER(KIND=IKIND) :: viscTypeF = viscTypeF_NA
 !        Limiting zero shear-rate viscosity value
          REAL(KIND=RKIND) :: mu_o = 0._RKIND
 !        Limiting high shear-rate viscosity (asymptotic) value
@@ -300,7 +300,15 @@
          REAL(KIND=RKIND) :: a = 0._RKIND
 !        Power-law exponent
          REAL(KIND=RKIND) :: n = 0._RKIND
-      END TYPE viscModelType
+      END TYPE viscModelTypeFluid
+
+!     Solid viscosity model type
+      TYPE viscModelTypeSolid
+!        Type of constitutive model for solid viscosity
+         INTEGER(KIND=IKIND) :: viscTypeS = viscTypeS_NA
+!        Viscosity value
+         REAL(KIND=RKIND) :: mu = 0._RKIND
+      END TYPE viscModelTypeSolid
 
 !     Domain type is to keep track with element belong to which domain
 !     and also different physical quantities
@@ -320,7 +328,9 @@
 !        Excitation-contraction coupling
          TYPE(eccModelType) :: ec
 !        Viscosity model for fluids
-         TYPE(viscModelType) :: visc
+         TYPE(viscModelTypeFluid) :: viscF
+!        Viscosity model for solids
+         TYPE(viscModelTypeSolid) :: viscS
       END TYPE dmnType
 
 !     Mesh adjacency (neighboring element for each element)

@@ -604,7 +604,13 @@
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
      2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
      3       (lEq%dmn(iDmn)%phys .EQ. phys_CMM .AND. .NOT.cmmInit))THEN
-            CALL DIST_VISCMODEL(lEq%dmn(iDmn)%visc)
+            CALL DIST_VISC_FLUID(lEq%dmn(iDmn)%viscF)
+         END IF
+
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct)) THEN
+            CALL cm%bcast(lEq%dmn(iDmn)%viscS%viscTypeS)
+            CALL cm%bcast(lEq%dmn(iDmn)%viscS%mu)
          END IF
       END DO
 
@@ -1141,13 +1147,13 @@
 !--------------------------------------------------------------------
 !     This subroutine distributes constants and parameters of the
 !     fluid viscosity constitutive model to all processes
-      SUBROUTINE DIST_VISCMODEL(lVis)
+      SUBROUTINE DIST_VISC_FLUID(lVis)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
-      TYPE(viscModelType), INTENT(INOUT) :: lVis
+      TYPE(viscModelTypeFluid), INTENT(INOUT) :: lVis
 
-      CALL cm%bcast(lVis%viscType)
+      CALL cm%bcast(lVis%viscTypeF)
       CALL cm%bcast(lVis%mu_i)
       CALL cm%bcast(lVis%mu_o)
       CALL cm%bcast(lVis%lam)
@@ -1155,7 +1161,7 @@
       CALL cm%bcast(lVis%n)
 
       RETURN
-      END SUBROUTINE DIST_VISCMODEL
+      END SUBROUTINE DIST_VISC_FLUID
 !####################################################################
 !     This is for partitioning a single mesh
       SUBROUTINE PARTMSH(lM, gmtl, nP, wgt)

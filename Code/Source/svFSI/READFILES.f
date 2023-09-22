@@ -1142,7 +1142,7 @@
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
      2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
      3       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
-            CALL READVISCMODEL(lEq%dmn(iDmn), lPD)
+            CALL READ_VISC_FLUID(lEq%dmn(iDmn), lPD)
          END IF
       END DO
 
@@ -2862,8 +2862,8 @@ c     2         "can be applied for Neumann boundaries only"
       RETURN
       END SUBROUTINE READMATMODEL
 !####################################################################
-!     This subroutine reads parameters of non-Newtonian viscosity model
-      SUBROUTINE READVISCMODEL(lDmn, lPD)
+!     This subroutine reads parameters of a fluid's viscosity model
+      SUBROUTINE READ_VISC_FLUID(lDmn, lPD)
       USE COMMOD
       USE LISTMOD
       USE ALLFUN
@@ -2880,48 +2880,48 @@ c     2         "can be applied for Neumann boundaries only"
       CALL TO_LOWER(ctmp)
       SELECT CASE (TRIM(ctmp))
       CASE ("constant", "const", "newtonian")
-         lDmn%visc%viscType = viscType_Const
-         lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0._RKIND)
+         lDmn%viscF%viscTypeF = viscTypeF_Const
+         lPtr => lVis%get(lDmn%viscF%mu_i,"Value",1,lb=0._RKIND)
 
       CASE ("carreau-yasuda", "cy")
-         lDmn%visc%viscType = viscType_CY
-         lPtr => lVis%get(lDmn%visc%mu_i,
+         lDmn%viscF%viscTypeF = viscTypeF_CY
+         lPtr => lVis%get(lDmn%viscF%mu_i,
      2      "Limiting high shear-rate viscosity",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%mu_o,
+         lPtr => lVis%get(lDmn%viscF%mu_o,
      2      "Limiting low shear-rate viscosity",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%lam,
+         lPtr => lVis%get(lDmn%viscF%lam,
      2      "Shear-rate tensor multiplier (lamda)",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%a,
+         lPtr => lVis%get(lDmn%viscF%a,
      2      "Shear-rate tensor exponent (a)",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%n,"Power-law index (n)",1,
+         lPtr => lVis%get(lDmn%viscF%n,"Power-law index (n)",1,
      2      lb=0._RKIND)
-         IF (lDmn%visc%mu_i .GT. lDmn%visc%mu_o) THEN
+         IF (lDmn%viscF%mu_i .GT. lDmn%viscF%mu_o) THEN
             err = "Unexpected inputs for Carreau-Yasuda model. "//
      2         "High shear-rate viscosity value should be higher than"//
      3         " low shear-rate value"
          END IF
 
       CASE ("cassons", "cass")
-         lDmn%visc%viscType = viscType_Cass
-         lPtr => lVis%get(lDmn%visc%mu_i,
+         lDmn%viscF%viscTypeF = viscTypeF_Cass
+         lPtr => lVis%get(lDmn%viscF%mu_i,
      2      "Asymptotic viscosity parameter",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%mu_o,
+         lPtr => lVis%get(lDmn%viscF%mu_o,
      2      "Yield stress parameter",1,lb=0._RKIND)
-         lDmn%visc%lam = 0.5_RKIND
+         lDmn%viscF%lam = 0.5_RKIND
          lPtr => lVis%get(rtmp,"Low shear-rate threshold")
-         IF (ASSOCIATED(lPtr)) lDmn%visc%lam = rtmp
+         IF (ASSOCIATED(lPtr)) lDmn%viscF%lam = rtmp
 
       CASE DEFAULT
          err = "Undefined constitutive model for viscosity used"
       END SELECT
 
       IF ((lDmn%phys .EQ. phys_stokes) .AND.
-     2    (lDmn%visc%viscType .NE. viscType_Const)) THEN
+     2    (lDmn%viscF%viscTypeF .NE. viscTypeF_Const)) THEN
          err = "Only constant viscosity is allowed for Stokes flow"
       END IF
 
       RETURN
-      END SUBROUTINE READVISCMODEL
+      END SUBROUTINE READ_VISC_FLUID
 !####################################################################
 !     This subroutine reads general velocity data from bct.vtp
       SUBROUTINE READBCT(lMB, lFa, fName)
