@@ -161,6 +161,7 @@ set(FSRCS TYPEMOD.f
          STRUCT.f
          TXT.f
          USTRUCT.f
+         VISC.f
          VTKXML.f)
 
 set(F90SRCS vtkComMod.f90

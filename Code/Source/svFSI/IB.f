@@ -320,14 +320,13 @@
          CASE("struct")
             lEq%dmnIB(iDmn)%phys = phys_struct
             propL(1) = solid_density
-            propL(2) = solid_viscosity
-            propL(3) = elasticity_modulus
-            propL(4) = poisson_ratio
-            propL(5) = ctau_M
-            propL(6) = ctau_C
-            propL(7) = f_x
-            propL(8) = f_y
-            IF (nsd .EQ. 3) propL(9) = f_z
+            propL(2) = elasticity_modulus
+            propL(3) = poisson_ratio
+            propL(4) = ctau_M
+            propL(5) = ctau_C
+            propL(6) = f_x
+            propL(7) = f_y
+            IF (nsd .EQ. 3) propL(8) = f_z
 
             nDOP = (/4,1,0,0/)
             outPuts(1) = out_displacement
@@ -349,8 +348,6 @@
                EXIT
             CASE (solid_density)
                lPtr => lPD%get(rtmp,"Density",1,ll=0._RKIND)
-            CASE (solid_viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0._RKIND)
             CASE (poisson_ratio)
@@ -378,6 +375,7 @@
 
          IF (lEq%dmnIB(iDmn)%phys .EQ. phys_struct) THEN
             CALL READMATMODEL(lEq%dmnIB(iDmn), lPD)
+            CALL READ_VISC_SOLID(lEq%dmnIB(iDmn), lPD)
          END IF
       END DO
 
@@ -3951,7 +3949,7 @@ c      END DO
       iEq     = ib%cEq
       iDmn    = ib%cDmn
       rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%viscS%mu
       fb(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
       fb(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
       fb(3)   = eq(iEq)%dmnIB(iDmn)%prop(f_z)
@@ -4072,7 +4070,7 @@ c      END DO
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
-      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
+      CALL GET_FLUID_VISC(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
 
 !     Solid internal stresses and stabilization parameters
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
@@ -4319,7 +4317,7 @@ c      END DO
       iEq     = ib%cEq
       iDmn    = ib%cDmn
       rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%viscS%mu
       fb(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
       fb(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
       rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
@@ -4409,7 +4407,7 @@ c      END DO
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
-      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
+      CALL GET_FLUID_VISC(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
 
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
 !        2nd Piola-Kirchhoff stress (S) and material stiffness in Voigt

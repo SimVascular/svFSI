@@ -171,15 +171,13 @@
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, i, j, k
-      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, tmXg, ya_g,
-     2   fb(3), ud(3), vx(3,3), F(3,3), FFt(3,3), FtVx(3,3), FVxt(3,3),
-     3   Svis(3,3), S(3,3), P(3,3), S0(3,3), Dm(6,6), Bm(6,3,eNoN),
-     4   FNx(3,eNoN), VxNx(3,eNoN), DBm(6,3), BmDBm, NxSNx, NxNx,
-     4   rmu, rmv, T1, Tv
+      REAL(KIND=RKIND) :: rho, dmp, amd, afu, afv, tmXg, ya_g, fb(3),
+     2   ud(3), vx(3,3), F(3,3), Svis(3,3), S(3,3), P(3,3), S0(3,3),
+     3   Dm(6,6), Bm(6,3,eNoN), DBm(6,3), Kvis_u(9,eNoN,eNoN),
+     4   Kvis_v(9,eNoN,eNoN), BmDBm, NxSNx, T1
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -241,21 +239,13 @@
       S0(3,2) = S0(2,3)
       S0(1,3) = S0(3,1)
 
-      Jac = MAT_DET(F, 3)
-      FFt = MATMUL(F, TRANSPOSE(F))
-
-!----------------------------------
-!     Viscous contribution
-      FtVx = MATMUL(TRANSPOSE(F), vx)
-      FVxt = MATMUL(F, TRANSPOSE(vx))
-
-!     2nd Piola-Kirchhoff stress due to viscosity
-      Svis = mu*MAT_SYMM(FtVx,3)
-!----------------------------------
-
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notationa (Dm)
       CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, S, Dm)
+
+!     Get viscous stress and stiffness
+      CALL GET_VISC_STRS(eq(cEq)%dmn(cDmn), eNoN, Nx, vx, F, Svis,
+     2   Kvis_u, Kvis_v)
 
 !     Elastic + Viscous stresses
       S = S + Svis
@@ -311,21 +301,10 @@
          Bm(6,3,a) = (Nx(3,a)*F(3,1) + F(3,3)*Nx(1,a))
       END DO
 
-!     Below quantities are used for viscous stress contribution
-!     Shape function gradients in the reference configuration
-      DO a=1, eNoN
-         FNx(1,a) = F(1,1)*Nx(1,a) + F(1,2)*Nx(2,a) + F(1,3)*Nx(3,a)
-         FNx(2,a) = F(2,1)*Nx(1,a) + F(2,2)*Nx(2,a) + F(2,3)*Nx(3,a)
-         FNx(3,a) = F(3,1)*Nx(1,a) + F(3,2)*Nx(2,a) + F(3,3)*Nx(3,a)
-
-         VxNx(1,a) = vx(1,1)*Nx(1,a) + vx(1,2)*Nx(2,a) + vx(1,3)*Nx(3,a)
-         VxNx(2,a) = vx(2,1)*Nx(1,a) + vx(2,2)*Nx(2,a) + vx(2,3)*Nx(3,a)
-         VxNx(3,a) = vx(3,1)*Nx(1,a) + vx(3,2)*Nx(2,a) + vx(3,3)*Nx(3,a)
-      END DO
-
 !     Local stiffness tensor
-      rmu = 0.5_RKIND*mu*afu
-      rmv = 0.5_RKIND*mu*afv
+      amd = w * amd
+      afu = w * afu
+      afv = w * afv
       DO b=1, eNoN
          DO a=1, eNoN
 !           Geometric stiffness
@@ -337,9 +316,7 @@
             T1 = amd*N(a)*N(b) + afu*NxSNx
 
 !           Material Stiffness (Bt*D*B)
-            DBm = MATMUL(Dm, Bm(:,:,b))
-
-            NxNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b) + Nx(3,a)*Nx(3,b)
+            DBm   = MATMUL(Dm, Bm(:,:,b))
 
 !----------------------------------
 !           dM1/du1
@@ -348,11 +325,8 @@
      2              Bm(3,1,a)*DBm(3,1) + Bm(4,1,a)*DBm(4,1) +
      3              Bm(5,1,a)*DBm(5,1) + Bm(6,1,a)*DBm(6,1)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(1,b)*VxNx(1,a) + NxNx*FVxt(1,1))
-     2         + rmv * (NxNx*FFt(1,1) + FNx(1,b)*FNx(1,a))
-
-            lK(1,a,b) = lK(1,a,b) + w*(T1 + afu*BmDBm + Tv)
+            lK(1,a,b) = lK(1,a,b) + afu*(BmDBm + Kvis_u(1,a,b))
+     2         + afv*Kvis_v(1,a,b) + T1
 !----------------------------------
 !           dM1/du2
 !           Material stiffness: Bt*D*B
@@ -360,11 +334,8 @@
      2              Bm(3,1,a)*DBm(3,2) + Bm(4,1,a)*DBm(4,2) +
      3              Bm(5,1,a)*DBm(5,2) + Bm(6,1,a)*DBm(6,2)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(1,b)*VxNx(2,a) + NxNx*FVxt(1,2))
-     2         + rmv * (NxNx*FFt(1,2) + FNx(1,b)*FNx(2,a))
-
-            lK(2,a,b) = lK(2,a,b) + w*(afu*BmDBm + Tv)
+            lK(2,a,b) = lK(2,a,b) + afu*(BmDBm + Kvis_u(2,a,b))
+     2         + afv*Kvis_v(2,a,b)
 !----------------------------------
 !           dM1/du3
 !           Material stiffness: Bt*D*B
@@ -372,11 +343,8 @@
      2              Bm(3,1,a)*DBm(3,3) + Bm(4,1,a)*DBm(4,3) +
      3              Bm(5,1,a)*DBm(5,3) + Bm(6,1,a)*DBm(6,3)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(1,b)*VxNx(3,a) + NxNx*FVxt(1,3))
-     2         + rmv * (NxNx*FFt(1,3) + FNx(1,b)*FNx(3,a))
-
-            lK(3,a,b) = lK(3,a,b) + w*(afu*BmDBm + Tv)
+            lK(3,a,b) = lK(3,a,b) + afu*(BmDBm + Kvis_u(3,a,b))
+     2         + afv*Kvis_v(3,a,b)
 !----------------------------------
 !           dM2/du1
 !           Material stiffness: Bt*D*B
@@ -384,11 +352,8 @@
      2              Bm(3,2,a)*DBm(3,1) + Bm(4,2,a)*DBm(4,1) +
      3              Bm(5,2,a)*DBm(5,1) + Bm(6,2,a)*DBm(6,1)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(2,b)*VxNx(1,a) + NxNx*FVxt(2,1))
-     2         + rmv * (NxNx*FFt(2,1) + FNx(2,b)*FNx(1,a))
-
-            lK(dof+1,a,b) = lK(dof+1,a,b) + w*(afu*BmDBm + Tv)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + afu*(BmDBm + Kvis_u(4,a,b))
+     2         + afv*Kvis_v(4,a,b)
 !----------------------------------
 !           dM2/du2
 !           Material stiffness: Bt*D*B
@@ -396,11 +361,8 @@
      2              Bm(3,2,a)*DBm(3,2) + Bm(4,2,a)*DBm(4,2) +
      3              Bm(5,2,a)*DBm(5,2) + Bm(6,2,a)*DBm(6,2)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(2,b)*VxNx(2,a) + NxNx*FVxt(2,2))
-     2         + rmv * (NxNx*FFt(2,2) + FNx(2,b)*FNx(2,a))
-
-            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + afu*BmDBm + Tv)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + afu*(BmDBm + Kvis_u(5,a,b))
+     2         + afv*Kvis_v(5,a,b) + T1
 !----------------------------------
 !           dM2/du3
 !           Material stiffness: Bt*D*B
@@ -408,11 +370,8 @@
      2              Bm(3,2,a)*DBm(3,3) + Bm(4,2,a)*DBm(4,3) +
      3              Bm(5,2,a)*DBm(5,3) + Bm(6,2,a)*DBm(6,3)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(2,b)*VxNx(3,a) + NxNx*FVxt(2,3))
-     2         + rmv * (NxNx*FFt(2,3) + FNx(2,b)*FNx(3,a))
-
-            lK(dof+3,a,b) = lK(dof+3,a,b) + w*(afu*BmDBm + Tv)
+            lK(dof+3,a,b) = lK(dof+3,a,b) + afu*(BmDBm + Kvis_u(6,a,b))
+     2         + afv*Kvis_v(6,a,b)
 !----------------------------------
 !           dM3/du1
 !           Material stiffness: Bt*D*B
@@ -420,11 +379,8 @@
      2              Bm(3,3,a)*DBm(3,1) + Bm(4,3,a)*DBm(4,1) +
      3              Bm(5,3,a)*DBm(5,1) + Bm(6,3,a)*DBm(6,1)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(3,b)*VxNx(1,a) + NxNx*FVxt(3,1))
-     2         + rmv * (NxNx*FFt(3,1) + FNx(3,b)*FNx(1,a))
-
-            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + w*(afu*BmDBm + Tv)
+            lK(2*dof+1,a,b) = lK(2*dof+1,a,b) + afu*(BmDBm
+     2         + Kvis_u(7,a,b)) + afv*Kvis_v(7,a,b)
 !----------------------------------
 !           dM3/du2
 !           Material stiffness: Bt*D*B
@@ -432,11 +388,8 @@
      2              Bm(3,3,a)*DBm(3,2) + Bm(4,3,a)*DBm(4,2) +
      3              Bm(5,3,a)*DBm(5,2) + Bm(6,3,a)*DBm(6,2)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(3,b)*VxNx(2,a) + NxNx*FVxt(3,2))
-     2         + rmv * (NxNx*FFt(3,2) + FNx(3,b)*FNx(2,a))
-
-            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + w*(afu*BmDBm + Tv)
+            lK(2*dof+2,a,b) = lK(2*dof+2,a,b) + afu*(BmDBm
+     2         + Kvis_u(8,a,b)) + afv*Kvis_v(8,a,b)
 !----------------------------------
 !           dM3/du3
 !           Material stiffness: Bt*D*B
@@ -444,12 +397,8 @@
      2              Bm(3,3,a)*DBm(3,3) + Bm(4,3,a)*DBm(4,3) +
      3              Bm(5,3,a)*DBm(5,3) + Bm(6,3,a)*DBm(6,3)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(3,b)*VxNx(3,a) + NxNx*FVxt(3,3))
-     2         + rmv * (NxNx*FFt(3,3) + FNx(3,b)*FNx(3,a))
-
-            lK(2*dof+3,a,b) = lK(2*dof+3,a,b)
-     2                      + w*(T1 + afu*BmDBm + Tv)
+            lK(2*dof+3,a,b) = lK(2*dof+3,a,b) + T1 + afu*(BmDBm
+     2         + Kvis_u(9,a,b)) + afv*Kvis_v(9,a,b)
 !----------------------------------
          END DO
       END DO
@@ -471,15 +420,13 @@
      2   lK(dof*dof,eNoN,eNoN)
 
       INTEGER(KIND=IKIND) :: a, b, i, j
-      REAL(KIND=RKIND) :: rho, mu, dmp, amd, afu, afv, Jac, tmXg, ya_g,
-     2   fb(2), ud(2), vx(2,2), F(2,2), FFt(2,2), FtVx(2,2), FVxt(2,2),
-     3   Svis(2,2), S(2,2), P(2,2), S0(2,2), Dm(3,3), Bm(3,2,eNoN),
-     4   FNx(2,eNoN), VxNx(2,eNoN), DBm(3,2), BmDBm, NxSNx, NxNx,
-     4   rmu, rmv, T1, Tv
+      REAL(KIND=RKIND) :: rho, dmp, amd, afu, afv, tmXg, ya_g, fb(2),
+     2   ud(2), vx(2,2), F(2,2), Svis(2,2), S(2,2), P(2,2), S0(2,2),
+     3   Dm(3,3), Bm(3,2,eNoN), DBm(3,2), Kvis_u(4,eNoN,eNoN),
+     4   Kvis_v(4,eNoN,eNoN), BmDBm, NxSNx, T1
 
 !     Define parameters
       rho     = eq(cEq)%dmn(cDmn)%prop(solid_density)
-      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       dmp     = eq(cEq)%dmn(cDmn)%prop(damping)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -522,21 +469,13 @@
       END DO
       S0(2,1) = S0(1,2)
 
-      Jac = MAT_DET(F, 2)
-      FFt = MATMUL(F, TRANSPOSE(F))
-
-!----------------------------------
-!     Viscous contribution
-      FtVx = MATMUL(TRANSPOSE(F), vx)
-      FVxt = MATMUL(F, TRANSPOSE(vx))
-
-!     2nd Piola-Kirchhoff stress due to viscosity
-      Svis = mu*MAT_SYMM(FtVx,2)
-!----------------------------------
-
 !     2nd Piola-Kirchhoff tensor (S) and material stiffness tensor in
 !     Voigt notation
       CALL GETPK2CC(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, S, Dm)
+
+!     Get viscous stress and stiffness
+      CALL GET_VISC_STRS(eq(cEq)%dmn(cDmn), eNoN, Nx, vx, F, Svis,
+     2   Kvis_u, Kvis_v)
 
 !     Elastic + Viscous stresses
       S = S + Svis
@@ -572,17 +511,10 @@
          Bm(3,2,a) = (Nx(1,a)*F(2,2) + F(2,1)*Nx(2,a))
       END DO
 
-      DO a=1, eNoN
-         FNx(1,a) = F(1,1)*Nx(1,a) + F(1,2)*Nx(2,a)
-         FNx(2,a) = F(2,1)*Nx(1,a) + F(2,2)*Nx(2,a)
-
-         VxNx(1,a) = vx(1,1)*Nx(1,a) + vx(1,2)*Nx(2,a)
-         VxNx(2,a) = vx(2,1)*Nx(1,a) + vx(2,2)*Nx(2,a)
-      END DO
-
 !     Local stiffness tensor
-      rmu = 0.5_RKIND*mu*afu
-      rmv = 0.5_RKIND*mu*afv
+      amd = w * amd
+      afu = w * afu
+      afv = w * afv
       DO b=1, eNoN
          DO a=1, eNoN
 !           Geometric stiffness
@@ -606,52 +538,38 @@
             DBm(3,2) = Dm(3,1)*Bm(1,2,b) + Dm(3,2)*Bm(2,2,b) +
      2         Dm(3,3)*Bm(3,2,b)
 
-            NxNx = Nx(1,a)*Nx(1,b) + Nx(2,a)*Nx(2,b)
-
 !----------------------------------
 !           dM1/du1
 !           Material stiffness: Bt*D*B
             BmDBm = Bm(1,1,a)*DBm(1,1) + Bm(2,1,a)*DBm(2,1) +
      2         Bm(3,1,a)*DBm(3,1)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(1,b)*VxNx(1,a) + NxNx*FVxt(1,1))
-     2         + rmv * (NxNx*FFt(1,1) + FNx(1,b)*FNx(1,a))
-
-            lK(1,a,b) = lK(1,a,b) + w*(T1 + afu*BmDBm + Tv)
+            lK(1,a,b) = lK(1,a,b) + afu*(BmDBm + Kvis_u(1,a,b))
+     2         + afv*Kvis_v(1,a,b) + T1
 !----------------------------------
 !           dM1/du2
 !           Material stiffness: Bt*D*B
             BmDBm = Bm(1,1,a)*DBm(1,2) + Bm(2,1,a)*DBm(2,2) +
      2         Bm(3,1,a)*DBm(3,2)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(1,b)*VxNx(2,a) + NxNx*FVxt(1,2))
-     2         + rmv * (NxNx*FFt(1,2) + FNx(1,b)*FNx(2,a))
-
-            lK(2,a,b) = lK(2,a,b) + w*(afu*BmDBm + Tv)
+            lK(2,a,b) = lK(2,a,b) + afu*(BmDBm + Kvis_u(2,a,b))
+     2         + afv*Kvis_v(2,a,b)
 !----------------------------------
 !           dM2/du1
 !           Material stiffness: Bt*D*B
             BmDBm = Bm(1,2,a)*DBm(1,1) + Bm(2,2,a)*DBm(2,1) +
      2         Bm(3,2,a)*DBm(3,1)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(2,b)*VxNx(1,a) + NxNx*FVxt(2,1))
-     2         + rmv * (NxNx*FFt(2,1) + FNx(2,b)*FNx(1,a))
-
-            lK(dof+1,a,b) = lK(dof+1,a,b) + w*(afu*BmDBm + Tv)
+            lK(dof+1,a,b) = lK(dof+1,a,b) + afu*(BmDBm + Kvis_u(3,a,b))
+     2         + afv*Kvis_v(3,a,b)
 !----------------------------------
 !           dM2/du2
 !           Material stiffness: Bt*D*B
             BmDBm = Bm(1,2,a)*DBm(1,2) + Bm(2,2,a)*DBm(2,2) +
      2         Bm(3,2,a)*DBm(3,2)
 
-!           Viscous terms contribution
-            Tv = rmu * (FNx(2,b)*VxNx(2,a) + NxNx*FVxt(2,2))
-     2         + rmv * (NxNx*FFt(2,2) + FNx(2,b)*FNx(2,a))
-
-            lK(dof+2,a,b) = lK(dof+2,a,b) + w*(T1 + afu*BmDBm + Tv)
+            lK(dof+2,a,b) = lK(dof+2,a,b) + afu*(BmDBm + Kvis_u(4,a,b))
+     2         + afv*Kvis_v(4,a,b) + T1
 !----------------------------------
          END DO
       END DO

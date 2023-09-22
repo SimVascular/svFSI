@@ -288,7 +288,8 @@
                END DO
                gam = SQRT(0.5_RKIND*gam)
 !              Compute viscosity
-               CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu, mu_s, mu_s)
+               CALL GET_FLUID_VISC(eq(iEq)%dmn(cDmn), gam, mu, mu_s,
+     2            mu_s)
                lRes(1) = mu
             ELSE
                err = "Correction is required in POST"
@@ -447,7 +448,8 @@
                END DO
                gam = SQRT(0.5_RKIND*gam)
 !              Compute viscosity
-               CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu, mu_s, mu_s)
+               CALL GET_FLUID_VISC(eq(iEq)%dmn(cDmn), gam, mu, mu_s,
+     2            mu_s)
 
 !     Now finding grad(u).n and n.grad(u).n
                Tdn   = 0._RKIND

@@ -76,10 +76,10 @@
 !     damping, shell thickness, stabilization coeffs. for USTRUCT
 !     (momentum, continuity)
       INTEGER(KIND=IKIND), PARAMETER :: prop_NA = 0, fluid_density = 1,
-     2   solid_density = 2, solid_viscosity = 3, elasticity_modulus = 4,
-     3   poisson_ratio = 5, conductivity = 6, f_x = 7, f_y = 8, f_z = 9,
-     4   backflow_stab = 10, source_term = 11, damping = 12,
-     5   shell_thickness = 13, ctau_M = 14, ctau_C = 15
+     2   solid_density = 2, elasticity_modulus = 3, poisson_ratio = 4,
+     3   conductivity = 5, f_x = 6, f_y = 7, f_z = 8, backflow_stab = 9,
+     4   source_term = 10, damping = 11, shell_thickness = 12,
+     5   ctau_M = 13, ctau_C = 14
 !--------------------------------------------------------------------
 !     Types of accepted elements
 !     Point, Line (linear), Line (quadratic), Triangle (linear),
@@ -203,7 +203,7 @@
 !--------------------------------------------------------------------
 !     Type of solid viscosity: potential-based, newtonian fluid
       INTEGER(KIND=IKIND), PARAMETER :: viscTypeS_NA = 689,
-     2   viscTypeS_Pot = 688, viscTypeS_NF = 687
+     2   viscTypeS_Pot = 688, viscTypeS_Newt = 687
 !--------------------------------------------------------------------
 !     Type of excitation-contraction coupling for active strain-based
 !     electromechanics formulation: transversely isotropic,
