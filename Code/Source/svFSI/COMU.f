@@ -82,19 +82,22 @@
          PROCEDURE, PUBLIC :: seq
 !        Forces the MPI communicator to abort
          PROCEDURE, PUBLIC :: fStop
-!        Broadcasting scaler/vector of logic/integer/real/character
+!        Broadcasting scalar/vector of logic/integer/real/character
          PROCEDURE :: BCASTLS
          PROCEDURE :: BCASTLV
          PROCEDURE :: BCASTIS
          PROCEDURE :: BCASTIV
          PROCEDURE :: BCASTIA2
+         PROCEDURE :: BCASTIA3
          PROCEDURE :: BCASTRS
          PROCEDURE :: BCASTRV
          PROCEDURE :: BCASTRA2
+         PROCEDURE :: BCASTRA3
          PROCEDURE :: BCASTSS
          PROCEDURE :: BCASTSV
          GENERIC :: bcast => BCASTLS, BCASTLV, BCASTIS, BCASTIV,
-     2      BCASTIA2, BCASTRS, BCASTRV, BCASTRA2, BCASTSS, BCASTSV
+     2      BCASTIA2, BCASTIA3, BCASTRS, BCASTRV, BCASTRA2, BCASTRA3,
+     3      BCASTSS, BCASTSV
 !        Blocking MPI send
          PROCEDURE :: send => SENDRV
 !        Blocking MPI recv
@@ -318,6 +321,21 @@
       RETURN
       END SUBROUTINE BCASTIA2
 !--------------------------------------------------------------------
+      SUBROUTINE BCASTIA3(cm, u)
+      IMPLICIT NONE
+      CLASS(cmType), INTENT(IN) :: cm
+      INTEGER(KIND=IKIND), INTENT(INOUT) :: u(:,:,:)
+
+      INTEGER(KIND=IKIND) l, m, n, ierr
+
+      l = SIZE(u,1)
+      m = SIZE(u,2)
+      n = SIZE(u,3)
+      CALL MPI_BCAST(u, l*m*n, mpint, master, cm%com(), ierr)
+
+      RETURN
+      END SUBROUTINE BCASTIA3
+!--------------------------------------------------------------------
       SUBROUTINE BCASTRS(cm, u)
       IMPLICIT NONE
       CLASS(cmType), INTENT(IN) :: cm
@@ -356,6 +374,21 @@
 
       RETURN
       END SUBROUTINE BCASTRA2
+!--------------------------------------------------------------------
+      SUBROUTINE BCASTRA3(cm, u)
+      IMPLICIT NONE
+      CLASS(cmType), INTENT(IN) :: cm
+      REAL(KIND=RKIND), INTENT(INOUT) :: u(:,:,:)
+
+      INTEGER(KIND=IKIND) l, m, n, ierr
+
+      l = SIZE(u,1)
+      m = SIZE(u,2)
+      n = SIZE(u,3)
+      CALL MPI_BCAST(u, l*m*n, mpreal, master, cm%com(), ierr)
+
+      RETURN
+      END SUBROUTINE BCASTRA3
 !--------------------------------------------------------------------
       SUBROUTINE BCASTSS(cm, u)
       IMPLICIT NONE

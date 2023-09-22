@@ -45,7 +45,7 @@
      2   Dg(tDof,tnNo)
 
       LOGICAL vmsStab
-      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, nFn
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
       TYPE(fsType) :: fs(2)
 
@@ -57,7 +57,7 @@
      2   Nqx(:,:)
 
       eNoN = lM%eNoN
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
       IF (lM%nFs .EQ. 1) THEN
@@ -86,7 +86,6 @@
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !        Create local copies
-         fN   = 0._RKIND
          tmXl = 0._RKIND
          ya_l = 0._RKIND
          DO a=1, eNoN
@@ -109,12 +108,6 @@
                END IF
             END IF
          END DO
-
-         IF (ALLOCATED(lM%fN)) THEN
-            DO iFn=1, nFn
-               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-            END DO
-         END IF
 
 !        Initialize residue and tangents
          lR  = 0._RKIND
@@ -140,6 +133,9 @@
                IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             END IF
             w = fs(1)%w(g) * Jac
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, fs(1)%N(:,g), fN)
 
             IF (nsd .EQ. 3) THEN
                CALL USTRUCT3D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn, w,
@@ -870,7 +866,7 @@
      5   VxNwx(3,eNoNw), NxNx, T1, T2, T3, Ku
 
 !     Define parameters
-      ctV     = 36._RKIND
+      ctV     = 0.0_RKIND !36._RKIND
       mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -1094,7 +1090,7 @@
      5   VxNwx(2,eNoNw), NxNx, T1, T2, T3, Ku
 
 !     Define parameters
-      ctV     = 36._RKIND
+      ctV     = 0.0_RKIND !36._RKIND
       mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)

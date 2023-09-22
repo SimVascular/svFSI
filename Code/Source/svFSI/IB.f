@@ -43,9 +43,7 @@
       IMPLICIT NONE
       TYPE(listType), INTENT(INOUT) :: list
 
-      LOGICAL :: flag
       INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e
-      REAL(KIND=RKIND) :: fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp, fExt
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(fileType) :: fTmp
@@ -205,50 +203,12 @@
       END DO
 
 !     Read fiber orientation
-      flag = .FALSE.
+      dbg = " Checking for any fiber directions"
       DO iM=1, ib%nMsh
-         lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
-         j = lPM%srch("Fiber direction file path")
-         IF (j .EQ. 0) j = lPM%srch("Fiber direction")
-         IF (j .NE. 0) THEN
-            flag = .TRUE.
-            EXIT
-         END IF
+         ib%msh(iM)%fib%nFn = 0
+         lPM => list%get(ib%msh(iM)%name, "Add IB", iM)
+         CALL READ_FIBERS(lPM, ib%msh(iM), ib%msh(iM)%fib)
       END DO
-
-      IF (flag) THEN
-         DO iM=1, ib%nMsh
-            lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
-
-            ib%msh(iM)%nFn = lPM%srch("Fiber direction file path")
-            j = ib%msh(iM)%nFn
-            IF (ib%msh(iM)%nFn .NE. 0) THEN
-               ALLOCATE(ib%msh(iM)%fN(j*nsd,ib%msh(iM)%nEl))
-               ib%msh(iM)%fN = 0._RKIND
-               DO i=1, ib%msh(iM)%nFn
-                  lPtr => lPM%get(cTmp, "Fiber direction file path", i)
-                  CALL READFIBNFF(ib%msh(iM), cTmp, "FIB_DIR", i)
-               END DO
-            ELSE
-               ib%msh(iM)%nFn = lPM%srch("Fiber direction")
-               j = ib%msh(iM)%nFn
-               IF (ib%msh(iM)%nFn .NE. 0) THEN
-                  ALLOCATE(ib%msh(iM)%fN(j*nsd,ib%msh(iM)%nEl))
-                  ib%msh(iM)%fN = 0._RKIND
-                  DO i=1, ib%msh(iM)%nFn
-                     lPtr => lPM%get(fibN, "Fiber direction", i)
-                     rtmp = SQRT(NORM(fibN))
-                     IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
-                     DO e=1, ib%msh(iM)%nEl
-                        ib%msh(iM)%fN((i-1)*nsd+1:i*nsd,e) = fibN(1:nsd)
-                     END DO
-                  END DO
-               END IF
-            END IF
-         END DO
-      ELSE
-         ib%msh(:)%nFn = 0
-      END IF
 
       IF (ib%nMsh .GT. 1) THEN
          std = " Total number of IB nodes: "//ib%tnNo
@@ -3824,7 +3784,7 @@ c      END DO
 !     Loop over all IB mesh
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
-         nFn   = MAX(ib%msh(iM)%nFn, 1)
+         nFn   = MAX(ib%msh(iM)%fib%nFn, 1)
          ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), fN(nsd,nFn),xbl(nsd,eNoNb),
      2      ubl(nsd,eNoNb), aul(nsd,eNoNb))
 !        Loop over each trace of IB integration points
@@ -3843,18 +3803,16 @@ c      END DO
      2         CALL NRBNNX(ib%msh(iM), e)
 
 !           Transfer to element-level local arrays
-            fN = 0._RKIND
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc)
                ubl(:,b) = Ubg(:,Bc)
                aul(:,b) = Aug(:,Bc)
-               IF (ALLOCATED(ib%msh(iM)%fN)) THEN
-                  DO j=1, nFn
-                     fN(:,j) = ib%msh(iM)%fN((j-1)*nsd+1:j*nsd,e)
-                  END DO
-               END IF
             END DO
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(ib%msh(iM), ib%msh(iM)%fib, e, g, eNoNb,
+     2         Nb, fN)
 
 !           Compute shapefunction gradients and element Jacobian in the
 !           reference configuration. The shapefunction gradients will be

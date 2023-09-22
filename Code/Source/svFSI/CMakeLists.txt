@@ -131,6 +131,7 @@ set(FSRCS TYPEMOD.f
          EC_DCPLD.f
          EQASSEM.f
          FFT.f
+         FIBERS.f
          FLUID.f
          FS.f
          FSI.f

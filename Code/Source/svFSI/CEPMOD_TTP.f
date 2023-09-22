@@ -1257,7 +1257,7 @@ c      dFa = alfa * dRFL * (c_Ca - c_Ca0)**2
 
       INTEGER(KIND=IKIND) :: slen, i, ios, nt
       CHARACTER(LEN=stdL) :: sline, scmd, sval
-      CHARACTER(LEN=stdL), DIMENSION(1024) :: tokList
+      CHARACTER(LEN=stdL), DIMENSION(250) :: tokList
 
       REWIND(fileId)
       slen = LEN(TRIM(skwrd))
@@ -1339,7 +1339,7 @@ c      dFa = alfa * dRFL * (c_Ca - c_Ca0)**2
       SUBROUTINE PARSESTR(strng, toks, ntoks)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN) :: strng
-      CHARACTER(LEN=*), DIMENSION(1024), INTENT(OUT) :: toks
+      CHARACTER(LEN=*), DIMENSION(250), INTENT(OUT) :: toks
       INTEGER(KIND=IKIND), INTENT(OUT) :: ntoks
 
       INTEGER(KIND=IKIND) :: i, j, slen

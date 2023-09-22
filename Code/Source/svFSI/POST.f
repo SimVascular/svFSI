@@ -528,7 +528,7 @@
       i    = eq(iEq)%s
       j    = i + 1
       k    = j + 1
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
 !     For higher order elements, we lower the order of shape functions
@@ -581,13 +581,6 @@
 
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
-         fN = 0._RKIND
-         IF (ALLOCATED(lM%fN)) THEN
-            DO l=1, nFn
-               fN(:,l) = lM%fN((l-1)*nsd+1:l*nsd,e)
-            END DO
-         END IF
-
          dl   = 0._RKIND
          yl   = 0._RKIND
          tmXl = 0._RKIND
@@ -619,6 +612,9 @@
             w  = fs%w(g)*Jac
             N  = fs%N(:,g)
             Je = Je + w
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, fs%eNoN, N, fN)
 
             Im  = MAT_ID(nsd)
             F   = Im
@@ -949,7 +945,7 @@
       i    = eq(iEq)%s
       j    = i + 1
       k    = j + 1
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
 !     Set shell dimension := 2
@@ -1013,14 +1009,6 @@
             xc(2,a) = x0(2,a) + dl(j,a)
             xc(3,a) = x0(3,a) + dl(k,a)
          END DO
-
-!        Get fiber directions
-         fN = 0._RKIND
-         IF (ALLOCATED(lM%fN)) THEN
-            DO iFn=1, nFn
-               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-            END DO
-         END IF
 
 !        Set number of integration points.
 !        Note: Gauss integration performed for NURBS elements
@@ -1104,6 +1092,14 @@
 !              Set weight of the Gauss point
                w  = lM%w(g)*Jac0
 
+!              Get fiber direction
+               fN = 0._RKIND
+               IF (lM%fib%locEl) THEN
+                  DO iFn=1, nFn
+                     fN(:,iFn) = lM%fib%fN((iFn-1)*nsd+1:iFn*nsd,1,e)
+                  END DO
+               END IF
+
             ELSE    ! for constant strain triangles
 !              Set element shape functions and their derivatives
                N = lM%N(:,g)
@@ -1143,6 +1139,9 @@
 
 !              Set weight of the Gauss point
                w  = Jac0*0.5_RKIND
+
+!              Get fiber directions at the integration point
+               CALL GET_FIBN(lM, lM%fib, e, g, lM%eNoN, N, fN)
             END IF
 
 !           Compute fiber direction in curvature coordinates
@@ -1291,7 +1290,7 @@
       k    = j + 1
 
       ALLOCATE (sA(tnNo), sF(nFn*nsd,tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,lM%nFn), fl(nsd,lM%nFn), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,lM%fib%nFn), fl(nsd,lM%fib%nFn), Nx(nsd,eNoN), N(eNoN))
 
       sA = 0._RKIND
       sF = 0._RKIND
@@ -1306,16 +1305,15 @@
             dl(:,a)  = lD(:,Ac)
          END DO
 
-         DO iFn=1, lM%nFn
-            fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-         END DO
-
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
                CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, F)
             END IF
             w = lM%w(g)*Jac
             N = lM%N(:,g)
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, N, fN)
 
             F  = MAT_ID(nsd)
             DO a=1, eNoN
@@ -1337,7 +1335,7 @@
                END IF
             END DO
 
-            DO iFn=1, lM%nFn
+            DO iFn=1, lM%fib%nFn
                fl(:,iFn) = MATMUL(F, fN(:,iFn))
                fl(:,iFn) = fl(:,iFn)/SQRT(NORM(fl(:,iFn)))
             END DO
@@ -1345,7 +1343,7 @@
             DO a=1, eNoN
                Ac     = lM%IEN(a,e)
                sA(Ac) = sA(Ac) + w*N(a)
-               DO iFn=1, lM%nFn
+               DO iFn=1, lM%fib%nFn
                   b = (iFn-1)*nsd
                   DO l=1, nsd
                      sF(b+l,Ac) = sF(b+l,Ac) + w*N(a)*fl(l,iFn)
@@ -1381,20 +1379,21 @@
       REAL(KIND=RKIND), INTENT(INOUT) :: res(1,lM%nNo)
       REAL(KIND=RKIND), INTENT(IN) :: lD(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, iFn, cPhys
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, i, j, k, iFn, nFn, cPhys
       REAL(KIND=RKIND) w, Jac, sHat, F(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), fN(:,:),
      2   fl(:,:), Nx(:,:), N(:), sA(:), sF(:)
 
       eNoN = lM%eNoN
+      nFn  = lM%fib%nFn
       dof  = eq(iEq)%dof
       i    = eq(iEq)%s
       j    = i + 1
       k    = j + 1
 
       ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   fN(nsd,2), fl(nsd,2), Nx(nsd,eNoN), N(eNoN))
+     2   fN(nsd,nFn), fl(nsd,nFn), Nx(nsd,eNoN), N(eNoN))
 
       sA = 0._RKIND
       sF = 0._RKIND
@@ -1411,15 +1410,15 @@
             dl(:,a)  = lD(:,Ac)
          END DO
 
-         fN(:,1) = lM%fN(1:nsd,e)
-         fN(:,2) = lM%fN(nsd+1:2*nsd,e)
-
          DO g=1, lM%nG
             IF (g.EQ.1 .OR. .NOT.lM%lShpF) THEN
                CALL GNN(eNoN, nsd, lM%Nx(:,:,g), xl, Nx, Jac, F)
             END IF
             w = lM%w(g)*Jac
             N = lM%N(:,g)
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, N, fN)
 
             F  = MAT_ID(nsd)
             DO a=1, eNoN
@@ -1484,7 +1483,7 @@
       REAL(KIND=RKIND) w, Jac, I4f, fl(nsd), F(nsd,nsd)
 
       REAL(KIND=RKIND), ALLOCATABLE :: xl(:,:), dl(:,:), Nx(:,:), N(:),
-     2   sA(:), sF(:)
+     2   fN(:,:), sA(:), sF(:)
 
       eNoN = lM%eNoN
       dof  = eq(iEq)%dof
@@ -1493,7 +1492,7 @@
       k    = j + 1
 
       ALLOCATE (sA(tnNo), sF(tnNo), xl(nsd,eNoN), dl(tDof,eNoN),
-     2   Nx(nsd,eNoN), N(eNoN))
+     2   Nx(nsd,eNoN), N(eNoN), fN(nsd,lM%fib%nFn))
 
       sA = 0._RKIND
       sF = 0._RKIND
@@ -1515,6 +1514,9 @@
             w = lM%w(g)*Jac
             N = lM%N(:,g)
 
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, N, fN)
+
             F  = MAT_ID(nsd)
             DO a=1, eNoN
                IF (nsd .EQ. 3) THEN
@@ -1535,7 +1537,7 @@
                END IF
             END DO
 
-            fl  = MATMUL(F, lM%fN(1:nsd,e))
+            fl  = MATMUL(F, fN(:,1))
             I4f = NORM(fl)
             DO a=1, eNoN
                Ac     = lM%IEN(a,e)
@@ -1556,7 +1558,7 @@
          ENDIF
       END DO
 
-      DEALLOCATE (sA, sF, xl, dl, N, Nx)
+      DEALLOCATE (sA, sF, xl, dl, N, Nx, fN)
 
       RETURN
       END SUBROUTINE FIBSTRETCH

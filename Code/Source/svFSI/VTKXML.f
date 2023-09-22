@@ -452,7 +452,7 @@
             IF (oGrp .EQ. outGrp_fN) THEN
                nFn = 1
                DO iM=1, nMsh
-                  nFn = MAX(nFn, msh(iM)%nFn)
+                  nFn = MAX(nFn, msh(iM)%fib%nFn)
                END DO
                nOut   = nOut + nFn
                outDof = outDof + eq(iEq)%output(iOut)%l * nFn
@@ -572,7 +572,7 @@
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(nFn*nsd,msh(iM)%nNo))
                   tmpV = 0._RKIND
-                  IF (msh(iM)%nFn .NE. 0) THEN
+                  IF (msh(iM)%fib%nFn .NE. 0) THEN
                      CALL FIBDIRPOST(msh(iM), nFn, tmpV, lD, iEq)
                   END IF
                   DO iFn=1, nFn
@@ -595,8 +595,11 @@
                   IF (ALLOCATED(tmpV)) DEALLOCATE(tmpV)
                   ALLOCATE(tmpV(1,msh(iM)%nNo))
                   tmpV = 0._RKIND
-                  IF (msh(iM)%nFn .EQ. 2) THEN
+                  IF (msh(iM)%fib%nFn .GE. 2) THEN
                      CALL FIBALGNPOST(msh(iM), tmpV, lD, iEq)
+                  ELSE
+                     err = " Fiber_alignment requires at least two "//
+     2                  "families of fibers"
                   END IF
                   DO a=1, msh(iM)%nNo
                      d(iM)%x(is,a) = tmpV(1,a)

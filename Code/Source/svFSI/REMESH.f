@@ -346,9 +346,14 @@
             IF (ALLOCATED(msh(iM)%N))      DEALLOCATE(msh(iM)%N)
             IF (ALLOCATED(msh(iM)%Nb))     DEALLOCATE(msh(iM)%Nb)
             IF (ALLOCATED(msh(iM)%nV))     DEALLOCATE(msh(iM)%nV)
-            IF (ALLOCATED(msh(iM)%fN))     DEALLOCATE(msh(iM)%fN)
             IF (ALLOCATED(msh(iM)%Nx))     DEALLOCATE(msh(iM)%Nx)
             IF (ALLOCATED(msh(iM)%Nxx))    DEALLOCATE(msh(iM)%Nxx)
+
+            msh(iM)%fib%locNd = .FALSE.
+            msh(iM)%fib%locEl = .FALSE.
+            msh(iM)%fib%locGP = .FALSE.
+            IF (ALLOCATED(msh(iM)%fib%fN))  DEALLOCATE(msh(iM)%fib%fN)
+
             CALL DESTROY(msh(iM)%nAdj)
             CALL DESTROY(msh(iM)%eAdj)
             DO i=1, msh(iM)%nFs

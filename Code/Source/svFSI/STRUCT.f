@@ -44,7 +44,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, nFn
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
@@ -53,7 +53,7 @@
      3   N(:), Nx(:,:), lR(:,:), lK(:,:,:)
 
       eNoN = lM%eNoN
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
 !     Initialize tensor operations
@@ -76,7 +76,6 @@
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !        Create local copies
-         fN   = 0._RKIND
          pS0l = 0._RKIND
          tmXl = 0._RKIND
          ya_l = 0._RKIND
@@ -105,12 +104,6 @@
             END IF
          END DO
 
-         IF (ALLOCATED(lM%fN)) THEN
-            DO iFn=1, nFn
-               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-            END DO
-         END IF
-
 !        Gauss integration
          lR = 0._RKIND
          lK = 0._RKIND
@@ -121,6 +114,9 @@
             END IF
             w = lM%w(g) * Jac
             N = lM%N(:,g)
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, N, fN)
 
             pSl = 0._RKIND
             IF (nsd .EQ. 3) THEN

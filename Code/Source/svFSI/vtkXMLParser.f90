@@ -486,6 +486,8 @@
             access="stream",convert="big_endian")
             vtk%isBinApp = .true.
             iPos = 1
+         else
+            vtk%isBinApp = .false.
          end if
          vtk%dataFormat = trim(stmp)
          if ( debug ) write(stdout,ftab2) &
@@ -1876,10 +1878,11 @@
                      do
                         read(vtk%fid,pos=iPos,end=001) c
                         iPos = iPos + 1
-                        if ( present(ePos) .and. iPos.ge.ePos) &
-                        then
-                           strng = ''
-                           return
+                        if (present(ePos)) then
+                           if (iPos.ge.ePos) then
+                              strng = ''
+                              return
+                           end if
                         end if
                         cnt = cnt+1
                         strng(cnt:cnt) = c
@@ -1905,9 +1908,11 @@
                strng = ''
                read(vtk%fid,'(A)',end=001) strng
                iPos = iPos+1
-               if ( present(ePos) .and. iPos.ge.ePos ) then
-                  strng = ''
-                  return
+               if (present(ePos)) then
+                  if (iPos .ge. ePos) then
+                     strng = ''
+                     return
+                  end if
                end if
             end if
             strng = adjustl(strng)

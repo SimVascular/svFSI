@@ -409,7 +409,6 @@
       IMPLICIT NONE
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      LOGICAL fnFlag
       INTEGER(KIND=IKIND) i, insd
 
       CALL cm%bcast(lM%lShpF)
@@ -423,13 +422,13 @@
       CALL cm%bcast(lM%nFs)
       CALL cm%bcast(lM%nG)
       CALL cm%bcast(lM%vtkType)
-      CALL cm%bcast(lM%nFn)
       CALL cm%bcast(lM%scF)
       CALL cm%bcast(lM%dx)
       CALL cm%bcast(lM%name)
-
-      fnFlag = ALLOCATED(lM%fN)
-      CALL cm%bcast(fnFlag)
+      CALL cm%bcast(lM%fib%nFn)
+      CALL cm%bcast(lM%fib%locNd)
+      CALL cm%bcast(lM%fib%locEl)
+      CALL cm%bcast(lM%fib%locGP)
 
       IF (cm%slv()) THEN
          lM%nNo = lM%gnNo
@@ -439,14 +438,21 @@
          ALLOCATE(lM%IEN(lM%eNoN, lM%nEl))
          ALLOCATE(lM%eId(lM%nEl))
          ALLOCATE(lM%fa(lM%nFa))
-         IF (fnFlag) ALLOCATE(lM%fN(lM%nFn*nsd,lM%nEl))
          CALL SELECTELE(lM)
+
+         IF (lM%fib%locNd) ALLOCATE(lM%fib%fN(nsd*lM%fib%nFn,1,lM%nNo))
+         IF (lM%fib%locEl) ALLOCATE(lM%fib%fN(nsd*lM%fib%nFn,1,lM%nEl))
+         IF (lM%fib%locGP)
+     2      ALLOCATE(lM%fib%fN(nsd*lM%fib%nFn,lM%nG,lM%nEl))
       END IF
       CALL cm%bcast(lM%gN)
       CALL cm%bcast(lM%lN)
       CALL cm%bcast(lM%IEN)
       CALL cm%bcast(lM%eId)
-      IF (fnFlag) CALL cm%bcast(lM%fN)
+
+      IF (lM%fib%locNd .OR. lM%fib%locEl .OR. lM%fib%locGP) THEN
+         CALL cm%bcast(lM%fib%fN)
+      END IF
 
       IF (lM%eType .EQ. eType_NRB) THEN
          CALL cm%bcast(lM%nSl)
@@ -1161,15 +1167,15 @@
       INTEGER(KIND=IKIND), INTENT(INOUT) :: gmtl(gtnNo)
       TYPE(mshType), INTENT(INOUT) :: lM
 
-      LOGICAL :: flag, fnFlag
+      LOGICAL :: flag
       INTEGER(KIND=MPI_OFFSET_KIND) :: idisp
-      INTEGER(KIND=IKIND) :: i, a, Ac, e, Ec, edgecut, nEl, nNo, eNoN,
-     2   eNoNb, ierr, fid, SPLIT, insd, nFn
+      INTEGER(KIND=IKIND) :: a, e, g, i, is, ie, Ac, Ec, nEl, nNo, nG,
+     2   nFn, eNoN, eNoNb, edgeCut, ierr, fid, SPLIT, insd
       CHARACTER(LEN=stdL) fTmp
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: part(:), gPart(:),
      2   tempIEN(:,:), gtlPtr(:), sCount(:), disp(:)
-      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:), tmpFn(:,:)
+      REAL(KIND=RKIND), ALLOCATABLE :: tmpR(:), lfN(:,:), gfN(:,:)
 
       IF (cm%seq()) THEN
          lM%nEl = lM%gnEl
@@ -1199,9 +1205,13 @@
       CALL cm%bcast(lM%gnEl)
       CALL cm%bcast(lM%gnNo)
       CALL cm%bcast(lM%name)
-      CALL cm%bcast(lM%nFn)
       CALL cm%bcast(lM%scF)
-      nFn = lM%nFn
+      CALL cm%bcast(lM%fib%nFn)
+      CALL cm%bcast(lM%fib%locNd)
+      CALL cm%bcast(lM%fib%locEl)
+      CALL cm%bcast(lM%fib%locGP)
+      nFn = lM%fib%nFn
+      nG  = lM%nG
 
       insd = nsd
       IF (lM%lShl) insd = nsd - 1
@@ -1386,17 +1396,30 @@ c            wrn = " ParMETIS failed to partition the mesh"
             DEALLOCATE(lM%eId)
          END IF
 
-!     This it to distribute fN, if allocated
-         fnFlag = .FALSE.
-         IF (ALLOCATED(lM%fN)) THEN
-            fnFlag = .TRUE.
-            ALLOCATE(tmpFn(nFn*nsd,lM%gnEl))
-            tmpFn = 0._RKIND
+!     This it to distribute fibers, if stored at elements or at
+!     integration points. Fibers at nodes will be distributed later
+!     when gtlptr is defined.
+         IF (lM%fib%locEl) THEN
+            ALLOCATE(gfN(nsd*nFn,lM%gnEl))
+            gfN = 0._RKIND
             DO e=1, lM%gnEl
                Ec = lM%otnIEN(e)
-               tmpFn(:,Ec) = lM%fN(:,e)
+               gfN(:,Ec) = lM%fib%fN(:,1,e)
             END DO
-            DEALLOCATE(lM%fN)
+            DEALLOCATE(lM%fib%fN)
+
+         ELSE IF (lM%fib%locGP) THEN
+            ALLOCATE(gfN(nsd*nFn*nG,lM%gnEl))
+            gfN = 0._RKIND
+            DO e=1, lM%gnEl
+               Ec = lM%otnIEN(e)
+               DO g=1, nG
+                  is = (g-1)*nsd*nFn + 1
+                  ie = g*nsd*nFn
+                  gfN(is:ie,Ec) = lM%fib%fN(:,g,e)
+               END DO
+            END DO
+            DEALLOCATE(lM%fib%fN)
          END IF
       ELSE
          ALLOCATE(lM%otnIEN(0))
@@ -1404,7 +1427,6 @@ c            wrn = " ParMETIS failed to partition the mesh"
       DEALLOCATE(gPart)
 
       CALL cm%bcast(flag)
-      CALL cm%bcast(fnFlag)
       CALL cm%bcast(lM%eDist)
 
       nEl = lM%eDist(cm%id() + 1) - lM%eDist(cm%id())
@@ -1425,17 +1447,47 @@ c            wrn = " ParMETIS failed to partition the mesh"
          DEALLOCATE(part)
       END IF
 
-!     Communicating fN, if neccessary
-      IF (fnFlag) THEN
-         ALLOCATE(lM%fN(nFn*nsd,nEl))
-         IF (.NOT.ALLOCATED(tmpFn)) ALLOCATE(tmpFn(0,0))
+!     Communicating fibers at elements, if neccessary
+      IF (lM%fib%locEl) THEN
+         ALLOCATE(lfN(nsd*nFn,nEl))
+         IF (.NOT.ALLOCATED(gfN)) ALLOCATE(gfN(0,0))
          DO i=1, cm%np()
-            disp(i)   = lM%eDist(i-1)*nFn*nsd
-            sCount(i) = lM%eDist(i)*nFn*nsd - disp(i)
+            disp(i)   = lM%eDist(i-1)*(nsd*nFn)
+            sCount(i) = lM%eDist(i)*(nsd*nFn) - disp(i)
          END DO
-         CALL MPI_SCATTERV(tmpFn, sCount, disp, mpreal, lM%fN,
-     2      nEl*nFn*nsd, mpreal, master, cm%com(), ierr)
-         DEALLOCATE(tmpFn)
+         CALL MPI_SCATTERV(gfN, sCount, disp, mpreal, lfN, nsd*nFn*nEl,
+     2      mpreal, master, cm%com(), ierr)
+         DEALLOCATE(gfN)
+
+         ALLOCATE(lM%fib%fN(nsd*nFn,1,nEl))
+         lM%fib%fN = 0._RKIND
+         DO e=1, nEl
+            lM%fib%fN(:,1,e) = lfN(:,e)
+         END DO
+         DEALLOCATE(lfN)
+
+!     Communicating fibers at integration points, if neccessary
+      ELSE IF (lM%fib%locGP) THEN
+         ALLOCATE(lfN(nsd*nFn*nG,nEl))
+         IF (.NOT.ALLOCATED(gfN)) ALLOCATE(gfN(0,0))
+         DO i=1, cm%np()
+            disp(i)   = lM%eDist(i-1)*(nsd*nFn*nG)
+            sCount(i) = lM%eDist(i)*(nsd*nFn*nG) - disp(i)
+         END DO
+         CALL MPI_SCATTERV(gfN, sCount, disp, mpreal, lfN,
+     2      (nsd*nFn*nG)*nEl, mpreal, master, cm%com(), ierr)
+         DEALLOCATE(gfN)
+
+         ALLOCATE(lM%fib%fN(nsd*nFn,nG,nEl))
+         lM%fib%fN = 0._RKIND
+         DO e=1, nEl
+            DO g=1, nG
+               is = (g-1)*(nsd*nFn) + 1
+               ie = g*nsd*nFn
+               lM%fib%fN(:,g,e) = lfN(is:ie,e)
+            END DO
+         END DO
+         DEALLOCATE(lfN)
       END IF
 
 !     Now scattering the sorted lM%IEN to all processors
@@ -1468,6 +1520,29 @@ c            wrn = " ParMETIS failed to partition the mesh"
       lM%nNo = nNo
       IF (cm%slv()) ALLOCATE(lM%gN(lM%gnNo))
       CALL cm%bcast(lM%gN)
+
+!     Use gtlptr to distribute fibers at nodes, if allocated
+      IF (lM%fib%locNd) THEN
+         ALLOCATE(gfN(nsd*nFn,lM%gnNo))
+         IF (cm%mas()) THEN
+            DO a=1, lM%gnNo
+               gfN(:,a) = lM%fib%fN(:,1,a)
+            END DO
+            DEALLOCATE(lM%fib%fN)
+         END IF
+
+         CALL cm%bcast(gfN)
+
+         ALLOCATE(lM%fib%fN(nsd*nFn,1,lM%nNo))
+         lM%fib%fN = 0._RKIND
+         DO Ac=1, lM%gnNo
+            a = gtlptr(Ac)
+            IF (a .NE. 0) THEN
+               lM%fib%fN(:,1,a) = gfN(:,Ac)
+            END IF
+         END DO
+         DEALLOCATE(gfN)
+      END IF
 
 !     Use gtlptr to distribute lM%tmX, if allocated
       flag = ALLOCATED(lM%tmX)

@@ -355,7 +355,7 @@
       RETURN
       END FUNCTION SGN
 !####################################################################
-!      Returning number of data/words in a string
+!     Returning number of data/words in a string
       PURE FUNCTION CheckNoNumbers(sTmp)
       IMPLICIT NONE
       CHARACTER(LEN=stdL), INTENT(IN) :: sTmp
@@ -906,12 +906,11 @@
       IMPLICIT NONE
       REAL(KIND=RKIND) CPUT
 
-!     year, month, day, rel. UTC, hr, min, sec, msec
-      INTEGER(KIND=IKIND) timeArray(8)
+      INTEGER(KIND=IKIND) ct, cr
 
-      CALL DATE_AND_TIME (VALUES=timeArray)
-      CPUT = timeArray(5)*3.6E+3_RKIND + timeArray(6)*60._RKIND +
-     2   timeArray(7)*1._RKIND + timeArray(8)*1.E-3_RKIND
+      CALL SYSTEM_CLOCK(COUNT=ct, COUNT_RATE=cr)
+
+      CPUT = REAL(ct,KIND=RKIND)/REAL(cr,KIND=RKIND)
 
       RETURN
       END FUNCTION CPUT
@@ -971,7 +970,7 @@
       SUBROUTINE parseString(strng, toks, ntoks)
       IMPLICIT NONE
       CHARACTER(LEN=*), INTENT(IN) :: strng
-      CHARACTER(LEN=*), DIMENSION(1024), INTENT(OUT) :: toks
+      CHARACTER(LEN=*), DIMENSION(250), INTENT(OUT) :: toks
       INTEGER(KIND=IKIND), INTENT(OUT) :: ntoks
 
       CHARACTER(LEN=stdL) :: dlmtr, token

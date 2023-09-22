@@ -489,6 +489,19 @@
          REAL(KIND=RKIND) :: tol = 1.E-6_RKIND
       END TYPE cntctModelType
 
+!     Fiber direction type
+      TYPE fibDirType
+!        If fibers are located at nodes
+         LOGICAL :: locNd = .FALSE.
+!        If fibers are located at element centroids
+         LOGICAL :: locEl = .FALSE.
+!        If fibers are located at integration/quadrature points
+         LOGICAL :: locGP = .FALSE.
+!        Number of fiber directions
+         INTEGER(KIND=IKIND) nFn
+!        Fiber directions, used for electrophysiology and solid mechanics
+         REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:,:)
+      END TYPE fibDirType
 !--------------------------------------------------------------------
 !     All the subTypes are defined, now defining the major types that
 !     will be directly allocated
@@ -581,8 +594,6 @@
          INTEGER(KIND=IKIND) nSl
 !        The element type recognized by VTK format
          INTEGER(KIND=IKIND) vtkType
-!        Number of fiber directions
-         INTEGER(KIND=IKIND) nFn
 !        Mesh scale factor
          REAL(KIND=RKIND) scF
 !        IB: Mesh size parameter
@@ -628,9 +639,6 @@
          REAL(KIND=RKIND), ALLOCATABLE :: Nb(:,:)
 !        Normal vector to each nodal point (for Shells)
          REAL(KIND=RKIND), ALLOCATABLE :: nV(:,:)
-!        Fiber orientations stored at the element level - used for
-!        electrophysiology and solid mechanics
-         REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:)
 !        Transmural coordinate for active strain type coupling
          REAL(KIND=RKIND), ALLOCATABLE :: tmX(:)
 !        Parent shape functions gradient
@@ -651,6 +659,8 @@
          TYPE(faceType), ALLOCATABLE :: fa(:)
 !        IB: tracers
          TYPE(traceType) :: trc
+!        Fiber direction type
+         TYPE(fibDirType) :: fib
       END TYPE mshType
 
 !     Equation type
