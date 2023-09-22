@@ -56,7 +56,7 @@
 !     Guccione
       REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
 !     HGO/HO model
-      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, c4f, c4s, dc4f, dc4s,
+      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, c4f, c4s, dc4f, dc4s, fds,
      2   Hff(nsd,nsd), Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
@@ -355,6 +355,7 @@
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
          Inv8 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,2)))
+         fds  = NORM(fl(:,1), fl(:,2))
 
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
@@ -376,11 +377,12 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = stM%a * EXP(stM%b*(Inv1-3._RKIND))
          g2   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
-         Sb   = g1*IDm + g2*Efs*Hfs
+         Sb   = g1*IDm + g2*Efs*fds*Hfs
 
 !        Isotropic + fiber-sheet interaction stiffness
          g1   = g1 * 2._RKIND*J4d*stM%b
          g2   = g2 * 2._RKIND*J4d*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g2   = g2 * fds * fds
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -438,6 +440,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          Inv4 = NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = NORM(fl(:,2), MATMUL(C, fl(:,2)))
          Inv8 = NORM(fl(:,1), MATMUL(C, fl(:,2)))
+         fds  = NORM(fl(:,1), fl(:,2))
 
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
@@ -484,9 +487,10 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !        Fiber-sheet interaction terms
          g1   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
-         S    = S + (g1*Efs*Hfs)
+         S    = S + (g1*Efs*fds*Hfs)
 
          g1   = g1 * 2._RKIND*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g1   = g1 * fds * fds
          CC   = CC + (g1*TEN_DYADPROD(Hfs, Hfs, nsd))
 
 !        Fiber-fiber interaction stress + additional reinforcement (Tfa)
@@ -583,7 +587,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
       ! Guccione !
       REAL(KIND=RKIND) :: QQ, Rm(nsd,nsd), Es(nsd,nsd), RmRm(nsd,nsd,6)
       ! HGO, HO !
-      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, c4f, c4s, dc4f, dc4s,
+      REAL(KIND=RKIND) :: Eff, Ess, Efs, kap, c4f, c4s, dc4f, dc4s, fds,
      2   Hff(nsd,nsd), Hss(nsd,nsd), Hfs(nsd,nsd)
 !     Active strain for electromechanics
       REAL(KIND=RKIND) :: Fe(nsd,nsd), Fa(nsd,nsd), Fai(nsd,nsd)
@@ -842,6 +846,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          Inv4 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = J2d*NORM(fl(:,2), MATMUL(C, fl(:,2)))
          Inv8 = J2d*NORM(fl(:,1), MATMUL(C, fl(:,2)))
+         fds  = NORM(fl(:,1), fl(:,2))
 
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
@@ -863,11 +868,12 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          g1   = stM%a * EXP(stM%b*(Inv1-3._RKIND))
          g2   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
-         Sb   = g1*IDm + g2*Efs*Hfs
+         Sb   = g1*IDm + g2*Efs*fds*Hfs
 
 !        Isotropic + fiber-sheet interaction stiffness
          g1   = g1 * 2._RKIND*J4d*stM%b
          g2   = g2 * 2._RKIND*J4d*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g2   = g2 * fds * fds
          CCb  = g1 * TEN_DYADPROD(IDm, IDm, nsd) +
      2          g2 * TEN_DYADPROD(Hfs, Hfs, nsd)
 
@@ -922,6 +928,7 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
          Inv4 = NORM(fl(:,1), MATMUL(C, fl(:,1)))
          Inv6 = NORM(fl(:,2), MATMUL(C, fl(:,2)))
          Inv8 = NORM(fl(:,1), MATMUL(C, fl(:,2)))
+         fds  = NORM(fl(:,1), fl(:,2))
 
          Eff  = Inv4 - 1._RKIND
          Ess  = Inv6 - 1._RKIND
@@ -963,9 +970,10 @@ c     2      (EXP(stM%khs*Ess) + EXP(-stM%khs*Ess) + 2.0_RKIND)
 !        Fiber-sheet interaction terms
          g1   = 2._RKIND * stM%afs * EXP(stM%bfs*Efs*Efs)
          Hfs  = MAT_SYMMPROD(fl(:,1), fl(:,2), nsd)
-         S    = S + (g1*Efs*Hfs)
+         S    = S + (g1*Efs*fds*Hfs)
 
          g1   = g1 * 2._RKIND*(1._RKIND + 2._RKIND*stM%bfs*Efs*Efs)
+         g1   = g1 * fds * fds
          CC   = CC + (g1*TEN_DYADPROD(Hfs, Hfs, nsd))
 
 !        Fiber-fiber interaction stress + additional reinforcement (Tfa)
