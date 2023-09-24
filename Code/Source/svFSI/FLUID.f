@@ -363,7 +363,7 @@
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
 !     The returned mu_g := (d\mu / d\gamma)
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
 
       IF (ISZERO(gam)) THEN
          mu_g = 0._RKIND
@@ -676,7 +676,7 @@
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
 !     The returned mu_g := (d\mu / d\gamma)
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
 
       IF (ISZERO(gam)) THEN
          mu_g = 0._RKIND
@@ -979,7 +979,7 @@
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
 !     The returned mu_x := (d\mu / d\gamma)
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
 
       IF (ISZERO(gam)) THEN
          mu_g = 0._RKIND
@@ -1195,7 +1195,7 @@
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
 !     The returned mu_x := (d\mu / d\gamma)
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
 
       IF (ISZERO(gam)) THEN
          mu_g = 0._RKIND
@@ -1427,7 +1427,7 @@
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
 !     The returned mu_g := (d\mu / d\gamma)
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
 
 !     sigma.n (deviatoric)
       sgmn(1) = mu*(es(1,1)*nV(1) + es(2,1)*nV(2) + es(3,1)*nV(3))
@@ -1617,7 +1617,7 @@
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
 !     The returned mu_g := (d\mu / d\gamma)
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_g)
 
 !     sigma.n (deviatoric)
       sgmn(1) = mu*(es(1,1)*nV(1) + es(2,1)*nV(2))
@@ -1698,55 +1698,4 @@
 
       RETURN
       END SUBROUTINE BWFLUID2D
-!####################################################################
-      SUBROUTINE GETVISCOSITY(lDmn, gamma, mu, mu_s, mu_x)
-      USE COMMOD
-      IMPLICIT NONE
-      TYPE(dmnType), INTENT(IN) :: lDmn
-      REAL(KIND=RKIND), INTENT(INOUT)  :: gamma
-      REAL(KIND=RKIND), INTENT(OUT) :: mu, mu_s, mu_x
-
-      REAL(KIND=RKIND) :: mu_i, mu_o, lam, a, n, T1, T2
-
-      SELECT CASE (lDmn%visc%viscType)
-      CASE (viscType_Const)
-         mu   = lDmn%visc%mu_i
-         mu_s = mu
-         mu_x = 0._RKIND
-
-      CASE (viscType_CY)
-         mu_i = lDmn%visc%mu_i
-         mu_o = lDmn%visc%mu_o
-         lam  = lDmn%visc%lam
-         a    = lDmn%visc%a
-         n    = lDmn%visc%n
-
-         T1   = 1._RKIND + (lam*gamma)**a
-         T2   = T1**((n-1._RKIND)/a)
-         mu   = mu_i + (mu_o-mu_i)*T2
-         mu_s = mu_i
-
-         T1   = T2/T1
-         T2   = lam**a * gamma**(a-1._RKIND) * T1
-         mu_x = (mu_o-mu_i)*(n-1._RKIND)*T2
-
-      CASE (viscType_Cass)
-         mu_i = lDmn%visc%mu_i
-         mu_o = lDmn%visc%mu_o
-         lam  = lDmn%visc%lam
-
-         IF (gamma .LT. lam) THEN
-            mu_o  = mu_o/SQRT(lam)
-            gamma = lam
-         ELSE
-            mu_o = mu_o/SQRT(gamma)
-         END IF
-         mu   = (mu_i + mu_o) * (mu_i + mu_o)
-         mu_s = mu_i*mu_i
-         mu_x = 2._RKIND*mu_o*(mu_o + mu_i)/gamma
-
-      END SELECT
-
-      RETURN
-      END SUBROUTINE GETVISCOSITY
 !####################################################################

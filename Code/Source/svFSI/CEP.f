@@ -45,7 +45,7 @@
       REAL(KIND=RKIND), INTENT(IN) :: Ag(tDof,tnNo), Yg(tDof,tnNo),
      2   Dg(tDof,tnNo)
 
-      INTEGER(KIND=IKIND) a, e, g, Ac, insd, eNoN, cPhys, iFn, nFn
+      INTEGER(KIND=IKIND) a, e, g, Ac, insd, eNoN, cPhys, nFn
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
 
       INTEGER(KIND=IKIND), ALLOCATABLE :: ptr(:)
@@ -57,7 +57,7 @@
       insd = nsd
       IF (lM%lFib) insd = 1
 
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
 !     CEP: dof = 1
@@ -76,7 +76,6 @@
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !        Create local copies
-         fN = 0._RKIND
          DO a=1, eNoN
             Ac = lM%IEN(a,e)
             ptr(a)  = Ac
@@ -85,12 +84,6 @@
             yl(:,a) = Yg(:,Ac)
             dl(:,a) = Dg(:,Ac)
          END DO
-
-         IF (ALLOCATED(lM%fN)) THEN
-            DO iFn=1, nFn
-               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-            END DO
-         END IF
 
 !        Gauss integration
          lR = 0._RKIND
@@ -102,6 +95,9 @@
             END IF
             w = lM%w(g) * Jac
             N = lM%N(:,g)
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, N, fN)
 
             IF (insd .EQ. 3) THEN
                CALL CEP3D(eNoN, nFn, w, N, Nx, al, yl, dl, fN, lR, lK)
@@ -335,7 +331,7 @@
 !        Diffusion tensor - spatial isotropy
          Diso    = Diso * Jac
          Dani(:) = Dani(:) * Jac
-         D(:,:)  = Diso * C(:,:)
+         D(:,:)  = Diso * Ci(:,:)
       ELSE
          D(:,:)  = 0._RKIND
          D(1,1)  = Diso

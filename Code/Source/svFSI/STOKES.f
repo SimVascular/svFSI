@@ -182,7 +182,7 @@
      2   p, es(3,3), rM, NxNx
 
 !     Define parameters
-      mu    = eq(cEq)%dmn(cDmn)%visc%mu_i
+      mu    = eq(cEq)%dmn(cDmn)%viscF%mu_i
       fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3) = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -304,7 +304,7 @@
      2   p, es(2,2), rM, NxNx
 
 !     Define parameters
-      mu    = eq(cEq)%dmn(cDmn)%visc%mu_i
+      mu    = eq(cEq)%dmn(cDmn)%viscF%mu_i
       fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
       af    = eq(cEq)%af*eq(cEq)%gam*dt
@@ -396,7 +396,7 @@
       REAL(KIND=RKIND) :: mu, wm, wf, div, vd(3), fb(3), px(3), kS, ctM,
      2   tauM, rMv(3), rM, NxNx
 
-      mu    = eq(cEq)%dmn(cDmn)%visc%mu_i
+      mu    = eq(cEq)%dmn(cDmn)%viscF%mu_i
       ctM   = eq(cEq)%dmn(cDmn)%prop(ctau_M)
       fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)
@@ -495,7 +495,7 @@
       REAL(KIND=RKIND) :: mu, wm, wf, div, vd(2), fb(2), px(2), kS, ctM,
      2   tauM, rMv(2), rM, NxNx
 
-      mu    = eq(cEq)%dmn(cDmn)%visc%mu_i
+      mu    = eq(cEq)%dmn(cDmn)%viscF%mu_i
       ctM   = eq(cEq)%dmn(cDmn)%prop(ctau_M)
       fb(1) = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2) = eq(cEq)%dmn(cDmn)%prop(f_y)

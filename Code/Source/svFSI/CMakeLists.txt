@@ -131,6 +131,7 @@ set(FSRCS TYPEMOD.f
          EC_DCPLD.f
          EQASSEM.f
          FFT.f
+         FIBERS.f
          FLUID.f
          FS.f
          FSI.f
@@ -160,6 +161,7 @@ set(FSRCS TYPEMOD.f
          STRUCT.f
          TXT.f
          USTRUCT.f
+         VISC.f
          VTKXML.f)
 
 set(F90SRCS vtkComMod.f90

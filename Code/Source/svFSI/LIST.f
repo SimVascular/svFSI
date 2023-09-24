@@ -440,7 +440,7 @@
       TYPE(listType), POINTER :: GFLIV
 
       INTEGER(KIND=IKIND) i, ioS, n, nToks
-      CHARACTER(LEN=stdL), DIMENSION(1024) :: tokList
+      CHARACTER(LEN=stdL), DIMENSION(250) :: tokList
 
       n = SIZE(vVal)
       IF (PRESENT(ind)) THEN
@@ -532,7 +532,7 @@
       TYPE(listType), POINTER :: GFLRV
 
       INTEGER(KIND=IKIND) i, ioS, n, nToks
-      CHARACTER(LEN=stdL), DIMENSION(1024) :: tokList
+      CHARACTER(LEN=stdL), DIMENSION(250) :: tokList
 
       n = SIZE(vVal)
       IF (PRESENT(ind)) THEN

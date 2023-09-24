@@ -544,10 +544,33 @@
          IF (N(i).GT.Nb(1,i) .AND. N(i).LT.Nb(2,i)) j = j + 1
       END DO
       l3 = j .EQ. eNoN
-      l4 = rt.GE.0.9999_RKIND .AND. rt.LE.1.0001_RKIND
+      l4 = rt.GE.0.999_RKIND .AND. rt.LE.1.001_RKIND
 
-      l1 = ALL((/l1, l2, l3, l4/))
-      IF (.NOT.l1) err = "Error in computing shape functions"
+      l1= ALL((/l1, l2, l3, l4/))
+      IF (.NOT.l1) THEN
+c         WRITE(100+cm%tF(),'(A)') REPEAT('-',48)
+c         WRITE(100+cm%tF(),*) l2, l3, l4
+c         WRITE(100+cm%tF(),'(A)') REPEAT('-',48)
+
+c         WRITE(100+cm%tF(),'(A)',ADVANCE='NO') "l2 (xi): "
+c         DO i=1, nsd
+c            WRITE(100+cm%tF(),'(A)',ADVANCE='NO') " "//STR(xi(i))
+c         END DO
+c         WRITE(100+cm%tF(),'(A)')
+c         WRITE(100+cm%tF(),'(A)') REPEAT('-',48)
+
+c         WRITE(100+cm%tF(),'(A)',ADVANCE='NO') "l3 (N): "//STR(j)
+c         DO i=1, eNoN
+c            WRITE(100+cm%tF(),'(A)',ADVANCE='NO') " "//STR(N(i))
+c         END DO
+c         WRITE(100+cm%tF(),'(A)')
+c         WRITE(100+cm%tF(),'(A)') REPEAT('-',48)
+
+c         WRITE(100+cm%tF(),'(A)') "l4 (sum N): "//STR(rt)
+c         WRITE(100+cm%tF(),'(A)') REPEAT('-',48)
+c         CALL FLUSH(100+cm%tF())
+         err = "Error in computing shape functions"
+      END IF
 
       RETURN
       END SUBROUTINE GETNNX
@@ -714,7 +737,6 @@ c         WRITE(1000+cm%tF(),'(10X,A)') "Fail.."
          Nxi(2,10) = -4._RKIND*xi(3)
          Nxi(3,10) =  4._RKIND*( s - xi(3) )
 
-!     2D elements
       CASE(eType_HEX8)
          lx = 1._RKIND - xi(1)
          ly = 1._RKIND - xi(2)
@@ -1097,6 +1119,7 @@ c        N(27) =  lx*ux*ly*uy*lz*uz
          Nxi(2,6) = -s
          Nxi(3,6) =  uz*0.5_RKIND
 
+!     2D elements
       CASE(eType_TRI3)
          N(1) = xi(1)
          N(2) = xi(2)
@@ -1422,15 +1445,17 @@ c        N(8) = lx*my*0.5_RKIND
          Nb(2,5:10) =  4._RKIND
 
       CASE(eType_HEX20)
-         Nb(1,1:20) = -0.125_RKIND
+         Nb(1,1:8)  = -625._RKIND/2048._RKIND
 
       CASE(eType_HEX27)
-         Nb(1,1:20) = -0.125_RKIND
+         Nb(1,1:26) = -0.125_RKIND
          Nb(1,27)   =  0._RKIND
 
       CASE(eType_WDG)
          xib(1,1)   =  0._RKIND
          xib(1,2)   =  0._RKIND
+         Nb(1,3)    = -1._RKIND
+         Nb(1,6)    = -1._RKIND
 
 !     2D elements
       CASE(eType_TRI3)
@@ -1442,7 +1467,7 @@ c        N(8) = lx*my*0.5_RKIND
          Nb(2,4:6)  =  4._RKIND
 
       CASE(eType_QUD8)
-         Nb(1,1:8)  = -0.125_RKIND
+         Nb(1,1:4)  = -0.25_RKIND
 
       CASE(eType_QUD9)
          Nb(1,1:8)  = -0.125_RKIND
@@ -1457,11 +1482,11 @@ c        N(8) = lx*my*0.5_RKIND
       END SELECT
 
 !     Add a small tolerance around the bounds
-      xib(1,:) = xib(1,:) - 1.0E-4_RKIND
-      xib(2,:) = xib(2,:) + 1.0E-4_RKIND
+      xib(1,:) = xib(1,:) - 1.0E-3_RKIND
+      xib(2,:) = xib(2,:) + 1.0E-3_RKIND
 
-      Nb(1,:)  = Nb(1,:)  - 1.0E-4_RKIND
-      Nb(2,:)  = Nb(2,:)  + 1.0E-4_RKIND
+      Nb(1,:)  = Nb(1,:)  - 1.0E-3_RKIND
+      Nb(2,:)  = Nb(2,:)  + 1.0E-3_RKIND
 
       RETURN
       END SUBROUTINE GETNNBNDS

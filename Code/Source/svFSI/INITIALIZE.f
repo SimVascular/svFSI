@@ -412,7 +412,7 @@
 !     This cTS corresponds to old variables. As soon as incrementing it
 !     by one, it will be associated to new variables.
       cTS      = startTS
-      time     = 0._RKIND
+      time     = start_time
       timeP(1) = 0._RKIND
       eq%iNorm = 0._RKIND
 
@@ -485,8 +485,8 @@
      2   " presence of projected boundaries"
       std = " Initializing from "//fName
 
-      cTS      = 0
-      time     = 0._RKIND
+      cTS      = startTS
+      time     = start_time
       timeP(1) = 0._RKIND
       eq%iNorm = 0._RKIND
 

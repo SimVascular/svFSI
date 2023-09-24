@@ -45,7 +45,7 @@
      2   Dg(tDof,tnNo)
 
       LOGICAL :: vmsStab
-      INTEGER(KIND=IKIND) a, e, g, l, Ac, eNoN, cPhys, iFn, nFn
+      INTEGER(KIND=IKIND) a, e, g, l, Ac, eNoN, cPhys, nFn
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
       TYPE(fsType) :: fs(2)
 
@@ -57,7 +57,7 @@
      2   Nwxx(:,:), Nqx(:,:)
 
       eNoN = lM%eNoN
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
       IF (lM%nFs .EQ. 1) THEN
@@ -87,7 +87,6 @@
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !        Create local copies
-         fN   = 0._RKIND
          pS0l = 0._RKIND
          ya_l = 0._RKIND
          DO a=1, eNoN
@@ -98,11 +97,6 @@
             yl(:,a)  = Yg(:,Ac)
             dl(:,a)  = Dg(:,Ac)
             bfl(:,a) = Bf(:,Ac)
-            IF (ALLOCATED(lM%fN)) THEN
-               DO iFn=1, nFn
-                  fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-               END DO
-            END IF
             IF (ALLOCATED(pS0)) pS0l(:,a) = pS0(:,Ac)
             IF (ecCpld) THEN
                IF (ALLOCATED(lM%tmX)) THEN
@@ -157,6 +151,9 @@
      2            fs(1)%Nxx(:,:,g), xwl, Nwx, Nwxx)
             END IF
             w = fs(1)%w(g) * Jac
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, fs(1)%N(:,g), fN)
 
             IF (nsd .EQ. 3) THEN
                SELECT CASE (cPhys)

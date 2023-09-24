@@ -199,7 +199,7 @@
 
 !        Compute fiber stretch at all the nodes
          DO iM=1, nMsh
-            IF (msh(iM)%nFn .NE. 0) THEN
+            IF (msh(iM)%fib%nFn .NE. 0) THEN
                ALLOCATE(sA(msh(iM)%nNo))
                sA = 0._RKIND
                CALL FIBSTRETCH(stEq, msh(iM), Dg, sA)

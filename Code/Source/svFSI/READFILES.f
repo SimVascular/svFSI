@@ -84,6 +84,7 @@
          saveIncr     = 10
          nITs         = 0
          startTS      = 0
+         start_time   = 0._RKIND
          roInf        = 0.2_RKIND
          stFileName   = "stFile"
          iniFilePath  = ""
@@ -163,13 +164,14 @@
 
          lPtr => list%get(fTmp,"Simulation initialization file path")
          IF (ASSOCIATED(lPtr)) iniFilePath = fTmp%fname
+         lPtr => list%get(startTS,"Starting time step",ll=0)
+         lPtr => list%get(start_time,"Simulation start time")
 
          lPtr => list%get(nsd,"Number of spatial dimensions",
      2      1,ll=2,ul=3)
          nsymd = 3*(nsd-1)
 
          lPtr => list%get(nTs,"Number of time steps",1,ll=1)
-         lPtr => list%get(startTS,"Starting time step",ll=0)
          lPtr => list%get(dt,"Time step size",1,lb=0._RKIND)
          lPtr => list%get(nITs,"Number of initialization time steps",
      2      ll=0)
@@ -549,10 +551,9 @@
          propL(2,1) = damping
          propL(3,1) = elasticity_modulus
          propL(4,1) = poisson_ratio
-         propL(5,1) = solid_viscosity
-         propL(6,1) = f_x
-         propL(7,1) = f_y
-         IF (nsd .EQ. 3) propL(8,1) = f_z
+         propL(5,1) = f_x
+         propL(6,1) = f_y
+         IF (nsd .EQ. 3) propL(7,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
@@ -593,12 +594,11 @@
          propL(1,1) = solid_density
          propL(2,1) = elasticity_modulus
          propL(3,1) = poisson_ratio
-         propL(4,1) = solid_viscosity
-         propL(5,1) = ctau_M
-         propL(6,1) = ctau_C
-         propL(7,1) = f_x
-         propL(8,1) = f_y
-         IF (nsd .EQ. 3) propL(9,1) = f_z
+         propL(4,1) = ctau_M
+         propL(5,1) = ctau_C
+         propL(6,1) = f_x
+         propL(7,1) = f_y
+         IF (nsd .EQ. 3) propL(8,1) = f_z
          CALL READDOMAIN(lEq, propL, list)
 
          lPtr => list%get(pstEq, "Prestress")
@@ -777,21 +777,19 @@
          propL(2,2) = elasticity_modulus
          propL(3,2) = poisson_ratio
          propL(4,2) = damping
-         propL(5,2) = solid_viscosity
-         propL(6,2) = f_x
-         propL(7,2) = f_y
-         IF (nsd .EQ. 3) propL(8,2) = f_z
+         propL(5,2) = f_x
+         propL(6,2) = f_y
+         IF (nsd .EQ. 3) propL(7,2) = f_z
 
 !        ustruct properties
          propL(1,3) = solid_density
          propL(2,3) = elasticity_modulus
          propL(3,3) = poisson_ratio
-         propL(4,3) = solid_viscosity
-         propL(5,3) = ctau_M
-         propL(6,3) = ctau_C
-         propL(7,3) = f_x
-         propL(8,3) = f_y
-         IF (nsd .EQ. 3) propL(9,3) = f_z
+         propL(4,3) = ctau_M
+         propL(5,3) = ctau_C
+         propL(6,3) = f_x
+         propL(7,3) = f_y
+         IF (nsd .EQ. 3) propL(8,3) = f_z
 
 !        lElas properties
          propL(1,4) = solid_density
@@ -1087,8 +1085,6 @@
             CASE (poisson_ratio)
                lPtr => lPD%get(rtmp,"Poisson ratio",1,ll=0._RKIND,
      2            ul=0.5_RKIND)
-            CASE (solid_viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (conductivity)
                lPtr => lPD%get(rtmp,"Conductivity",1,ll=0._RKIND)
             CASE (f_x)
@@ -1153,7 +1149,13 @@
          IF ((lEq%dmn(iDmn)%phys .EQ. phys_fluid)  .OR.
      2       (lEq%dmn(iDmn)%phys .EQ. phys_stokes) .OR.
      3       (lEq%dmn(iDmn)%phys.EQ.phys_CMM .AND. .NOT.cmmInit)) THEN
-            CALL READVISCMODEL(lEq%dmn(iDmn), lPD)
+            CALL READ_VISC_FLUID(lEq%dmn(iDmn), lPD)
+         END IF
+
+!        Read solid viscosity model parameters
+         IF ((lEq%dmn(iDmn)%phys .EQ. phys_struct)  .OR.
+     2       (lEq%dmn(iDmn)%phys .EQ. phys_ustruct)) THEN
+            CALL READ_VISC_SOLID(lEq%dmn(iDmn), lPD)
          END IF
       END DO
 
@@ -2878,67 +2880,6 @@ c     2         "can be applied for Neumann boundaries only"
 
       RETURN
       END SUBROUTINE READMATMODEL
-!####################################################################
-!     This subroutine reads parameters of non-Newtonian viscosity model
-      SUBROUTINE READVISCMODEL(lDmn, lPD)
-      USE COMMOD
-      USE LISTMOD
-      USE ALLFUN
-      IMPLICIT NONE
-      TYPE(dmnType), INTENT(INOUT) :: lDmn
-      TYPE(listType), INTENT(INOUT) :: lPD
-
-      TYPE(listType), POINTER :: lPtr, lVis
-      REAL(KIND=RKIND) :: rtmp
-      CHARACTER(LEN=stdL) ctmp
-
-      lVis => lPD%get(ctmp,"Viscosity",1)
-
-      CALL TO_LOWER(ctmp)
-      SELECT CASE (TRIM(ctmp))
-      CASE ("constant", "const", "newtonian")
-         lDmn%visc%viscType = viscType_Const
-         lPtr => lVis%get(lDmn%visc%mu_i,"Value",1,lb=0._RKIND)
-
-      CASE ("carreau-yasuda", "cy")
-         lDmn%visc%viscType = viscType_CY
-         lPtr => lVis%get(lDmn%visc%mu_i,
-     2      "Limiting high shear-rate viscosity",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%mu_o,
-     2      "Limiting low shear-rate viscosity",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%lam,
-     2      "Shear-rate tensor multiplier (lamda)",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%a,
-     2      "Shear-rate tensor exponent (a)",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%n,"Power-law index (n)",1,
-     2      lb=0._RKIND)
-         IF (lDmn%visc%mu_i .GT. lDmn%visc%mu_o) THEN
-            err = "Unexpected inputs for Carreau-Yasuda model. "//
-     2         "High shear-rate viscosity value should be higher than"//
-     3         " low shear-rate value"
-         END IF
-
-      CASE ("cassons", "cass")
-         lDmn%visc%viscType = viscType_Cass
-         lPtr => lVis%get(lDmn%visc%mu_i,
-     2      "Asymptotic viscosity parameter",1,lb=0._RKIND)
-         lPtr => lVis%get(lDmn%visc%mu_o,
-     2      "Yield stress parameter",1,lb=0._RKIND)
-         lDmn%visc%lam = 0.5_RKIND
-         lPtr => lVis%get(rtmp,"Low shear-rate threshold")
-         IF (ASSOCIATED(lPtr)) lDmn%visc%lam = rtmp
-
-      CASE DEFAULT
-         err = "Undefined constitutive model for viscosity used"
-      END SELECT
-
-      IF ((lDmn%phys .EQ. phys_stokes) .AND.
-     2    (lDmn%visc%viscType .NE. viscType_Const)) THEN
-         err = "Only constant viscosity is allowed for Stokes flow"
-      END IF
-
-      RETURN
-      END SUBROUTINE READVISCMODEL
 !####################################################################
 !     This subroutine reads general velocity data from bct.vtp
       SUBROUTINE READBCT(lMB, lFa, fName)
