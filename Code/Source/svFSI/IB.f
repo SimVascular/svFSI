@@ -43,9 +43,7 @@
       IMPLICIT NONE
       TYPE(listType), INTENT(INOUT) :: list
 
-      LOGICAL :: flag
       INTEGER(KIND=IKIND) :: i, j, iM, iFa, a, b, Ac, e
-      REAL(KIND=RKIND) :: fibN(nsd), rtmp
       CHARACTER(LEN=stdL) :: ctmp, fExt
       TYPE(listType), POINTER :: lPtr, lPM
       TYPE(fileType) :: fTmp
@@ -205,50 +203,12 @@
       END DO
 
 !     Read fiber orientation
-      flag = .FALSE.
+      dbg = " Checking for any fiber directions"
       DO iM=1, ib%nMsh
-         lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
-         j = lPM%srch("Fiber direction file path")
-         IF (j .EQ. 0) j = lPM%srch("Fiber direction")
-         IF (j .NE. 0) THEN
-            flag = .TRUE.
-            EXIT
-         END IF
+         ib%msh(iM)%fib%nFn = 0
+         lPM => list%get(ib%msh(iM)%name, "Add IB", iM)
+         CALL READ_FIBERS(lPM, ib%msh(iM), ib%msh(iM)%fib)
       END DO
-
-      IF (flag) THEN
-         DO iM=1, ib%nMsh
-            lPM => list%get(ib%msh(iM)%name,"Add IB",iM)
-
-            ib%msh(iM)%nFn = lPM%srch("Fiber direction file path")
-            j = ib%msh(iM)%nFn
-            IF (ib%msh(iM)%nFn .NE. 0) THEN
-               ALLOCATE(ib%msh(iM)%fN(j*nsd,ib%msh(iM)%nEl))
-               ib%msh(iM)%fN = 0._RKIND
-               DO i=1, ib%msh(iM)%nFn
-                  lPtr => lPM%get(cTmp, "Fiber direction file path", i)
-                  CALL READFIBNFF(ib%msh(iM), cTmp, "FIB_DIR", i)
-               END DO
-            ELSE
-               ib%msh(iM)%nFn = lPM%srch("Fiber direction")
-               j = ib%msh(iM)%nFn
-               IF (ib%msh(iM)%nFn .NE. 0) THEN
-                  ALLOCATE(ib%msh(iM)%fN(j*nsd,ib%msh(iM)%nEl))
-                  ib%msh(iM)%fN = 0._RKIND
-                  DO i=1, ib%msh(iM)%nFn
-                     lPtr => lPM%get(fibN, "Fiber direction", i)
-                     rtmp = SQRT(NORM(fibN))
-                     IF (.NOT.ISZERO(rtmp)) fibN(:) = fibN(:)/rtmp
-                     DO e=1, ib%msh(iM)%nEl
-                        ib%msh(iM)%fN((i-1)*nsd+1:i*nsd,e) = fibN(1:nsd)
-                     END DO
-                  END DO
-               END IF
-            END IF
-         END DO
-      ELSE
-         ib%msh(:)%nFn = 0
-      END IF
 
       IF (ib%nMsh .GT. 1) THEN
          std = " Total number of IB nodes: "//ib%tnNo
@@ -360,14 +320,13 @@
          CASE("struct")
             lEq%dmnIB(iDmn)%phys = phys_struct
             propL(1) = solid_density
-            propL(2) = solid_viscosity
-            propL(3) = elasticity_modulus
-            propL(4) = poisson_ratio
-            propL(5) = ctau_M
-            propL(6) = ctau_C
-            propL(7) = f_x
-            propL(8) = f_y
-            IF (nsd .EQ. 3) propL(9) = f_z
+            propL(2) = elasticity_modulus
+            propL(3) = poisson_ratio
+            propL(4) = ctau_M
+            propL(5) = ctau_C
+            propL(6) = f_x
+            propL(7) = f_y
+            IF (nsd .EQ. 3) propL(8) = f_z
 
             nDOP = (/4,1,0,0/)
             outPuts(1) = out_displacement
@@ -389,8 +348,6 @@
                EXIT
             CASE (solid_density)
                lPtr => lPD%get(rtmp,"Density",1,ll=0._RKIND)
-            CASE (solid_viscosity)
-               lPtr => lPD%get(rtmp,"Viscosity",ll=0._RKIND)
             CASE (elasticity_modulus)
                lPtr => lPD%get(rtmp,"Elasticity modulus",1,lb=0._RKIND)
             CASE (poisson_ratio)
@@ -418,6 +375,7 @@
 
          IF (lEq%dmnIB(iDmn)%phys .EQ. phys_struct) THEN
             CALL READMATMODEL(lEq%dmnIB(iDmn), lPD)
+            CALL READ_VISC_SOLID(lEq%dmnIB(iDmn), lPD)
          END IF
       END DO
 
@@ -3824,7 +3782,7 @@ c      END DO
 !     Loop over all IB mesh
       DO iM=1, ib%nMsh
          eNoNb = ib%msh(iM)%eNoN
-         nFn   = MAX(ib%msh(iM)%nFn, 1)
+         nFn   = MAX(ib%msh(iM)%fib%nFn, 1)
          ALLOCATE(Nb(eNoNb), Nbx(nsd,eNoNb), fN(nsd,nFn),xbl(nsd,eNoNb),
      2      ubl(nsd,eNoNb), aul(nsd,eNoNb))
 !        Loop over each trace of IB integration points
@@ -3843,18 +3801,16 @@ c      END DO
      2         CALL NRBNNX(ib%msh(iM), e)
 
 !           Transfer to element-level local arrays
-            fN = 0._RKIND
             DO b=1, eNoNb
                Bc = ib%msh(iM)%IEN(b,e)
                xbl(:,b) = ib%x(:,Bc)
                ubl(:,b) = Ubg(:,Bc)
                aul(:,b) = Aug(:,Bc)
-               IF (ALLOCATED(ib%msh(iM)%fN)) THEN
-                  DO j=1, nFn
-                     fN(:,j) = ib%msh(iM)%fN((j-1)*nsd+1:j*nsd,e)
-                  END DO
-               END IF
             END DO
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(ib%msh(iM), ib%msh(iM)%fib, e, g, eNoNb,
+     2         Nb, fN)
 
 !           Compute shapefunction gradients and element Jacobian in the
 !           reference configuration. The shapefunction gradients will be
@@ -3993,7 +3949,7 @@ c      END DO
       iEq     = ib%cEq
       iDmn    = ib%cDmn
       rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%viscS%mu
       fb(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
       fb(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
       fb(3)   = eq(iEq)%dmnIB(iDmn)%prop(f_z)
@@ -4114,7 +4070,7 @@ c      END DO
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
-      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
+      CALL GET_FLUID_VISC(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
 
 !     Solid internal stresses and stabilization parameters
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
@@ -4361,7 +4317,7 @@ c      END DO
       iEq     = ib%cEq
       iDmn    = ib%cDmn
       rho_s   = eq(iEq)%dmnIB(iDmn)%prop(solid_density)
-      mu_s    = eq(iEq)%dmnIB(iDmn)%prop(solid_viscosity)
+      mu_s    = eq(iEq)%dmnIB(iDmn)%viscS%mu
       fb(1)   = eq(iEq)%dmnIB(iDmn)%prop(f_x)
       fb(2)   = eq(iEq)%dmnIB(iDmn)%prop(f_y)
       rho_f   = eq(iEq)%dmn(cDmn)%prop(fluid_density)
@@ -4451,7 +4407,7 @@ c      END DO
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
-      CALL GETVISCOSITY(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
+      CALL GET_FLUID_VISC(eq(iEq)%dmn(cDmn), gam, mu_f, rtmp, mu_fx)
 
       IF (ib%mthd .EQ. ibMthd_IFEM) THEN
 !        2nd Piola-Kirchhoff stress (S) and material stiffness in Voigt

@@ -1388,10 +1388,14 @@
       IF (ALLOCATED(lM%N))       DEALLOCATE(lM%N)
       IF (ALLOCATED(lM%Nb))      DEALLOCATE(lM%Nb)
       IF (ALLOCATED(lM%nV))      DEALLOCATE(lM%nV)
-      IF (ALLOCATED(lM%fN))      DEALLOCATE(lM%fN)
       IF (ALLOCATED(lM%tmX))     DEALLOCATE(lM%tmX)
       IF (ALLOCATED(lM%Nx))      DEALLOCATE(lM%Nx)
       IF (ALLOCATED(lM%Nxx))     DEALLOCATE(lM%Nxx)
+
+      lM%fib%locNd = .FALSE.
+      lM%fib%locEl = .FALSE.
+      lM%fib%locGP = .FALSE.
+      IF (ALLOCATED(lM%fib%fN))  DEALLOCATE(lM%fib%fN)
 
       IF (ALLOCATED(lM%fs)) THEN
          DO i=1, lM%nFs
@@ -1425,7 +1429,6 @@
       lM%nEl   = 0
       lM%nFa   = 0
       lM%nNo   = 0
-      lM%nFn   = 0
 
       RETURN
       END SUBROUTINE DESTROYMSH

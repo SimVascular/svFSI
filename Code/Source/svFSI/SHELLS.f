@@ -53,7 +53,7 @@
       eNoN = lM%eNoN
       IF (lM%eType .EQ. eType_TRI3) eNoN = 2*eNoN
 
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
 !     Initialize tensor operations
@@ -94,13 +94,15 @@
             bfl(:,a) = Bf(:,Ac)
          END DO
 
-         IF (ALLOCATED(lM%fN)) THEN
-            DO iFn=1, nFn
-               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-            END DO
-         END IF
-
          IF (lM%eType .EQ. eType_TRI3) THEN
+!           Get fiber direction
+            fN = 0._RKIND
+            IF (lM%fib%locEl) THEN
+               DO iFn=1, nFn
+                  fN(:,iFn) = lM%fib%fN((iFn-1)*nsd+1:iFn*nsd,1,e)
+               END DO
+            END IF
+
 !           Constant strain triangles, no numerical integration
             CALL SHELLCST(lM, e, eNoN, nFn, fN, al, yl, dl, xl, bfl,
      2         ptr)
@@ -114,6 +116,9 @@
 
 !           Gauss integration
             DO g=1, lM%nG
+!              Get fiber directions at the integration point
+               CALL GET_FIBN(lM, lM%fib, e, g, eNoN, lM%N(:,g), fN)
+
                CALL SHELL3D(lM, g, eNoN, nFn, fN, al, yl, dl, xl,
      2            bfl, lR, lK)
             END DO

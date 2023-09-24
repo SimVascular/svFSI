@@ -291,9 +291,9 @@
       END TYPE eccModelType
 
 !     Fluid viscosity model type
-      TYPE viscModelType
+      TYPE viscModelTypeFluid
 !        Type of constitutive model for fluid viscosity
-         INTEGER(KIND=IKIND) :: viscType = viscType_NA
+         INTEGER(KIND=IKIND) :: viscTypeF = viscTypeF_NA
 !        Limiting zero shear-rate viscosity value
          REAL(KIND=RKIND) :: mu_o = 0._RKIND
 !        Limiting high shear-rate viscosity (asymptotic) value
@@ -304,7 +304,15 @@
          REAL(KIND=RKIND) :: a = 0._RKIND
 !        Power-law exponent
          REAL(KIND=RKIND) :: n = 0._RKIND
-      END TYPE viscModelType
+      END TYPE viscModelTypeFluid
+
+!     Solid viscosity model type
+      TYPE viscModelTypeSolid
+!        Type of constitutive model for solid viscosity
+         INTEGER(KIND=IKIND) :: viscTypeS = viscTypeS_NA
+!        Viscosity value
+         REAL(KIND=RKIND) :: mu = 0._RKIND
+      END TYPE viscModelTypeSolid
 
 !     Domain type is to keep track with element belong to which domain
 !     and also different physical quantities
@@ -324,7 +332,9 @@
 !        Excitation-contraction coupling
          TYPE(eccModelType) :: ec
 !        Viscosity model for fluids
-         TYPE(viscModelType) :: visc
+         TYPE(viscModelTypeFluid) :: viscF
+!        Viscosity model for solids
+         TYPE(viscModelTypeSolid) :: viscS
       END TYPE dmnType
 
 !     Mesh adjacency (neighboring element for each element)
@@ -499,6 +509,19 @@
          REAL(KIND=RKIND) :: tol = 1.E-6_RKIND
       END TYPE cntctModelType
 
+!     Fiber direction type
+      TYPE fibDirType
+!        If fibers are located at nodes
+         LOGICAL :: locNd = .FALSE.
+!        If fibers are located at element centroids
+         LOGICAL :: locEl = .FALSE.
+!        If fibers are located at integration/quadrature points
+         LOGICAL :: locGP = .FALSE.
+!        Number of fiber directions
+         INTEGER(KIND=IKIND) nFn
+!        Fiber directions, used for electrophysiology and solid mechanics
+         REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:,:)
+      END TYPE fibDirType
 !--------------------------------------------------------------------
 !     All the subTypes are defined, now defining the major types that
 !     will be directly allocated
@@ -591,8 +614,6 @@
          INTEGER(KIND=IKIND) nSl
 !        The element type recognized by VTK format
          INTEGER(KIND=IKIND) vtkType
-!        Number of fiber directions
-         INTEGER(KIND=IKIND) nFn
 !        Mesh scale factor
          REAL(KIND=RKIND) scF
 !        IB: Mesh size parameter
@@ -638,9 +659,6 @@
          REAL(KIND=RKIND), ALLOCATABLE :: Nb(:,:)
 !        Normal vector to each nodal point (for Shells)
          REAL(KIND=RKIND), ALLOCATABLE :: nV(:,:)
-!        Fiber orientations stored at the element level - used for
-!        electrophysiology and solid mechanics
-         REAL(KIND=RKIND), ALLOCATABLE :: fN(:,:)
 !        Transmural coordinate for active strain type coupling
          REAL(KIND=RKIND), ALLOCATABLE :: tmX(:)
 !        Parent shape functions gradient
@@ -661,6 +679,8 @@
          TYPE(faceType), ALLOCATABLE :: fa(:)
 !        IB: tracers
          TYPE(traceType) :: trc
+!        Fiber direction type
+         TYPE(fibDirType) :: fib
       END TYPE mshType
 
 !     Equation type
@@ -969,6 +989,8 @@
       REAL(KIND=RKIND) dt
 !     Time
       REAL(KIND=RKIND) time
+!     Simulation starting time
+      REAL(KIND=RKIND) :: start_time = 0._RKIND
 
 !     CHARACTER VARIABLES
 !     Initialization file path

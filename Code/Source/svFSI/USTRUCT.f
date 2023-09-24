@@ -45,7 +45,7 @@
      2   Dg(tDof,tnNo)
 
       LOGICAL vmsStab
-      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, iFn, nFn
+      INTEGER(KIND=IKIND) a, e, g, Ac, eNoN, cPhys, nFn
       REAL(KIND=RKIND) w, Jac, ksix(nsd,nsd)
       TYPE(fsType) :: fs(2)
 
@@ -57,7 +57,7 @@
      2   Nqx(:,:)
 
       eNoN = lM%eNoN
-      nFn  = lM%nFn
+      nFn  = lM%fib%nFn
       IF (nFn .EQ. 0) nFn = 1
 
       IF (lM%nFs .EQ. 1) THEN
@@ -86,7 +86,6 @@
          IF (lM%eType .EQ. eType_NRB) CALL NRBNNX(lM, e)
 
 !        Create local copies
-         fN   = 0._RKIND
          tmXl = 0._RKIND
          ya_l = 0._RKIND
          DO a=1, eNoN
@@ -109,12 +108,6 @@
                END IF
             END IF
          END DO
-
-         IF (ALLOCATED(lM%fN)) THEN
-            DO iFn=1, nFn
-               fN(:,iFn) = lM%fN((iFn-1)*nsd+1:iFn*nsd,e)
-            END DO
-         END IF
 
 !        Initialize residue and tangents
          lR  = 0._RKIND
@@ -140,6 +133,9 @@
                IF (ISZERO(Jac)) err = "Jac < 0 @ element "//e
             END IF
             w = fs(1)%w(g) * Jac
+
+!           Get fiber directions at the integration point
+            CALL GET_FIBN(lM, lM%fib, e, g, eNoN, fs(1)%N(:,g), fN)
 
             IF (nsd .EQ. 3) THEN
                CALL USTRUCT3D_M(vmsStab, fs(1)%eNoN, fs(2)%eNoN, nFn, w,
@@ -174,12 +170,12 @@
             IF (nsd .EQ. 3) THEN
                CALL USTRUCT3D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w, Jac,
      2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, dl, bfl,
-     3            ksix, lR, lK, lKd)
+     3            lR, lK, lKd)
 
             ELSE IF (nsd .EQ. 2) THEN
                CALL USTRUCT2D_C(vmsStab, fs(1)%eNoN, fs(2)%eNoN, w, Jac,
      2            fs(1)%N(:,g), fs(2)%N(:,g), Nwx, Nqx, al, yl, dl, bfl,
-     3            ksix, lR, lK, lKd)
+     3            lR, lK, lKd)
 
             END IF
          END DO ! g: loop
@@ -217,14 +213,13 @@
 
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b
       REAL(KIND=RKIND) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p,
-     2   pd, F(3,3), Jac, Fi(3,3), mu, rho, beta, drho, dbeta, ya_g, Ja,
-     3   VxFi(3,eNoNw), ddev(3,3), Svis(3,3), Siso(3,3), Dm(6,6), tauM,
-     4   tauC, rC, rCl, Pdev(3,3), NxFi(3,eNoNw), Bm(6,3,eNoNw),
-     5   VxNx(3,eNoNw), DdNx(3,eNoNw), DBm(6,3), BtDB, NxSNx, NxNx,
-     6   Ku, tmXg, T1, T2, T3, Tv, r13, r23
+     2   pd, F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, ya_g, Ja,
+     3   Svis(3,3), Siso(3,3), Dm(6,6), tauM, tauC, rC, rCl, Pdev(3,3),
+     4   NxFi(3,eNoNw), VxFi(3,3), Bm(6,3,eNoNw), VxtNx(3,eNoNw),
+     6   DBm(6,3), Kvis_u(9,eNoNw,eNoNw), Kvis_v(9,eNoNw,eNoNw), BtDB,
+     7   NxSNx, Ku, tmXg, T1, T2, T3, Tv
 
 !     Define parameters
-      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -297,18 +292,9 @@
       CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, Siso,
      2   Dm, Ja)
 
-!----------------------------------
-!     Viscous contribution
-!     Velocity gradient in current configuration
-      VxFi = MATMUL(vx, Fi)
-
-!     Deviatoric strain tensor
-      ddev = MAT_DEV(MAT_SYMM(VxFi,3), 3)
-
-!     2nd Piola-Kirchhoff stress due to viscosity
-      Svis = MATMUL(ddev, TRANSPOSE(Fi))
-      Svis = 2._RKIND*mu*Jac*MATMUL(Fi, Svis)
-!----------------------------------
+!     Get viscous stress and stiffness
+      CALL GET_VISC_STRS(eq(cEq)%dmn(cDmn), eNoNw, Nwx, vx, F, Svis,
+     2   Kvis_u, Kvis_v)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
@@ -329,13 +315,14 @@
 
 !     Shape function gradients in the current configuration
       DO a=1, eNoNw
-         NxFi(1,a) = Nwx(1,a)*Fi(1,1) + Nwx(2,a)*Fi(2,1) +
-     2      Nwx(3,a)*Fi(3,1)
-         NxFi(2,a) = Nwx(1,a)*Fi(1,2) + Nwx(2,a)*Fi(2,2) +
-     2      Nwx(3,a)*Fi(3,2)
-         NxFi(3,a) = Nwx(1,a)*Fi(1,3) + Nwx(2,a)*Fi(2,3) +
-     2      Nwx(3,a)*Fi(3,3)
+         NxFi(1,a) = Nwx(1,a)*Fi(1,1) + Nwx(2,a)*Fi(2,1)
+     2             + Nwx(3,a)*Fi(3,1)
+         NxFi(2,a) = Nwx(1,a)*Fi(1,2) + Nwx(2,a)*Fi(2,2)
+     2             + Nwx(3,a)*Fi(3,2)
+         NxFi(3,a) = Nwx(1,a)*Fi(1,3) + Nwx(2,a)*Fi(2,3)
+     2             + Nwx(3,a)*Fi(3,3)
       END DO
+      VxFi = MATMUL(vx, Fi)
 
       rC  = beta*pd + VxFi(1,1) + VxFi(2,2) + VxFi(3,3)
       rCl = -p + tauC*rC
@@ -343,20 +330,20 @@
 !     Local residue
       DO a=1, eNoNw
          T1 = Jac*rho*vd(1)*Nw(a)
-         T2 = Pdev(1,1)*Nwx(1,a) + Pdev(1,2)*Nwx(2,a) +
-     2      Pdev(1,3)*Nwx(3,a)
+         T2 = Pdev(1,1)*Nwx(1,a) + Pdev(1,2)*Nwx(2,a)
+     2      + Pdev(1,3)*Nwx(3,a)
          T3 = Jac*rCl*NxFi(1,a)
          lR(1,a) = lR(1,a) + w*(T1 + T2 + T3)
 
          T1 = Jac*rho*vd(2)*Nw(a)
-         T2 = Pdev(2,1)*Nwx(1,a) + Pdev(2,2)*Nwx(2,a) +
-     2      Pdev(2,3)*Nwx(3,a)
+         T2 = Pdev(2,1)*Nwx(1,a) + Pdev(2,2)*Nwx(2,a)
+     2      + Pdev(2,3)*Nwx(3,a)
          T3 = Jac*rCl*NxFi(2,a)
          lR(2,a) = lR(2,a) + w*(T1 + T2 + T3)
 
          T1 = Jac*rho*vd(3)*Nw(a)
-         T2 = Pdev(3,1)*Nwx(1,a) + Pdev(3,2)*Nwx(2,a) +
-     2      Pdev(3,3)*Nwx(3,a)
+         T2 = Pdev(3,1)*Nwx(1,a) + Pdev(3,2)*Nwx(2,a)
+     2      + Pdev(3,3)*Nwx(3,a)
          T3 = Jac*rCl*NxFi(3,a)
          lR(3,a) = lR(3,a) + w*(T1 + T2 + T3)
       END DO
@@ -389,24 +376,15 @@
       END DO
 
       DO a=1, eNoNw
-         DdNx(1,a) = ddev(1,1)*NxFi(1,a) + ddev(1,2)*NxFi(2,a) +
-     2               ddev(1,3)*NxFi(3,a)
-         DdNx(2,a) = ddev(2,1)*NxFi(1,a) + ddev(2,2)*NxFi(2,a) +
-     2               ddev(2,3)*NxFi(3,a)
-         DdNx(3,a) = ddev(3,1)*NxFi(1,a) + ddev(3,2)*NxFi(2,a) +
-     2               ddev(3,3)*NxFi(3,a)
-
-         VxNx(1,a) = VxFi(1,1)*NxFi(1,a) + VxFi(2,1)*NxFi(2,a) +
-     2               VxFi(3,1)*NxFi(3,a)
-         VxNx(2,a) = VxFi(1,2)*NxFi(1,a) + VxFi(2,2)*NxFi(2,a) +
-     2               VxFi(3,2)*NxFi(3,a)
-         VxNx(3,a) = VxFi(1,3)*NxFi(1,a) + VxFi(2,3)*NxFi(2,a) +
-     2               VxFi(3,3)*NxFi(3,a)
+         VxtNx(1,a) = VxFi(1,1)*NxFi(1,a) + VxFi(2,1)*NxFi(2,a)
+     2              + VxFi(3,1)*NxFi(3,a)
+         VxtNx(2,a) = VxFi(1,2)*NxFi(1,a) + VxFi(2,2)*NxFi(2,a)
+     2              + VxFi(3,2)*NxFi(3,a)
+         VxtNx(3,a) = VxFi(1,3)*NxFi(1,a) + VxFi(2,3)*NxFi(2,a)
+     2              + VxFi(3,3)*NxFi(3,a)
       END DO
 
 !     Tangent (stiffness) matrices
-      r13 = 1._RKIND / 3._RKIND
-      r23 = 2._RKIND / 3._RKIND
       DO b=1, eNoNw
          DO a=1, eNoNw
             NxSNx = Nwx(1,a)*Siso(1,1)*Nwx(1,b)
@@ -416,26 +394,20 @@
      5       + Nwx(3,a)*Siso(3,2)*Nwx(2,b) + Nwx(3,a)*Siso(3,3)*Nwx(3,b)
             DBm   = MATMUL(Dm, Bm(:,:,b))
 
-            NxNx = NxFi(1,a)*NxFi(1,b) + NxFi(2,a)*NxFi(2,b)
-     2           + NxFi(3,a)*NxFi(3,b)
-
 !----------------------------------
 !           dM1_dV1 + af/am *dM_1/dU_1
             BtDB = Bm(1,1,a)*DBm(1,1) + Bm(2,1,a)*DBm(2,1) +
      2             Bm(3,1,a)*DBm(3,1) + Bm(4,1,a)*DBm(4,1) +
      3             Bm(5,1,a)*DBm(5,1) + Bm(6,1,a)*DBm(6,1)
             T1   = Jac*rho*vd(1)*Nw(a)*NxFi(1,b)
-            T2   = -tauC*Jac*NxFi(1,a)*VxNx(1,b)
-            Tv   = (2._RKIND*(DdNx(1,a)*NxFi(1,b) - DdNx(1,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(1,1) + NxFi(1,b)*VxNx(1,a)
-     3           -  r23*NxFi(1,a)*VxNx(1,b)))*mu*Jac
+            T2   = -tauC*Jac*NxFi(1,a)*VxtNx(1,b)
 
-            Ku   = w*af*(T1 + T2 + Tv + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx + Kvis_u(1,a,b))
             lKd(1,a,b) = lKd(1,a,b) + Ku
 
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = T1 + af*Jac*tauC*rho*NxFi(1,a)*NxFi(1,b)
-            Tv   = af*mu*Jac*(r13*NxFi(1,a)*NxFi(1,b) + NxNx)
+            Tv   = af*Kvis_v(1,a,b)
             lK(1,a,b)  = lK(1,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_1/dV_2 + af/am *dM_1/dU_2
@@ -443,18 +415,14 @@
      2             Bm(3,1,a)*DBm(3,2) + Bm(4,1,a)*DBm(4,2) +
      3             Bm(5,1,a)*DBm(5,2) + Bm(6,1,a)*DBm(6,2)
             T1   = Jac*rho*vd(1)*Nw(a)*NxFi(2,b)
-            T2   = -tauC*Jac*NxFi(1,a)*VxNx(2,b)
+            T2   = -tauC*Jac*NxFi(1,a)*VxtNx(2,b)
             T3   = Jac*rCl*(NxFi(1,a)*NxFi(2,b) - NxFi(2,a)*NxFi(1,b))
-            Tv   = (2._RKIND*(DdNx(1,a)*NxFi(2,b) - DdNx(1,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(1,2) + NxFi(1,b)*VxNx(2,a)
-     3           -  r23*NxFi(1,a)*VxNx(2,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(2,a,b))
             lKd(2,a,b) = lKd(2,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(2,b)
-            Tv   = af*mu*Jac*(NxFi(2,a)*NxFi(1,b)
-     2           - r23*NxFi(1,a)*NxFi(2,b))
+            Tv   = af*Kvis_v(2,a,b)
             lK(2,a,b) = lK(2,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_1/dV_3 + af/am *dM_1/dU_3
@@ -462,18 +430,14 @@
      2             Bm(3,1,a)*DBm(3,3) + Bm(4,1,a)*DBm(4,3) +
      3             Bm(5,1,a)*DBm(5,3) + Bm(6,1,a)*DBm(6,3)
             T1   = Jac*rho*vd(1)*Nw(a)*NxFi(3,b)
-            T2   = -tauC*Jac*NxFi(1,a)*VxNx(3,b)
+            T2   = -tauC*Jac*NxFi(1,a)*VxtNx(3,b)
             T3   = Jac*rCl*(NxFi(1,a)*NxFi(3,b) - NxFi(3,a)*NxFi(1,b))
-            Tv   = (2._RKIND*(DdNx(1,a)*NxFi(3,b) - DdNx(1,b)*NxFi(3,a))
-     2           - (NxNx*VxFi(1,3) + NxFi(1,b)*VxNx(3,a)
-     3           -  r23*NxFi(1,a)*VxNx(3,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(3,a,b))
             lKd(3,a,b) = lKd(3,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(3,b)
-            Tv   = af*mu*Jac*(NxFi(3,a)*NxFi(1,b)
-     2           - r23*NxFi(1,a)*NxFi(3,b))
+            Tv   = af*Kvis_v(3,a,b)
             lK(3,a,b) = lK(3,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_2/dV_1 + af/am *dM_2/dU_1
@@ -481,18 +445,14 @@
      2             Bm(3,2,a)*DBm(3,1) + Bm(4,2,a)*DBm(4,1) +
      3             Bm(5,2,a)*DBm(5,1) + Bm(6,2,a)*DBm(6,1)
             T1   = Jac*rho*vd(2)*Nw(a)*NxFi(1,b)
-            T2   = -tauC*Jac*NxFi(2,a)*VxNx(1,b)
+            T2   = -tauC*Jac*NxFi(2,a)*VxtNx(1,b)
             T3   = Jac*rCl*(NxFi(2,a)*NxFi(1,b) - NxFi(1,a)*NxFi(2,b))
-            Tv   = (2._RKIND*(DdNx(2,a)*NxFi(1,b) - DdNx(2,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(2,1) + NxFi(2,b)*VxNx(1,a)
-     3           -  r23*NxFi(2,a)*VxNx(1,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(4,a,b))
             lKd(4,a,b) = lKd(4,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(1,b)
-            Tv   = af*mu*Jac*(NxFi(1,a)*NxFi(2,b)
-     2           - r23*NxFi(2,a)*NxFi(1,b))
+            Tv   = af*Kvis_v(4,a,b)
             lK(5,a,b) = lK(5,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_2/dV_2 + af/am *dM_2/dU_2
@@ -500,17 +460,14 @@
      2             Bm(3,2,a)*DBm(3,2) + Bm(4,2,a)*DBm(4,2) +
      3             Bm(5,2,a)*DBm(5,2) + Bm(6,2,a)*DBm(6,2)
             T1   = Jac*rho*vd(2)*Nw(a)*NxFi(2,b)
-            T2   = -tauC*Jac*NxFi(2,a)*VxNx(2,b)
-            Tv   = (2._RKIND*(DdNx(2,a)*NxFi(2,b) - DdNx(2,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(2,2) + NxFi(2,b)*VxNx(2,a)
-     3           -  r23*NxFi(2,a)*VxNx(2,b)))*mu*Jac
+            T2   = -tauC*Jac*NxFi(2,a)*VxtNx(2,b)
 
-            Ku   = w*af*(T1 + T2 + Tv + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx + Kvis_u(5,a,b))
             lKd(5,a,b) = lKd(5,a,b) + Ku
 
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = T1 + af*Jac*tauC*rho*NxFi(2,a)*NxFi(2,b)
-            Tv   = af*mu*Jac*(r13*NxFi(2,a)*NxFi(2,b) + NxNx)
+            Tv   = af*Kvis_v(5,a,b)
             lK(6,a,b) = lK(6,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_2/dV_3 + af/am *dM_2/dU_3
@@ -518,18 +475,14 @@
      2             Bm(3,2,a)*DBm(3,3) + Bm(4,2,a)*DBm(4,3) +
      3             Bm(5,2,a)*DBm(5,3) + Bm(6,2,a)*DBm(6,3)
             T1   = Jac*rho*vd(2)*Nw(a)*NxFi(3,b)
-            T2   = -tauC*Jac*NxFi(2,a)*VxNx(3,b)
+            T2   = -tauC*Jac*NxFi(2,a)*VxtNx(3,b)
             T3   = Jac*rCl*(NxFi(2,a)*NxFi(3,b) - NxFi(3,a)*NxFi(2,b))
-            Tv   = (2._RKIND*(DdNx(2,a)*NxFi(3,b) - DdNx(2,b)*NxFi(3,a))
-     2           - (NxNx*VxFi(2,3) + NxFi(2,b)*VxNx(3,a)
-     3           -  r23*NxFi(2,a)*VxNx(3,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(6,a,b))
             lKd(6,a,b) = lKd(6,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(3,b)
-            Tv   = af*mu*Jac*(NxFi(3,a)*NxFi(2,b)
-     2           - r23*NxFi(2,a)*NxFi(3,b))
+            Tv   = af*Kvis_v(6,a,b)
             lK(7,a,b) = lK(7,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_3/dV_1 + af/am *dM_3/dU_1
@@ -537,18 +490,14 @@
      2             Bm(3,3,a)*DBm(3,1) + Bm(4,3,a)*DBm(4,1) +
      3             Bm(5,3,a)*DBm(5,1) + Bm(6,3,a)*DBm(6,1)
             T1   = Jac*rho*vd(3)*Nw(a)*NxFi(1,b)
-            T2   = -tauC*Jac*NxFi(3,a)*VxNx(1,b)
+            T2   = -tauC*Jac*NxFi(3,a)*VxtNx(1,b)
             T3   = Jac*rCl*(NxFi(3,a)*NxFi(1,b) - NxFi(1,a)*NxFi(3,b))
-            Tv   = (2._RKIND*(DdNx(3,a)*NxFi(1,b) - DdNx(3,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(3,1) + NxFi(3,b)*VxNx(1,a)
-     3           -  r23*NxFi(3,a)*VxNx(1,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(7,a,b))
             lKd(7,a,b) = lKd(7,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(3,a)*NxFi(1,b)
-            Tv   = af*mu*Jac*(NxFi(1,a)*NxFi(3,b)
-     2           - r23*NxFi(3,a)*NxFi(1,b))
+            Tv   = af*Kvis_v(7,a,b)
             lK(9,a,b) = lK(9,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_3/dV_2 + af/am *dM_3/dU_2
@@ -556,18 +505,14 @@
      2             Bm(3,3,a)*DBm(3,2) + Bm(4,3,a)*DBm(4,2) +
      3             Bm(5,3,a)*DBm(5,2) + Bm(6,3,a)*DBm(6,2)
             T1   = Jac*rho*vd(3)*Nw(a)*NxFi(2,b)
-            T2   = -tauC*Jac*NxFi(3,a)*VxNx(2,b)
+            T2   = -tauC*Jac*NxFi(3,a)*VxtNx(2,b)
             T3   = Jac*rCl*(NxFi(3,a)*NxFi(2,b) - NxFi(2,a)*NxFi(3,b))
-            Tv   = (2._RKIND*(DdNx(3,a)*NxFi(2,b) - DdNx(3,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(3,2) + NxFi(3,b)*VxNx(2,a)
-     3           -  r23*NxFi(3,a)*VxNx(2,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(8,a,b))
             lKd(8,a,b) = lKd(8,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(3,a)*NxFi(2,b)
-            Tv   = af*mu*Jac*(NxFi(2,a)*NxFi(3,b)
-     2           - r23*NxFi(3,a)*NxFi(2,b))
+            Tv   = af*Kvis_v(8,a,b)
             lK(10,a,b) = lK(10,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_3/dV_3 + af/am *dM_3/dU_3
@@ -575,17 +520,14 @@
      2             Bm(3,3,a)*DBm(3,3) + Bm(4,3,a)*DBm(4,3) +
      3             Bm(5,3,a)*DBm(5,3) + Bm(6,3,a)*DBm(6,3)
             T1   = Jac*rho*vd(3)*Nw(a)*NxFi(3,b)
-            T2   = -tauC*Jac*NxFi(3,a)*VxNx(3,b)
-            Tv   = (2._RKIND*(DdNx(3,a)*NxFi(3,b) - DdNx(3,b)*NxFi(3,a))
-     2           - (NxNx*VxFi(3,3) + NxFi(3,b)*VxNx(3,a)
-     3           -  r23*NxFi(3,a)*VxNx(3,b)))*mu*Jac
+            T2   = -tauC*Jac*NxFi(3,a)*VxtNx(3,b)
 
-            Ku   = w*af*(T1 + T2 + Tv + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx + Kvis_u(9,a,b))
             lKd(9,a,b) = lKd(9,a,b) + Ku
 
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = T1 + af*Jac*tauC*rho*NxFi(3,a)*NxFi(3,b)
-            Tv   = af*mu*Jac*(r13*NxFi(3,a)*NxFi(3,b) + NxNx)
+            Tv   = af*Kvis_v(9,a,b)
             lK(11,a,b) = lK(11,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
          END DO
@@ -626,14 +568,13 @@
 
       INTEGER(KIND=IKIND) :: i, j, k, a, b
       REAL(KIND=RKIND) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p,
-     2   pd, F(2,2), Jac, Fi(2,2), mu, rho, beta, drho, dbeta, ya_g, Ja,
-     3   VxFi(2,eNoNw), ddev(2,2), Svis(2,2), Siso(2,2), Dm(3,3), tauM,
-     3   tauC, rC, rCl, Pdev(2,2), NxFi(2,eNoNw), Bm(3,2,eNoNw),
-     4   VxNx(2,eNoNw), DdNx(2,eNoNw), DBm(3,2), BtDB, NxSNx, NxNx,
-     5   Ku, tmXg, T1, T2, T3, Tv
+     2   pd, F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, ya_g, Ja,
+     3   Svis(2,2), Siso(2,2), Dm(3,3), tauM, tauC, rC, rCl, Pdev(2,2),
+     4   NxFi(2,eNoNw), VxFi(2,2), Bm(3,2,eNoNw), VxtNx(2,eNoNw),
+     6   DBm(3,2), Kvis_u(9,eNoNw,eNoNw), Kvis_v(9,eNoNw,eNoNw), BtDB,
+     7   NxSNx, Ku, tmXg, T1, T2, T3, Tv
 
 !     Define parameters
-      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
@@ -691,18 +632,9 @@
       CALL GETPK2CCdev(eq(cEq)%dmn(cDmn), F, nFn, fN, tmXg, ya_g, Siso,
      2   Dm, Ja)
 
-!----------------------------------
-!     Viscous contribution
-!     Velocity gradient in current configuration
-      VxFi = MATMUL(vx, Fi)
-
-!     Deviatoric strain tensor
-      ddev = MAT_DEV(MAT_SYMM(VxFi,2), 2)
-
-!     2nd Piola-Kirchhoff stress due to viscosity
-      Svis = MATMUL(ddev, TRANSPOSE(Fi))
-      Svis = 2._RKIND*mu*Jac*MATMUL(Fi, Svis)
-!----------------------------------
+!     Get viscous stress and stiffness
+      CALL GET_VISC_STRS(eq(cEq)%dmn(cDmn), eNoNw, Nwx, vx, F, Svis,
+     2   Kvis_u, Kvis_v)
 
 !     Compute rho and beta depending on the volumetric penalty model
       CALL GVOLPEN(eq(cEq)%dmn(cDmn), p, rho, beta, drho, dbeta, Ja)
@@ -726,6 +658,10 @@
          NxFi(1,a) = Nwx(1,a)*Fi(1,1) + Nwx(2,a)*Fi(2,1)
          NxFi(2,a) = Nwx(1,a)*Fi(1,2) + Nwx(2,a)*Fi(2,2)
       END DO
+      VxFi(1,1) = vx(1,1)*Fi(1,1) + vx(1,2)*Fi(2,1)
+      VxFi(1,2) = vx(1,1)*Fi(1,2) + vx(1,2)*Fi(2,2)
+      VxFi(2,1) = vx(2,1)*Fi(1,1) + vx(2,2)*Fi(2,1)
+      VxFi(2,2) = vx(2,1)*Fi(1,2) + vx(2,2)*Fi(2,2)
 
       rC  = beta*pd + VxFi(1,1) + VxFi(2,2)
       rCl = -p + tauC*rC
@@ -756,11 +692,8 @@
       END DO
 
       DO a=1, eNoNw
-         DdNx(1,a) = ddev(1,1)*NxFi(1,a) + ddev(1,2)*NxFi(2,a)
-         DdNx(2,a) = ddev(2,1)*NxFi(1,a) + ddev(2,2)*NxFi(2,a)
-
-         VxNx(1,a) = VxFi(1,1)*NxFi(1,a) + VxFi(2,1)*NxFi(2,a)
-         VxNx(2,a) = VxFi(1,2)*NxFi(1,a) + VxFi(2,2)*NxFi(2,a)
+         VxtNx(1,a) = VxFi(1,1)*NxFi(1,a) + VxFi(2,1)*NxFi(2,a)
+         VxtNx(2,a) = VxFi(1,2)*NxFi(1,a) + VxFi(2,2)*NxFi(2,a)
       END DO
 
 !     Tangent (stiffness) matrices
@@ -785,77 +718,61 @@
             DBm(3,2) = Dm(3,1)*Bm(1,2,b) + Dm(3,2)*Bm(2,2,b) +
      2         Dm(3,3)*Bm(3,2,b)
 
-            NxNx = NxFi(1,a)*NxFi(1,b) + NxFi(2,a)*NxFi(2,b)
-
 !----------------------------------
 !           dM1_dV1 + af/am *dM_1/dU_1
             BtDB = Bm(1,1,a)*DBm(1,1) + Bm(2,1,a)*DBm(2,1) +
      2              Bm(3,1,a)*DBm(3,1)
             T1   = Jac*rho*vd(1)*Nw(a)*NxFi(1,b)
-            T2   = -tauC*Jac*NxFi(1,a)*VxNx(1,b)
-            Tv   = (2._RKIND*(DdNx(1,a)*NxFi(1,b) - DdNx(1,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(1,1) + NxFi(1,b)*VxNx(1,a)
-     3           -  NxFi(1,a)*VxNx(1,b)))*mu*Jac
+            T2   = -tauC*Jac*NxFi(1,a)*VxtNx(1,b)
 
-            Ku   = w*af*(T1 + T2 + Tv + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx + Kvis_u(1,a,b))
             lKd(1,a,b) = lKd(1,a,b) + Ku
 
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = T1 + af*Jac*tauC*rho*NxFi(1,a)*NxFi(1,b)
-            Tv   = af*mu*Jac*NxNx
+            Tv   = af*Kvis_v(1,a,b)
             lK(1,a,b)  = lK(1,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_1/dV_2 + af/am *dM_1/dU_2
             BtDB = Bm(1,1,a)*DBm(1,2) + Bm(2,1,a)*DBm(2,2) +
      2             Bm(3,1,a)*DBm(3,2)
             T1   = Jac*rho*vd(1)*Nw(a)*NxFi(2,b)
-            T2   = -tauC*Jac*NxFi(1,a)*VxNx(2,b)
+            T2   = -tauC*Jac*NxFi(1,a)*VxtNx(2,b)
             T3   = Jac*rCl*(NxFi(1,a)*NxFi(2,b) - NxFi(2,a)*NxFi(1,b))
-            Tv   = (2._RKIND*(DdNx(1,a)*NxFi(2,b) - DdNx(1,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(1,2) + NxFi(1,b)*VxNx(2,a)
-     3           -  NxFi(1,a)*VxNx(2,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(2,a,b))
             lKd(2,a,b) = lKd(2,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(1,a)*NxFi(2,b)
-            Tv   = af*mu*Jac*(NxFi(2,a)*NxFi(1,b)
-     2           - NxFi(1,a)*NxFi(2,b))
+            Tv   = af*Kvis_v(2,a,b)
             lK(2,a,b) = lK(2,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_2/dV_1 + af/am *dM_2/dU_1
             BtDB = Bm(1,2,a)*DBm(1,1) + Bm(2,2,a)*DBm(2,1) +
      2             Bm(3,2,a)*DBm(3,1)
             T1   = Jac*rho*vd(2)*Nw(a)*NxFi(1,b)
-            T2   = -tauC*Jac*NxFi(2,a)*VxNx(1,b)
+            T2   = -tauC*Jac*NxFi(2,a)*VxtNx(1,b)
             T3   = Jac*rCl*(NxFi(2,a)*NxFi(1,b) - NxFi(1,a)*NxFi(2,b))
-            Tv   = (2._RKIND*(DdNx(2,a)*NxFi(1,b) - DdNx(2,b)*NxFi(1,a))
-     2           - (NxNx*VxFi(2,1) + NxFi(2,b)*VxNx(1,a)
-     3           -  NxFi(2,a)*VxNx(1,b)))*mu*Jac
 
-            Ku   = w*af*(T1 + T2 + T3 + Tv + BtDB)
+            Ku   = w*af*(T1 + T2 + T3 + BtDB + Kvis_u(3,a,b))
             lKd(3,a,b) = lKd(3,a,b) + Ku
 
             T2   = af*Jac*tauC*rho*NxFi(2,a)*NxFi(1,b)
-            Tv   = af*mu*Jac*(NxFi(1,a)*NxFi(2,b)
-     2           - NxFi(2,a)*NxFi(1,b))
+            Tv   = af*Kvis_v(3,a,b)
             lK(4,a,b) = lK(4,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
 !           dM_2/dV_2 + af/am *dM_2/dU_2
             BtDB = Bm(1,2,a)*DBm(1,2) + Bm(2,2,a)*DBm(2,2) +
      2             Bm(3,2,a)*DBm(3,2)
             T1   = Jac*rho*vd(2)*Nw(a)*NxFi(2,b)
-            T2   = -tauC*Jac*NxFi(2,a)*VxNx(2,b)
-            Tv   = (2._RKIND*(DdNx(2,a)*NxFi(2,b) - DdNx(2,b)*NxFi(2,a))
-     2           - (NxNx*VxFi(2,2) + NxFi(2,b)*VxNx(2,a)
-     3           -  NxFi(2,a)*VxNx(2,b)))*mu*Jac
+            T2   = -tauC*Jac*NxFi(2,a)*VxtNx(2,b)
 
-            Ku   = w*af*(T1 + T2 + Tv + BtDB + NxSNx)
+            Ku   = w*af*(T1 + T2 + BtDB + NxSNx + Kvis_u(4,a,b))
             lKd(4,a,b) = lKd(4,a,b) + Ku
 
             T1   = am*Jac*rho*Nw(a)*Nw(b)
             T2   = T1 + af*Jac*tauC*rho*NxFi(2,a)*NxFi(2,b)
-            Tv   = af*mu*Jac*NxNx
+            Tv   = af*Kvis_v(4,a,b)
             lK(5,a,b) = lK(5,a,b) + w*(T2 + Tv) + afm*Ku
 !----------------------------------
          END DO
@@ -878,7 +795,7 @@
       END SUBROUTINE USTRUCT2D_M
 !####################################################################
       SUBROUTINE USTRUCT3D_C(vmsFlag, eNoNw, eNoNq, w, Je, Nw, Nq, Nwx,
-     2   Nqx, al, yl, dl, bfl, Kxi, lR, lK, lKd)
+     2   Nqx, al, yl, dl, bfl, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -886,20 +803,18 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(3,eNoNw), Nqx(3,eNoNq), al(tDof,eNoNw), yl(tDof,eNoNw),
-     3   dl(tDof,eNoNw), bfl(3,eNoNw), Kxi(3,3)
+     3   dl(tDof,eNoNw), bfl(3,eNoNw)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lKd(dof*3,eNoNw,eNoNw), lK(dof*dof,eNoNw,eNoNw)
 
       INTEGER(KIND=IKIND) :: i, j, k, l, a, b
-      REAL(KIND=RKIND) :: ctV, fb(3), am, af, afm, v(3), vd(3), vx(3,3),
-     2   p, pd, px(3), F(3,3), Jac, Fi(3,3), mu, rho, beta, drho, dbeta,
-     3   tauM, tauC, tauV, rC, rM(3), NwxFi(3,eNoNw), NqxFi(3,eNoNq),
-     4   Kx(3,3), VxFi(3,3), PxFi(3), rMNqx(eNoNq), rMNwx(eNoNw),
-     5   VxNwx(3,eNoNw), NxNx, T1, T2, T3, Ku
+      REAL(KIND=RKIND) :: fb(3), am, af, afm, v(3), vd(3), vx(3,3), p,
+     2   pd, px(3), F(3,3), Jac, Fi(3,3), rho, beta, drho, dbeta, tauM,
+     3   tauC, rC, rM(3), NwxFi(3,eNoNw), NqxFi(3,eNoNq), VxFi(3,3),
+     4   PxFi(3), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(3,eNoNw), NxNx, Ku,
+     5   T1, T2, T3
 
 !     Define parameters
-      ctV     = 36._RKIND
-      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       fb(3)   = eq(cEq)%dmn(cDmn)%prop(f_z)
@@ -973,17 +888,6 @@
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
-
-!        Stabilization parameter for solid viscosity
-         Kx = MATMUL(Kxi, Fi)
-         Kx = MATMUL(TRANSPOSE(Fi), Kx)
-
-         tauV = Kx(1,1)*Kx(1,1) + Kx(2,1)*Kx(2,1) + Kx(3,1)*Kx(3,1)
-     2        + Kx(1,2)*Kx(1,2) + Kx(2,2)*Kx(2,2) + Kx(3,2)*Kx(3,2)
-     3        + Kx(1,3)*Kx(1,3) + Kx(2,3)*Kx(2,3) + Kx(3,3)*Kx(3,3)
-         tauV = ctV*mu*mu*tauV
-
-         tauM = 1._RKIND / SQRT( tauV + (1._RKIND/tauM)**2._RKIND )
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND
@@ -1102,7 +1006,7 @@
       END SUBROUTINE USTRUCT3D_C
 !--------------------------------------------------------------------
       SUBROUTINE USTRUCT2D_C(vmsFlag, eNoNw, eNoNq, w, Je, Nw, Nq, Nwx,
-     2   Nqx, al, yl, dl, bfl, Kxi, lR, lK, lKd)
+     2   Nqx, al, yl, dl, bfl, lR, lK, lKd)
       USE COMMOD
       USE ALLFUN
       IMPLICIT NONE
@@ -1110,20 +1014,18 @@
       INTEGER(KIND=IKIND), INTENT(IN) :: eNoNw, eNoNq
       REAL(KIND=RKIND), INTENT(IN) :: w, Je, Nw(eNoNw), Nq(eNoNq),
      2   Nwx(2,eNoNw), Nqx(2,eNoNq), al(tDof,eNoNw), yl(tDof,eNoNw),
-     3   dl(tDof,eNoNw), bfl(2,eNoNw), Kxi(2,2)
+     3   dl(tDof,eNoNw), bfl(2,eNoNw)
       REAL(KIND=RKIND), INTENT(INOUT) :: lR(dof,eNoNw),
      2   lKd(dof*2,eNoNw,eNoNw), lK(dof*dof,eNoNw,eNoNw)
 
       INTEGER(KIND=IKIND) :: i, j, k, a, b
-      REAL(KIND=RKIND) :: ctV, fb(2), am, af, afm, v(2), vd(2), vx(2,2),
-     2   p, pd, px(2), F(2,2), Jac, Fi(2,2), mu, rho, beta, drho, dbeta,
-     3   tauM, tauC, tauV, rC, rM(2), NwxFi(2,eNoNw), NqxFi(2,eNoNq),
-     4   Kx(2,2), VxFi(2,2), PxFi(2), rMNqx(eNoNq), rMNwx(eNoNw),
-     5   VxNwx(2,eNoNw), NxNx, T1, T2, T3, Ku
+      REAL(KIND=RKIND) :: fb(2), am, af, afm, v(2), vd(2), vx(2,2), p,
+     2   pd, px(2), F(2,2), Jac, Fi(2,2), rho, beta, drho, dbeta, tauM,
+     3   tauC, rC, rM(2), NwxFi(2,eNoNw), NqxFi(2,eNoNq), VxFi(2,2),
+     4   PxFi(2), rMNqx(eNoNq), rMNwx(eNoNw), VxNwx(2,eNoNw), NxNx, Ku,
+     5   T1, T2, T3
 
 !     Define parameters
-      ctV     = 36._RKIND
-      mu      = eq(cEq)%dmn(cDmn)%prop(solid_viscosity)
       fb(1)   = eq(cEq)%dmn(cDmn)%prop(f_x)
       fb(2)   = eq(cEq)%dmn(cDmn)%prop(f_y)
       am      = eq(cEq)%am
@@ -1181,16 +1083,6 @@
 !     Compute stabilization parameters
       IF (vmsFlag) THEN
          CALL GETTAU(eq(cEq)%dmn(cDmn), Jac, Je, tauM, tauC)
-
-!        Stabilization parameter for solid viscosity
-         Kx = MATMUL(Kxi, Fi)
-         Kx = MATMUL(TRANSPOSE(Fi), Kx)
-
-         tauV = Kx(1,1)*Kx(1,1) + Kx(2,1)*Kx(2,1)
-     2        + Kx(1,2)*Kx(1,2) + Kx(2,2)*Kx(2,2)
-         tauV = ctV*mu*mu*tauV
-
-         tauM = 1._RKIND / SQRT( tauV + (1._RKIND/tauM)**2._RKIND )
       ELSE
          tauM = 0._RKIND
          tauC = 0._RKIND

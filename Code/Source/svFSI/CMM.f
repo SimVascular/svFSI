@@ -342,7 +342,7 @@
       gam = SQRT(0.5_RKIND*gam)
 
 !     Compute viscosity based on shear-rate and chosen viscosity model
-      CALL GETVISCOSITY(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_x)
+      CALL GET_FLUID_VISC(eq(cEq)%dmn(cDmn), gam, mu, mu_s, mu_x)
       IF (ISZERO(gam)) THEN
          mu_x = 0._RKIND
       ELSE
