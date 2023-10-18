@@ -61,7 +61,7 @@ For more detailed instructions, please refer to [`INSTALL.md`](./INSTALL.md).
 
 ## Run Simulation
 
-`svFSI` requires a plain-text input file to specify simulation parameters. The syntax of the input file can be found [here](http://simvascular.github.io/docssvFSI.html#input).
+`svFSI` requires a plain-text input file to specify simulation parameters. The syntax of the input file can be found [here](https://simvascular.github.io/documentation/svfsi.html#input).
 
 A master template is provided in the current repository, [svFSI_master.inp](./svFSI_master.inp). Users are also recommended to go through the input files in the [examples](https://github.com/SimVascular/svFSI-Tests) and modify them for their needs.
 
@@ -121,7 +121,7 @@ Below, we provide a list of the available choice of constitutive models for diff
    | cepModel\_TTP  | tenTusscher-Panfilov model       | "TTP", "tenTusscher-Panfilov" |
 
 ## Documentation
-More details can be found on the [**svFSI**](http://simvascular.github.io/docssvFSI.html) page, and direct links to the documentation for different functionalities are provided here:
+More details can be found on the [**svFSI**](https://simvascular.github.io/documentation/svfsi.html) page, and direct links to the documentation for different functionalities are provided here:
 - [Fluid-Structure Interaction (FSI)](http://simvascular.github.io/docssvFSI-FSI.html)
 - [Cardiac electrophysiology modeling](http://simvascular.github.io/docssvFSI-CEP.html)
 - [Cardiac mechanics modeling](http://simvascular.github.io/docssvFSI-Structure.html)
